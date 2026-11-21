@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import type { FieldErrorMap } from '@/lib/apiErrors';
 import { casesApi, useCaseWrite, type CaseAction, type CaseDetail } from '@/hooks/queries/cases';
 import { ChoiceGroup, ErrorSummary, SaveStatus, SelectField, TextareaField, errorsFrom, useDraft } from './formKit';
-import { ReadOnlyNote, gradeOptionsWith, SentRow, cycleOptionsWith } from './caseBits';
+import { ReadOnlyNote, gradeOptionsWith, relationshipOptionsWith, SentRow, cycleOptionsWith } from './caseBits';
 import { StageCard } from './StageCard';
 import type { StepState } from './StageBar';
 
@@ -77,6 +77,7 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
   const [outcome, setOutcome] = useState<'' | 'continua_visita' | 'no_interesa'>('');
   const [reason, setReason] = useState('');
   const [outcomeErrors, setOutcomeErrors] = useState<FieldErrorMap>({});
+  const [changing, setChanging] = useState(false);
 
   const patch = useCaseWrite(detail.id, (body: Record<string, unknown>) => casesApi.patchStage(detail.id, 'informes', body));
   const patchOutcome = useCaseWrite(detail.id, (body: Record<string, unknown>) => casesApi.patchStage(detail.id, 'informes', body));
@@ -100,6 +101,7 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
       onSuccess: (d) => {
         setOutcome('');
         setReason('');
+        setChanging(false);
         toast.success(outcome === 'no_interesa' ? 'Expediente cerrado: no le interesa.' : `Resultado guardado. Expediente en «${d.stage_label}».`);
       },
       onError: (e) => setOutcomeErrors(errorsFrom(e)),
@@ -131,7 +133,7 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
           <Input label="Edad" id="inf-age" type="number" min={0} max={25} inputMode="numeric" {...field('child_age')} />
           <SelectField label="Grado al que ingresa" id="inf-grade" options={gradeOptionsWith(server.grade_applying)} {...field('grade_applying')} />
           <SelectField label="Ciclo" id="inf-cycle" options={cycleOptionsWith(server.cycle)} {...field('cycle')} />
-          <Input label="Parentesco (opcional)" id="inf-rel" autoComplete="off" {...field('relationship')} />
+          <SelectField label="Parentesco" id="inf-rel" placeholder="Sin dato" options={relationshipOptionsWith(server.relationship)} {...field('relationship')} />
           <Input label="Cómo nos conoció (opcional)" id="inf-ref" autoComplete="off" {...field('referral_source')} />
         </div>
         <ErrorSummary errors={errors} labels={LABELS} />
@@ -147,7 +149,9 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
         {detail.informes.outcome && (
           <p className="text-sm text-muted">Registrado: <strong className="text-ink">{detail.informes.outcome_label}</strong></p>
         )}
-        {openCase ? (
+        {openCase && detail.informes.outcome && !changing ? (
+          <Button type="button" size="sm" variant="ghost" className="!text-purple" onClick={() => setChanging(true)}>Cambiar el resultado</Button>
+        ) : openCase ? (
           <form noValidate className="space-y-3" onSubmit={(e) => { e.preventDefault(); saveOutcome(); }}>
             <ChoiceGroup
               legend="¿Cómo terminó la llamada de informes?"

@@ -44,7 +44,8 @@ describe('describeChanges', () => {
     expect(describeChanges({ sent: 'ficha_link', channel: 'whatsapp', email_sent: false, override: true })).toEqual([
       'Envío: Liga de la ficha de inscripción, por WhatsApp', 'Excepción de administrador: Sí',
     ]);
-    expect(describeChanges({ visit_outcome: ['', 'agenda_examen'] })).toEqual(['Resultado de la visita: sin dato → Asistió y agenda examen']);
+    expect(describeChanges({ visit_outcome: ['', 'agenda_examen'] })).toEqual(['Resultado de la visita: Asistió y agenda examen']);
+    expect(describeChanges({ exam_notes: ['Traer lápiz', ''] })).toEqual(['Notas del examen: Traer lápiz → sin dato']);
     expect(describeChanges({ case: 7, voided: true, reason: 'Duplicado', summary: '$9,500.00 · transferencia' })).toEqual([
       'Anulado', 'Motivo: Duplicado', 'Detalle: $9,500.00 · transferencia',
     ]);

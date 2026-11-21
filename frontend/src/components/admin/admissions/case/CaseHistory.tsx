@@ -87,8 +87,10 @@ const VALUE: Record<string, Record<string, string>> = {
 const DATE_FIELDS = new Set(['exam_at', 'exam_results_at', 'costs_sent_at', 'visit_link_sent_at']);
 const MONTH_FIELDS = new Set(['start_month', 'end_month', 'paid_on']);
 
+const EMPTY = 'sin dato';
+
 function show(field: string, value: unknown): string {
-  if (value === null || value === undefined || value === '') return 'sin dato';
+  if (value === null || value === undefined || value === '') return EMPTY;
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
   if (field === 'stage') return stageMeta(String(value)).label;
   if (DATE_FIELDS.has(field)) return fmtDayTime(String(value)) || String(value);
@@ -118,7 +120,7 @@ export function describeChanges(changes: Record<string, unknown>): string[] {
     let line = '';
     if (Array.isArray(value) && value.length === 2) {
       const [before, after] = value.map((v) => show(field, v));
-      if (before !== after) line = `${label}: ${before} → ${after}`;
+      if (before !== after) line = before === EMPTY ? `${label}: ${after}` : `${label}: ${before} → ${after}`;
     } else {
       const text = show(field, value);
       if (text) line = `${label}: ${text}`;

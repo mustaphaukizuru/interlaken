@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { CheckCircle2, Circle, CircleAlert, Send } from 'lucide-react';
+import { CheckCircle2, CircleAlert, CircleDashed, Send } from 'lucide-react';
 import { clsx } from 'clsx';
 import { GRADES } from '@/lib/grades';
 import { fmtDayTime } from '@/lib/caseStages';
@@ -29,6 +29,15 @@ export function gradeOptionsWith(current: string) {
   return current && !GRADES.includes(current) ? [{ value: current, label: current }, ...GRADE_OPTIONS] : GRADE_OPTIONS;
 }
 
+/** The ficha's «Parentesco con el alumno» choices: a valid one prefills «Quién llena la ficha». */
+export const RELATIONSHIPS = ['Madre', 'Padre', 'Tutor/a legal', 'Abuelo/a', 'Otro familiar'];
+
+/** Relationship options plus the case's own value when it is another word («Padre/Madre»). */
+export function relationshipOptionsWith(current: string) {
+  const base = RELATIONSHIPS.map((r) => ({ value: r, label: r }));
+  return current && !RELATIONSHIPS.includes(current) ? [{ value: current, label: current }, ...base] : base;
+}
+
 /** «Cuotas enviadas el 7 dic 2026, 09:30» or «Sin enviar», with its send button. */
 export function SentRow({ label, sentAt, buttonLabel, onSend, disabled, hint }: {
   label: string;
@@ -44,7 +53,7 @@ export function SentRow({ label, sentAt, buttonLabel, onSend, disabled, hint }: 
         <p className="flex items-center gap-2 text-sm font-semibold text-ink">
           {sentAt
             ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-700" aria-hidden="true" />
-            : <Circle className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />}
+            : <CircleDashed className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />}
           {label}
         </p>
         <p className="mt-0.5 pl-6 text-xs text-muted">{sentAt ? `Enviado el ${fmtDayTime(sentAt)}` : hint || 'Sin enviar'}</p>

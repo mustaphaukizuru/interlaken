@@ -114,7 +114,7 @@ export default function AdminVisitsWeek() {
       </div>
       {seesAdmissions && (
         <ul className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted" aria-label="Simbología">
-          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-line bg-white" aria-hidden="true" /> Visita</li>
+          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-subtle/50 bg-white" aria-hidden="true" /> Visita</li>
           <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-pink/40 bg-pink-light" aria-hidden="true" /> <PenLine size={12} className="text-pink-dark" aria-hidden="true" /> Examen de admisión</li>
           {exams.isError && <li className="text-coral-700" role="status">No se pudieron cargar los exámenes.</li>}
         </ul>

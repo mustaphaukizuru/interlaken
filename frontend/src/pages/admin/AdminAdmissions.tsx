@@ -198,13 +198,13 @@ function CasesSection() {
 
   const columns: Column<CaseRow>[] = [
     {
-      id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 170,
+      id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 150,
       cell: (c) => (
         <Link to={`/admin/admisiones/${c.id}`} className="font-semibold text-ink hover:text-purple hover:underline">{c.child_name}</Link>
       ),
     },
     {
-      id: 'parent', header: 'Tutor', minWidth: 170,
+      id: 'parent', header: 'Tutor', minWidth: 140,
       cell: (c) => (
         <>
           <div className="text-ink">{c.parent_name}</div>
@@ -213,7 +213,7 @@ function CasesSection() {
       ),
     },
     {
-      id: 'grade', header: 'Grado y ciclo', minWidth: 130,
+      id: 'grade', header: 'Grado y ciclo', minWidth: 105,
       cell: (c) => (
         <>
           <div className="whitespace-nowrap text-muted">{c.grade_applying}</div>
@@ -221,13 +221,13 @@ function CasesSection() {
         </>
       ),
     },
-    { id: 'stage', header: 'Etapa', sortKey: 'stage', minWidth: 150, cell: (c) => <StageChip stage={c.stage} outcome={c.closed_outcome_label} short /> },
+    { id: 'stage', header: 'Etapa', sortKey: 'stage', minWidth: 130, cell: (c) => <StageChip stage={c.stage} outcome={c.closed_outcome_label} short /> },
     {
-      id: 'next', header: 'Siguiente paso', minWidth: 190,
+      id: 'next', header: 'Siguiente paso', minWidth: 150,
       cell: (c) => (c.next_action ? <span className="text-sm text-ink">{c.next_action.label}</span> : ''),
     },
     {
-      id: 'waiting', header: 'En la etapa', sortKey: 'stage_changed_at', minWidth: 110,
+      id: 'waiting', header: 'En la etapa', sortKey: 'stage_changed_at', minWidth: 90,
       cell: (c) => (c.stage === 'inscrito' || c.stage === 'cerrado' ? '' : (
         <span className={`inline-flex items-center gap-1 whitespace-nowrap ${isStale(c.days_waiting) ? 'font-semibold text-amber' : 'text-muted'}`}>
           {isStale(c.days_waiting) && <Hourglass size={13} aria-hidden="true" />}

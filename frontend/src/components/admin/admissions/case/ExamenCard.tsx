@@ -48,6 +48,7 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
   const [result, setResult] = useState<'' | 'aceptado' | 'no_aceptado'>('');
   const [reason, setReason] = useState('');
   const [resultErrors, setResultErrors] = useState<FieldErrorMap>({});
+  const [changing, setChanging] = useState(false);
 
   const patch = useCaseWrite(detail.id, (body: Record<string, unknown>) => casesApi.patchStage(detail.id, 'examen', body));
   const patchResult = useCaseWrite(detail.id, (body: Record<string, unknown>) => casesApi.patchStage(detail.id, 'examen', body));
@@ -84,7 +85,7 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
     setResultErrors({});
     patchResult.mutate({ result, ...(result === 'no_aceptado' ? { reason: reason.trim() } : {}) }, {
       onSuccess: (d) => {
-        setResult(''); setReason('');
+        setResult(''); setReason(''); setChanging(false);
         toast.success(result === 'no_aceptado' ? 'Expediente cerrado: no aceptado.' : `Aceptado. Expediente en «${d.stage_label}».`);
       },
       onError: (e) => setResultErrors(errorsFrom(e)),
@@ -135,7 +136,9 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
           <p className="text-sm text-muted">Registrado: <strong className="text-ink">{detail.examen.result_label}</strong>
             {detail.examen.reason ? ` · ${detail.examen.reason}` : ''}</p>
         )}
-        {openCase ? (
+        {openCase && detail.examen.result && !changing ? (
+          <Button type="button" size="sm" variant="ghost" className="!text-purple" onClick={() => setChanging(true)}>Cambiar el resultado</Button>
+        ) : openCase ? (
           <form noValidate className="space-y-3" onSubmit={(e) => { e.preventDefault(); saveResult(); }}>
             <ChoiceGroup
               legend="Resultado"

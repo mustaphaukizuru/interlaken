@@ -472,6 +472,19 @@ describe('AdminCase (Expediente)', () => {
     expect(await screen.findByRole('dialog', { name: 'Revisión' })).toHaveTextContent('Ficha #3');
   });
 
+  it('a recorded outcome stays as a line until «Cambiar el resultado»', async () => {
+    const user = userEvent.setup();
+    serve(makeCase('examen', { visita: { outcome: 'agenda_examen', outcome_label: 'Asistió y agenda examen', outcome_at: '2026-11-19T10:00:00-06:00', note: 'Vino con la abuela.', bookings: [] } }));
+    renderCase();
+    await user.click(await screen.findByRole('button', { name: '2. Visita guiada: completada' }));
+    const card = document.getElementById('etapa-visita')!;
+    expect(within(card).getByText('Asistió y agenda examen')).toBeInTheDocument();
+    expect(within(card).queryByRole('radio')).not.toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Cambiar el resultado o la nota' }));
+    expect(within(card).getAllByRole('radio')).toHaveLength(3);
+    expect(within(card).getByLabelText('Nota de la visita (opcional)')).toHaveValue('Vino con la abuela.');
+  });
+
   it('the history reads as sentences, newest first', async () => {
     serve(makeCase('visita'));
     renderCase();

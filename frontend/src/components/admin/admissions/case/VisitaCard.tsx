@@ -53,6 +53,7 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const [saved, setSaved] = useState('');
   const [linking, setLinking] = useState(false);
+  const [changing, setChanging] = useState(false);
   const patch = useCaseWrite(detail.id, (body: Record<string, unknown>) => casesApi.patchStage(detail.id, 'visita', body));
 
   const closes = outcome === 'no_interesa' || (outcome === 'no_asistio' && !reschedule);
@@ -69,7 +70,7 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
     setErrors({});
     patch.mutate(body, {
       onSuccess: (d) => {
-        setOutcome(''); setReason(''); setNote(null);
+        setOutcome(''); setReason(''); setNote(null); setChanging(false);
         setSaved('Guardado.');
         toast.success(closes ? 'Expediente cerrado.' : outcome ? `Resultado guardado. Expediente en «${d.stage_label}».` : 'Nota guardada.');
       },
@@ -110,7 +111,12 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
           <p className="text-sm text-muted">Registrado: <strong className="text-ink">{detail.visita.outcome_label}</strong>
             {detail.visita.outcome_at ? ` · ${fmtDay(detail.visita.outcome_at)}` : ''}</p>
         )}
-        {openCase ? (
+        {openCase && detail.visita.outcome && !changing ? (
+          <div className="space-y-2">
+            {detail.visita.note && <p className="text-sm text-ink">{detail.visita.note}</p>}
+            <Button type="button" size="sm" variant="ghost" className="!text-purple" onClick={() => setChanging(true)}>Cambiar el resultado o la nota</Button>
+          </div>
+        ) : openCase ? (
           <form noValidate className="space-y-3" onSubmit={(e) => { e.preventDefault(); save(); }}>
             <ChoiceGroup
               legend="¿Cómo terminó la visita?"
@@ -162,7 +168,7 @@ function BookingLine({ booking: b }: { booking: CaseBooking }) {
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 font-semibold text-ink">
           <CalendarClock className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
-          {fmtDay(b.date)}, {b.start_time}–{b.end_time}
+          {fmtDay(b.date)}, {b.start_time} a {b.end_time}
         </p>
         <p className="pl-6 text-xs text-muted">
           {b.visit_type_label}{b.num_attendees > 1 ? ` · ${b.num_attendees} personas` : ''}

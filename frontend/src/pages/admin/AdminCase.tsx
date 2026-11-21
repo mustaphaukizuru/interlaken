@@ -145,7 +145,10 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
       <div className="card mb-6 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <StageChip stage={detail.stage} outcome={detail.closed_outcome_label} />
+            {/* Announced when an outcome moves the case (aria-live). */}
+            <span data-testid="case-stage" role="status" aria-live="polite" aria-label={`Etapa: ${detail.stage_label}${detail.closed_outcome_label ? `, ${detail.closed_outcome_label}` : ''}`}>
+              <StageChip stage={detail.stage} outcome={detail.closed_outcome_label} />
+            </span>
             {openCase && (
               <span className={`inline-flex items-center gap-1 text-xs ${isStale(detail.days_waiting) ? 'font-semibold text-amber' : 'text-muted'}`}>
                 <Hourglass size={13} aria-hidden="true" /> {detail.days_waiting > 0 ? `${waitingText(detail.days_waiting)} en esta etapa` : 'Llegó hoy a esta etapa'}

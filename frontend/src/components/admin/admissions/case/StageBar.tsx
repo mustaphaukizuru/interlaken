@@ -4,9 +4,12 @@ import { PROCESS_STAGES, STAGE_META, stageIndex, type StageKey } from '@/lib/cas
 
 export type StepState = 'done' | 'current' | 'pending' | 'closed';
 
-/** Short words that fit five steps on a 360 px phone. */
+/** Short words under each step (tablet and up) and on a 360 px phone. */
 const SHORT: Record<string, string> = {
   informes: 'Informes', visita: 'Visita', examen: 'Examen', documentacion: 'Documentos', inscrito: 'Inscrito',
+};
+const TINY: Record<string, string> = {
+  informes: 'Informes', visita: 'Visita', examen: 'Examen', documentacion: 'Docs.', inscrito: 'Inscrito',
 };
 
 const STATE_TEXT: Record<StepState, string> = {
@@ -54,7 +57,7 @@ export function StageBar({ stage, closedFrom, onJump }: {
                 <span
                   aria-hidden="true"
                   className={clsx(
-                    'absolute right-1/2 top-[22px] h-0.5 w-full -translate-y-1/2',
+                    'absolute right-1/2 top-[18px] z-0 h-0.5 w-full -translate-y-1/2 sm:top-[22px]',
                     state === 'pending' || state === 'closed' ? 'bg-line' : meta.dot,
                   )}
                 />
@@ -64,13 +67,13 @@ export function StageBar({ stage, closedFrom, onJump }: {
                 onClick={() => onJump(s)}
                 aria-current={state === 'current' ? 'step' : undefined}
                 aria-label={`${meta.step}. ${meta.label}: ${STATE_TEXT[state]}`}
-                className="relative flex min-h-[44px] w-full flex-col items-center gap-1 rounded-xl px-0.5 pb-1 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="relative z-10 flex min-h-[44px] w-full flex-col items-center gap-1 rounded-xl px-0.5 pb-1 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 <span
                   className={clsx(
-                    'flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold ring-2 transition',
+                    'flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ring-2 transition sm:h-11 sm:w-11',
                     state === 'done' && clsx(meta.dot, 'text-white ring-white'),
-                    state === 'current' && clsx('bg-white ring-4', meta.text, 'ring-current'),
+                    state === 'current' && clsx('bg-white ring-[3px] sm:ring-4', meta.text, 'ring-current'),
                     state === 'pending' && 'bg-white text-subtle ring-line',
                     state === 'closed' && 'bg-coral-50 text-coral-700 ring-coral-600/40',
                   )}
@@ -81,7 +84,8 @@ export function StageBar({ stage, closedFrom, onJump }: {
                         : meta.step}
                 </span>
                 <span className={clsx('w-full truncate text-[11px] leading-tight sm:text-xs', state === 'current' ? 'font-bold text-ink' : 'font-medium text-muted')}>
-                  {SHORT[s]}
+                  <span className="sm:hidden">{TINY[s]}</span>
+                  <span className="hidden sm:inline">{SHORT[s]}</span>
                 </span>
               </button>
             </li>

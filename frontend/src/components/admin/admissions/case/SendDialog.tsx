@@ -191,7 +191,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
           <ChannelOption value="whatsapp" current={channel} onPick={setChannel} icon={MessageCircle} title="Por WhatsApp"
             hint={`Se abre WhatsApp con el mensaje listo${detail.parent_phone ? ` para ${detail.parent_phone}` : ''}.`} />
           <ChannelOption value="copy" current={channel} onPick={setChannel} icon={ClipboardCopy} title={copy.hasLink ? 'Copiar liga' : 'Copiar mensaje'}
-            hint="Para pegarla en otro medio. Se registra como enviada." />
+            hint={copy.hasLink ? 'Para pegarla en otro medio. Se registra como enviada.' : 'Para pegarlo en otro medio. Se registra como enviado.'} />
         </div>
       </fieldset>
 

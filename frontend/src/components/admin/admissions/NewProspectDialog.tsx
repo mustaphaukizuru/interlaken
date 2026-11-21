@@ -11,13 +11,14 @@ import type { FieldErrorMap } from '@/lib/apiErrors';
 import { fmtDay } from '@/lib/caseStages';
 import { casesApi, storeCase, type CaseRow, type ProspectInput } from '@/hooks/queries/cases';
 import { ChoiceGroup, ErrorSummary, SelectField, errorsFrom } from './case/formKit';
-import { GRADE_OPTIONS, cycleChoices } from './case/caseBits';
+import { GRADE_OPTIONS, RELATIONSHIPS, cycleChoices } from './case/caseBits';
 
 const LABELS: Record<string, string> = {
   child_name: 'Nombre del alumno',
   parent_name: 'Tutor',
   parent_phone: 'Celular',
   previous_school: 'Colegio de procedencia',
+  relationship: 'Parentesco',
   child_age: 'Edad',
   grade_applying: 'Grado',
   cycle: 'Ciclo',
@@ -33,10 +34,11 @@ interface Form {
   grade_applying: string;
   cycle: 'actual' | 'proximo';
   parent_email: string;
+  relationship: string;
 }
 
 const EMPTY: Form = {
-  child_name: '', parent_name: '', parent_phone: '', previous_school: '', child_age: '', grade_applying: '', cycle: 'proximo', parent_email: '',
+  child_name: '', parent_name: '', parent_phone: '', previous_school: '', child_age: '', grade_applying: '', cycle: 'proximo', parent_email: '', relationship: '',
 };
 
 function validate(f: Form): FieldErrorMap {
@@ -60,6 +62,8 @@ function toInput(f: Form): ProspectInput {
     previous_school: f.previous_school.trim(),
     child_age: f.child_age ? Number(f.child_age) : null,
     parent_email: f.parent_email.trim(),
+    // Blank: the API stores «Padre/Madre»; a ficha choice prefills «Quién llena la ficha».
+    ...(f.relationship ? { relationship: f.relationship } : {}),
   };
 }
 
@@ -127,6 +131,7 @@ function NewProspectBody({ onClose }: { onClose: () => void }) {
           <Input id="np-parent" label="Nombre del tutor" autoComplete="off" {...field('parent_name')} />
           <Input id="np-phone" label="Celular" type="tel" inputMode="tel" autoComplete="off" placeholder="55 1234 5678" {...field('parent_phone')} />
           <Input id="np-email" label="Correo (opcional)" type="email" autoComplete="off" {...field('parent_email')} />
+          <SelectField id="np-rel" label="Parentesco (opcional)" placeholder="Sin dato" options={RELATIONSHIPS.map((r) => ({ value: r, label: r }))} {...field('relationship')} />
           <SelectField id="np-grade" label="Grado al que ingresa" placeholder="Elija el grado" options={GRADE_OPTIONS} {...field('grade_applying')} />
           <Input id="np-age" label="Edad (opcional)" type="number" min={0} max={25} inputMode="numeric" {...field('child_age')} />
           <Input id="np-school" label="Colegio de procedencia (opcional)" autoComplete="off" {...field('previous_school')} />
