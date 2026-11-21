@@ -22,7 +22,9 @@ export const FLOAT_DEFAULTS = {
  * three actions: WhatsApp, Agendar visita, Solicitar contraseña. The number is
  * admin-editable; with no number the launcher only offers the visit link.
  * On phones the sticky "Agendar visita" bar already carries WhatsApp, so while
- * that bar is visible the bubble renders from md up only.
+ * that bar is visible the bubble renders from md up only. The ficha's steps
+ * (FichaWizard, `data-ficha-steps` on <html>) put their own action bar at the
+ * bottom of a phone, so there too the bubble waits for md.
  */
 export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: boolean }) {
   const { whatsapp_number, chrome } = useSiteSettings();
@@ -37,7 +39,7 @@ export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: 
   }, [open]);
 
   if (!whatsapp_number) return null;
-  const wrap = `fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 ${stickyCtaVisible ? 'hidden md:flex' : 'flex'} flex-col items-end gap-2 md:right-6 md:bottom-6`;
+  const wrap = `fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 ${stickyCtaVisible ? 'hidden md:flex' : 'flex'} flex-col items-end gap-2 md:right-6 md:bottom-6 max-[767px]:[html[data-ficha-steps]_&]:hidden`;
   const item = 'flex min-h-[44px] items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink shadow-card ring-1 ring-line hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
   return (

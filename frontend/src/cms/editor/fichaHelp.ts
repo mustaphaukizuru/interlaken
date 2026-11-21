@@ -20,7 +20,7 @@ export const FICHA_HELP: Record<string, string> = {
   statePending: 'Se ve en la lista de pasos bajo un paso que todavía no se abre.',
   stateCurrent: 'Se ve en la lista de pasos bajo el paso en el que está la familia.',
   nextLabel: button('principal de cada paso: guarda y pasa al siguiente'),
-  backLabel: button('para volver al paso anterior (guarda lo que cambió)'),
+  backLabel: button('para volver al paso anterior (guarda lo que cambió). En un celular angosto solo se ve la flecha y el texto lo escucha un lector de pantalla'),
   reviewReturn: button('principal cuando la familia llegó a corregir desde la revisión'),
   laterLabel: button('que guarda el paso y envía al correo un enlace para seguir después'),
   optionalMark: 'Palabra pequeña junto a la etiqueta de un dato que no es obligatorio, por ejemplo «opcional».',

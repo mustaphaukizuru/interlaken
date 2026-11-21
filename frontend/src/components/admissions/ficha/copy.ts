@@ -24,7 +24,7 @@ export const FICHA_TEXT = {
   statePending: 'Pendiente',
   stateCurrent: 'Paso actual',
   nextLabel: 'Guardar y continuar',
-  backLabel: 'Atrás',
+  backLabel: 'Anterior',
   reviewReturn: 'Guardar y volver a la revisión',
   laterLabel: 'Guardar y continuar después',
   optionalMark: 'opcional',
@@ -225,6 +225,7 @@ export const BLANKABLE: ReadonlySet<TextKey> = new Set<TextKey>([
  * current default instead; a text the school wrote itself always wins.
  */
 export const RETIRED_DEFAULTS: Partial<Record<TextKey, readonly string[]>> = {
+  backLabel: ['Atrás'],
   alumnoTitle: ['Datos del alumno'],
   alumnoIntro: ['Escríbalos como aparecen en el acta de nacimiento.'],
   curpHint: ['Si escribe primero la CURP, llenamos la fecha de nacimiento, el sexo y el estado de nacimiento.'],

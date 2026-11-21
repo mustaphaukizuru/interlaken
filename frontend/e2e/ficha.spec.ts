@@ -67,6 +67,9 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await expect(page.getByRole('heading', { level: 2, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
   await expect(page.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(page).toHaveURL(/\/pre-registro$/); // the token left the address bar
+  // The phone's action bar floats at the bottom of the screen; the WhatsApp bubble steps aside.
+  await expect(page.locator('[data-ficha-actions]')).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Contactar al colegio' })).toBeHidden();
   await expect(page.getByLabel('Apellido paterno')).toHaveValue(`López${run}`);
   await page.getByLabel('CURP', { exact: true }).fill(CHILD_CURP.toLowerCase());
   await expect(page.getByLabel('Fecha de nacimiento')).toHaveValue(CHILD_DOB);

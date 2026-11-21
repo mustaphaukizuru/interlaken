@@ -64,9 +64,10 @@ export const ErrorSummary = forwardRef<HTMLDivElement, { title: string; items: S
           <ul className="mt-2 space-y-1 pl-7 text-sm">
             {items.map((it) => (
               <li key={it.id}>
+                {/* Inline padding: a taller target without changing how the line wraps. */}
                 <a
                   href={`#${it.id}`}
-                  className="font-medium text-coral-800 underline underline-offset-2 hover:text-coral-900"
+                  className="py-3 font-medium text-coral-800 underline underline-offset-2 hover:text-coral-900"
                   onClick={(e) => { e.preventDefault(); go(it.id); }}
                 >
                   {it.label}
