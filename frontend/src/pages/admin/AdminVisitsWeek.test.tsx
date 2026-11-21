@@ -1,16 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import AdminVisitsWeek, { localISODate, mondayOf, shiftWeek } from './AdminVisitsWeek';
-import { bookingsApi } from '@/services/api';
+import AdminVisitsWeek, { localISODate, mondayOf, shiftWeek, weekEnd } from './AdminVisitsWeek';
+import { api, bookingsApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/services/api', () => ({
+  api: { get: vi.fn() },
   bookingsApi: {
     adminWeek: vi.fn().mockResolvedValue({ data: { start: '2026-08-24', end: '2026-08-30', days: [
       { date: '2026-08-24', slots: [{ id: 1, title: 'Clase abierta', visit_type: 'open_class', start_time: '09:00', end_time: '10:30', capacity: 12, is_active: true, booked: 2, bookings: [
-        { id: 5, parent_name: 'María', child_name: 'Ana', status: 'confirmed', outcome: '', num_attendees: 2, parent_phone: '5512345678' },
+        { id: 5, parent_name: 'María', child_name: 'Ana', status: 'confirmed', outcome: '', num_attendees: 2, parent_phone: '5512345678', case: 7 },
       ] }] },
       ...[25, 26, 27, 28, 29, 30].map((d) => ({ date: `2026-08-${d}`, slots: [] })),
     ] } }),
@@ -18,10 +20,45 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+const EXAMS = {
+  from: '2026-08-24', to: '2026-08-30',
+  days: [
+    { date: '2026-08-24', exams: [] },
+    { date: '2026-08-25', exams: [{ case: 9, child_name: 'Lucía Prueba', parent_name: 'Marta', parent_phone: '5512345678', grade_applying: '2° Primaria', level: 'primaria', exam_at: '2026-08-25T15:00:00Z', time: '09:00', exam_notes: '', exam_results_at: null, result: '', stage: 'examen', date_sent_at: null }] },
+    ...[26, 27, 28, 29, 30].map((d) => ({ date: `2026-08-${d}`, exams: [] })),
+  ],
+};
+
 describe('AdminVisitsWeek', () => {
+  beforeEach(() => {
+    vi.mocked(api.get).mockReset();
+    vi.mocked(api.get).mockResolvedValue({ data: EXAMS } as never);
+    useAuthStore.setState({ user: { id: 1, role: 'admin' } as never, isAuthenticated: true });
+  });
+
   it('week helpers', () => {
     expect(mondayOf(new Date('2026-08-27T12:00:00'))).toBe('2026-08-24');
     expect(shiftWeek('2026-08-24', 1)).toBe('2026-08-31');
+    expect(weekEnd('2026-08-24')).toBe('2026-08-30');
+  });
+
+  it('shows the admission exams in the grid with their own colour and legend; both open the Expediente', async () => {
+    renderWithProviders(<AdminVisitsWeek />, { route: '/admin/visitas/semana' });
+    const exam = await screen.findByRole('link', { name: /09:00 · Examen.*Lucía Prueba/ });
+    expect(exam).toHaveAttribute('href', '/admin/admisiones/9');
+    expect(exam.className).toContain('bg-pink-light');
+    expect(screen.getByRole('list', { name: 'Simbología' })).toHaveTextContent('Examen de admisión');
+    expect(screen.getByRole('link', { name: 'Expediente de Ana' })).toHaveAttribute('href', '/admin/admisiones/7');
+    expect(api.get).toHaveBeenCalledWith('/admissions/admin/exams/', { params: { from: mondayOf(new Date()), to: weekEnd(mondayOf(new Date())) } });
+  });
+
+  it('a Visitas-only account sees the visits without exams', async () => {
+    useAuthStore.setState({ user: { id: 2, role: 'staff', staff_areas: ['visitas'] } as never, isAuthenticated: true });
+    renderWithProviders(<AdminVisitsWeek />, { route: '/admin/visitas/semana' });
+    expect(await screen.findByText(/María · Ana/)).toBeInTheDocument();
+    expect(api.get).not.toHaveBeenCalled();
+    expect(screen.queryByRole('list', { name: 'Simbología' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Expediente de Ana' })).not.toBeInTheDocument();
   });
   it('renders the 7 days with bookings and actions', async () => {
     renderWithProviders(<AdminVisitsWeek />, { route: '/admin/visitas/semana' });

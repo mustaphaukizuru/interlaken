@@ -899,14 +899,14 @@ export const contactApi = {
 };
 
 // ── BOOKINGS ──────────────────────────────────────────────
-export interface WeekBooking { id: number; parent_name: string; child_name: string; status: string; outcome: string; num_attendees: number; parent_phone: string }
+export interface WeekBooking { id: number; parent_name: string; child_name: string; status: string; outcome: string; num_attendees: number; parent_phone: string; /** Admission case (Expediente) of the visit. */ case?: number | null }
 export interface WeekSlot { id: number; date: string; title: string; visit_type: string; start_time: string; end_time: string; capacity: number; is_active: boolean; booked: number; bookings: WeekBooking[] }
 
 export const bookingsApi = {
   /** Weekly calendar, reschedule and outcome (BACKLOG P4-2). */
   adminWeek: (start: string) => api.get<{ start: string; end: string; days: { date: string; slots: WeekSlot[] }[] }>('/bookings/admin/week/', { params: { start } }),
   adminReschedule: (id: number, slot: number) => api.post(`/bookings/admin/bookings/${id}/reschedule/`, { slot }),
-  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string; changed: boolean; skipped?: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
+  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string; stage?: string; changed: boolean; skipped?: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
   // Public
   getAvailability: (params?: { type?: string; from?: string; to?: string }) =>
     api.get('/bookings/availability/', { params }),
