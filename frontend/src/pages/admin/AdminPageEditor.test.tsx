@@ -16,6 +16,8 @@ vi.mock('@/services/api', () => ({
   },
 }));
 vi.mock('@/cms/editor/shell/publishApi', () => ({ publishPage: vi.fn() }));
+// «Revisión antes de publicar»: «Publicar» opens the review first (AdminPageEditor.review.test.tsx covers it).
+vi.mock('@/cms/editor/review/reviewApi', async (orig) => ({ ...(await orig<object>()), reviewApi: { check: vi.fn(), discard: vi.fn() } }));
 let role = 'admin';
 vi.mock('@/store/authStore', () => ({
   useAuthStore: (sel: (s: { user: { id: number; role: string } }) => unknown) => sel({ user: { id: 1, role } }),
@@ -24,6 +26,7 @@ vi.mock('@/store/authStore', () => ({
 import toast from 'react-hot-toast';
 import { contentApi } from '@/services/api';
 import { publishPage } from '@/cms/editor/shell/publishApi';
+import { reviewApi } from '@/cms/editor/review/reviewApi';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
 import AdminPageEditor from './AdminPageEditor';
@@ -41,6 +44,13 @@ const PAGE = {
 const LEGACY = { ...PAGE, status: 'draft', published_version_number: null, has_unpublished_changes: true };
 
 const httpError = (status: number, data: Record<string, unknown>) => Object.assign(new Error(`HTTP ${status}`), { response: { status, data } });
+const CLEAN = { ok: true, errors: [], warnings: [], suggestions: [], issues: [], changes: [], baseline: 'published' };
+/** «Publicar» in the bar opens the review; its own «Publicar» sends the page. */
+async function publishFromReview() {
+  await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Revisión antes de publicar' });
+  await userEvent.click(await within(dialog).findByRole('button', { name: /^Publicar$/ }));
+}
 
 function renderEditor(base = '/admin', query = '') {
   return renderWithProviders(
@@ -65,6 +75,7 @@ beforeEach(() => {
   stubViewport(1280);
   vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: PAGE } as never);
   vi.mocked(contentApi.adminUpdatePage).mockImplementation(async (_id, data) => ({ data: { ...PAGE, ...data } }) as never);
+  vi.mocked(reviewApi.check).mockResolvedValue({ data: CLEAN } as never);
 });
 
 describe('AdminPageEditor action bar', () => {
@@ -262,7 +273,7 @@ describe('AdminPageEditor contract C1 (old generic seed drafts)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Este borrador usa el formato antiguo' });
     await userEvent.click(within(dialog).getByRole('button', { name: /Publicar de todos modos/ }));
-    await waitFor(() => expect(publishPage).toHaveBeenCalledWith(7, 'publish', true));
+    await waitFor(() => expect(publishPage).toHaveBeenCalledWith(7, 'publish', true, undefined));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
@@ -273,8 +284,8 @@ describe('AdminPageEditor contract C1 (old generic seed drafts)', () => {
     renderEditor();
     await ready();
     expect(screen.queryByText('Borrador antiguo')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
-    await waitFor(() => expect(publishPage).toHaveBeenCalledWith(7, 'publish', false));
+    await publishFromReview();
+    await waitFor(() => expect(publishPage).toHaveBeenCalledWith(7, 'publish', false, []));
     const dialog = await screen.findByRole('dialog', { name: 'Este borrador usa el formato antiguo' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -350,7 +361,7 @@ describe('AdminPageEditor contract C2 (two people on one page)', () => {
     renderEditor();
     await userEvent.click(await screen.findByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }));
     await screen.findByRole('alert', {}, { timeout: 4000 });
-    await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
+    await publishFromReview();
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('otra persona guardó cambios')));
     expect(publishPage).not.toHaveBeenCalled();
   });

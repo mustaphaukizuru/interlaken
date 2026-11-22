@@ -5,7 +5,7 @@
  * Kept apart from AdminPageEditor.test.tsx (the editor shell's own tests).
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 
@@ -18,6 +18,7 @@ vi.mock('@/services/api', () => ({
   },
 }));
 vi.mock('@/cms/editor/shell/publishApi', () => ({ publishPage: vi.fn() }));
+vi.mock('@/cms/editor/review/reviewApi', async (orig) => ({ ...(await orig<object>()), reviewApi: { check: vi.fn(), discard: vi.fn() } }));
 vi.mock('@/store/authStore', () => ({
   useAuthStore: (sel: (s: { user: { id: number; role: string } }) => unknown) => sel({ user: { id: 1, role: 'admin' } }),
 }));
@@ -25,6 +26,7 @@ vi.mock('@/store/authStore', () => ({
 import toast from 'react-hot-toast';
 import { contentApi } from '@/services/api';
 import { publishPage } from '@/cms/editor/shell/publishApi';
+import { reviewApi } from '@/cms/editor/review/reviewApi';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { loadAllGroups } from '@/cms/sections/loaders';
 import AdminPageEditor from './AdminPageEditor';
@@ -62,20 +64,21 @@ describe('AdminPageEditor field errors', () => {
     expect(screen.getAllByText('Este campo es obligatorio.').length).toBeGreaterThan(0);
   });
 
-  it('shows the structured publish errors next to their field', async () => {
-    vi.mocked(publishPage).mockRejectedValue({
-      response: {
-        status: 400,
-        data: {
-          detail: 'Corrija antes de publicar: Enlace roto en «Llamado a la acción» (sección 2) › Botón: /no-existe no lleva a ninguna página ni redirección.',
-          issues: [{ level: 'error', code: 'broken_link', block_id: 'b', message: 'Enlace roto en «Llamado a la acción» (sección 2) › Botón: /no-existe…', block_index: 1, block_label: 'Llamado a la acción', field: 'cta', field_label: 'Botón', field_message: 'Enlace roto: /no-existe no lleva a ninguna página ni redirección. Elija otro destino.' }],
-          errors: [{ block_index: 1, block_id: 'b', block_label: 'Llamado a la acción', field: 'cta', field_label: 'Botón', message: 'Enlace roto: /no-existe no lleva a ninguna página ni redirección. Elija otro destino.' }],
-        },
-      },
-    });
+  it('shows the review errors next to their field, and «Ir al campo» focuses it', async () => {
+    const broken = {
+      level: 'error', code: 'broken_link', key: 'broken_link:b:cta', block_id: 'b', block_index: 1, block_label: 'Llamado a la acción',
+      field: 'cta', field_label: 'Botón', message: 'Enlace roto. Sección 2 (Llamado a la acción), campo «Botón»: /no-existe no lleva a ninguna página.',
+      field_message: 'Enlace roto: /no-existe no lleva a ninguna página ni redirección. Elija otro destino.', value: null, preview: '', fix: null,
+    };
+    vi.mocked(reviewApi.check).mockResolvedValue({ data: { ok: false, errors: [broken], warnings: [], suggestions: [], issues: [broken], changes: [], baseline: 'none' } } as never);
     renderEditor();
     await userEvent.click(await screen.findByRole('button', { name: /Publicar/ }, { timeout: 8000 }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    const dialog = await screen.findByRole('dialog', { name: 'Revisión antes de publicar' });
+    expect(await within(dialog).findByRole('button', { name: /^Publicar$/ })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Ir al campo/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(publishPage).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
     expect(await screen.findByRole('heading', { name: 'Antes de publicar, corrija 2 campos' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /2\. Llamado a la acción › Botón/ }));
     await waitFor(() => expect(document.activeElement?.id).toBe('f-b-cta'));
