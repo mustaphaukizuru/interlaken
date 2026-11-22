@@ -225,10 +225,10 @@ function GaleriaGridView(p: GridProps) {
                   className="w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   onError={(e) => (((e.target as HTMLImageElement).closest('button') as HTMLButtonElement).style.display = 'none')}
                 />
-                {/* Hover affordance: gradient wash + "Ampliar" pill */}
+                {/* Hover affordance: gradient wash + an «Ampliar» tag (an action hint, not a status badge: radius-sm, decision 0002) */}
                 <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/0 to-ink/0 opacity-100 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100" />
-                <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-bold text-ink opacity-100 shadow-sm transition-all duration-300 lg:translate-y-1.5 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 motion-reduce:transition-none">
-                  <Maximize2 className="h-3 w-3 text-green-dark" /> {copy.zoomLabel}
+                <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-sm bg-white/95 px-3 py-1 text-xs font-bold text-ink opacity-100 shadow-sm transition-all duration-300 lg:translate-y-1.5 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 motion-reduce:transition-none">
+                  <Maximize2 size={14} aria-hidden="true" className="text-green-dark" /> {copy.zoomLabel}
                 </span>
                 {photo.caption && (
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-3 pb-2.5 pt-8 text-left text-[12.5px] font-semibold text-white opacity-90 transition-opacity group-hover:opacity-0">

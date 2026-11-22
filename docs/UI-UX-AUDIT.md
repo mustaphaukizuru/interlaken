@@ -1,3 +1,5 @@
+> **Superseded** on 21 Nov 2026 by `docs/UX-AUDIT.md`.
+
 # UI/UX audit (BACKLOG P1-I7), 22 Aug 2026
 
 Scope: every portal and public screen at 360 / 768 / 1440. Status reflects the autopilot build on
