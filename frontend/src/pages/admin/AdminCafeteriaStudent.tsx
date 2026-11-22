@@ -189,7 +189,7 @@ export default function AdminCafeteriaStudent() {
           <p>
             <strong>Recargas pagadas por aplicar:</strong>{' '}
             {balance.pending_topups.map((t) => `$${parseFloat(t.amount).toFixed(2)} (folio ${t.folio ?? '—'})`).join(', ')}.
-            {' '}Aún no están en el saldo: se aplican al cargarlas en el POS de Loyverse.
+            {' '}Aún no están en el saldo. En «Por aplicar» se ve qué falta: verificarlas en MultiCobros (la app las carga sola en Loyverse) o, si dice «Cargar a mano», cargarlas en el POS.
           </p>
           <Link to="/admin/cafeteria?tab=pos" className="shrink-0 text-sm font-semibold text-purple hover:underline">
             Ir a «Por aplicar» →

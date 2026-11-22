@@ -845,6 +845,7 @@ function PosLoadTab() {
   return (
     <div className="space-y-6">
       <PaidTopUpQueue />
+      <AutoLoadedToVerify />
       <AppliedTodayList />
       <PosQueue
         kind="load"
@@ -861,6 +862,60 @@ function PosLoadTab() {
         emptyText="No hay recargas reembolsadas esperando descarga en Loyverse."
       />
     </div>
+  );
+}
+
+/** Card top-ups the app already loaded into Loyverse on approval (instant
+ *  auto-load), still to match in MultiCobros: the rest of «Por verificar».
+ *  Hidden when there are none (always, with the auto-load off). */
+function AutoLoadedToVerify() {
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isError, refetch } = useTopUpsList({ page, needs_verify: 1 });
+  const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
+  const count = data?.count ?? 0;
+  if (!isLoading && !isError && count === 0) return null;
+
+  const columns: Column<TopUpLogEntry>[] = [
+    { id: 'when', header: 'Pagada', hideable: false, className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.processed_at || d.created_at) },
+    { id: 'student', header: 'Alumno', className: 'font-medium text-ink', cell: studentCell },
+    { id: 'amount', header: 'Monto', align: 'right', className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
+    { id: 'reference', header: 'Operación Banorte', minWidth: 190, cell: banorteCell },
+  ];
+
+  return (
+    <Card>
+      <div className="mb-4 max-w-2xl">
+        <h2 className="font-head text-base font-semibold text-ink">Cargadas por la app: por verificar</h2>
+        <p className="mt-1 text-sm text-muted">
+          La app ya las cargó en Loyverse al confirmarse el pago y el alumno ya puede usarlas. Falta confirmarlas en
+          MultiCobros: una por una con «Verificar en MultiCobros», o todas a la vez con «Subir reporte de MultiCobros».
+          No las cargue en el POS. Si alguna no aparece aprobada en MultiCobros, avise a dirección.
+        </p>
+      </div>
+      <DataTable<TopUpLogEntry>
+        tableId="cafeteria-auto-verify"
+        columns={columns}
+        rows={data?.results}
+        rowKey={(d) => d.id}
+        rowLabel={(d) => `recarga de ${d.student_name}`}
+        caption="Cargadas por la app: por verificar"
+        page={page}
+        count={count}
+        onPage={setPage}
+        itemLabel="recargas"
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={() => refetch()}
+        rowActions={(d) => (
+          <Button size="sm" variant="secondary" onClick={() => setVerifying(d)}>
+            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+            Verificar en MultiCobros
+          </Button>
+        )}
+        empty={{ icon: CheckCircle2, title: 'Todo verificado', description: 'No hay recargas cargadas por la app pendientes de verificar.' }}
+      />
+      <VerifyBanorteDialog row={verifying} onClose={() => setVerifying(null)} />
+    </Card>
   );
 }
 
