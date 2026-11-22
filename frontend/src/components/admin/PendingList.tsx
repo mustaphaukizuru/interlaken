@@ -114,6 +114,19 @@ export function pendingRows(counters: Counters) {
       : it));
 }
 
+/**
+ * True when the API sends the «Pendientes» counters. An older backend (the
+ * SPA deployed before the API) sends the sidebar keys only: then the list
+ * hides instead of claiming «Todo al día» over queues it cannot see.
+ */
+const LEGACY_AREA_KEYS = ['admisiones', 'visitas', 'cafeteria'];
+const PENDIENTES_KEYS = ['preregistros', 'inscripciones', 'documentos', 'visitas_hoy', 'cafeteria_caja',
+  'cafeteria_aplicar', 'pagos_fallidos', 'saldo_bajo', 'loyverse_alertas'];
+export function speaksPendientes(counters: Counters): boolean {
+  const hasLegacy = LEGACY_AREA_KEYS.some((k) => k in counters);
+  return !hasLegacy || PENDIENTES_KEYS.some((k) => k in counters);
+}
+
 /** Same query as the sidebar badges (one request, shared cache). */
 export function usePendingCounters() {
   return useQuery({
@@ -135,6 +148,7 @@ export function usePendingCounters() {
 export function PendingList({ totals = {} }: { totals?: PendingTotals }) {
   const { data, isLoading, isError, refetch } = usePendingCounters();
   const rows = data ? pendingRows(data) : [];
+  if (data && !speaksPendientes(data)) return null;
 
   return (
     <section aria-labelledby="pending-title" className="card mb-6 !p-0">
