@@ -1,18 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Coffee, Maximize2, X, Sun } from 'lucide-react';
+import { Maximize2, ScanLine, SquareUserRound, Sun, X } from 'lucide-react';
 import { Barcode } from '@/components/ui/Barcode';
 import { Badge } from '@/components/ui/Badge';
+import { CredentialFace } from '@/components/portal/CredentialFace';
 import type { CafeteriaCard } from '@/types';
 import { BalanceWithPending, PendingProjectionNote } from '@/components/portal/BalanceWithPending';
 
 /**
- * Digital cafetería card — the student's phone becomes their POS card. Shows
- * identity + live balance and the Loyverse customer code as a scannable Code128
- * barcode (what the register reads) plus a QR. "Pantalla completa" opens a big,
- * bright, scan-ready view for the cashier.
+ * Digital cafetería card: the student's phone becomes their POS card. The
+ * card is drawn as the school's printed student ID (CredentialFace, with the
+ * Loyverse code as its Matrícula and Code128 barcode, what the register
+ * reads); the live balance sits in the panel beside it. "Pantalla completa"
+ * opens a big, bright, scan-ready view (barcode + QR) for the cashier.
+ * `footer` goes under the balance (the page's «Saldo actualizado…» line).
  */
-export default function StudentCard({ card }: { card: CafeteriaCard }) {
+export default function StudentCard({ card, footer }: { card: CafeteriaCard; footer?: ReactNode }) {
   const [full, setFull] = useState(false);
   const s = card.student;
   // A staff member's own account (tipo «personal») reads as its puesto, with
@@ -65,63 +68,64 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
 
   return (
     <>
-      {/* Print: black on white with a hairline frame (browsers drop the
-          gradient, which would leave white type on white paper). */}
-      <div data-testid="credencial-face" className="mx-auto w-full max-w-sm overflow-hidden rounded-md shadow-purple ring-1 ring-black/5 print:ring-black/40">
-        {/* Gradient face: the credential's identity (brand, not decoration) */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-pink-hot to-pink px-5 pb-5 pt-4 text-white print:bg-none print:[&_*]:!text-black">
-          <div className="relative flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/85">
-              <Coffee size={16} aria-hidden="true" /> Credencial de cafetería
-            </span>
-            {low && <Badge variant="warning">Saldo bajo</Badge>}
-          </div>
-
-          <div className="relative mt-5">
-            <p className="font-head text-2xl font-bold leading-tight">{s.name}</p>
-            <p className="text-sm text-white/85">{roleLine || 'Alumno'}</p>
-          </div>
-
-          {/* flex-wrap: with a paid top-up on its way («$150.00 → $350.00») the
-              code moves under the balance on narrow phones instead of squeezing it. */}
-          <div className="relative mt-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-            <BalanceWithPending variant="credential" className="min-w-0" balance={card.balance} pending={card.pending_topups} />
-            <div className="ml-auto text-right">
-              {/* The code is the Loyverse spelling (ci09932), the same one the POS
-                  scans and the office reads on the register: label it as such. */}
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">Código Loyverse</p>
-              <p className="font-head text-base font-bold tracking-wider">{card.code || '—'}</p>
-            </div>
-          </div>
+      {/* The card as printed, with the wallet beside it (under it on phones).
+          The card itself stays the printed one: the balance lives in the panel. */}
+      <div
+        data-testid="credencial-face"
+        className="mx-auto grid w-full max-w-4xl items-start gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:gap-8 print:block"
+      >
+        <div className="mx-auto w-full max-w-[20rem] md:max-w-none print:mx-0 print:w-[54mm]">
+          <CredentialFace card={card} className="w-full" />
+          {card.code && (
+            // 48 px: students use this view (Phase 6).
+            <button
+              type="button"
+              onClick={() => setFull(true)}
+              className="btn-primary mt-3 min-h-[48px] w-full text-sm print:hidden"
+            >
+              <Maximize2 size={18} aria-hidden="true" /> Mostrar en pantalla completa
+            </button>
+          )}
         </div>
 
-        {/* Scan strip */}
-        <div className="bg-white px-5 py-4 text-center">
-          {/* The projection's line, on white so it keeps its contrast. */}
+        <div className="rounded-md bg-white p-5 shadow-card print:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <BalanceWithPending
+              className="min-w-0"
+              balance={card.balance}
+              pending={card.pending_topups}
+              low={low}
+              note={false}
+            />
+            {low && <Badge variant="warning">Saldo bajo</Badge>}
+          </div>
           <PendingProjectionNote
             balance={card.balance}
             pending={card.pending_topups}
-            className="mb-3 text-sm leading-snug text-muted"
+            className="mt-1 text-sm leading-snug text-muted"
           />
-          {card.code ? (
-            <>
-              <Barcode value={card.code} height={58} className="mx-auto max-w-full" />
-              {/* 48 px: students use this view (Phase 6). */}
-              <button
-                type="button"
-                onClick={() => setFull(true)}
-                className="mx-auto mt-2 flex min-h-[48px] items-center gap-2 rounded-sm px-4 text-sm font-semibold text-purple transition hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 print:hidden"
-              >
-                <Maximize2 size={20} aria-hidden="true" /> Mostrar en pantalla completa
-              </button>
-            </>
-          ) : (
-            <p className="py-4 text-sm text-muted">
+          {footer && <div className="mt-3">{footer}</div>}
+          {!card.code && (
+            <p className="mt-3 text-sm text-muted">
               {staff
                 ? 'Esta cuenta aún no tiene cafetería. Contacte al colegio para activarla.'
                 : 'Este alumno aún no tiene cafetería. Contacte al colegio para activarla.'}
             </p>
           )}
+          <ul className="mt-4 space-y-2.5 border-t border-line pt-4 text-[13px] leading-snug text-muted">
+            <li className="flex gap-2">
+              <ScanLine size={16} className="mt-px flex-shrink-0 text-subtle" aria-hidden="true" />
+              <span>En caja escanean el código de barras de la credencial: con «Pantalla completa» se lee mejor.</span>
+            </li>
+            {!s.photo && (
+              <li className="flex gap-2">
+                <SquareUserRound size={16} className="mt-px flex-shrink-0 text-subtle" aria-hidden="true" />
+                <span>{staff
+                  ? 'Sin foto todavía: aparecerá la de su cuenta de Google cuando inicie sesión con ella.'
+                  : 'Sin foto todavía: aparecerá la de la cuenta de Google del alumno cuando inicie sesión con ella.'}</span>
+              </li>
+            )}
+          </ul>
         </div>
       </div>
 

@@ -197,7 +197,7 @@ export const sections = [
       ...headingFields({ text: true }),
       f.url('video', 'Video (YouTube o Vimeo)', { hint: 'Vacío = el video de Ajustes.' }),
       f.image('poster', 'Foto de portada del video', { hint: 'Vacío = la miniatura de YouTube.' }),
-      f.toggle('clickToPlay', 'Esperar un clic para reproducir', { hint: 'Apagado: empieza sin sonido al llegar a la sección.' }),
+      f.toggle('clickToPlay', 'Esperar un clic para reproducir', { hint: 'Apagado: empieza solo, sin sonido.' }),
       f.link('primary', 'Botón principal'),
       f.link('secondary', 'Botón secundario'),
     ],

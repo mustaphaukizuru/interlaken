@@ -22,6 +22,7 @@ from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.avatar import avatar_url
 from apps.accounts.family import can_access_student, family_students
 from apps.accounts.models import StudentProfile, User
 from apps.core.audit import record
@@ -519,6 +520,10 @@ class MyCardsView(APIView):
                     'tipo': s.tipo,
                     'puesto': s.puesto,
                     'puesto_label': s.get_puesto_display(),
+                    # The credential's photo: the account's uploaded photo,
+                    # else the Google picture of its school Gmail, else ''
+                    # (an empty frame on the card).
+                    'photo': avatar_url(s.user),
                 },
                 'code': code,                       # QR/barcode payload
                 'linked': bool(s.loyverse_id),

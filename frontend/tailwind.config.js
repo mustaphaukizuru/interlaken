@@ -8,6 +8,10 @@ export default {
       colors: {
         // Nivel educativo palette (school instruction 2026-08-21)
         nivel: { preescolar: '#8ac6a4', primaria: '#f4436c', secundaria: '#f1c82f' },
+        // The printed student ID (school template, 2026-11-22): navy band and
+        // a deeper ink for type on the level colour (4.7:1 on Primaria pink,
+        // where the template navy only reaches 3.2:1).
+        credencial: { navy: '#013e52', ink: '#001f2c' },
         // `brand` remapped to the Interlaken purple scale so every existing
         // `brand-*` utility across the app rebrands automatically.
         brand: {

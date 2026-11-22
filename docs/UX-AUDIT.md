@@ -180,6 +180,40 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
   emptied `SiteSettings.video_url`; it was restored locally to
   `https://youtu.be/z271WfIaPSE` (the value in the owner's saved DB).
 
+### Credencial drawn as the printed student ID (owner request, 22 Nov 2026)
+- **What.** `/portal/credencial`, «Mi credencial» and the staff view in
+  Alumnos now show the school's printed ID (template supplied by the owner):
+  navy band with the logo, the level's C.C.T. and «45 años»; the level colour
+  with the clock-ray pattern; grade pill («5A Primaria»), photo, Nombre, Ciclo
+  Escolar, Matrícula (the Loyverse code) and the Code128 barcode the POS scans.
+  Balance, «Saldo bajo», paid top-ups on their way and «Saldo actualizado…»
+  moved to a panel beside the card (under it on phones), so the card itself
+  matches the plastic one. «Pantalla completa» (barcode + QR) is unchanged.
+- **Colours.** The school's level palette (`nivel`): Maternal and Preescolar
+  mint, Primaria pink, Secundaria yellow; staff (and a pupil with no level)
+  lavender with the puesto in the pill and «Código» for the code. Card type
+  uses a deeper ink (`credencial.ink`) so it passes AA on Primaria pink.
+- **C.C.T. per level** comes from the official list in
+  `lib/sepIncorporations.ts`. The owner's sample cards print the Preescolar
+  C.C.T. on a Primaria card and the Secundaria one on another; the digital
+  card prints each level's own registration.
+- **Photo.** The account's uploaded photo, else the Google picture saved at
+  its last Google sign-in, else an empty frame (owner's rule). Google pictures
+  are asked at 480 px. Cards API: new `student.photo` (no migration).
+- **Responsive.** Sized from the template's artboard (2550 × 4050) with
+  container units: 320 px on phones, 320 px beside the panel on tablets,
+  352 px on desktop; prints at real CR80 size (54 × 85.6 mm) from Alumnos →
+  Imprimir.
+- **Assets.** `public/assets/credencial/logo.webp` and `45-anos.webp`, cut from
+  the owner's template with a transparent background (13 kB and 10 kB).
+- **Home JS budget.** The master merge (#291/#292) left `/` at 172.016 kB,
+  16 bytes over its 172 kB budget, before this work. The card adds nothing to
+  public pages (its SEP figures are copied, not imported from the footer's
+  module, with a test that they agree; its icons are not shared). Shortening
+  the home video toggle's editor hint brought `/` back to 171.999 kB: it
+  passes by one byte, so the next public change needs the structural fix
+  (lazy admin route table) or the owner's call on the budget.
+
 ### Deploy notes (when approved)
 Standard `deploy.sh`; no migrations, no env vars, no crontab change. After
 deploy: hard-refresh once (new CSS), check `/`, `/portal` and `/admin` on a

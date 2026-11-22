@@ -126,7 +126,10 @@ export default function CredencialPage() {
       {isError ? (
         <Card><ErrorState onRetry={() => refetch()} /></Card>
       ) : isLoading || pickUnresolved ? (
-        <div className="mx-auto h-[280px] w-full max-w-sm skeleton rounded-md" aria-busy="true" />
+        <div className="mx-auto grid w-full max-w-4xl items-start gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:gap-8" aria-busy="true">
+          <div className="skeleton mx-auto aspect-[2550/4050] w-full max-w-[20rem] rounded-md md:max-w-none" />
+          <div className="skeleton h-40 rounded-md" />
+        </div>
       ) : !cards?.length ? (
         <Card>
           <EmptyState icon={Coffee} title="Sin credencial de cafetería"
@@ -155,10 +158,7 @@ export default function CredencialPage() {
         </Card>
       ) : active ? (
         <>
-          <div className="space-y-3">
-            <StudentCard card={active} />
-            <Freshness at={freshAt(dataUpdatedAt, servedAt)} />
-          </div>
+          <StudentCard card={active} footer={<Freshness at={freshAt(dataUpdatedAt, servedAt)} />} />
 
           {/* Activity: visits from Loyverse; consumption from the school's
               ledger. Loyverse's own "total_spent" only counts cash/card (the
@@ -244,7 +244,7 @@ function Freshness({ at }: { at: number }) {
   }, []);
   if (!at) return null;
   return (
-    <p aria-live="polite" className="mx-auto flex max-w-sm items-center justify-center gap-1.5 text-center text-[13px] text-muted">
+    <p aria-live="polite" className="flex items-center gap-1.5 text-[13px] text-muted">
       {online ? <Clock size={16} aria-hidden="true" /> : <WifiOff size={16} aria-hidden="true" />}
       <span>
         {freshnessLabel(at, Math.max(now, at))}

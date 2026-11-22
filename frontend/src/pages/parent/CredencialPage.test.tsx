@@ -81,7 +81,7 @@ describe('CredencialPage activity: «Consumo registrado» (owner, 2026-11-08)', 
 
 describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => {
   beforeEach(() => vi.clearAllMocks());
-  const face = () => screen.getByText('Código Loyverse').closest('[data-testid="credencial-face"]') as HTMLElement;
+  const face = () => screen.getByTestId('credencial-face');
 
   it('the card shows the real balance, the projection, and the line on white', async () => {
     getCards.mockResolvedValue({ data: [{
@@ -108,7 +108,7 @@ describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => 
 
 describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-11-19)', () => {
   beforeEach(() => vi.clearAllMocks());
-  const face = () => screen.getByText('Código Loyverse').closest('[data-testid="credencial-face"]') as HTMLElement;
+  const face = () => screen.getByTestId('credencial-face');
   const staff = (puesto: string, puesto_label: string) => ({
     ...CARD,
     student: { ...CARD.student, name: 'Caja Ejemplo', grade: '', group: '', tipo: 'personal' as const, puesto: puesto as never, puesto_label },
@@ -117,14 +117,14 @@ describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-1
   it('a pupil keeps grade and group', async () => {
     getCards.mockResolvedValue({ data: [{ ...CARD, student: { ...CARD.student, tipo: 'alumno' as const, puesto: '' as const, puesto_label: '' } }] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
-    await screen.findByText('Código Loyverse');
+    await screen.findByTestId('credencial-face');
     expect(within(face()).getByText('4° · Grupo A')).toBeInTheDocument();
   });
 
   it('staff with a puesto: the puesto, no grade, no group', async () => {
     getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
-    await screen.findByText('Código Loyverse');
+    await screen.findByTestId('credencial-face');
     expect(within(face()).getByText('Docente')).toBeInTheDocument();
     expect(within(face()).queryByText(/Alumno|Grupo/)).toBeNull();
   });
@@ -132,7 +132,7 @@ describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-1
   it('staff without a puesto: «Personal del colegio», never «Sin asignar»', async () => {
     getCards.mockResolvedValue({ data: [staff('sin_asignar', 'Sin asignar')] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
-    await screen.findByText('Código Loyverse');
+    await screen.findByTestId('credencial-face');
     expect(within(face()).getByText('Personal del colegio')).toBeInTheDocument();
     expect(within(face()).queryByText(/Alumno|Sin asignar/)).toBeNull();
   });
@@ -140,7 +140,7 @@ describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-1
   it('a portal-only staff login: the page speaks to the holder, never of «el alumno»', async () => {
     getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
-    await screen.findByText('Código Loyverse');
+    await screen.findByTestId('credencial-face');
     expect(screen.getByRole('heading', { level: 1, name: 'Mi credencial de cafetería' })).toBeInTheDocument();
     expect(screen.getByText('Muestre el código en caja para que le cobren de su saldo.')).toBeInTheDocument();
     expect(screen.queryByText(/identificar al alumno/)).toBeNull();
@@ -149,7 +149,7 @@ describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-1
   it('a family keeps the family heading', async () => {
     getCards.mockResolvedValue({ data: [CARD] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
-    await screen.findByText('Código Loyverse');
+    await screen.findByTestId('credencial-face');
     expect(screen.getByRole('heading', { level: 1, name: 'Credencial de cafetería' })).toBeInTheDocument();
     expect(screen.getByText(/identificar al alumno/)).toBeInTheDocument();
   });
@@ -199,7 +199,7 @@ describe('CredencialPage follows the child picked anywhere in the portal (P0, 20
     balance: '45.00',
     points: '45.00',
   };
-  const face = () => screen.getByText('Código Loyverse').closest('[data-testid="credencial-face"]') as HTMLElement;
+  const face = () => screen.getByTestId('credencial-face');
   const PARENT = { id: 3, email: 'mama@example.com', first_name: 'Ana', last_name: 'Quintana', full_name: 'Ana Quintana', role: 'parent', avatar: '', whatsapp: '' } as User;
 
   beforeEach(() => {
@@ -212,7 +212,7 @@ describe('CredencialPage follows the child picked anywhere in the portal (P0, 20
     act(() => useSelectedChildStore.setState({ childId: 12 }));
     getCards.mockResolvedValue({ data: [CARD, DIEGO] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
-    await screen.findByText('Código Loyverse');
+    await screen.findByTestId('credencial-face');
     expect(within(face()).getByText('Diego Quintana')).toBeInTheDocument();
     expect(within(face()).getByText('ci09825')).toBeInTheDocument();
     expect(within(face()).queryByText('Emma Quintana')).toBeNull();
@@ -247,7 +247,7 @@ describe('CredencialPage follows the child picked anywhere in the portal (P0, 20
     getCards.mockResolvedValue({ data: [CARD] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
     expect(await screen.findByText('Diego aún no tiene credencial')).toBeInTheDocument();
-    expect(screen.queryByText('Código Loyverse')).toBeNull();
+    expect(screen.queryByTestId('credencial-face')).toBeNull();
     expect(screen.queryByText('ci09824')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Ver credencial de Emma' }));
     expect(useSelectedChildStore.getState().childId).toBe(10);
