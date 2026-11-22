@@ -211,7 +211,7 @@
   .cms-rich ol { list-style: decimal; padding-left: 1.5rem; }
   .cms-rich li + li { margin-top: 0.25em; }
   .cms-rich a { @apply font-medium text-green-dark underline; }
-  .cms-rich blockquote { @apply border-l-4 border-line pl-4 italic text-muted; }
+  .cms-rich blockquote { @apply border-l-2 border-line pl-4 italic text-muted; }
 
   /* ── Legacy component classes (kept so existing pages stay intact) ── */
   .btn-primary {
