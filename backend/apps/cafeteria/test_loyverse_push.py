@@ -611,3 +611,36 @@ class TestMorningReport:
         assert "por cargar en el POS" in send.call_args.args[0]
         assert "Cargue cada monto al cliente de Loyverse" in body
         assert "SE CARGA SOLA" not in log and "la app la carga sola" not in body
+
+
+class TestVerifyAfterTheFact:
+    """instant mode: a top-up the app loaded on approval leaves «Por aplicar»,
+    but stays in «Por verificar». The console lists it (needs_verify=1) with
+    its own «Verificar en MultiCobros» button, and verifying it clears it."""
+
+    def test_listed_until_verified(
+        self, push, loyverse, admin_client, django_capture_on_commit_callbacks
+    ):
+        from django.urls import reverse
+
+        push.CAFETERIA_TOPUP_LOYVERSE_PUSH = "instant"
+        with django_capture_on_commit_callbacks(execute=True):
+            _, topup, payment = paid_topup("200.00", checkout="PRD", balance=100)
+        topup.refresh_from_db()
+        assert topup.applied_via == TopUpRequest.AppliedVia.AUTO_POS
+
+        listed = admin_client.get(reverse("admin-topups"), {"needs_verify": 1}).data
+        assert [r["id"] for r in listed["results"]] == [topup.pk]
+        assert listed["results"][0]["banorte"]["needs_verification"] is True
+        assert not admin_client.get(reverse("admin-topups"), {"needs_apply": 1}).data["results"]
+
+        verified(payment)
+        assert admin_client.get(reverse("admin-topups"), {"needs_verify": 1}).data["results"] == []
+        assert not paid_topups_awaiting_verification().exists()
+
+    def test_nothing_listed_with_the_auto_load_off(self, settings, loyverse, admin_client):
+        from django.urls import reverse
+
+        settings.PAYMENTS_LIVE = True
+        paid_topup("200.00", checkout="PRD", balance=100)  # PAID: «Por aplicar», not here
+        assert admin_client.get(reverse("admin-topups"), {"needs_verify": 1}).data["results"] == []

@@ -280,6 +280,7 @@ class TopUpFilter(PersonFilterSet):
     needs_unload = django_filters.BooleanFilter(method="filter_needs_unload", widget=BooleanWidget)
     needs_review = django_filters.BooleanFilter(method="filter_needs_review", widget=BooleanWidget)
     needs_apply = django_filters.BooleanFilter(method="filter_needs_apply", widget=BooleanWidget)
+    needs_verify = django_filters.BooleanFilter(method="filter_needs_verify", widget=BooleanWidget)
     applied_on = django_filters.DateFilter(method="filter_applied_on")
 
     class Meta:
@@ -305,6 +306,21 @@ class TopUpFilter(PersonFilterSet):
         if not value:
             return qs
         return qs.filter(pk__in=services.paid_topups_pending().values("pk"))
+
+    def filter_needs_verify(self, qs, name, value):
+        """Card top-ups the app already wrote into Loyverse on approval
+        (``CAFETERIA_TOPUP_LOYVERSE_PUSH=instant``) whose real approval staff
+        still have to match in MultiCobros: the part of «Por verificar» that
+        is no longer in «Por aplicar»."""
+        if not value:
+            return qs
+        from apps.payments.multicobros import paid_topups_awaiting_verification
+
+        return qs.filter(
+            pk__in=paid_topups_awaiting_verification()
+            .filter(status=TopUpRequest.Status.COMPLETED)
+            .values("pk")
+        )
 
     def filter_needs_pos(self, qs, name, value):
         """Paid online, credited locally, not yet loaded into the POS (refunds and
@@ -1038,11 +1054,12 @@ class AdminAdjustmentListView(DateRangeMixin, AdminListMixin, generics.ListAPIVi
 # ── top-ups log ───────────────────────────────────────────
 class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     """GET .../admin/topups/?q=&status=&method=&student=&from=&to=&ordering=
-    &needs_pos=&needs_unload=&needs_review=
+    &needs_pos=&needs_unload=&needs_review=&needs_verify=
 
     Every ``TopUpRequest`` (office + online) with its linked gateway payment.
     ``needs_pos=1`` is the POS load queue, ``needs_unload=1`` the post-refund
-    unload queue, ``needs_review=1`` the card attempts to check in MultiCobros.
+    unload queue, ``needs_review=1`` the card attempts to check in MultiCobros,
+    ``needs_verify=1`` the top-ups the app already loaded, still to verify.
     """
     admin_area = 'cafeteria'
 
