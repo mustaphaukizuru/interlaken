@@ -72,9 +72,9 @@ export default function StudentCard({ card, footer }: { card: CafeteriaCard; foo
           The card itself stays the printed one: the balance lives in the panel. */}
       <div
         data-testid="credencial-face"
-        className="mx-auto grid w-full max-w-4xl items-start gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:gap-8 print:block"
+        className="mx-auto grid w-full max-w-4xl items-start gap-5 md:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] md:gap-6 xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:gap-8 print:block"
       >
-        <div className="mx-auto w-full max-w-[20rem] md:max-w-none print:mx-0 print:w-[54mm]">
+        <div className="mx-auto w-full max-w-[28rem] md:max-w-none print:mx-0 print:w-[85.6mm]">
           <CredentialFace card={card} className="w-full" />
           {card.code && (
             // 48 px: students use this view (Phase 6).

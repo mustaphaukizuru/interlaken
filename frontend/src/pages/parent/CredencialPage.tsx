@@ -126,8 +126,8 @@ export default function CredencialPage() {
       {isError ? (
         <Card><ErrorState onRetry={() => refetch()} /></Card>
       ) : isLoading || pickUnresolved ? (
-        <div className="mx-auto grid w-full max-w-4xl items-start gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:gap-8" aria-busy="true">
-          <div className="skeleton mx-auto aspect-[2550/4050] w-full max-w-[20rem] rounded-md md:max-w-none" />
+        <div className="mx-auto grid w-full max-w-4xl items-start gap-5 md:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] md:gap-6 xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:gap-8" aria-busy="true">
+          <div className="skeleton mx-auto aspect-[4050/2550] w-full max-w-[28rem] rounded-md md:max-w-none" />
           <div className="skeleton h-40 rounded-md" />
         </div>
       ) : !cards?.length ? (

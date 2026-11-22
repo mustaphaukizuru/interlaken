@@ -4,18 +4,23 @@ import { gradeBadge, levelOf, photoSrc, schoolCycle, sepLines, type Level } from
 import type { CafeteriaCard } from '@/types';
 
 /**
- * The digital credencial drawn as the school's printed student ID (owner,
- * 2026-11-22): navy band with the logo, the C.C.T. and the «45 años» mark;
- * the level's colour with the clock-ray pattern; grade pill, photo, Nombre,
- * Ciclo Escolar, Matrícula and the barcode the cafetería POS scans.
+ * The digital credencial: the school's printed student ID (owner,
+ * 2026-11-22) laid out as a standard landscape ID card (CR80, 85.6 x 54 mm,
+ * like a bank card or a wallet pass). Navy band with the logo, the C.C.T.
+ * and the «45 años» mark; the level's colour with the clock-ray pattern;
+ * photo, grade, Nombre, Ciclo escolar, Matrícula and a barcode strip the
+ * cafetería POS scans.
  *
- * Every position comes from the template's artboard (2550 × 4050, a CR80
- * card portrait at 1200 dpi), so the card keeps its proportions at any
- * width; type is sized in container units (index.css, `.credencial`).
+ * Positions are in artboard units (4050 x 2550, CR80 landscape at 1200 dpi,
+ * the template's scale), so the card keeps its proportions at any width;
+ * type is sized in container units (index.css, `.credencial`).
  */
-const W = 2550;
-const H = 4050;
-const BAND = 990; // the navy band's width
+const W = 4050;
+const H = 2550;
+const BAND = 1050; // the navy band's width
+const PHOTO = { x: 1250, y: 220, w: 1150, h: 1530 }; // 3:4 portrait
+const DATA = { x: 2590, y: 220, w: 1260, h: 1530 };
+const STRIP = { x: 1250, y: 1900, w: 2600, h: 430 }; // the barcode strip
 
 const box = (x: number, y: number, w: number, h: number) => ({
   left: `${(x / W) * 100}%`,
@@ -54,11 +59,11 @@ const LEVEL_FILL: Record<Level, string> = {
   secundaria: 'fill-nivel-secundaria',
 };
 
-function Field({ label, value, long = false, first = false }: { label: string; value: string; long?: boolean; first?: boolean }) {
+function Field({ label, value, className = '' }: { label: string; value: string; className?: string }) {
   return (
-    <div className={first ? '' : 'cred-gap'}>
-      <dt className="cred-label font-light">{label}</dt>
-      <dd className={`${long ? 'cred-value-long' : 'cred-value'} line-clamp-3 font-bold [overflow-wrap:anywhere]`}>{value}</dd>
+    <div className="min-w-0">
+      <dt className="cred-label font-semibold uppercase tracking-[0.08em]">{label}</dt>
+      <dd className={`mt-[0.4cqw] font-bold [overflow-wrap:anywhere] ${className || 'cred-value truncate'}`}>{value}</dd>
     </div>
   );
 }
@@ -92,11 +97,11 @@ export function CredentialFace({ card, className = '' }: { card: CafeteriaCard; 
   return (
     <section
       aria-label={`Credencial de ${s.name}`}
-      className={`credencial relative aspect-[2550/4050] overflow-hidden rounded-md bg-credencial-navy font-head text-credencial-ink shadow-lg ring-1 ring-black/5 [print-color-adjust:exact] print:shadow-none ${className}`}
+      className={`credencial relative aspect-[4050/2550] overflow-hidden rounded-md bg-credencial-navy font-head text-credencial-ink shadow-lg ring-1 ring-black/5 [print-color-adjust:exact] print:shadow-none ${className}`}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full" aria-hidden="true" focusable="false">
         <defs>
-          <pattern id={patternId} patternUnits="userSpaceOnUse" x="1246" y="1112" width={TILE_W} height={TILE_H}>
+          <pattern id={patternId} patternUnits="userSpaceOnUse" x="1328" y="1275" width={TILE_W} height={TILE_H}>
             <g fill="none" className="stroke-white" strokeOpacity={0.17} strokeLinecap="round">
               <path d={LONG_RAYS} strokeWidth={38} />
               <path d={SHORT_RAYS} strokeWidth={19} />
@@ -106,25 +111,22 @@ export function CredentialFace({ card, className = '' }: { card: CafeteriaCard; 
         <rect width={BAND} height={H} className="fill-credencial-navy" />
         <rect x={BAND} width={W - BAND} height={H} className={fill} />
         <rect x={BAND} width={W - BAND} height={H} fill={`url(#${patternId})`} />
-        <rect x={1095} y={654} width={1218} height={148} rx={74} className="fill-credencial-navy" />
-        <rect x={1117} y={3377} width={1163} height={491} className="fill-white" />
-        <image href="/assets/credencial/logo.webp" x={150} y={300} width={690} height={610} />
-        <image href="/assets/credencial/45-anos.webp" x={227} y={3040} width={536} height={626} />
+        {/* White mat around the photo and the barcode strip, as on a printed ID. */}
+        <rect x={PHOTO.x - 26} y={PHOTO.y - 26} width={PHOTO.w + 52} height={PHOTO.h + 52} rx={44} className="fill-white" />
+        <rect x={STRIP.x} y={STRIP.y} width={STRIP.w} height={STRIP.h} rx={44} className="fill-white" />
+        <image href="/assets/credencial/logo.webp" x={155} y={190} width={740} height={654} />
+        <image href="/assets/credencial/45-anos.webp" x={300} y={1880} width={450} height={526} />
       </svg>
 
       {/* The navy band: the level's SEP registration under the logo. */}
       {sep && (
-        <div className="absolute text-center text-white" style={box(40, 1105, 910, 420)}>
+        <div className="absolute flex flex-col items-center justify-center text-center text-white" style={box(50, 930, 950, 420)}>
           <p className="cred-sep font-semibold">C.C.T. {sep.cct}</p>
-          {sep.lines.map((l) => <p key={l} className="cred-sep font-light">{l}</p>)}
+          {sep.lines.map((l) => <p key={l} className={`${l.length > 16 ? 'cred-sep-long' : 'cred-sep'} whitespace-nowrap font-light`}>{l}</p>)}
         </div>
       )}
 
-      <div className="absolute flex items-center justify-center px-[3%] text-white" style={box(1095, 654, 1218, 148)}>
-        <span className="cred-pill truncate font-bold">{badge}</span>
-      </div>
-
-      <div className="absolute overflow-hidden bg-white" style={box(1175, 865, 1059, 1385)}>
+      <div className="absolute overflow-hidden rounded-sm bg-white" style={box(PHOTO.x, PHOTO.y, PHOTO.w, PHOTO.h)}>
         {photo ? (
           <img
             src={photo}
@@ -139,15 +141,21 @@ export function CredentialFace({ card, className = '' }: { card: CafeteriaCard; 
         )}
       </div>
 
-      <dl className="absolute flex flex-col items-center justify-center text-center" style={box(1080, 2290, 1248, 1060)}>
-        <Field first label="Nombre" value={s.name} long={s.name.length > 30} />
-        <Field label="Ciclo Escolar" value={schoolCycle()} />
-        <Field label={staff ? 'Código' : 'Matrícula'} value={card.code || '—'} />
-      </dl>
-
-      <div className="absolute flex items-center justify-center px-[4%] py-[2.5%]" style={box(1117, 3377, 1163, 491)}>
-        {card.code && <Barcode value={card.code} displayValue={false} height={70} className="h-full w-full" />}
+      <div className="absolute flex flex-col justify-between" style={box(DATA.x, DATA.y, DATA.w, DATA.h)}>
+        <span className="cred-pill self-start truncate rounded-full bg-credencial-navy px-[1.6cqw] py-[0.7cqw] font-bold text-white">{badge}</span>
+        <dl className="flex flex-col gap-[1.6cqw]">
+          <Field label="Nombre" value={s.name} className={`${s.name.length > 26 ? 'cred-name-long' : 'cred-name'} line-clamp-3`} />
+          <Field label="Ciclo escolar" value={schoolCycle()} />
+          <Field label={staff ? 'Código' : 'Matrícula'} value={card.code || '—'} />
+        </dl>
       </div>
+
+      <div className="absolute flex items-center justify-center px-[2cqw] py-[1cqw]" style={box(STRIP.x, STRIP.y, STRIP.w, STRIP.h)}>
+        {card.code && <Barcode value={card.code} displayValue={false} height={56} className="h-full max-w-full" />}
+      </div>
+
+      {/* A soft sheen, as on a laminated card. */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-white/0 to-transparent" aria-hidden="true" />
     </section>
   );
 }

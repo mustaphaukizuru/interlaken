@@ -200,10 +200,15 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
 - **Photo.** The account's uploaded photo, else the Google picture saved at
   its last Google sign-in, else an empty frame (owner's rule). Google pictures
   are asked at 480 px. Cards API: new `student.photo` (no migration).
-- **Responsive.** Sized from the template's artboard (2550 × 4050) with
-  container units: 320 px on phones, 320 px beside the panel on tablets,
-  352 px on desktop; prints at real CR80 size (54 × 85.6 mm) from Alumnos →
-  Imprimir.
+- **Standard landscape card (owner, same day).** The vertical card read as
+  too long, so it is laid out as a standard landscape ID (CR80, 85.6 × 54 mm,
+  like a bank card): navy band left (logo, C.C.T., 45 años), level colour
+  with the pattern, photo on a white mat, grade pill, NOMBRE, CICLO ESCOLAR,
+  MATRÍCULA, and a white barcode strip across the bottom; a soft laminate
+  sheen. Artboard 4050 × 2550, type in container units with a minimum size
+  for phones. 358 px wide on phones (the balance now shows without
+  scrolling), 416 px beside the panel on tablets, 480 px on desktop; prints
+  at 85.6 × 54 mm from Alumnos → Imprimir.
 - **Assets.** `public/assets/credencial/logo.webp` and `45-anos.webp`, cut from
   the owner's template with a transparent background (13 kB and 10 kB).
 - **Home JS budget.** The master merge (#291/#292) left `/` at 172.016 kB,
