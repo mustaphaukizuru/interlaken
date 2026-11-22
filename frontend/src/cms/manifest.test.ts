@@ -41,6 +41,14 @@ function fieldLabels(fields: FieldSpec[], prefix = ''): [string, string][] {
   ]);
 }
 
+/** Editor kind of every field path (`items[].title`: «text»): the pre-publish review (content/publish_checks.py) tells labels, links and long texts apart. */
+function fieldKinds(fields: FieldSpec[], prefix = ''): [string, FieldKind][] {
+  return fields.flatMap((fs): [string, FieldKind][] => [
+    [`${prefix}${fs.key}`, fs.kind],
+    ...(fs.kind === 'items' ? fieldKinds(fs.item ?? [], `${prefix}${fs.key}[].`) : []),
+  ]);
+}
+
 function entry(spec: BlockSpec) {
   // «Tabla» fields: the backend enforces their limits (content/table_block.py).
   const tables = Object.fromEntries(spec.fields.filter((fs) => fs.kind === 'table' && fs.limits).map((fs) => [fs.key, fs.limits]));
@@ -51,7 +59,10 @@ function entry(spec: BlockSpec) {
     required: Object.fromEntries(spec.fields.filter((fs) => fs.required).map((fs) => [fs.key, PY_KIND[fs.kind]])),
     images: imagePaths(spec.fields),
     labels: Object.fromEntries(fieldLabels(spec.fields)),
+    kinds: Object.fromEntries(fieldKinds(spec.fields)),
     ...(Object.keys(tables).length ? { tables } : {}),
+    // What the site shows for a prop the page leaves out, and what «Restaurar» brings back.
+    ...(spec.defaults && Object.keys(spec.defaults).length ? { defaults: spec.defaults } : {}),
   };
 }
 
@@ -84,6 +95,9 @@ async function buildTemplates() {
         path: t.path,
         title: t.title,
         seo: { title: tokenize(t.seo.title ?? route?.title ?? ''), description: tokenize(t.seo.description ?? route?.description ?? '') },
+        // The design as the site shows it before any edit (block ids `${slug}-${n}`, props over the section
+        // defaults): what «Qué cambia» compares a first publication with.
+        sections: t.sections.map((e) => (typeof e === 'string' ? { type: e } : e)),
       }];
     })),
   };
