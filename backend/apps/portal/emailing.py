@@ -221,7 +221,9 @@ def name_initial(first: str, last: str = '') -> str:
     if not given:
         return first_name_initial(last)
     if not surnames:
-        return first_name_initial(first)
+        # No surname on record: the first given name alone. A middle name's
+        # initial would read like a surname («Ana M.» for Ana María).
+        return given[0]
     return f'{given[0]} {surnames[0][0]}.'
 
 

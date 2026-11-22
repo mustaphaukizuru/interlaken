@@ -138,12 +138,14 @@ def _check_child(user, child: StudentProfile | None):
 
 
 def _code_email(child: StudentProfile, requester, code: str):
-    from apps.portal.emailing import EmailContent, first_name_initial, long_date
+    from apps.portal.emailing import EmailContent, long_date, person_initial
 
     first = child.user.first_name or child.user.full_name
     # D13: the body names the child by first name and initial; the subject and
     # the inbox preview carry neither the name nor the code.
-    short = first_name_initial(child.user.full_name) or first
+    # person_initial: first given name + first surname's initial, as in every
+    # other family email («Ana P.», never «Ana M.» from a middle name).
+    short = person_initial(child.user) or first
     expires = long_date(timezone.now() + CODE_TTL, with_time=True)
     pretty = f'{code[:3]} {code[3:]}'
     content = EmailContent(

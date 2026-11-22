@@ -36,6 +36,8 @@ export default function MobileTabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Navegación principal"
+      // data-bottom-bar: the cookie banner lifts itself above this bar (CookieBanner.tsx).
+      data-bottom-bar=""
       className="fixed inset-x-0 bottom-0 z-sticky flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg print:hidden lg:hidden"
     >
       {items.map(({ icon: Icon, label, to, end, badgeKey }) => (

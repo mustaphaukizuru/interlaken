@@ -143,6 +143,8 @@ class TestNames:
     def test_first_name_and_first_surname_initial(self):
         assert name_initial('Ana María', 'Pérez Gil') == 'Ana P.'
         assert name_initial('Leo', '') == 'Leo' and name_initial('', 'Ramos Terrazas') == 'Ramos T.'
+        # No surname: never a middle name's initial posing as one (review 2026-11-22).
+        assert name_initial('Ana María', '') == 'Ana'
         user = StudentUserFactory.build(first_name='Carla', last_name='Ramos Terrazas')
         assert person_initial(user) == 'Carla R.' and person_initial(None) == ''
 

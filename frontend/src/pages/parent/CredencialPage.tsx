@@ -69,21 +69,28 @@ export default function CredencialPage() {
   // (P0, 2026-11-21: a parent who picked B opened A's barcode at the till).
   const storedId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
-  const { children: family } = useFamilyChildren();
+  const { children: family, loaded: familyLoaded, isFamily } = useFamilyChildren();
   const cardOf = (id: number | null) => (id == null ? undefined : cards?.find((c) => c.student.id === id));
+  // The picked child has no card in this answer: until the family list says
+  // whether that child is ours (and simply has no credential yet), wait.
+  // Falling back to cards[0] meanwhile would show a sibling's barcode and
+  // overwrite the pick (code review 2026-11-22).
+  const pickUnresolved = !mine && isFamily && storedId != null && !!cards && !cardOf(storedId) && !familyLoaded;
   // A child of this family with no credential yet: say so, never show a sibling's.
   const missingChild = !mine && storedId != null && !cardOf(storedId)
     ? family.find((c) => c.id === storedId)
     : undefined;
-  const active = mine ? cards?.[0] : (cardOf(storedId) ?? (missingChild ? undefined : cards?.[0]));
+  const active = mine
+    ? cards?.[0]
+    : (cardOf(storedId) ?? (missingChild || pickUnresolved ? undefined : cards?.[0]));
 
   // No (or a stale) pick and several cards: adopt the one shown, so the
   // header and every other page agree with the barcode on screen.
   useEffect(() => {
-    if (mine || !cards || cards.length < 2 || missingChild) return;
+    if (mine || !cards || cards.length < 2 || missingChild || pickUnresolved) return;
     if (storedId != null && cards.some((c) => c.student.id === storedId)) return;
     setChildId(cards[0].student.id);
-  }, [mine, cards, storedId, missingChild, setChildId]);
+  }, [mine, cards, storedId, missingChild, pickUnresolved, setChildId]);
 
   const studentId = active?.student.id;
   const {
@@ -118,7 +125,7 @@ export default function CredencialPage() {
 
       {isError ? (
         <Card><ErrorState onRetry={() => refetch()} /></Card>
-      ) : isLoading ? (
+      ) : isLoading || pickUnresolved ? (
         <div className="mx-auto h-[280px] w-full max-w-sm skeleton rounded-md" aria-busy="true" />
       ) : !cards?.length ? (
         <Card>

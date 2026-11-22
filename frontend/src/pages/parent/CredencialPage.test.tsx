@@ -254,6 +254,26 @@ describe('CredencialPage follows the child picked anywhere in the portal (P0, 20
     expect(await screen.findByText('ci09824')).toBeInTheDocument();
   });
 
+  it('cold open: waits for the family list instead of flashing a sibling’s barcode (review 2026-11-22)', async () => {
+    useAuthStore.setState({ user: PARENT, accessToken: 't', isAuthenticated: true });
+    let release: (v: unknown) => void = () => {};
+    getDashboard.mockReturnValue(new Promise((r) => { release = r; }) as never);
+    act(() => useSelectedChildStore.setState({ childId: 12 }));
+    getCards.mockResolvedValue({ data: [CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await waitFor(() => expect(getCards).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('ci09824')).toBeNull();
+    expect(useSelectedChildStore.getState().childId).toBe(12);
+    await act(async () => release({ data: { children: [
+      { id: 10, name: 'Emma Quintana', grade: '4°', group: 'A', student_id: '09824' },
+      { id: 12, name: 'Diego Quintana', grade: '1°', group: 'B', student_id: '09825' },
+    ] } }));
+    expect(await screen.findByText('Diego aún no tiene credencial')).toBeInTheDocument();
+    expect(screen.queryByText('ci09824')).toBeNull();
+    expect(useSelectedChildStore.getState().childId).toBe(12);
+  });
+
   it('says how old the balance is', async () => {
     getCards.mockResolvedValue({ data: [CARD] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });

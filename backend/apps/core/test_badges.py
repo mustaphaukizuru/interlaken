@@ -140,13 +140,13 @@ def test_failed_payments_skip_family_cancellations_and_old_ones():
     PaymentFactory(status=Payment.Status.FAILED, gateway_raw={'stage': 'supersede'})
     old = PaymentFactory(status=Payment.Status.FAILED)
     Payment.objects.filter(pk=old.pk).update(created_at=now - timedelta(days=9))
-    stuck = PaymentFactory(status=Payment.Status.PROCESSING)
+    stuck = PaymentFactory(status=Payment.Status.PROCESSING)  # not a FAILED row: the link can't list it
     Payment.objects.filter(pk=stuck.pk).update(created_at=now - timedelta(hours=30))
     PaymentFactory(status=Payment.Status.PENDING)  # still inside the bank window
     PaymentFactory(status=Payment.Status.SUCCESS)
 
-    assert failed_payments_count() == 3
-    assert _compute_badges(staff('cafeteria'))['pagos_fallidos'] == 3
+    assert failed_payments_count() == 2
+    assert _compute_badges(staff('cafeteria'))['pagos_fallidos'] == 2
 
 
 def test_loyverse_alerts_count_the_stale_cron_checks():
@@ -185,3 +185,34 @@ def test_arco_overdue_is_admin_only():
 def test_an_empty_money_queue_has_no_age():
     data = _compute_badges(staff('cafeteria'))
     assert data['cafeteria_verificar'] == 0 and 'cafeteria_verificar_edad' not in data
+
+
+def test_aplicar_counts_credited_topups_not_in_the_pos_and_never_doubles_verificar():
+    """Code review 2026-11-22: a top-up waiting for its MultiCobros check is
+    counted once (under «Por verificar»), and one already credited here but
+    not loaded into Loyverse still shows under «Por aplicar»."""
+    from decimal import Decimal
+
+    from apps.accounts.factories import ParentFactory, StudentProfileFactory
+    from apps.cafeteria.models import TopUpRequest
+    from apps.payments.models import BanorteCheckout, Payment
+
+    parent = ParentFactory()
+    student = StudentProfileFactory(parents=[parent])
+
+    def card_topup(status):
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal('100.00'), method=TopUpRequest.Method.ONLINE, status=status)
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA, amount=Decimal('100.00'),
+            gateway=Payment.Gateway.BANORTE, related_topup=topup, status=Payment.Status.SUCCESS)
+        BanorteCheckout.objects.create(payment=payment, control_number=f'IK{payment.pk:06d}',
+                                       mode='PRD', resultado_payw='A', referencia='123456')
+        return topup
+
+    card_topup(TopUpRequest.Status.PAID)        # approval not matched yet: «Por verificar» only
+    card_topup(TopUpRequest.Status.COMPLETED)   # credited here, not in Loyverse yet: «Por aplicar»
+
+    data = _compute_badges(staff('cafeteria'))
+    assert data['cafeteria_verificar'] == 1
+    assert data['cafeteria_aplicar'] == 1

@@ -34,7 +34,8 @@ interface Item {
   tone: Tone;
   one: string;
   many: string;
-  to: string;
+  /** Built when the row renders, so links with dates follow the clock (a console left open overnight). */
+  to: string | (() => string);
   /** One supporting line (what to do next), optional. */
   hint?: (c: Counters, totals: PendingTotals) => string | undefined;
 }
@@ -74,7 +75,8 @@ const ITEMS: Item[] = [
     to: '/admin/cafeteria?tab=deposits&estado=pending&metodo=office' },
   { key: 'pagos_fallidos', area: 'cafeteria', icon: CreditCard, tone: 'danger',
     one: 'pago con tarjeta fallido', many: 'pagos con tarjeta fallidos',
-    to: `/admin/pagos?estado=failed&desde=${daysAgo(6)}`, hint: () => 'Últimos 7 días, sin contar cancelados por la familia.' },
+    to: () => `/admin/pagos?estado=failed&desde=${daysAgo(6)}`,
+    hint: () => 'Últimos 7 días. La lista también muestra los cancelados por la familia.' },
   { key: 'loyverse_alertas', area: 'cafeteria', icon: RefreshCw, tone: 'danger',
     one: 'alerta de sincronización con Loyverse', many: 'alertas de sincronización con Loyverse',
     to: '/admin/cafeteria', hint: () => 'Revise «Estado de la sincronización».' },
@@ -91,7 +93,7 @@ const ITEMS: Item[] = [
   { key: 'visitas', area: 'visitas', icon: CalendarClock, tone: 'info',
     one: 'visita por confirmar', many: 'visitas por confirmar', to: '/admin/visitas?estado=pending' },
   { key: 'visitas_hoy', area: 'visitas', icon: CalendarCheck, tone: 'info',
-    one: 'visita hoy', many: 'visitas hoy', to: `/admin/visitas?desde=${daysAgo(0)}&hasta=${daysAgo(0)}` },
+    one: 'visita hoy', many: 'visitas hoy', to: () => `/admin/visitas?desde=${daysAgo(0)}&hasta=${daysAgo(0)}` },
   { key: 'mensajes', area: 'mensajes', icon: Inbox, tone: 'info',
     one: 'mensaje sin atender', many: 'mensajes sin atender', to: '/admin/mensajes' },
   { key: 'formularios', area: 'mensajes', icon: FormInput, tone: 'info',
@@ -184,7 +186,7 @@ export function PendingList({ totals = {} }: { totals?: PendingTotals }) {
             return (
               <li key={it.key}>
                 <Link
-                  to={it.to}
+                  to={typeof it.to === 'function' ? it.to() : it.to}
                   className="group flex min-h-[56px] items-center gap-3 px-5 py-3 transition-colors hover:bg-cream/60 focus-visible:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 sm:px-[22px]"
                 >
                   <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-sm ${TONE[it.tone]}`}>

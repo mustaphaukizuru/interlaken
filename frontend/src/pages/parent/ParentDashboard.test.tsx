@@ -520,7 +520,7 @@ describe('ParentDashboard «Hoy» (Phase 6 pilot)', () => {
     await waitFor(() => expect(portalApi.markNotificationRead).toHaveBeenCalledWith(9));
   });
 
-  it('never more than four rows, low balances first, and no duplicate «saldo bajo» aviso', async () => {
+  it('never more than four rows, urgent avisos first, and no duplicate «saldo bajo» aviso', async () => {
     getDashboard.mockResolvedValue({ data: {
       ...LINKED_DATA,
       cafeteria_balances: LINKED_DATA.cafeteria_balances.map((b) => ({ ...b, low: true })),
@@ -535,11 +535,21 @@ describe('ParentDashboard «Hoy» (Phase 6 pilot)', () => {
     await screen.findByText('Suspensión de clases');
     const rows = hoy().getAllByRole('listitem');
     expect(rows).toHaveLength(4);
-    expect(within(rows[0]).getByText('Saldo bajo de Luis')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('Saldo bajo de Sofía')).toBeInTheDocument();
-    expect(within(rows[1]).getByRole('link', { name: 'Recargar a Sofía López' })).toHaveAttribute('href', '/portal/cafeteria?hijo=12');
-    // The «saldo bajo» alert is the row above, not a second one.
+    // Urgent school alerts are never the rows cut (code review 2026-11-22).
+    expect(within(rows[0]).getByText('Suspensión de clases')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Simulacro')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('Vacunación')).toBeInTheDocument();
+    expect(within(rows[3]).getByText('Saldo bajo de Luis')).toBeInTheDocument();
+    expect(within(rows[3]).getByRole('link', { name: 'Recargar a Luis López' })).toHaveAttribute('href', expect.stringContaining('/portal/cafeteria?hijo='));
+    // The «saldo bajo» alert is the low-balance row, not a second one.
     expect(hoy().getAllByText(/Saldo bajo de Luis/)).toHaveLength(1);
+  });
+
+  it('one unread aviso counted by the dashboard only: «1 aviso sin leer», singular', async () => {
+    getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [], unread_notifications: 1 } } as never);
+    getNotifications.mockRejectedValue(new Error('offline'));
+    renderPage();
+    expect(await screen.findByText('1 aviso sin leer')).toBeInTheDocument();
   });
 
   it('shows the selected child’s figures from the spending query', async () => {

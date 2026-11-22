@@ -78,8 +78,9 @@ _NOT_A_PROBLEM_STAGES = ('cancel', 'expire', 'supersede')
 def failed_payments_count(now=None) -> int:
     """Card payments that FAILED in the last ``FAILED_PAYMENT_DAYS`` days for a
     reason a person may have to look at (declined, bank timeout, not found in
-    MultiCobros, configuration), plus attempts of that window stuck pending
-    for more than 24 h (the summary's ``stuck_pending`` rule)."""
+    MultiCobros, configuration). Attempts stuck pending are not counted here:
+    the row links to the FAILED list, which cannot show them (code review
+    2026-11-22); the Pagos page reports them on its own (``stuck_pending``)."""
     from datetime import timedelta
 
     from django.db.models import Q
@@ -94,10 +95,7 @@ def failed_payments_count(now=None) -> int:
     failed = (Payment.objects.filter(status=Payment.Status.FAILED, created_at__gte=since)
               .exclude(Q(gateway_raw__has_key='stage') & Q(gateway_raw__stage__in=_NOT_A_PROBLEM_STAGES))
               .count())
-    stuck = Payment.objects.filter(
-        status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING],
-        created_at__gte=since, created_at__lt=now - timedelta(hours=24)).count()
-    return failed + stuck
+    return failed
 
 
 def loyverse_sync_alerts(now=None) -> int:
@@ -196,11 +194,15 @@ def _compute_badges(user) -> dict:
     if 'cafeteria' in areas:
         # «Por verificar»: the part of «cafeteria» only a MultiCobros check can
         # move (paid by card, approval not verified), shown apart next to Cafetería.
-        queue('cafeteria_verificar', paid_topups_awaiting_verification(), 'processed_at')
+        to_verify = paid_topups_awaiting_verification()
+        queue('cafeteria_verificar', to_verify, 'processed_at')
         queue('cafeteria_caja', office_cash, 'created_at')
-        # Paid card top-ups to load into the POS at 07:30 (the «Por aplicar» list).
-        queue('cafeteria_aplicar', online_topups_awaiting_staff().filter(
-            status=TopUpRequest.Status.PAID), 'processed_at')
+        # Card top-ups staff still have to load into the POS (the «Por aplicar»
+        # list): paid ones, and ones already credited here but not in Loyverse
+        # yet. Those still waiting for a MultiCobros check are counted once,
+        # under «Por verificar» (code review 2026-11-22: no top-up in two rows).
+        queue('cafeteria_aplicar', online_topups_awaiting_staff().exclude(
+            pk__in=to_verify.values('pk')), 'processed_at')
         out['pagos_fallidos'] = failed_payments_count(now)
         out['saldo_bajo'] = low_balance_queryset().filter(student__tipo=StudentProfile.Tipo.ALUMNO).count()
         out['loyverse_alertas'] = loyverse_sync_alerts(now)

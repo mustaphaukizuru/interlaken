@@ -179,10 +179,15 @@ export default function ParentDashboard() {
   } else if (restCount > 0) {
     hoy.push({
       key: 'notif-rest', icon: Bell, tone: 'neutral',
-      title: `${restCount} avisos sin leer`,
+      title: restCount === 1 ? '1 aviso sin leer' : `${restCount} avisos sin leer`,
       action: { label: 'Ver avisos', to: '/portal/notificaciones?sin_leer=1' },
     });
   }
+
+  // Urgent school alerts first, then the rest in the order built: «Hoy» shows
+  // only the first rows, and an urgent aviso must never be the one cut
+  // (code review 2026-11-22). Array.prototype.sort is stable.
+  hoy.sort((a, b) => Number(b.tone === 'danger') - Number(a.tone === 'danger'));
 
   const now = new Date(nowMs);
   const todayLine = format(now, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });

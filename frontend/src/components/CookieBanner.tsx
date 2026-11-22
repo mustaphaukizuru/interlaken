@@ -20,6 +20,9 @@ export const COOKIE_DEFAULTS = {
  * `data-sticky-cta`). Elsewhere the banner sits on the bottom edge.
  */
 const CLEAR_STICKY_CTA = 'max-md:[body:has([data-sticky-cta])_&]:mb-[76px]';
+// The portal's phone tab bar (MobileTabBar, data-bottom-bar) shows below lg:
+// the banner lifts above it too instead of hiding the tabs (code review 2026-11-22).
+const CLEAR_TAB_BAR = 'max-lg:[body:has([data-bottom-bar])_&]:mb-[76px]';
 
 export default function CookieBanner({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
   const text = useSiteTexts(COOKIE_DEFAULTS);
@@ -27,7 +30,7 @@ export default function CookieBanner({ onAccept, onDecline }: { onAccept: () => 
     <div
       role="region"
       aria-label="Aviso de cookies"
-      className={`fixed bottom-0 inset-x-0 z-drawer ${CLEAR_STICKY_CTA} p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] print:hidden`}
+      className={`fixed bottom-0 inset-x-0 z-drawer ${CLEAR_STICKY_CTA} ${CLEAR_TAB_BAR} p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] print:hidden`}
     >
       <div className="max-w-3xl mx-auto bg-white rounded-md shadow-raised p-5 sm:flex sm:items-center sm:gap-5">
         <div className="flex items-start gap-3 flex-1">
