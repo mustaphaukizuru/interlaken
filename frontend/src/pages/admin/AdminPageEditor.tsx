@@ -109,6 +109,10 @@ export default function AdminPageEditor() {
   const isAdmin = role === 'admin';
   const base = cmsBase(role);
   const desktop = useMediaQuery('(min-width: 1024px)');
+  // On phones the toaster sits at the bottom (ToastHost), right over the review dialog's
+  // «Entiendo las advertencias» and «Publicar»: notices raised while it is open go on top.
+  const phone = !useMediaQuery('(min-width: 768px)');
+  const dialogToast = phone ? { position: 'top-center' as const } : undefined;
   const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
   const [blocks, setBlocksState] = useState<Block[]>([]);
@@ -286,7 +290,8 @@ export default function AdminPageEditor() {
       if (seq === reviewSeq.current) setReviewing(false);
     }
   };
-  const openReview = () => { setReviewOpen(true); void runReview(); };
+  // Older notices (a token's «Deshacer», «Guardado») would cover the dialog's footer on phones.
+  const openReview = () => { toast.dismiss(); setReviewOpen(true); void runReview(); };
 
   const publish = useMutation({
     mutationFn: async ({ action, confirmLegacy, acknowledged }: { action: 'publish' | 'unpublish'; confirmLegacy?: boolean; acknowledged?: string[] }) => {
@@ -317,7 +322,7 @@ export default function AdminPageEditor() {
         setDialog(null);
         showReport(refusal);
         setReviewOpen(true);
-        if (refusal.code === 'publish_warnings' && vars.acknowledged?.length) toast.error('Apareció una advertencia nueva: revísela antes de publicar.');
+        if (refusal.code === 'publish_warnings' && vars.acknowledged?.length) toast.error('Apareció una advertencia nueva: revísela antes de publicar.', dialogToast);
         return;
       }
       const f = apiFieldErrors(e);
@@ -350,10 +355,10 @@ export default function AdminPageEditor() {
   /** A quick fix of the review: the field takes the backend's value (undo and autosave as any edit), then a new review. */
   const fixIssue = (issue: ReviewIssue) => {
     const res = applyFix(draft.current.blocks, draft.current.meta.seo, issue);
-    if (!res) { toast.error('Esta corrección ya no aplica: la sección cambió. Use «Ir al campo».'); return; }
+    if (!res) { toast.error('Esta corrección ya no aplica: la sección cambió. Use «Ir al campo».', dialogToast); return; }
     if (res.blocks) update(res.blocks);
     if (res.seo) updateMeta({ seo: res.seo });
-    toast.success(`Corregido: ${issue.fix?.label ?? ''}.`);
+    toast.success(`Corregido: ${issue.fix?.label ?? ''}.`, dialogToast);
     void runReview();
   };
   const jumpToIssue = (issue: ReviewIssue) => {

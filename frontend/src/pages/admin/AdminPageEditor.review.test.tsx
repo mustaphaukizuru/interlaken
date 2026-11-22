@@ -87,7 +87,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     const dialog = await openReview();
     vi.mocked(reviewApi.check).mockResolvedValue({ data: report({ errors: [] }) } as never);
     await userEvent.click(await within(dialog).findByRole('button', { name: 'Cambiar por «Agendar visita»' }));
-    expect(toast.success).toHaveBeenCalledWith('Corregido: Cambiar por «Agendar visita».');
+    expect(toast.success).toHaveBeenCalledWith('Corregido: Cambiar por «Agendar visita».', undefined); // desktop: the toaster's own corner
     await waitFor(() => expect(vi.mocked(reviewApi.check)).toHaveBeenCalledTimes(2));
     expect((lastCheck()[1]!.draft_blocks[1].props as Record<string, unknown>).ctaPrimary).toEqual(VISIT);
     await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
@@ -98,6 +98,18 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     expect(within(dialog).getByRole('button', { name: /^Publicar$/ })).toBeDisabled();
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Entiendo las advertencias' }));
     expect(within(dialog).getByRole('button', { name: /^Publicar$/ })).toBeEnabled();
+  });
+
+  it('on a phone, opening the review clears older notices and a quick fix notice goes on top', async () => {
+    // The phone toaster sits at the bottom, right over «Entiendo las advertencias» and «Publicar».
+    stubViewport(390);
+    renderEditor();
+    await ready();
+    const dialog = await openReview();
+    expect(toast.dismiss).toHaveBeenCalled();
+    vi.mocked(reviewApi.check).mockResolvedValue({ data: report({ errors: [] }) } as never);
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Cambiar por «Agendar visita»' }));
+    expect(toast.success).toHaveBeenCalledWith('Corregido: Cambiar por «Agendar visita».', { position: 'top-center' });
   });
 
   it('publishes with the acknowledged warnings, and a new server warning reopens the review', async () => {
@@ -112,7 +124,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     // Someone added a slip meanwhile: the review shows it and the tick is off again.
     expect(await within(dialog).findByRole('region', { name: /Advertencias \(3\)/ })).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'Entiendo las advertencias' })).not.toBeChecked();
-    expect(toast.error).toHaveBeenCalledWith('Apareció una advertencia nueva: revísela antes de publicar.');
+    expect(toast.error).toHaveBeenCalledWith('Apareció una advertencia nueva: revísela antes de publicar.', undefined);
 
     vi.mocked(publishPage).mockResolvedValueOnce({ data: { ...PAGE, has_unpublished_changes: false, version: 2 } } as never);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Entiendo las advertencias' }));

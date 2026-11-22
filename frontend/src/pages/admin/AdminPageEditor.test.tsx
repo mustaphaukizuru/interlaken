@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route, Routes } from 'react-router-dom';
 
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn(), dismiss: vi.fn() } }));
 vi.mock('@/services/api', () => ({
   contentApi: {
     adminGetPage: vi.fn(),
