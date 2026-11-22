@@ -318,6 +318,10 @@ class Page(models.Model):
     draft_revision = models.PositiveIntegerField(default=0)
     draft_updated_by = models.ForeignKey('accounts.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     draft_updated_at = models.DateTimeField(null=True, blank=True)
+    # «Revisión antes de publicar»: since when the draft differs from the
+    # published version (None while they match). Kept by save(); the editor
+    # shows «cambios sin publicar desde …» once it is a few days old.
+    unpublished_since = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -329,13 +333,37 @@ class Page(models.Model):
     def __str__(self):
         return f'/{self.slug} ({self.get_status_display()})'
 
+    def draft_differs(self) -> bool:
+        """The draft (blocks or SEO) is not what the published version holds (always True before a first publish)."""
+        live = self.published_version if self.published_version_id else None
+        if live is None:
+            return True
+        return json.dumps(self.draft_blocks, sort_keys=True) != json.dumps(live.blocks, sort_keys=True) \
+            or json.dumps(self.seo, sort_keys=True) != json.dumps(live.seo, sort_keys=True)
+
+    def save(self, *args, **kwargs):
+        # Every write of the draft or of the published version keeps unpublished_since right.
+        fields = kwargs.get('update_fields')
+        if fields is None or {'draft_blocks', 'seo', 'published_version'} & set(fields):
+            since = (self.unpublished_since or timezone.now()) if self.draft_differs() else None
+            if since != self.unpublished_since:
+                self.unpublished_since = since
+                if fields is not None:
+                    kwargs['update_fields'] = [*fields, 'unpublished_since']
+        super().save(*args, **kwargs)
+
     def stamp_draft(self, user) -> None:
         """One more draft save: bump the revision and remember who and when (caller saves)."""
         self.draft_revision = (self.draft_revision or 0) + 1
         self.draft_updated_by = user if getattr(user, 'pk', None) else None
         self.draft_updated_at = timezone.now()
 
-    def publish(self, user, *, legacy_confirmed: bool = False) -> PageVersion:
+    def publish(self, user, *, legacy_confirmed: bool = False, acknowledged: list[str] | None = None) -> PageVersion:
+        """A new published version of the draft, as is. The gate (publish_checks) belongs to the
+        callers that need one (editor, schedule, bulk); migrations and commands publish directly.
+
+        ``acknowledged``: keys of the warnings the person confirmed («Entiendo las advertencias»), audited.
+        """
         number = (self.versions.aggregate(m=models.Max('number'))['m'] or 0) + 1
         with transaction.atomic():
             v = PageVersion.objects.create(page=self, number=number, blocks=self.draft_blocks, seo=self.seo, author=user)
@@ -355,6 +383,8 @@ class Page(models.Model):
             changes = {'published_version': number}
             if legacy_confirmed:
                 changes['legacy_seed_confirmed'] = True
+            if acknowledged:
+                changes['warnings_acknowledged'] = list(acknowledged)
             record('update', self, changes, actor=user, context='cms.publish')
         except Exception:  # noqa: BLE001
             pass
@@ -466,9 +496,9 @@ class PageAdminSerializer(serializers.ModelSerializer):
                   'published_version_number', 'has_unpublished_changes', 'published_at',
                   'review_requested_at', 'review_requested_by_name', 'review_note', 'publish_at', 'unpublish_at',
                   'legacy_seed', 'seed_seo', 'draft_revision', 'draft_updated_by', 'draft_updated_at',
-                  'created_at', 'updated_at']
+                  'unpublished_since', 'created_at', 'updated_at']
         read_only_fields = ['id', 'status', 'published_at', 'review_requested_at', 'review_requested_by_name', 'review_note',
-                            'draft_revision', 'draft_updated_at', 'created_at', 'updated_at']
+                            'draft_revision', 'draft_updated_at', 'unpublished_since', 'created_at', 'updated_at']
 
     # Staff edit drafts and ask Dirección for approval; only an admin decides
     # WHEN a page goes live or comes down (the cms_schedule cron acts on these
@@ -811,7 +841,7 @@ def _page_destroy(page: Page) -> None:
 
 
 def _page_publish_plan(page: Page, payload) -> None:
-    from .checks import run_checks
+    from .publish_checks import review
 
     if page.status == Page.Status.PUBLISHED and page.published_version_id:
         if not PageAdminSerializer().get_has_unpublished_changes(page):
@@ -819,9 +849,13 @@ def _page_publish_plan(page: Page, payload) -> None:
     if is_legacy_seed(page):
         # Never in bulk: publishing it replaces the designed page, so it needs the editor's confirmation.
         raise BulkSkip("borrador antiguo con bloques genéricos: publíquelo desde el editor para confirmar")
-    errors = [i for i in run_checks(page) if i["level"] == "error"]
-    if errors:
-        raise ValueError("Corrija antes de publicar: " + " · ".join(e["message"] for e in errors[:3]))
+    report = review(page)
+    if report["errors"]:
+        raise ValueError("Corrija antes de publicar: " + " · ".join(e["message"] for e in report["errors"][:3]))
+    if report["warnings"]:
+        # Warnings need someone to read them («Entiendo las advertencias»), which a bulk action cannot ask.
+        n = len(report["warnings"])
+        raise BulkSkip(f"{'tiene una advertencia' if n == 1 else f'tiene {n} advertencias'}: publíquela desde el editor para revisarlas")
 
 
 def _page_publish(page: Page, payload, actor) -> dict:
@@ -871,15 +905,20 @@ class PageBulkView(AdminBulkView):
 
 
 class PagePublishView(APIView):
-    """POST /content/admin/pages/<pk>/publish/  {"action": "publish"|"unpublish", "confirm_legacy"?: true}
+    """POST /content/admin/pages/<pk>/publish/
+    {"action": "publish"|"unpublish", "confirm_legacy"?: true, "acknowledge_warnings"?: true, "acknowledged_warnings"?: [key]}
 
     A draft still in the old generic format (``legacy_seed``) answers 409
     ``{"code": "legacy_seed_draft", "detail"}`` unless ``confirm_legacy`` is true.
+    Then «Revisión antes de publicar» (publish_checks.review): any error answers
+    409 ``publish_blocked``; warnings answer 409 ``publish_warnings`` until the
+    request acknowledges them. Both bodies carry ``errors``, ``warnings``,
+    ``issues`` and ``changes``.
     """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
-        page = Page.objects.filter(pk=pk).first()
+        page = Page.objects.select_related('published_version').filter(pk=pk).first()
         if page is None:
             raise Http404
         action = request.data.get('action', 'publish')
@@ -889,15 +928,12 @@ class PagePublishView(APIView):
         legacy = is_legacy_seed(page)
         if legacy and not confirmed(request.data.get('confirm_legacy')):
             return legacy_seed_response(page)
-        # Pre-publish checks (P3-12): errors block, warnings are informative.
-        from .checks import issue_error, run_checks
-        issues = run_checks(page)
-        errors = [i for i in issues if i['level'] == 'error']
-        if errors:
-            return Response({'detail': 'Corrija antes de publicar: ' + ' · '.join(e['message'] for e in errors[:5]), 'issues': issues,
-                             'errors': [issue_error(e) for e in errors]},
-                            status=status.HTTP_400_BAD_REQUEST)
-        v = page.publish(request.user, legacy_confirmed=legacy)
+        from .publish_checks import publish_refusal, review
+        report = review(page)
+        refusal = publish_refusal(report, request.data)
+        if refusal:
+            return Response(refusal, status=status.HTTP_409_CONFLICT)
+        v = page.publish(request.user, legacy_confirmed=legacy, acknowledged=[w['key'] for w in report['warnings']])
         data = PageAdminSerializer(page).data
         data['version'] = v.number
         return Response(data)
@@ -942,16 +978,108 @@ class PageVersionsView(APIView):
 
 
 class PageChecksView(APIView):
-    """GET /content/admin/pages/<pk>/checks/ — pre-publish checklist (P3-12)."""
+    """«Revisión antes de publicar» (publish_checks.review) of a page's draft.
+
+    GET  /content/admin/pages/<pk>/checks/   the saved draft
+    POST /content/admin/pages/<pk>/checks/   {"draft_blocks"?, "seo"?}: the editor's draft as it is on screen,
+                                             saved or not (nothing is stored)
+
+    Answers ``{ok, errors, warnings, issues, changes, baseline}``.
+    """
     permission_classes = [IsAdminOrStaff]
 
+    def _report(self, page, blocks=None, seo=None):
+        from .publish_checks import review
+        return Response(review(page, blocks=blocks, seo=seo))
+
     def get(self, request, pk):
-        page = Page.objects.filter(pk=pk).first()
+        page = Page.objects.select_related('published_version').filter(pk=pk).first()
         if page is None:
             raise Http404
-        from .checks import run_checks
-        issues = run_checks(page)
-        return Response({'issues': issues, 'ok': not any(i['level'] == 'error' for i in issues)})
+        return self._report(page)
+
+    def post(self, request, pk):
+        page = Page.objects.select_related('published_version').filter(pk=pk).first()
+        if page is None:
+            raise Http404
+        blocks = seo = None
+        if hasattr(request.data, 'get') and 'draft_blocks' in request.data:
+            invalid = blocks_error_response(request.data)
+            if invalid is not None:
+                return invalid
+            blocks = validate_blocks(request.data.get('draft_blocks'))
+        if hasattr(request.data, 'get') and isinstance(request.data.get('seo'), dict):
+            seo = request.data.get('seo')
+        return self._report(page, blocks, seo)
+
+
+class PagesChecksSummaryView(APIView):
+    """GET /content/admin/pages/checks-summary/: the «Contenido» chips of every CMS page.
+
+    Per page: ``draft`` (errors and warnings of the draft), ``live`` (errors of
+    what the site shows), ``unpublished_since``. One context for all pages,
+    so the queries do not grow with the number of pages.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        from .publish_checks import pages_context, review, summarize
+
+        pages = list(Page.objects.select_related('published_version'))
+        ctx = pages_context(pages)
+        results = []
+        for page in pages:
+            live_version = page.status == Page.Status.PUBLISHED and page.published_version_id and page.published_version
+            differs = page.draft_differs()
+            draft = summarize(review(page, ctx=ctx)) if (differs or not live_version) else None
+            live = summarize(review(page, ctx=ctx, live=True)) if live_version else None
+            if draft is None and live is not None:
+                draft = {**live, 'warnings': 0, 'first_warning': None}
+            results.append({
+                'id': page.pk, 'slug': page.slug, 'has_unpublished_changes': bool(differs),
+                'unpublished_since': serializers.DateTimeField().to_representation(page.unpublished_since) if page.unpublished_since else None,
+                'draft': draft, 'live': live,
+            })
+        return Response({'results': results})
+
+
+class PageDiscardView(APIView):
+    """POST /content/admin/pages/<pk>/discard/ {"draft_revision"?}: «Descartar cambios».
+
+    The draft goes back to the published version (blocks and SEO). Like any
+    draft save it bumps the revision; with ``draft_revision`` it answers 409
+    ``draft_conflict`` when someone saved in between. Nothing is published.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk):
+        with transaction.atomic():
+            page = Page.objects.select_for_update().filter(pk=pk).first()
+            if page is None:
+                raise Http404
+            live = page.published_version if page.published_version_id else None
+            if page.status != Page.Status.PUBLISHED or live is None:
+                return Response({'detail': 'Esta página no tiene una versión publicada a la cual volver.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            raw = request.data.get('draft_revision') if hasattr(request.data, 'get') else None
+            if raw not in (None, ''):
+                try:
+                    expected = int(raw)
+                except (TypeError, ValueError):
+                    return Response({'draft_revision': ['Debe ser un número entero.']}, status=status.HTTP_400_BAD_REQUEST)
+                if expected != page.draft_revision:
+                    page = Page.objects.select_related('draft_updated_by').get(pk=page.pk)
+                    return Response(draft_conflict_payload(page), status=status.HTTP_409_CONFLICT)
+            page.draft_blocks, page.seo = live.blocks, live.seo
+            page.stamp_draft(request.user)
+            page.save(update_fields=['draft_blocks', 'seo', 'draft_revision', 'draft_updated_by', 'draft_updated_at', 'updated_at'])
+        try:
+            from apps.core.audit import record
+            record('update', page, {'draft_discarded_to': live.number}, actor=request.user, context='cms.discard')
+        except Exception:  # noqa: BLE001
+            pass
+        page = Page.objects.select_related('published_version', 'draft_updated_by').get(pk=page.pk)
+        return Response(PageAdminSerializer(page).data)
 
 
 class PageReviewView(APIView):

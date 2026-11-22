@@ -107,13 +107,19 @@ def test_messages_name_the_section_and_the_field():
 
 
 def test_a_link_to_the_private_ficha_is_flagged():
-    """The ficha de inscripción is private (sent after admission): a public link to it is a warning."""
+    """The ficha de inscripción is private (sent after admission): a public link to it blocks publishing.
+
+    (A warning until «Revisión antes de publicar», 2026-11-21: publish_checks.py.)
+    """
     page = Page(slug='costos', title='Costos', seo={}, draft_blocks=[
         {'id': 'p', 'type': 'costos.prices', 'props': {'ctaPrimary': {'label': 'Ficha', 'href': '/pre-registro'},
                                                        'ctaSecondary': {'label': 'Ficha', 'href': '/inscripcion?x=1'}}},
     ])
-    issues = [i for i in run_checks(page) if i['code'] == 'private_link']
-    assert len(issues) == 2 and all(i['level'] == 'warning' for i in issues)
+    from apps.content.publish_checks import review
+
+    issues = [i for i in review(page)['errors'] if i['code'] == 'private_link']
+    assert len(issues) == 2 and all(i['level'] == 'error' for i in issues)
     assert 'la ficha de inscripción es personal' in issues[0]['message'].lower()
     assert '/agendar-visita' in issues[0]['message']
-    assert not [i for i in run_checks(page) if i['level'] == 'error']   # never blocks publishing
+    assert all(i['fix']['value'] == {'label': 'Agendar visita', 'href': '/agendar-visita'} for i in issues)
+    assert not [i for i in run_checks(page) if i['code'] == 'private_link']   # the structural checks leave it to the review

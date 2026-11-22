@@ -106,7 +106,10 @@ def test_a_table_on_the_pagos_page_publishes(api_client):
     page = Page.objects.get(slug="pagos")
     assert (
         api_client.post(
-            reverse("admin-page-publish", args=[page.pk]), {"action": "publish"}, format="json"
+            # The draft leaves out the design's «Plataformas» section: a «large change», acknowledged.
+            reverse("admin-page-publish", args=[page.pk]),
+            {"action": "publish", "acknowledge_warnings": True},
+            format="json",
         ).status_code
         == 200
     )

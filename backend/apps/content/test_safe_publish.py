@@ -23,7 +23,7 @@ DESIGNED = [
     {'id': 'costos-1', 'type': 'costos.hero', 'props': {'title': 'Costos {{ciclo}}', 'image': '/assets/facade.webp',
                                                         'subtitle': 'Inscripción y colegiaturas'}},
     {'id': 'costos-2', 'type': 'costos.prices', 'props': {'note': 'Cifras informativas.',
-                                                          'cta': {'label': 'Pre-registro', 'href': '/pre-registro'},
+                                                          'cta': {'label': 'Agendar visita', 'href': '/agendar-visita'},
                                                           'links': [{'label': 'WhatsApp', 'href': 'https://wa.me/5215555555555'},
                                                                     {'label': 'Llamar', 'href': 'tel:+525553791188'},
                                                                     {'label': 'Documentos', 'href': '/admisiones/documentacion'},
@@ -72,7 +72,8 @@ def test_publish_legacy_needs_confirmation(admin_client, admin_user):
     assert not is_legacy_seed(page)
     page.draft_blocks = [GENERIC[0]]
     page.save()
-    assert admin_client.post(url, {'action': 'publish'}, format='json').status_code == 200
+    # (dropping a block is a «large change»: acknowledged here)
+    assert admin_client.post(url, {'action': 'publish', 'acknowledge_warnings': True}, format='json').status_code == 200
     # Unpublished again: the design shows, so the generic draft is legacy again.
     page.unpublish(admin_user)
     assert admin_client.post(url, {'action': 'publish'}, format='json').status_code == 409
