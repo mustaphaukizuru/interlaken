@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Coffee, Maximize2, X, Sun } from 'lucide-react';
 import { Barcode } from '@/components/ui/Barcode';
+import { Badge } from '@/components/ui/Badge';
 import type { CafeteriaCard } from '@/types';
 import { BalanceWithPending, PendingProjectionNote } from '@/components/portal/BalanceWithPending';
 
@@ -64,26 +65,21 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
 
   return (
     <>
-      <div data-testid="credencial-face" className="mx-auto w-full max-w-sm overflow-hidden rounded-md shadow-purple ring-1 ring-black/5">
-        {/* Gradient face */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-pink-hot to-pink px-5 pb-5 pt-4 text-white">
-          <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10 blur-xl" />
-          <div className="pointer-events-none absolute -bottom-12 -left-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
-
-          <div className="relative flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-white/85">
-              <Coffee className="h-3.5 w-3.5" /> Credencial de cafetería
+      {/* Print: black on white with a hairline frame (browsers drop the
+          gradient, which would leave white type on white paper). */}
+      <div data-testid="credencial-face" className="mx-auto w-full max-w-sm overflow-hidden rounded-md shadow-purple ring-1 ring-black/5 print:ring-black/40">
+        {/* Gradient face: the credential's identity (brand, not decoration) */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-pink-hot to-pink px-5 pb-5 pt-4 text-white print:bg-none print:[&_*]:!text-black">
+          <div className="relative flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/85">
+              <Coffee size={16} aria-hidden="true" /> Credencial de cafetería
             </span>
-            {low && (
-              <span className="rounded-full bg-amber-300/90 px-2 py-0.5 text-[10.5px] font-bold text-amber-900">
-                Saldo bajo
-              </span>
-            )}
+            {low && <Badge variant="warning">Saldo bajo</Badge>}
           </div>
 
           <div className="relative mt-5">
-            <p className="font-head text-xl font-bold leading-tight">{s.name}</p>
-            <p className="text-[13px] text-white/80">{roleLine || 'Alumno'}</p>
+            <p className="font-head text-2xl font-bold leading-tight">{s.name}</p>
+            <p className="text-sm text-white/85">{roleLine || 'Alumno'}</p>
           </div>
 
           {/* flex-wrap: with a paid top-up on its way («$150.00 → $350.00») the
@@ -93,7 +89,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             <div className="ml-auto text-right">
               {/* The code is the Loyverse spelling (ci09932), the same one the POS
                   scans and the office reads on the register: label it as such. */}
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Código Loyverse</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">Código Loyverse</p>
               <p className="font-head text-base font-bold tracking-wider">{card.code || '—'}</p>
             </div>
           </div>
@@ -105,24 +101,25 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
           <PendingProjectionNote
             balance={card.balance}
             pending={card.pending_topups}
-            className="mb-3 text-[12.5px] leading-snug text-muted"
+            className="mb-3 text-sm leading-snug text-muted"
           />
           {card.code ? (
             <>
               <Barcode value={card.code} height={58} className="mx-auto max-w-full" />
+              {/* 48 px: students use this view (Phase 6). */}
               <button
                 type="button"
                 onClick={() => setFull(true)}
-                className="mx-auto mt-2 flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[12.5px] font-semibold text-purple transition hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                className="mx-auto mt-2 flex min-h-[48px] items-center gap-2 rounded-sm px-4 text-sm font-semibold text-purple transition hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 print:hidden"
               >
-                <Maximize2 className="h-3.5 w-3.5" /> Mostrar en pantalla completa
+                <Maximize2 size={20} aria-hidden="true" /> Mostrar en pantalla completa
               </button>
             </>
           ) : (
-            <p className="py-4 text-[12.5px] text-muted">
+            <p className="py-4 text-sm text-muted">
               {staff
-                ? 'Esta cuenta aún no está vinculada a cafetería. Contacta al colegio para activarla.'
-                : 'Este alumno aún no está vinculado a cafetería. Contacta al colegio para activarlo.'}
+                ? 'Esta cuenta aún no tiene cafetería. Contacte al colegio para activarla.'
+                : 'Este alumno aún no tiene cafetería. Contacte al colegio para activarla.'}
             </p>
           )}
         </div>
@@ -132,7 +129,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
       {full && card.code && (
         <div
           ref={overlayRef}
-          className="fixed inset-0 z-overlay flex flex-col items-center justify-center gap-6 bg-white p-[max(1.5rem,env(safe-area-inset-bottom))]"
+          className="fixed inset-0 z-overlay flex flex-col items-center justify-center gap-6 bg-white p-[max(1.5rem,env(safe-area-inset-bottom))] print:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Código para escanear en caja"
@@ -149,9 +146,9 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             type="button"
             onClick={() => setFull(false)}
             aria-label="Cerrar"
-            className="absolute right-4 top-4 z-10 rounded-sm p-2 text-ink/60 transition hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+            className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-sm text-muted transition hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
           >
-            <X className="h-6 w-6" />
+            <X size={24} aria-hidden="true" />
           </button>
 
           <div className="relative z-10 text-center">
@@ -162,8 +159,8 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
           <Barcode value={card.code} height={130} fontSize={22} className="relative z-10 w-full max-w-md" />
           <div className="relative z-10"><QRCodeSVG value={card.code} size={168} level="M" marginSize={2} /></div>
 
-          <p className="relative z-10 flex items-center gap-1.5 text-[12.5px] text-subtle">
-            <Sun className="h-4 w-4" /> Sube el brillo y muestra este código en caja.
+          <p className="relative z-10 flex items-center gap-1.5 text-sm text-muted">
+            <Sun size={20} aria-hidden="true" /> Suba el brillo y muestre este código en caja.
           </p>
         </div>
       )}

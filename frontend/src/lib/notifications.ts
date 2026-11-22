@@ -1,5 +1,6 @@
 import { Info, AlertTriangle, Receipt, Coffee, type LucideIcon } from 'lucide-react';
 import { notifPreview } from './notificationText';
+import { portalApi } from '@/services/api';
 
 export interface Notif {
   id: number;
@@ -11,9 +12,19 @@ export interface Notif {
   announcement?: number | null;
 }
 
+/** The bell's list (first page, newest first), shared by the header menu and
+ *  Inicio's «Hoy» under one cache key, so neither asks twice. */
+export const NOTIFICATIONS_KEY = ['notifications'] as const;
+export async function fetchNotifications(): Promise<Notif[]> {
+  const r = await portalApi.getNotifications();
+  return (r.data.results ?? r.data) as Notif[];
+}
+
+/** Category per type. The page and menu are «Avisos»; `warning` is the
+ *  school's urgent alert (sent even when a category is muted). */
 export const NOTIF_META: Record<Notif['notif_type'], { icon: LucideIcon; cls: string; label: string }> = {
-  info:      { icon: Info,          cls: 'bg-purple/10 text-purple',    label: 'Avisos' },
-  warning:   { icon: AlertTriangle, cls: 'bg-amber/10 text-amber',      label: 'Alertas' },
+  info:      { icon: Info,          cls: 'bg-purple/10 text-purple',    label: 'Comunicados' },
+  warning:   { icon: AlertTriangle, cls: 'bg-warning-bg text-warning',  label: 'Urgentes' },
   payment:   { icon: Receipt,       cls: 'bg-coral/10 text-coral',      label: 'Pagos' },
   cafeteria: { icon: Coffee,        cls: 'bg-green/10 text-green-dark', label: 'Cafetería' },
 };
@@ -42,14 +53,28 @@ export function isLongMessage(message: string | null | undefined): boolean {
   return text.length > 0 && notifPreview(message) !== text;
 }
 
-export type NotifGroup = 'Hoy' | 'Esta semana' | 'Anteriores';
+export type NotifGroup = 'Urgentes' | 'Hoy' | 'Esta semana' | 'Anteriores';
 
-/** Group by recency for the sheet/page (BACKLOG P1-B2). */
+/** An unread urgent alert: pinned above everything else until it is read. */
+export const isPinned = (n: Notif) => n.notif_type === 'warning' && !n.is_read;
+
+/**
+ * The same list with unread urgent alerts first (Phase 4.7: urgent pinned
+ * first), each part keeping the server's order (newest first). Client-side
+ * only: the API has no priority field, `warning` is the urgent type.
+ */
+export function pinUrgent(list: Notif[]): Notif[] {
+  return [...list.filter(isPinned), ...list.filter((n) => !isPinned(n))];
+}
+
+/** Group for the sheet/page (BACKLOG P1-B2): unread urgent alerts pinned in
+ *  «Urgentes», then by recency. */
 export function groupNotifs(list: Notif[], now = new Date()): { label: NotifGroup; items: Notif[] }[] {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const weekAgo = startOfToday - 6 * 86_400_000;
-  const buckets: Record<NotifGroup, Notif[]> = { Hoy: [], 'Esta semana': [], Anteriores: [] };
+  const buckets: Record<NotifGroup, Notif[]> = { Urgentes: [], Hoy: [], 'Esta semana': [], Anteriores: [] };
   for (const n of list) {
+    if (isPinned(n)) { buckets.Urgentes.push(n); continue; }
     const t = new Date(n.created_at).getTime();
     if (t >= startOfToday) buckets.Hoy.push(n);
     else if (t >= weekAgo) buckets['Esta semana'].push(n);

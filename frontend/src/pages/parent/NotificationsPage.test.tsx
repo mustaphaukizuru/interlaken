@@ -38,12 +38,12 @@ describe('NotificationsPage (Data Ops Phase 9)', () => {
     await waitFor(() => expect(getNotifications).toHaveBeenCalledWith({ page: 2, type: 'cafeteria', unread: '1' }));
   });
 
-  it('"Marcar todas como leídas" still calls the API and refreshes the list', async () => {
+  it('«Marcar todo como leído» still calls the API and refreshes the list', async () => {
     getNotifications.mockResolvedValue({ data: { count: 1, results: [notif] } } as never);
     markAll.mockResolvedValue({ data: {} } as never);
     renderWithProviders(<NotificationsPage />, { route: '/portal/notificaciones' });
     await screen.findByText('Saldo bajo');
-    await userEvent.click(screen.getByRole('button', { name: /Marcar todas como leídas/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar todo como leído' }));
     await waitFor(() => expect(markAll).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(2));
   });
@@ -52,9 +52,17 @@ describe('NotificationsPage (Data Ops Phase 9)', () => {
     getNotifications.mockResolvedValue({ data: { count: 0, results: [] } } as never);
     renderWithProviders(<><NotificationsPage /><LocationProbe /></>, { route: '/portal/notificaciones?sin_leer=1&page=2' });
     expect(await screen.findByText('Está al día')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Ver todas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ver todos los avisos' }));
     await waitFor(() => expect(urlParams().get('sin_leer')).toBeNull());
     expect(urlParams().get('page')).toBeNull();
+  });
+
+  it('«Marcar todo como leído» is disabled when nothing is unread', async () => {
+    getNotifications.mockResolvedValue({ data: { count: 1, results: [{ ...notif, is_read: true }] } } as never);
+    renderWithProviders(<NotificationsPage />, { route: '/portal/notificaciones' });
+    await screen.findByText('Saldo bajo');
+    expect(screen.getByRole('button', { name: 'Marcar todo como leído' })).toBeDisabled();
+    expect(screen.getByRole('heading', { level: 1, name: 'Avisos' })).toBeInTheDocument();
   });
 
   it('shows the shared error state with a retry', async () => {

@@ -60,7 +60,7 @@ describe('NotificationList (bell and page preview)', () => {
     render(<NotificationList items={[long, { ...long, id: 2, is_read: true, title: 'Leída', notif_type: 'info' }]} onOpen={onOpen} />);
     expect(screen.getAllByLabelText('Sin leer')).toHaveLength(1);
     expect(screen.getByText('Cafetería')).toBeInTheDocument();
-    expect(screen.getByText('Avisos')).toBeInTheDocument();
+    expect(screen.getByText('Comunicados')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /2 recarga\(s\)/ }));
     expect(onOpen).toHaveBeenCalledWith(long);
   });

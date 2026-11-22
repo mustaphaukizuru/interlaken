@@ -5,7 +5,8 @@ import { portalApi } from '@/services/api';
 import { Coffee, QrCode, Users, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Save, Bell, Shield } from 'lucide-react';
+import { Save, Bell, Shield, Info } from 'lucide-react';
+import { useSelectedChildStore } from '@/store/selectedChildStore';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -22,13 +23,13 @@ const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',
 };
 
-/** "Mi información" — name, WhatsApp, notification prefs (password is admin-managed). */
+/** «Mi perfil»: name, WhatsApp, notification prefs (password is admin-managed). */
 type Tab = 'perfil' | 'hijos' | 'seguridad' | 'avisos' | 'privacidad';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'perfil', label: 'Perfil' },
   { key: 'hijos', label: 'Mis hijos' },
   { key: 'seguridad', label: 'Seguridad' },
-  { key: 'avisos', label: 'Notificaciones' },
+  { key: 'avisos', label: 'Avisos' },
   { key: 'privacidad', label: 'Privacidad' },
 ];
 
@@ -49,6 +50,7 @@ export default function ProfilePage() {
     staleTime: 60_000,
   });
   const children = dash?.children ?? [];
+  const setChildId = useSelectedChildStore((st) => st.setChildId);
   // Profile completeness (BACKLOG P1-F4): the fields the school actually needs.
   const checks = [
     { ok: !!user?.first_name && !!user?.last_name, label: 'Nombre completo' },
@@ -77,7 +79,7 @@ export default function ProfilePage() {
       setUser(data as User);
       toast.success('Información actualizada correctamente.');
     },
-    onError: () => toast.error('No se pudo guardar. Intenta de nuevo.'),
+    onError: () => toast.error('No se pudo guardar. Intente de nuevo.'),
   });
 
   const prefsMutation = useMutation({
@@ -126,12 +128,12 @@ export default function ProfilePage() {
 
   return (
     <>
-      <PageHeader title="Mi información" subtitle="Tus datos, tu familia, tu seguridad y tus avisos." />
+      <PageHeader title="Mi perfil" subtitle="Sus datos, su familia, su seguridad y sus avisos." />
       <div className="mx-auto max-w-2xl space-y-4">
         <div role="tablist" aria-label="Secciones" className="flex gap-1 overflow-x-auto rounded-md bg-cream-2 p-1">
           {tabs.map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => set({ tab: t.key === 'perfil' ? null : t.key })}
-              className={`min-h-[40px] flex-1 whitespace-nowrap rounded-sm px-3 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
+              className={`min-h-[44px] flex-1 whitespace-nowrap rounded-sm px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
               {t.label}
             </button>
           ))}
@@ -155,9 +157,12 @@ export default function ProfilePage() {
         <Card>
           {!locked && <div className="mb-5 border-b border-line pb-5"><AvatarUpload /></div>}
           {locked && (
-            <p className="mb-4 rounded-md bg-cream-2 px-4 py-3 text-sm text-muted" role="note">
-              Sus datos los actualiza el colegio. ¿Algo está mal?{' '}
-              <a href={`mailto:info@interlaken.com.mx?subject=${encodeURIComponent('Corrección de mis datos en el portal')}`} className="font-semibold text-purple hover:underline">Solicite la corrección</a>.
+            <p className="mb-4 flex items-start gap-2 rounded-sm bg-cream px-3 py-2.5 text-sm text-muted" role="note">
+              <Info size={16} className="mt-0.5 shrink-0 text-subtle" aria-hidden="true" />
+              <span>
+                Sus datos los actualiza el colegio. ¿Algo está mal?{' '}
+                <a href={`mailto:info@interlaken.com.mx?subject=${encodeURIComponent('Corrección de mis datos en el portal')}`} className="font-semibold text-purple hover:underline">Solicite la corrección</a>.
+              </span>
             </p>
           )}
           <form onSubmit={submit} className="space-y-4">
@@ -188,7 +193,7 @@ export default function ProfilePage() {
             </div>
             {!locked && <div className="flex justify-end pt-1">
               <Button type="submit" variant="primary" loading={mutation.isPending} disabled={!dirty || !firstName.trim() || !lastName.trim()} className="min-h-[44px]">
-                <Save className="h-4 w-4" /> Guardar cambios
+                <Save size={16} aria-hidden="true" /> Guardar cambios
               </Button>
             </div>}
           </form>
@@ -196,7 +201,7 @@ export default function ProfilePage() {
         {isFamily && (
           <Card>
             <div className="mb-3 flex items-center gap-2">
-              <Users className="h-4 w-4 text-purple" />
+              <Users size={20} className="text-purple" aria-hidden="true" />
               <h2 className="font-head text-base font-semibold text-ink">Mi familia</h2>
             </div>
             {children.length === 0 ? (
@@ -209,9 +214,10 @@ export default function ProfilePage() {
                       <p className="text-sm font-medium text-ink">{c.name}</p>
                       <p className="text-xs text-subtle">{c.grade}{c.group ? ` ${c.group}` : ''} · Matrícula {c.student_id}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <Link to={`/portal/cafeteria?hijo=${c.id}`} className="btn-outline min-h-[36px] px-3 text-xs"><Coffee className="h-3.5 w-3.5" aria-hidden="true" /> Cafetería</Link>
-                      <Link to="/portal/credencial" className="btn-outline min-h-[36px] px-3 text-xs"><QrCode className="h-3.5 w-3.5" aria-hidden="true" /> Credencial</Link>
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={`/portal/cafeteria?hijo=${c.id}`} aria-label={`Ver cafetería de ${c.name}`} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-sm bg-purple-light px-3 text-sm font-semibold text-purple hover:bg-purple-xlight"><Coffee size={16} aria-hidden="true" /> Ver cafetería</Link>
+                      {/* The credential follows the shared child selection: pick this child first. */}
+                      <Link to="/portal/credencial" onClick={() => setChildId(c.id)} aria-label={`Ver credencial de ${c.name}`} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-sm bg-purple-light px-3 text-sm font-semibold text-purple hover:bg-purple-xlight"><QrCode size={16} aria-hidden="true" /> Ver credencial</Link>
                     </div>
                   </li>
                 ))}
@@ -229,7 +235,7 @@ export default function ProfilePage() {
         <SecurityPanel />
         <Card>
           <div className="mb-3 flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-purple" />
+            <ShieldCheck size={20} className="text-purple" aria-hidden="true" />
             <h2 className="font-head text-base font-semibold text-ink">Sesión</h2>
           </div>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -243,7 +249,7 @@ export default function ProfilePage() {
         <NotifyEmailCard accountEmail={user?.email} />
         <Card>
           <div className="mb-3 flex items-center gap-2">
-            <Bell className="h-4 w-4 text-purple" />
+            <Bell size={20} className="text-purple" aria-hidden="true" />
             <h2 className="font-head text-base font-semibold text-ink">Avisos</h2>
           </div>
           <p className="mb-4 text-sm text-muted">Elija cómo recibir compras de cafetería, saldos bajos y comunicados.</p>
@@ -290,7 +296,7 @@ export default function ProfilePage() {
         {tab === 'privacidad' && (
         <Card>
           <div className="mb-3 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-purple" />
+            <Shield size={20} className="text-purple" aria-hidden="true" />
             <h2 className="font-head text-base font-semibold text-ink">Privacidad y derechos ARCO</h2>
           </div>
           <p className="mb-4 text-sm text-muted">
@@ -299,9 +305,9 @@ export default function ProfilePage() {
           </p>
           <Link
             to="/portal/privacidad"
-            className="inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline"
+            className="inline-flex min-h-[44px] items-center text-sm font-semibold text-purple hover:underline"
           >
-            Ir a Privacidad y ARCO
+            Abrir Privacidad y ARCO
           </Link>
         </Card>
         )}

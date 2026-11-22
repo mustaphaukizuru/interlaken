@@ -124,24 +124,24 @@ export function InstallHint() {
   return (
     <section
       aria-label="Instalar la aplicación del portal"
-      className="relative rounded-md border border-purple/20 bg-purple-light/50 px-4 py-3 text-sm text-ink"
+      className="relative rounded-md bg-purple-light px-4 py-3 text-sm text-ink print:hidden"
     >
       <button
         type="button"
         onClick={dismissForever}
         aria-label="No volver a mostrar esta sugerencia"
-        className="absolute right-1.5 top-1.5 rounded-sm p-2 text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        className="absolute right-0.5 top-0.5 flex h-11 w-11 items-center justify-center rounded-sm text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
       >
         <X size={16} aria-hidden="true" />
       </button>
-      <div className="flex items-start gap-2 pr-8">
+      <div className="flex items-start gap-2 pr-10">
         <Smartphone size={16} className="mt-0.5 shrink-0 text-purple" aria-hidden="true" />
         <div>
           <p className="font-medium">Lleve el portal en su pantalla de inicio</p>
           {ios ? (
             <p className="mt-1 text-muted">
               En Safari: toque{' '}
-              <Share size={13} className="-mt-0.5 inline" aria-hidden="true" />{' '}
+              <Share size={16} className="-mt-0.5 inline" aria-hidden="true" />{' '}
               <span className="font-medium text-ink">Compartir</span> y elija{' '}
               <span className="font-medium text-ink">“Agregar a pantalla de inicio”</span>.
             </p>

@@ -58,7 +58,7 @@ export default function ComunicadoDetailPage() {
       qc.invalidateQueries({ queryKey: ['announcement', annId] });
       toast.success('Comentario publicado');
     },
-    onError: () => toast.error('No se pudo publicar el comentario. Intenta de nuevo.'),
+    onError: () => toast.error('No se pudo publicar el comentario. Intente de nuevo.'),
   });
 
   const submit = (e: FormEvent) => {
@@ -82,7 +82,7 @@ export default function ComunicadoDetailPage() {
         <div className="card">
           <ErrorState
             title="Comunicado no disponible"
-            description="No se encontró el comunicado o no tienes acceso a él."
+            description="No se encontró el comunicado o no tiene acceso a él."
             onRetry={() => ann.refetch()}
           />
         </div>
@@ -128,14 +128,14 @@ export default function ComunicadoDetailPage() {
           <SectionCard title={`Comentarios${comments.data ? ` (${comments.data.length})` : ''}`}>
             <div className="p-5">
               <form onSubmit={submit} className="mb-5 flex flex-col gap-2">
-                <label htmlFor="comment-body" className="sr-only">Escribe un comentario</label>
+                <label htmlFor="comment-body" className="sr-only">Escriba un comentario</label>
                 <textarea
                   id="comment-body"
                   value={body}
                   onChange={e => setBody(e.target.value)}
                   rows={3}
                   maxLength={2000}
-                  placeholder="Escribe un comentario o una pregunta…"
+                  placeholder="Escriba un comentario o una pregunta…"
                   className="input-field resize-y"
                 />
                 <div className="flex justify-end">

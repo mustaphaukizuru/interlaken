@@ -6,7 +6,7 @@ type AvatarUser = Pick<User, 'first_name' | 'last_name' | 'avatar'>;
 interface AvatarProps {
   user: AvatarUser | null;
   size?: number;
-  /** Corner radius class. The header/sidebar chips are squircles, not circles. */
+  /** Corner radius class. Avatars are round (D1/D2); kept for callers that crop square. */
   rounded?: string;
   className?: string;
 }
@@ -46,7 +46,7 @@ export function Avatar({ user, size = 64, rounded = 'rounded-full', className = 
   }
   return (
     <div
-      className={`${rounded} flex flex-shrink-0 items-center justify-center bg-gradient-to-br from-pink to-purple font-head font-bold text-white ${className}`}
+      className={`${rounded} flex flex-shrink-0 items-center justify-center bg-purple-light font-head font-bold text-purple ${className}`}
       style={{ width: size, height: size, fontSize: Math.round(size / 2.6) }}
       aria-hidden="true"
     >

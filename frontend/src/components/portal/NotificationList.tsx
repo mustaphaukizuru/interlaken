@@ -1,7 +1,7 @@
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { groupNotifs, NOTIF_META, type Notif } from '@/lib/notifications';
+import { groupNotifs, NOTIF_META, pinUrgent, type Notif } from '@/lib/notifications';
 import { notifPreview } from '@/lib/notificationText';
 
 interface Props {
@@ -13,20 +13,21 @@ interface Props {
 }
 
 /**
- * Grouped (Hoy / Esta semana / Anteriores) tappable list shared by the bell sheet and the page.
+ * Grouped tappable list shared by the bell sheet and the page: unread urgent
+ * alerts pinned in «Urgentes», then Hoy / Esta semana / Anteriores.
  *
  * Each row is a preview: icon, title (two lines at most), the opening of the
- * message (two lines at most), category and time. The whole text lives on the
- * notification's own page. The summary used to carry `block` next to
- * `line-clamp-2`; `block` won the `display` and the clamp never applied, so a
- * long staff report filled the dropdown.
+ * message (two lines at most), category and time. Unread reads as one thing
+ * only: a dot (with its text for screen readers). The whole text lives on the
+ * notification's own page.
  */
-export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notificaciones' }: Props) {
-  const visible = limit ? items.slice(0, limit) : items;
+export function NotificationList({ items, onOpen, limit, emptyText = 'Sin avisos por ahora.' }: Props) {
+  const pinned = pinUrgent(items);
+  const visible = limit ? pinned.slice(0, limit) : pinned;
   if (visible.length === 0) {
     return (
       <div className="px-4 py-12 text-center">
-        <Bell size={22} className="mx-auto mb-2 text-subtle" aria-hidden="true" />
+        <Bell size={24} className="mx-auto mb-2 text-subtle" aria-hidden="true" />
         <p className="text-sm text-muted">{emptyText}</p>
       </div>
     );
@@ -35,7 +36,7 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
     <div>
       {groupNotifs(visible).map((g) => (
         <section key={g.label} aria-label={g.label}>
-          <h3 className="sticky top-0 z-10 bg-white/95 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[1.4px] text-subtle backdrop-blur">
+          <h3 className={`sticky top-0 z-10 bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-[1.2px] ${g.label === 'Urgentes' ? 'text-warning' : 'text-subtle'}`}>
             {g.label}
           </h3>
           <ul>
@@ -45,17 +46,14 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
               const preview = notifPreview(n.message);
               const when = formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: es });
               return (
-                <li key={n.id}>
+                <li key={n.id} className="border-b border-line last:border-0">
                   <button
                     type="button"
                     onClick={() => onOpen(n)}
-                    className={`relative flex min-h-[56px] w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition-colors last:border-0 hover:bg-cream focus-visible:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 active:bg-cream ${
-                      n.is_read ? '' : 'bg-purple/[0.035]'
-                    }`}
+                    className="flex min-h-[56px] w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 active:bg-cream"
                   >
-                    {!n.is_read && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-purple" aria-hidden="true" />}
                     <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${m.cls}`}>
-                      <Icon size={17} aria-hidden="true" />
+                      <Icon size={20} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start gap-2">
@@ -67,7 +65,7 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
                       {preview && (
                         <span className="mt-0.5 line-clamp-2 break-words text-[13px] leading-snug text-muted">{preview}</span>
                       )}
-                      <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[12px] text-subtle">
+                      <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-subtle">
                         <span>{m.label}</span>
                         <span aria-hidden="true">·</span>
                         <time dateTime={n.created_at}>{when}</time>

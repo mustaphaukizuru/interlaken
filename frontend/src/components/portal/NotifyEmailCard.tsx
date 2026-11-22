@@ -77,9 +77,9 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
           </div>
           <div className="flex shrink-0 gap-2">
             {!data.verified && (
-              <Button variant="secondary" size="sm" onClick={() => save.mutate(data.email)} loading={save.isPending} className="min-h-[36px]">Reenviar enlace</Button>
+              <Button variant="secondary" size="sm" onClick={() => save.mutate(data.email)} loading={save.isPending} className="min-h-[44px]">Reenviar enlace</Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => remove.mutate()} loading={remove.isPending} className="min-h-[36px]">Quitar</Button>
+            <Button variant="ghost" size="sm" onClick={() => remove.mutate()} loading={remove.isPending} className="min-h-[44px]">Quitar</Button>
           </div>
         </div>
       )}

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Coffee } from 'lucide-react';
 import { cafeteriaApi } from '@/services/api';
 import { fmtDay, fmtMXN, fmtMXNCompact, getChartTheme } from '@/lib/chartTheme';
-import { usePrefersDark, useReducedMotion } from '@/hooks/useMediaQuery';
+import { useReducedMotion } from '@/hooks/useMediaQuery';
 import { useChartEntrance } from '@/hooks/useChartEntrance';
 import { SectionEmpty } from '@/components/ui/SectionCard';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -24,9 +24,9 @@ const AXIS_FONT = 11;
 /** `student` given: the card follows the page's child switcher (one child at a
  *  time, never a mixed total of siblings) and hides its own picker. */
 export default function CafeteriaTrendCard({ student: controlled }: { student?: number | 'all' } = {}) {
-  const dark = usePrefersDark();
   const reduced = useReducedMotion();
-  const theme = getChartTheme(dark);
+  // The SPA is light-only (D9): a dark OS setting must not darken the chart on a white card.
+  const theme = getChartTheme(false);
   const entrance = useChartEntrance();
 
   const [picked, setStudent] = useState<number | 'all'>('all');
@@ -65,8 +65,8 @@ export default function CafeteriaTrendCard({ student: controlled }: { student?: 
     <div className="card min-w-0 overflow-hidden !p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cream px-5 py-4">
         <div>
-          <h2 className="font-head text-[15px] font-bold text-ink">Consumo de cafetería</h2>
-          <p className="text-[12px] text-subtle">Últimos 30 días</p>
+          <h2 className="font-head text-base font-bold text-ink">Consumo de cafetería</h2>
+          <p className="text-xs text-subtle">Últimos 30 días</p>
         </div>
         <div className="flex items-center gap-3">
           {controlled === undefined && (children?.length ?? 0) > 1 && (
@@ -83,7 +83,7 @@ export default function CafeteriaTrendCard({ student: controlled }: { student?: 
           {total > 0 && (
             <div className="text-right">
               <div className="font-head text-[15px] font-bold text-ink">{fmtMXN(total)}</div>
-              <div className="text-[11px] text-subtle">total gastado</div>
+              <div className="text-xs text-subtle">total gastado</div>
             </div>
           )}
         </div>

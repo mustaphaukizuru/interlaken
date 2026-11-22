@@ -36,7 +36,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-sticky flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_-12px_rgba(64,26,142,0.25)] backdrop-blur-lg lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-sticky flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg print:hidden lg:hidden"
     >
       {items.map(({ icon: Icon, label, to, end, badgeKey }) => (
         <NavLink
@@ -44,7 +44,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
           to={to}
           end={end}
           className={({ isActive }) =>
-            `flex min-w-0 flex-1 flex-col items-center gap-1 rounded-sm pb-1.5 pt-2 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
+            `flex min-h-[56px] min-w-0 flex-1 flex-col items-center gap-0.5 rounded-sm pb-1.5 pt-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
               isActive ? 'text-purple' : 'text-subtle'
             }`
           }
@@ -56,7 +56,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
                   isActive ? 'bg-purple/10' : ''
                 }`}
               >
-                <Icon size={19} />
+                <Icon size={24} aria-hidden="true" />
                 {badgeKey && (badges[badgeKey] ?? 0) > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-coral px-1 text-[9px] font-bold text-white" aria-label={`${badges[badgeKey]} pendientes`}>
                     {(badges[badgeKey] ?? 0) > 99 ? '99+' : badges[badgeKey]}

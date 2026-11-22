@@ -1,21 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
   cafeteriaApi: {
     getCards: vi.fn(),
     getLoyverseHistory: vi.fn().mockResolvedValue({ data: { linked: true, receipts: [] } }),
   },
+  portalApi: { getDashboard: vi.fn() },
 }));
 // JsBarcode measures its text on a canvas, which jsdom does not implement.
 vi.mock('@/components/ui/Barcode', () => ({ Barcode: () => null }));
 
-import CredencialPage from './CredencialPage';
-import { cafeteriaApi } from '@/services/api';
+import CredencialPage, { freshnessLabel } from './CredencialPage';
+import { cafeteriaApi, portalApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { useSelectedChildStore } from '@/store/selectedChildStore';
+import { useAuthStore, type User } from '@/store/authStore';
 import type { CafeteriaCard } from '@/types';
 
 const getCards = vi.mocked(cafeteriaApi.getCards);
+const getDashboard = vi.mocked(portalApi.getDashboard);
 
 // The production case: 274 visits, purchases paid with points, and Loyverse's
 // total_spent (cash/card only) at $0.00.
@@ -183,5 +188,85 @@ describe('CredencialPage «Saldo bajo» follows the paid top-ups on their way', 
     getCards.mockResolvedValue({ data: [low] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
     expect(await screen.findByText('Saldo bajo')).toBeInTheDocument();
+  });
+});
+
+describe('CredencialPage follows the child picked anywhere in the portal (P0, 2026-11-21)', () => {
+  const DIEGO: CafeteriaCard = {
+    ...CARD,
+    student: { ...CARD.student, id: 12, name: 'Diego Quintana', grade: '1°', group: 'B', student_id: '09825' },
+    code: 'ci09825',
+    balance: '45.00',
+    points: '45.00',
+  };
+  const face = () => screen.getByText('Código Loyverse').closest('[data-testid="credencial-face"]') as HTMLElement;
+  const PARENT = { id: 3, email: 'mama@example.com', first_name: 'Ana', last_name: 'Quintana', full_name: 'Ana Quintana', role: 'parent', avatar: '', whatsapp: '' } as User;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    act(() => useSelectedChildStore.setState({ childId: null }));
+    useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
+  });
+
+  it('opens on the child selected elsewhere, with no chips of its own', async () => {
+    act(() => useSelectedChildStore.setState({ childId: 12 }));
+    getCards.mockResolvedValue({ data: [CARD, DIEGO] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('Diego Quintana')).toBeInTheDocument();
+    expect(within(face()).getByText('ci09825')).toBeInTheDocument();
+    expect(within(face()).queryByText('Emma Quintana')).toBeNull();
+    // The page has no picker of its own: the header switcher is the one.
+    expect(document.querySelector('[aria-pressed]')).toBeNull();
+  });
+
+  it('switching elsewhere (the shared store) moves the barcode to that child', async () => {
+    act(() => useSelectedChildStore.setState({ childId: 10 }));
+    getCards.mockResolvedValue({ data: [CARD, DIEGO] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('ci09824');
+    act(() => useSelectedChildStore.getState().setChildId(12));
+    expect(await within(face()).findByText('ci09825')).toBeInTheDocument();
+    expect(within(face()).queryByText('ci09824')).toBeNull();
+  });
+
+  it('nothing picked yet: shows the first card and adopts it, so the header agrees', async () => {
+    getCards.mockResolvedValue({ data: [CARD, DIEGO] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('ci09824');
+    await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(10));
+  });
+
+  it('a sibling without a credential: says so and never shows another child’s barcode', async () => {
+    useAuthStore.setState({ user: PARENT, accessToken: 't', isAuthenticated: true });
+    getDashboard.mockResolvedValue({ data: { children: [
+      { id: 10, name: 'Emma Quintana', grade: '4°', group: 'A', student_id: '09824' },
+      { id: 12, name: 'Diego Quintana', grade: '1°', group: 'B', student_id: '09825' },
+    ] } } as never);
+    act(() => useSelectedChildStore.setState({ childId: 12 }));
+    getCards.mockResolvedValue({ data: [CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Diego aún no tiene credencial')).toBeInTheDocument();
+    expect(screen.queryByText('Código Loyverse')).toBeNull();
+    expect(screen.queryByText('ci09824')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver credencial de Emma' }));
+    expect(useSelectedChildStore.getState().childId).toBe(10);
+    expect(await screen.findByText('ci09824')).toBeInTheDocument();
+  });
+
+  it('says how old the balance is', async () => {
+    getCards.mockResolvedValue({ data: [CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo actualizado hace un momento')).toBeInTheDocument();
+  });
+});
+
+describe('freshnessLabel', () => {
+  const at = new Date(2026, 10, 18, 8, 30).getTime();
+  it('reads minutes, then the time today, then the day', () => {
+    expect(freshnessLabel(at, at + 10_000)).toBe('Saldo actualizado hace un momento');
+    expect(freshnessLabel(at, at + 5 * 60_000)).toBe('Saldo actualizado hace 5 min');
+    expect(freshnessLabel(at, at + 3 * 3_600_000)).toBe('Saldo actualizado hoy a las 08:30');
+    expect(freshnessLabel(at, at + 3 * 86_400_000)).toBe('Saldo actualizado el 18 de nov a las 08:30');
   });
 });

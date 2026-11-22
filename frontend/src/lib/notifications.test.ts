@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupNotifs, isLongMessage, notifDestination, type Notif } from './notifications';
+import { groupNotifs, isLongMessage, notifDestination, pinUrgent, type Notif } from './notifications';
 
 const base = (over: Partial<Notif>): Notif => ({
   id: 1, notif_type: 'info', title: 't', message: 'm', is_read: false, created_at: '', ...over,
@@ -48,5 +48,30 @@ describe('notifDestination · long messages', () => {
     expect(isLongMessage(alert)).toBe(false);
     expect(isLongMessage('Línea uno\nlínea dos')).toBe(false);
     expect(isLongMessage('Uno.\n\nDos.')).toBe(true);
+  });
+});
+
+describe('pinUrgent / «Urgentes»', () => {
+  it('puts unread urgent alerts first, each part in the server order', () => {
+    const list = [
+      base({ id: 1 }),
+      base({ id: 2, notif_type: 'warning' }),
+      base({ id: 3, notif_type: 'warning', is_read: true }),
+      base({ id: 4, notif_type: 'warning' }),
+    ];
+    expect(pinUrgent(list).map((n) => n.id)).toEqual([2, 4, 1, 3]);
+  });
+
+  it('groups them in «Urgentes» above the date groups; a read alert goes back to its date', () => {
+    const now = new Date(2026, 7, 22, 12);
+    const iso = (d: Date) => d.toISOString();
+    const groups = groupNotifs([
+      base({ id: 1, created_at: iso(new Date(2026, 7, 22, 8)) }),
+      base({ id: 2, notif_type: 'warning', created_at: iso(new Date(2026, 6, 1)) }),
+      base({ id: 3, notif_type: 'warning', is_read: true, created_at: iso(new Date(2026, 7, 22, 9)) }),
+    ], now);
+    expect(groups.map((g) => [g.label, g.items.map((n) => n.id)])).toEqual([
+      ['Urgentes', [2]], ['Hoy', [1, 3]],
+    ]);
   });
 });

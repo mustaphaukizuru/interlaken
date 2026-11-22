@@ -19,11 +19,11 @@ export function writeSeen(iso: string) {
 function NovedadRow({ it, Icon }: { it: NovedadItem; Icon: typeof Bell }) {
   return (
     <>
-      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${it.unread ? 'bg-purple/10 text-purple' : 'bg-cream-2 text-subtle'}`}><Icon size={14} aria-hidden="true" /></span>
+      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm ${it.unread ? 'bg-purple/10 text-purple' : 'bg-cream text-subtle'}`}><Icon size={16} aria-hidden="true" /></span>
       <span className="min-w-0 flex-1">
         <span className={`block truncate text-sm ${it.unread ? 'font-semibold text-ink' : 'text-ink'}`}>{it.title}</span>
         {it.text && <span className="block truncate text-xs text-muted">{it.text}</span>}
-        <span className="block text-[11px] text-subtle">{formatDateTime(it.at)}</span>
+        <span className="block text-xs text-subtle">{formatDateTime(it.at)}</span>
       </span>
       {it.unread && <><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-pink" aria-hidden="true" /><span className="sr-only">Nuevo</span></>}
     </>
@@ -41,18 +41,18 @@ export function NovedadesPanel({ className = '' }: { className?: string }) {
       {isLoading ? <div className="skeleton h-24" aria-hidden="true" /> : items.length === 0 ? (
         <SectionEmpty icon={Sparkles}>Nada nuevo desde su última visita</SectionEmpty>
       ) : (
-        <ul className="divide-y divide-line" aria-label="Novedades">
+        <ul className="divide-y divide-line px-3 py-1" aria-label="Novedades">
           {items.slice(0, 8).map((it, i) => {
             const Icon = ICON[it.type] ?? Bell;
             return (
               <li key={i}>
                 {/* An item without a page to open (a school date) is a plain row, not a dead link. */}
                 {it.link ? (
-                  <Link to={it.link} className="flex items-start gap-3 py-2.5 hover:bg-cream-2 -mx-2 px-2 rounded-sm">
+                  <Link to={it.link} className="flex min-h-[44px] items-start gap-3 rounded-sm px-2 py-2.5 hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40">
                     <NovedadRow it={it} Icon={Icon} />
                   </Link>
                 ) : (
-                  <div className="-mx-2 flex items-start gap-3 rounded-sm px-2 py-2.5">
+                  <div className="flex items-start gap-3 px-2 py-2.5">
                     <NovedadRow it={it} Icon={Icon} />
                   </div>
                 )}

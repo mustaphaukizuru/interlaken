@@ -54,7 +54,7 @@ describe('MyCafeteriaPage', () => {
     expect(screen.queryByText(/Grupo/)).toBeNull();
     await waitFor(() => expect(cafeteriaApi.getTransactions).toHaveBeenCalledWith(expect.objectContaining({ mine: 1 })));
     expect(cafeteriaApi.getSpendingCategories).toHaveBeenCalledWith(30, undefined, true);
-    expect(screen.getByRole('link', { name: 'Mi credencial' })).toHaveAttribute('href', '/portal/mi-cafeteria/credencial');
+    expect(screen.getByRole('link', { name: 'Ver mi credencial' })).toHaveAttribute('href', '/portal/mi-cafeteria/credencial');
   });
 
   it('a paid top-up on the own wallet shows where the balance is heading', async () => {
