@@ -2438,12 +2438,8 @@
           "href": "/agendar-visita"
         },
         "secondary": {
-          "label": "Cafetería",
+          "label": "Portal Cafetería",
           "href": "/login"
-        },
-        "tertiary": {
-          "label": "Colegiaturas",
-          "href": "/pagos"
         },
         "poster": "/assets/court-wide.webp",
         "posterAlt": "Campus Colegio Interlaken",

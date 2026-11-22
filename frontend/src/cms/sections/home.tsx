@@ -152,9 +152,9 @@ export const sections = [
       showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
       subtitle: 'Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.',
       primary: VISIT_CTA,
-      // Same three as the header (school, 2026-11-22).
-      secondary: { label: 'Cafetería', href: '/login' },
-      tertiary: { label: 'Colegiaturas', href: '/pagos' },
+      // Same as the header buttons (owner, 2026-11-22: «Portal Cafetería»,
+      // no «Colegiaturas»). The optional third button stays empty.
+      secondary: { label: 'Portal Cafetería', href: '/login' },
       poster: '/assets/court-wide.webp', posterAlt: 'Campus Colegio Interlaken', video: '',
     },
   }),
