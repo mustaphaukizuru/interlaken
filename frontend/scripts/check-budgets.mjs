@@ -75,7 +75,12 @@ const ROUTE_BUDGET_OVERRIDES = {
   // console page's lazy() stub and <Route> sits in the entry chunk the public
   // home also loads (~60 stubs today). Follow-up that reclaims more than this:
   // move the /admin route tree into one lazily loaded module.
-  '/': { budgetKb: 171, reason: 'intentional framer-motion animations (~30 kB gz) + admin route table in the entry chunk' },
+  // 2026-11-21 (+1 kB, PENDING OWNER REVIEW in the UX refinement PR): master
+  // 170.7 kB → 171.1 kB. The +0.4 kB is the public footer from UX Phase 5
+  // (44px tap targets, one contact list shared by the phone accordion and the
+  // desktop column, print rules, the region heading), all in PublicLayout in
+  // the entry chunk. The same structural follow-up above reclaims far more.
+  '/': { budgetKb: 172, reason: 'intentional framer-motion animations (~30 kB gz) + admin route table in the entry chunk' },
 };
 
 /**
