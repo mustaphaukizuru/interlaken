@@ -39,8 +39,7 @@
     }
     .card {
       background: #ffffff;
-      border: 1px solid var(--line);
-      border-radius: 24px;
+      border-radius: 12px; /* --radius-md: borderless surface (decisions/0001-0002) */
       box-shadow: 0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10);
       padding: 40px 32px;
       max-width: 420px;
@@ -54,7 +53,7 @@
       margin-bottom: 10px;
     }
     h1 .accent { color: var(--purple); }
-    p { font-size: 0.95rem; line-height: 1.55; color: var(--muted); margin-bottom: 24px; }
+    p { font-size: 1rem; line-height: 1.55; color: var(--muted); margin-bottom: 24px; }
     .actions { display: flex; flex-direction: column; gap: 10px; }
     a.btn {
       display: inline-flex;
@@ -62,7 +61,7 @@
       justify-content: center;
       min-height: 44px;
       padding: 10px 22px;
-      border-radius: 999px;
+      border-radius: 8px; /* --radius-sm: no pill buttons */
       font-weight: 600;
       font-size: 0.95rem;
       text-decoration: none;
@@ -72,7 +71,7 @@
     a.home { border: 1.5px solid var(--purple); color: var(--purple); background: transparent; }
     a.home:hover, a.home:focus-visible { background: var(--purple-light); }
     a:focus-visible { outline: 3px solid rgba(64,26,142,0.4); outline-offset: 2px; }
-    .rule { width: 48px; height: 3px; border-radius: 2px; background: var(--coral); margin: 0 auto 18px; }
+    .rule { width: 48px; height: 3px; border-radius: 9999px; background: var(--coral); margin: 0 auto 18px; }
   </style>
 </head>
 <body>
