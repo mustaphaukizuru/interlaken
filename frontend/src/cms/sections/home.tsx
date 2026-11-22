@@ -39,7 +39,8 @@ const heroItem: Variants = {
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 interface HeroProps {
   showLogo?: boolean; title?: string; titleAccent?: string; subtitle?: string;
-  primary?: CmsLink; secondary?: CmsLink; poster?: number | string; posterAlt?: string; video?: string;
+  primary?: CmsLink; secondary?: CmsLink; tertiary?: CmsLink;
+  poster?: number | string; posterAlt?: string; video?: string;
 }
 function HomeHeroView(p: HeroProps) {
   const t = useTokens();
@@ -48,6 +49,9 @@ function HomeHeroView(p: HeroProps) {
   const poster = useCmsImage(p.poster, t(p.posterAlt), { full: true });
   const primary = asLink(p.primary);
   const secondary = asLink(p.secondary);
+  // Optional (2026-11-22, «Colegiaturas»): a page published before it existed,
+  // or one that leaves it empty, keeps its two buttons.
+  const tertiary = asLink(p.tertiary);
   return (
     <HeroVideo
       className="min-h-[min(92svh,820px)] sm:min-h-[min(88svh,760px)]"
@@ -87,6 +91,9 @@ function HomeHeroView(p: HeroProps) {
               {primary.label} <ArrowRight size={17} />
             </CmsAnchor>
             <CmsAnchor link={secondary} className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark" />
+            {tertiary.label && tertiary.href && (
+              <CmsAnchor link={tertiary} className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark" />
+            )}
           </m.div>
         </m.div>
       </Container>
@@ -136,6 +143,7 @@ export const sections = [
       f.textarea('subtitle', 'Subtítulo', { hint: 'Puede usar {{ciclo}} y {{anios}}.' }),
       f.link('primary', 'Botón principal'),
       f.link('secondary', 'Botón secundario'),
+      f.link('tertiary', 'Tercer botón', { hint: 'Opcional: vacío = no se muestra.' }),
       f.image('poster', 'Foto de portada', { hint: 'Se ve mientras carga el video, o siempre si no hay video.' }),
       f.text('posterAlt', 'Descripción de la foto (accesibilidad)'),
       f.url('video', 'Video de portada (MP4)', { hint: 'Vacío = el video de Ajustes.' }),
@@ -144,7 +152,9 @@ export const sections = [
       showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
       subtitle: 'Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.',
       primary: VISIT_CTA,
-      secondary: { label: 'Portal Cafetería', href: '/login' },
+      // Same three as the header (school, 2026-11-22).
+      secondary: { label: 'Cafetería', href: '/login' },
+      tertiary: { label: 'Colegiaturas', href: '/pagos' },
       poster: '/assets/court-wide.webp', posterAlt: 'Campus Colegio Interlaken', video: '',
     },
   }),

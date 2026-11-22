@@ -31,8 +31,9 @@ const HIDE_STICKY_CTA = [
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
  *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra.
- *  «Opción 3» (2026-11-20): «Pagos» se llama «Familias» y recibe el pago en
- *  línea («Pagar colegiatura», antes un botón) y «Plataformas» (antes en «El Colegio»). */
+ *  «Opción 3» (2026-11-20): «Pagos» se llama «Familias» y recibe «Plataformas»
+ *  (antes en «El Colegio»). 2026-11-22: sin «Pagar colegiatura», que repetía
+ *  «Colegiaturas y cafetería» (esa página enlaza al pago de colegiaturas). */
 type MenuEntry = { label: string; to: string; icon: LucideIcon };
 type MenuGroupEntry = { label: string; items: MenuEntry[] };
 
@@ -78,7 +79,6 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
   {
     label: 'Familias',
     items: [
-      { label: 'Pagar colegiatura', to: 'https://interlaken.servoescolar.mx', icon: CreditCard },
       { label: 'Colegiaturas y cafetería', to: '/pagos', icon: CircleDollarSign },
       { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
       { label: 'Plataformas', to: '/plataformas', icon: MonitorSmartphone },
