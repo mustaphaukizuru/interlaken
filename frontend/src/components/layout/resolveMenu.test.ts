@@ -42,10 +42,9 @@ describe('resolveMenu', () => {
     const adminShape = ADMIN_DEFAULT_MENU.map((g) => [g.label, g.items.map((i) => [i.label, i.to])]);
     expect(adminShape).toEqual(publicShape);
   });
-  it('header buttons are «Cafetería», «Colegiaturas» and «Agendar visita» (school, 2026-11-22)', () => {
+  it('header buttons are «Portal Cafetería» and «Agendar visita», no «Colegiaturas» (owner, 2026-11-22)', () => {
     expect(CHROME_DEFAULTS.header_buttons).toEqual([
-      { label: 'Cafetería', href: '/login', icon: 'Coffee' },
-      { label: 'Colegiaturas', href: '/pagos', icon: 'CircleDollarSign' },
+      { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
       { label: 'Agendar visita', href: '/agendar-visita', primary: true },
     ]);
   });

@@ -17,12 +17,12 @@ export interface SiteChrome {
 }
 
 export const CHROME_DEFAULTS: SiteChrome = {
-  // School, 2026-11-22 (René, option 1): three buttons, «Cafetería»,
-  // «Colegiaturas» (the families page with the tuition and cafetería links)
-  // and «Agendar visita». Up to 4 fit (navigation.validate_chrome).
+  // Owner, 2026-11-22 (after #292): back to two buttons, «Portal Cafetería»
+  // and «Agendar visita»; «Colegiaturas» is no longer a header button (the
+  // «Familias» menu keeps «Colegiaturas y cafetería»). Up to 4 fit
+  // (navigation.validate_chrome).
   header_buttons: [
-    { label: 'Cafetería', href: '/login', icon: 'Coffee' },
-    { label: 'Colegiaturas', href: '/pagos', icon: 'CircleDollarSign' },
+    { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
     { label: 'Agendar visita', href: '/agendar-visita', primary: true },
   ],
   footer_tagline: 'Educación bilingüe de excelencia para el desarrollo integral de sus hijos. Tlalnepantla, Estado de México.',
