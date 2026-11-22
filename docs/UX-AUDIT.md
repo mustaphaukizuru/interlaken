@@ -15,7 +15,84 @@ branch changes code.
 
 ## 0 · Summary for review
 
-_Filled in at the end of the run._
+One branch, `ux/refinement-programme`, 16 local commits on top of `master`
+fd8f03cc (never pushed). No migrations, no new dependencies, no env or
+deploy changes. Behaviour on the money path is unchanged.
+
+### What changed
+- **Design system:** two radii (8 px controls, 12 px surfaces) and no pill
+  buttons; borderless surfaces; status colour pairs; one layer scale; Badge
+  with text + icon; 16 px body floor on phones; motion at 300 ms / 12 px;
+  print stylesheet; `npm run check:ui` in CI; `/_design` reference page (dev
+  only); decision records `docs/decisions/0001-0004`.
+- **Public site:** content aligned with header and footer; notice banner
+  passes AA; cookie banner no longer covers dialogs; ficha shows one error
+  line and focuses the field to fix, h1 on every screen, safer autocomplete,
+  leave-page warning; contacto/visita/facturación/CMS forms share one
+  pattern with inline success and failure; no card-in-card; 44 px footer links.
+- **Family portal:** «Hoy» first; one header child switcher (the credencial
+  now follows it: it could show a sibling's barcode before); flat header;
+  avisos with urgent items pinned and one unread dot; 44/48 px targets;
+  credencial shows when its balance was updated and works in print.
+- **Staff console:** «Pendientes» exceptions list with ages and one-click
+  queues (new read-only counters); KPI tiles are real links; one money
+  format; «Sin resultados / Limpiar filtros»; denied-area state instead of a
+  silent redirect; inline errors and a «Saldo: $X → $Y» preview on balance
+  adjustments; dense tables by default.
+- **Email:** borderless on-brand layout, purple 8 px button with Outlook
+  padding, colours tied to the tokens, notice blocks only for comunicados,
+  no names/codes/amounts in subjects, first name + initial in family bodies,
+  `render_emails` previews, `docs/EMAIL-DESIGN.md`.
+- **Django admin:** notifications, document review, comunicado activation,
+  booking slots and payments can no longer be edited around the console's
+  workflows; AA caption colour; smoke test over every admin.
+
+### P0 status
+| P0 | Status |
+|---|---|
+| Credencial ignored the selected child (wrong barcode at the till) | ✅ |
+| No header child switcher; six pickers | ✅ (cafetería keeps one in-page picker: T2) |
+| Dashboard without «Hoy» | ✅ |
+| Pagos not child-scoped | ⏳ T1 |
+| Console tiles not links, queues hidden, English codes | ✅ |
+| Staff accounts without an exceptions home | ◐ built and tested, not routed (T3, behaviour change) |
+| Pill buttons everywhere | ✅ |
+| Public notice banner contrast; cookie banner over dialogs | ✅ |
+| Django admin: notifications editable, `is_verified` bypass | ✅ |
+| Scope proof missing on 5 endpoints | ✅ tests added, no leak found |
+
+### Verification (21–22 Nov 2026, local)
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | clean |
+| `npm run lint` | 0 errors (209 warnings; +9 «only-export-components» from new helper files) |
+| `npm run check:ui` | clean |
+| Vitest | 186 files, **1,216 tests passing** (baseline 1,163) |
+| `npm run build` / `check:sw` | OK |
+| `check:budgets` | OK after a **+1 kB home budget (172 kB, pending owner review)**: the footer's 44 px targets and print rules add 0.4 kB to the entry chunk (measured against a `master` build) |
+| pytest (full, SQLite) | **3,287 passed, 0 failed**, 18 skipped (Postgres-only, optional PDF lib); core/portal/accounts rerun after the review fixes: 1,411 passed, 0 failed |
+| Playwright visual baselines | will differ everywhere (expected): regenerate in CI and review (T18) |
+| Code review (medium, whole branch) | 9 findings (5 important: credencial cold-open race, «Por aplicar» missing credited top-ups, failed-payments row vs its list, stale dated links, urgent avisos cut from «Hoy»; 1 pre-existing double count; 3 nits): **all fixed** with tests |
+
+### Decisions for the owner in the morning
+1. **Home JS budget** 171 → 172 kB, or do T17 (lazy admin routes) first.
+2. **Inbox preview line** of receipts still repeats the intro, which can show
+   an amount (D13 covers subjects only). Keep, or hide amounts there too?
+3. **Staff «Pendientes» home** (T3) needs the flag channel (D14).
+4. **Media:** Freepik Premium is connected (14,763 credits). Nothing was
+   spent; choose a budget and slots.
+5. **Photo consent** (D16) and **marketing email legal review** (T21, T22).
+
+### Deploy notes (when approved)
+Standard `deploy.sh`; no migrations, no env vars, no crontab change. After
+deploy: hard-refresh once (new CSS), check `/`, `/portal` and `/admin` on a
+phone, and run `python manage.py render_emails --out /tmp/emails` only on a
+DEBUG machine (it refuses in production). Rollback: redeploy `master` fd8f03cc.
+
+### Local environment note
+The run used a fresh seeded SQLite DB. The owner's previous local DB is kept
+as `db_local.sqlite3.pre-uiux` (repo root, untracked) and in the session
+scratchpad; restore it with `mv db_local.sqlite3.pre-uiux db_local.sqlite3`.
 
 ## 1 · Decisions taken (owner, 21 Nov 2026)
 
@@ -88,9 +165,35 @@ each needs the owner's go-ahead. Effort in hours, one engineer.
 | P14 | Eyebrows as plain text after a per-section contrast check on dark heroes | Tonight they became 8 px tags | 2–3 |
 | P15 | i18n framework / SPA dark theme | Out of scope by D8/D9; listed only for completeness | 40+ each |
 
-## 5 · Tickets
+## 5 · Tickets (open after this PR)
 
-_Filled in at the end of the run._
+Ready to paste as GitHub issues (D20). Estimates in hours, one engineer.
+«Owner» = needs a decision or an action only the school can take.
+
+| # | Ticket | Acceptance criteria | Est. | Depends |
+|---|---|---|---|---|
+| T1 | **Pagos scoped to the selected child** (portal P0-2) | `/portal/pagos` defaults to the child chosen in the header; the summary takes `?student=`; test proves child B never sees A's payments in the default view | 4–6 | API param |
+| T2 | Cafetería page: one child picker | Families use the header switcher only; the in-page picker stays for staff; money-path test updated, amounts and flow unchanged | 2–3 | owner OK (money path) |
+| T3 | **Staff «Pendientes» home** | A staff account with areas can open `/admin` and sees only its areas' pending rows (component built and tested); sidebar label «Pendientes»; behind a flag | 3–4 | D14 flag channel |
+| T4 | Comunicado rendered email preview | `POST /portal/admin/announcements/email-preview/` returns subject + HTML from the same renderer as the fan-out; composer shows it before sending | 4–6 | — |
+| T5 | Record drawer with Prev/Next and `?ver=` | Alumnos and Admisiones first; table position and filters kept | 16–24 | — |
+| T6 | One date format across the console | Every console page uses `lib/tableFormat` (cafetería done tonight) | 4–6 | — |
+| T7 | Eyebrows as plain text | Per-section contrast check on dark heroes, then `.section-label-*` drop the tint | 2–3 | — |
+| T8 | Single-image CMS block with width/height | `useMediaInfo` from `cms/runtime.tsx`; no layout shift; school photos never cropped | 2–3 | — |
+| T9 | Visit booking grade as a select | Data change (free text today) | 2 | owner |
+| T10 | Ficha autosave behind a flag | Debounced save on blur/idle; health data stays server-side | 6–10 | D14 |
+| T11 | Precache the credencial chunk | Credencial opens offline at the till; `check:sw` green; precache size noted | 1–2 | — |
+| T12 | Icon-scale sweep | Remaining off-scale lucide sizes (~200, mostly console and CMS editor) move to 16/20/24 | 3–4 | — |
+| T13 | Copy sweep for console pages not touched tonight | Messages ≤ 15 words, verb-first buttons, usted | 4–6 | — |
+| T14 | Route-level axe + authenticated Lighthouse in CI | `@axe-core/playwright` (new dev dependency) | 4–8 | owner OK (dependency) |
+| T15 | Notification priority field | Proposal P1 | 8–12 | — |
+| T16 | Gallery hover chip (`galeria.tsx:230`) | Not a status badge → plain caption | 1 | — |
+| T17 | Lazy admin route tree | Moves ~60 console `lazy()` stubs out of the public entry chunk; reclaims several kB on `/` and returns the home budget to ≤ 171 kB | 4–6 | — |
+| T18 | Regenerate visual baselines in CI and review the diffs | Every public route and the portal/console shots; approve or file fixes | 2 | owner |
+| T19 | Real-device pass | iPhone Safari and an Android phone: portal home, header switcher, credencial, recarga up to Banorte, ficha | 2 | owner |
+| T20 | Email client pass | Gmail (web/app), Outlook (Windows/web), Apple Mail, from `render_emails` samples and test sends to owner inboxes | 2 | owner |
+| T21 | Photo consent (D16) | School confirms consent is on file for photos showing students | — | owner |
+| T22 | Marketing email (P7) | Legal review (LFPDPPP 2025, LFPC art. 18 Bis / REPEP) before any build | — | owner + counsel |
 
 ## 6 · Read-only production queries for the owner
 
@@ -518,3 +621,30 @@ an outsider test. **Missing proof (P0 candidates, code looks right):**
 `portal/novedades.py:55/68 NovedadesView` (hand-written payment filter the
 contract regex doesn't catch). P1: `NotificationMarkReadView` (`portal/views.py:732`),
 `AnnouncementAckView` (:702).
+
+**Status after this branch (Appendix E).** ✅ borderless layout, purple 8 px
+button with Outlook padding, token parity test, preheader ≤ 90, line breaks
+in Outlook, notice-only blocks, «Aviso importante» on emergencies, invite
+expiry date, first name + initial in family bodies, Django admin P0s and
+P1 items 3–6 and 9, admin smoke test, five scope proof tests (no leak).
+⏳ staff bodies keep full names (by design); `low_balance_alerts.py`
+details and `loyverse_push.py:635` staff subject; RFC repeated in the
+facturación acknowledgement (`core/views.py`); comunicado subjects uncapped
+(the school's title); English column headers and missing search on some
+read-only admins; logo PNG on a white box in forced dark.
+
+Subjects changed (D13: no names, codes or amounts):
+
+| Before | After |
+|---|---|
+| Código para agregar a {nombre}: {código} | Su código para vincular a sus hijos |
+| Confirme su correo para los avisos de {nombre} | Confirme su correo para recibir avisos |
+| Pre-registro recibido: {niño} · Nuevo pre-registro: {niño} | Pre-registro recibido · Nuevo pre-registro |
+| Ficha de inscripción iniciada / recibida: {niño} · Nueva ficha … iniciada: {niño} | names dropped |
+| Enlace para continuar la ficha: {niño} | Enlace para continuar la ficha |
+| Invitación de inscripción: {niño} | Invitación de inscripción |
+| Inscripción aprobada: {niño} · Actualización de su inscripción: {niño} | names dropped |
+| Documentos pendientes para la inscripción de {nombre} | Documentos pendientes para la inscripción |
+| Documento(s) por corregir: {niño} · Documentos de inscripción: {niño} · Inscripción recibida: {niño} | names dropped |
+| Examen de admisión de {niño} · Resultado del examen de admisión de {niño} · Ficha de inscripción: {niño} | Fecha del examen de admisión · Resultado del examen de admisión · Ficha de inscripción |
+| Interlaken: Por verificar: {alumno}, $X | Interlaken: Recarga por verificar (or «N recargas por verificar», «Recordatorio · …») |
