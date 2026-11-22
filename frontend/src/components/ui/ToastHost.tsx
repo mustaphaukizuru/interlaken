@@ -23,9 +23,11 @@ export function ToastHost() {
   return (
     <Toaster
       position={isMobile ? 'bottom-center' : 'top-right'}
+      // The layer scale (index.css --z-toast) instead of the library's 9999, so
+      // the full-screen credencial and the skip link stay above toasts.
       containerStyle={isMobile
-        ? { bottom: 'calc(84px + env(safe-area-inset-bottom))', left: 12, right: 12 }
-        : { top: 16, right: 16 }}
+        ? { bottom: 'calc(84px + env(safe-area-inset-bottom))', left: 12, right: 12, zIndex: 'var(--z-toast)' as unknown as number }
+        : { top: 16, right: 16, zIndex: 'var(--z-toast)' as unknown as number }}
       toastOptions={{
         style: { maxWidth: isMobile ? '100%' : 380 },
         // Errors linger longer and are announced immediately by screen readers.

@@ -94,7 +94,7 @@ export default {
       // Fluid type scale — clamp() so display type shrinks gracefully on mobile.
       fontSize: {
         'fluid-sm':   'clamp(0.8125rem, 0.78rem + 0.16vw, 0.875rem)',
-        'fluid-base': 'clamp(0.9375rem, 0.9rem + 0.19vw, 1rem)',
+        'fluid-base': 'clamp(1rem, 0.96rem + 0.19vw, 1.0625rem)', // 16px floor on phones (no body text under 16px)
         'fluid-lg':   'clamp(1.0625rem, 1rem + 0.31vw, 1.25rem)',
         'fluid-xl':   'clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem)',
         'fluid-2xl':  'clamp(1.5rem, 1.3rem + 1vw, 2rem)',

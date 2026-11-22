@@ -11,7 +11,7 @@
 | `xl`  | 1280px | Dashboards: 3 to 4 KPI tiles per row. |
 | `2xl` | 1536px | Two-pane list + detail layouts (admisiones, alumnos). |
 
-Audit every new screen at **360, 390, 768, 1024, 1440, 1920**. The Playwright visual suite (`frontend/e2e/visual.spec.ts`) snapshots 390 and 1280.
+Audit every new screen at **360, 390, 768, 1024, 1280, 1440** (and 1920 for console two-pane views). The Playwright visual suite (`frontend/e2e/visual.spec.ts`) snapshots 390 and 1280.
 
 ## Non-negotiables
 
@@ -20,7 +20,7 @@ Audit every new screen at **360, 390, 768, 1024, 1440, 1920**. The Playwright vi
 - Respect safe areas: `env(safe-area-inset-bottom)` on fixed bottom UI (tab bar, sheets, sticky CTAs).
 - Body never scrolls horizontally; wide content (tables, code, charts) scrolls inside its own `overflow-x-auto` container (`.admin-table-wrap`).
 - Content max width: public pages `max-w-6xl` (1152px); portal `max-w-[1320px]`.
-- Type uses the fluid scale (`text-fluid-*`) for headings; body stays 15 to 16px.
+- Type uses the fluid scale (`text-fluid-*`) for headings; body text is at least 16px on phones (`text-fluid-base` floor 1rem since 2026-11-21).
 - Hover-only affordances always have a tap equivalent.
 - `prefers-reduced-motion` disables entrance animations (see `lib/motion.tsx`, `Reveal`).
 

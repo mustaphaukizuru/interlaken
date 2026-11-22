@@ -156,6 +156,22 @@
   }
 }
 
+/* Print (Phase 11, 2026-11-21): black on white, no chrome, clean breaks.
+   Components hide their own chrome with Tailwind `print:hidden`; anything can
+   opt out with data-print="hide". Table headers repeat on every page. */
+@media print {
+  @page { margin: 14mm 12mm; }
+  html, body { background: #fff !important; color: #000 !important; }
+  *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; animation: none !important; }
+  .accent-bar, .skip-link, [data-print="hide"] { display: none !important; }
+  .card, .admin-table-wrap { border: 1px solid #bbb; background: #fff !important; }
+  .admin-table-wrap { max-height: none !important; overflow: visible !important; }
+  thead { display: table-header-group; }
+  tr, img, figure, .card, .break-inside-avoid { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+  a { color: #000 !important; text-decoration: underline; }
+}
+
 /* Top accent bar — show on all public pages */
 .accent-bar { height: 3px; width: 100%; background: var(--grad-bar); flex-shrink: 0; }
 

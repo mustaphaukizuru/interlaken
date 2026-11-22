@@ -44,7 +44,7 @@ in the login glow was removed in this run).
 |---|---|---|
 | Ink / body text | `ink` / `--text-main` | `#1A1130` |
 | Muted text | `muted` / `--text-muted` | `#6E6885` |
-| Subtle text | `subtle` / `--text-light` | `#726B89` (darkened from `#9A93AE`, which was 2.93:1; now 5.02:1 white / 4.59:1 cream) |
+| Subtle text | `subtle` / `--text-light` | `#6B6482` (one value in CSS, Tailwind, email and Unfold since 2026-11-21; 5.57:1 white / 5.09:1 cream) |
 | Hairline border | `line` / `--border` | `#ECEAF3` |
 | Border (alt) | `line-2` / `--border-2` | `#EEEBF5` |
 | Page bg (cream) | `cream` / `cream-2` | `#F5F4FA` / `#FAF9FD` |
@@ -55,6 +55,10 @@ in the login glow was removed in this run).
 - **Success** → green family (`green-dark` `#316f1c` for text on light = AA;
   `green-strong` `#38801e` for solid interactive faces under white labels).
 - **Warning/attention** → amber (`#b45309`, AA as text on white/cream).
+- **Status pairs (2026-11-21):** `--success-fg/bg`, `--warning-fg/bg`,
+  `--danger-fg/bg`, `--info-fg/bg`, `--neutral-fg/bg`; Tailwind `text-success
+  bg-success-bg` etc. Each foreground passes AA on its own tint (warning
+  4.57:1 is the tightest). Status colours are for status only.
 - **Error/danger** → coral family; form validation text uses `red-600` (Tailwind
   default) as the conventional error signal.
 - **Info** → purple/brand.
@@ -85,14 +89,25 @@ token definitions, never in components.
 
 - Spacing: default Tailwind 4/8px scale; vertical rhythm via `<Section>` (`sm
   48px` / `md 72px` / `lg 96px`) and `<Container>`.
-- Radii: `xl2 18px`, `xl3 24px`, `xl4 32px` (+ Tailwind defaults); `--radius 18px`.
-- Elevation: `shadow-card/purple/pink/green/coral` (`--shadow-*`).
+- **Radii (2026-11-21, `decisions/0001`):** two values only. `rounded-sm` =
+  `--radius-sm` 8 px for controls; `rounded-md` = `--radius-md` 12 px for
+  surfaces; `rounded-full` only for badges, count pills, avatars, switches,
+  dots, spinners and step numbers. No pill buttons. Old names are aliases;
+  `npm run check:ui` rejects them in `src/`.
+- **Surfaces (`decisions/0002`):** borderless. White on cream with
+  `shadow-card`, or a tint inside a white surface; hairlines only on fields,
+  table rows and dividers; never a card inside a card. Popovers and dialogs use
+  `shadow-raised`.
+- **Layers (`decisions/0003`):** `z-sticky` 30 < `z-header` 35 < `z-dropdown` 40
+  < `z-drawer` 50 < `z-modal` 60 < `z-toast` 70 < `z-overlay` 80.
+- Elevation: `shadow-card`, `shadow-raised`; brand glows `shadow-purple/pink/green/coral` for CTAs only.
 
 ### 1.8 Motion
 
 - Easing token `--ease: cubic-bezier(0.4, 0, 0.2, 1)`.
 - Duration scale: `--transition-fast 150ms` / `--transition 200ms` /
   `--transition-slow 300ms` (300ms is the ceiling).
+- Route entrance 300 ms (the ceiling; was 320 ms). No page transitions.
 - **`prefers-reduced-motion: reduce`** is honored globally (`index.css` neutralizes
   animations/transitions/smooth-scroll) and per-component (`Reveal`, `.hover-lift`).
 
@@ -106,10 +121,11 @@ Primitives (`ui/`) — centralized, token-consuming, variant-driven:
 |---|---|
 | `Section` | `bg`: white·cream·dark·gradient·none; `spacing`: sm·md·lg |
 | `Container` | width `md·lg·xl` |
-| `Button` | primary/secondary/danger + `btn`,`btn-pink`,`btn-outline`,`btn-ghost`,`btn-green`,`btn-lg`; `loading` state; ≥44px |
+| `Button` | primary/secondary/danger + `btn`,`btn-pink`,`btn-outline`,`btn-ghost`,`btn-green`,`btn-lg`; `loading` state; ≥44px; `rounded-sm` (never a pill) |
 | `Input` | label + inline error; ≥16px (no iOS zoom), ≥44px, brand focus ring |
-| `Card` | `.card` token border (`line`) + `shadow-card` |
-| `Badge`, `StatCard` | tone: purple·pink·coral·green·amber (token-driven) |
+| `Card` | `.card`: borderless white surface, `rounded-md`, `shadow-card` |
+| `Badge` | status only: success·warning·error·info·neutral; text + icon (14 px); one per row |
+| `StatCard` | KPI tile; a link when it has a target, otherwise a plain stat |
 | `Blob` / `Accent` | decorative SVG; brand tone tokens; `aria-hidden` |
 | `Reveal` | scroll-in animation; respects reduced-motion |
 | `Modal` | bottom-sheet on mobile |
@@ -130,7 +146,9 @@ brand hex (sanctioned third-party exception).
 
 ## 3. Layout & responsive
 
-- Mobile-first. Test breakpoints: **320 / 375 / 768 / 1024 / 1440 px**.
+- Mobile-first. Audit widths: **360 / 390 / 768 / 1024 / 1280 / 1440 px**
+  (1920 for the console two-pane view); regression baselines at 390 and 1280.
+- Body text is at least 16 px on phones (`text-fluid-base` floor 1rem).
 - Container max widths via `<Container>`; page rhythm via `<Section>`.
 - Photography: campus `.webp` in `public/assets`, explicit `width`/`height`
   (zero CLS), `loading="lazy"` below the fold, `fetchPriority="high"` on the hero,
