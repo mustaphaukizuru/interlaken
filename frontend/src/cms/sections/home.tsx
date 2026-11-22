@@ -193,9 +193,18 @@ export const sections = [
   section({
     type: 'video', label: 'Inicio · Video institucional', description: 'Video con texto y botones. Se oculta solo si no hay video.',
     component: lazySection(below, 'HomeVideo'),
-    fields: [...headingFields({ text: true }), f.url('video', 'Video (YouTube o Vimeo)', { hint: 'Vacío = el video de Ajustes.' }), f.link('primary', 'Botón principal'), f.link('secondary', 'Botón secundario')],
+    fields: [
+      ...headingFields({ text: true }),
+      f.url('video', 'Video (YouTube o Vimeo)', { hint: 'Vacío = el video de Ajustes.' }),
+      f.image('poster', 'Foto de portada del video', { hint: 'Vacío = la miniatura de YouTube.' }),
+      f.toggle('clickToPlay', 'Esperar un clic para reproducir', { hint: 'Apagado: empieza sin sonido al llegar a la sección.' }),
+      f.link('primary', 'Botón principal'),
+      f.link('secondary', 'Botón secundario'),
+    ],
     defaults: {
-      eyebrow: 'Conócenos', title: 'Interlaken en video', video: '',
+      eyebrow: 'Conócenos', title: 'Interlaken en video', video: '', clickToPlay: false,
+      // The facade photo matches the ad's first real shot (the building), so the cover fades into the video.
+      poster: '/assets/facade-sign.webp',
       text: 'Nuestro video institucional. Y si quiere conocer el colegio en persona, agende una visita: le mostramos instalaciones, salones y patios.',
       primary: { label: 'Agendar una visita', href: '/agendar-visita' }, secondary: { label: 'Ver la galería', href: '/galeria' },
     },

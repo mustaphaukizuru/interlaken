@@ -2924,12 +2924,16 @@
       "group": "home",
       "locked": false,
       "required": {},
-      "images": [],
+      "images": [
+        "poster"
+      ],
       "labels": {
         "eyebrow": "Etiqueta superior",
         "title": "Título",
         "text": "Texto",
         "video": "Video (YouTube o Vimeo)",
+        "poster": "Foto de portada del video",
+        "clickToPlay": "Esperar un clic para reproducir",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
       },
@@ -2938,6 +2942,8 @@
         "title": "text",
         "text": "textarea",
         "video": "url",
+        "poster": "image",
+        "clickToPlay": "toggle",
         "primary": "link",
         "secondary": "link"
       },
@@ -2945,6 +2951,8 @@
         "eyebrow": "Conócenos",
         "title": "Interlaken en video",
         "video": "",
+        "clickToPlay": false,
+        "poster": "/assets/facade-sign.webp",
         "text": "Nuestro video institucional. Y si quiere conocer el colegio en persona, agende una visita: le mostramos instalaciones, salones y patios.",
         "primary": {
           "label": "Agendar una visita",

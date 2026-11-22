@@ -153,6 +153,33 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
   home hero too: after merging, keep both sets of hero fields and regenerate
   the manifests (`UPDATE_CMS_MANIFEST=1`).
 
+### «Interlaken en video» autoplay (owner request, 22 Nov 2026)
+- **What.** The home band's YouTube ad («Interlaken Publicitario», set in
+  Ajustes) now starts as a silent, looping preview when the visitor reaches
+  it; «Ver con sonido» restarts it from the beginning with sound and the
+  YouTube controls. Own pause button; pauses off screen and in a hidden tab;
+  Save-Data, 2g/3g and reduced motion keep the old click-to-play card.
+- **Why not a full background.** The ad has a voice-over and its own text;
+  muted behind the heading it loses its message and fights the copy. A true
+  background loop needs the original MP4 from the school (then it can be a
+  self-hosted silent loop like the heroes, with the full ad one click away).
+- **Cover.** `facade-sign.webp` (the building, the ad's first real shot) covers
+  the preview until YouTube has hidden its title and buttons (~5 s of
+  playback, via the iframe API's progress messages; 8 s fallback), then fades
+  into the video. YouTube's own thumbnail (a cartoon dog) and its other frames
+  (children's faces) were not used. The glow behind the card is the cover,
+  blurred.
+- **CMS.** Home block «Video institucional» gains «Foto de portada del video»
+  (empty = YouTube thumbnail) and «Esperar un clic para reproducir» (off =
+  preview; older saved pages preview too). Other video blocks are unchanged.
+- **Privacy/performance.** YouTube (nocookie domain) now loads when the band
+  nears the screen instead of on click: no cookies, but Google sees the
+  visitor's IP, and the player downloads about 1 MB. Nothing loads above the
+  band, so first paint and the home JS budget are unaffected (171.9 / 172 kB).
+- **Local data note.** The band had vanished locally because the demo reseed
+  emptied `SiteSettings.video_url`; it was restored locally to
+  `https://youtu.be/z271WfIaPSE` (the value in the owner's saved DB).
+
 ### Deploy notes (when approved)
 Standard `deploy.sh`; no migrations, no env vars, no crontab change. After
 deploy: hard-refresh once (new CSS), check `/`, `/portal` and `/admin` on a
