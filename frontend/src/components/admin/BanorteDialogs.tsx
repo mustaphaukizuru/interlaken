@@ -13,6 +13,7 @@ import { apiErrorMessage } from '@/lib/apiErrors';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { CAF_MONEY_VIEWS, CAF_TOPUPS } from '@/hooks/queries/cafeteria';
 import { PAYMENTS_ENTITY } from '@/hooks/queries/payments';
+import { cleanReferencia, REFERENCIA_HINT, referenciaProblem } from '@/lib/referencia';
 import type { BanorteOperation, BanorteVerifyResult, TopUpLogEntry } from '@/types';
 
 /** What the MultiCobros dialogs read of a payment: a deposit-log row, or a row
@@ -129,8 +130,9 @@ function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void 
   // The submit button goes away with the form: keep keyboard focus in the dialog.
   const done = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (outcome) done.current?.focus(); }, [outcome]);
+  const refProblem = referenciaProblem(referencia, row.banorte?.control_number);
   const verify = useMutation({
-    mutationFn: () => paymentsApi.verifyBanorte(row.payment_id!, { referencia: referencia.trim(), amount: amount.trim() }),
+    mutationFn: () => paymentsApi.verifyBanorte(row.payment_id!, { referencia: cleanReferencia(referencia), amount: amount.trim() }),
     onSuccess: ({ data }) => {
       void invalidate();
       const said = verifyOutcome(row, data);
@@ -145,7 +147,7 @@ function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void 
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (referencia.trim() && amount.trim()) verify.mutate();
+    if (referencia.trim() && amount.trim() && !refProblem) verify.mutate();
   };
   if (outcome) {
     const Icon = outcome.applied ? CheckCircle2 : Clock;
@@ -174,12 +176,13 @@ function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void 
         Escriba la referencia y el monto tal como los muestra MultiCobros.
       </p>
       <OperationFacts row={row} />
-      <Input label="Referencia en MultiCobros" inputMode="numeric" autoComplete="off" required value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+      <Input label="Referencia en MultiCobros" inputMode="numeric" autoComplete="off" required value={referencia}
+        hint={REFERENCIA_HINT} error={refProblem || undefined} onChange={(e) => setReferencia(e.target.value)} />
       <Input label="Monto en MultiCobros" inputMode="decimal" autoComplete="off" required value={amount} onChange={(e) => setAmount(e.target.value)} />
       <p className="text-xs text-muted">Si no aparece o el monto no coincide, no la cargue en el POS y avise a dirección.</p>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" size="sm" loading={verify.isPending} disabled={!referencia.trim() || !amount.trim()}>
+        <Button type="submit" size="sm" loading={verify.isPending} disabled={!referencia.trim() || !amount.trim() || !!refProblem}>
           Sí, aparece aprobada
         </Button>
       </div>
@@ -215,9 +218,10 @@ export function ReconcileBanorteForm({ row, onClose, prefill, onDone }: {
   const [codigoAut, setCodigoAut] = useState(prefill?.codigo_aut ?? '');
   const [amount, setAmount] = useState(prefill?.amount ?? '');
   const [note, setNote] = useState('');
+  const refProblem = outcome === 'approved' ? referenciaProblem(referencia, b?.control_number) : '';
   const reconcile = useMutation({
     mutationFn: () => paymentsApi.reconcileBanorte(row.payment_id!, outcome === 'approved'
-      ? { outcome, referencia: referencia.trim(), codigo_aut: codigoAut.trim(), amount: amount.trim(), note: note.trim() }
+      ? { outcome, referencia: cleanReferencia(referencia), codigo_aut: codigoAut.trim(), amount: amount.trim(), note: note.trim() }
       : { outcome, note: note.trim() }),
     onSuccess: ({ data }) => {
       if (data.detail === 'already_processed') toast.success('Ya estaba conciliada.');
@@ -232,7 +236,7 @@ export function ReconcileBanorteForm({ row, onClose, prefill, onDone }: {
     onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo conciliar el pago.')),
   });
   const ready = outcome === 'approved'
-    ? !!(referencia.trim() && codigoAut.trim() && amount.trim())
+    ? !!(referencia.trim() && codigoAut.trim() && amount.trim()) && !refProblem
     : !!note.trim();
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -267,7 +271,8 @@ export function ReconcileBanorteForm({ row, onClose, prefill, onDone }: {
       {outcome === 'approved' ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Referencia Payworks" inputMode="numeric" autoComplete="off" required value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+            <Input label="Referencia Payworks" inputMode="numeric" autoComplete="off" required value={referencia}
+              hint={REFERENCIA_HINT} error={refProblem || undefined} onChange={(e) => setReferencia(e.target.value)} />
             <Input label="Número de autorización" autoComplete="off" required value={codigoAut} onChange={(e) => setCodigoAut(e.target.value)} />
           </div>
           <Input label="Monto en MultiCobros" inputMode="decimal" autoComplete="off" required value={amount} onChange={(e) => setAmount(e.target.value)} />
