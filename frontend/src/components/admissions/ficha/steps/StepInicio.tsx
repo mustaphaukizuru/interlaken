@@ -11,10 +11,10 @@ import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { apiErrorCode, apiErrorMessage, apiFieldErrors } from '@/lib/apiErrors';
 import { fichaApi } from '../api';
 import { bodyFor, fieldId, initialValues, sectionMissing, stepField } from '../choices';
-import type { FichaCopy } from '../copy';
+import { fillText, type FichaCopy } from '../copy';
 import { Field } from '../fields';
 import { FichaFormProvider } from '../context';
-import { Block, ErrorSummary, Row, StepHeading, type SummaryItem } from '../parts';
+import { Block, ErrorSummary, Row, StepHeading, useFocusFirstInvalid, useUnsavedWarning } from '../parts';
 import { ResumeForm } from '../ResumeForm';
 import type { FichaSchema, FieldErrors, StartResponse, Values } from '../types';
 
@@ -32,6 +32,9 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
   const [busy, setBusy] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
   const checklist = copy.list('checklist');
+  // Typed but not sent yet: leaving the page asks first (nothing is saved on its own).
+  const [pristine] = useState(() => JSON.stringify(bodyFor(step, initialValues(schema, step, {}))));
+  useUnsavedWarning(JSON.stringify(bodyFor(step, values)) !== pristine);
 
   const set = (name: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -43,7 +46,9 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
     });
   };
   const setMany = (patch: Values) => Object.entries(patch).forEach(([k, v]) => set(k, v));
-  const showSummary = () => { setTimeout(() => summaryRef.current?.focus(), 0); };
+  // The first field with a problem takes the focus; else the error line.
+  const requestFocus = useFocusFirstInvalid();
+  const showProblems = (names: string[]) => requestFocus(names.map((n) => fieldId(step.key, n)), summaryRef);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,7 +56,7 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
     if (Object.keys(missing).length) {
       setErrors(missing);
       setDetail(undefined);
-      showSummary();
+      showProblems(Object.keys(missing));
       return;
     }
     setBusy(true);
@@ -67,15 +72,14 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
       const known = Object.fromEntries(Object.entries(fields).filter(([k]) => stepField(step, k)));
       setErrors(known);
       setDetail(Object.keys(known).length ? undefined : apiErrorMessage(err, copy.t('startError')));
-      showSummary();
+      showProblems(Object.keys(known));
     } finally {
       setBusy(false);
     }
   };
 
-  const items: SummaryItem[] = Object.entries(errors).map(([name, message]) => ({
-    id: fieldId(step.key, name), label: stepField(step, name)?.label ?? name, message,
-  }));
+  const problems = Object.keys(errors).length;
+  const line = problems ? fillText(copy.t('errorSummary'), { n: problems }) : detail;
 
   return (
     <div className="card p-4 sm:p-8">
@@ -85,7 +89,7 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
           <p className="text-sm font-bold text-ink">{copy.t('checklistTitle')}</p>
           <ul className="mt-2 space-y-1.5">
             {checklist.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-[15px] text-muted">
+              <li key={item} className="flex items-start gap-2 text-base text-muted">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-strong" aria-hidden="true" />
                 <span>{item}</span>
               </li>
@@ -93,7 +97,7 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
           </ul>
         </div>
       ) : null}
-      <ErrorSummary ref={summaryRef} title={copy.t('errorSummary')} items={items} detail={detail} />
+      <ErrorSummary ref={summaryRef} line={line} />
       <FichaFormProvider value={{ schema, step, values, errors, set, setMany, copy }}>
         <form noValidate onSubmit={submit} className="space-y-8">
           <Block title={copy.t('whoTitle')}>
@@ -124,7 +128,7 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
           </Button>
         </form>
       </FichaFormProvider>
-      <div className="mt-8 border-t border-line pt-6">
+      <div className="mt-10">
         <ResumeForm copy={copy} />
       </div>
     </div>

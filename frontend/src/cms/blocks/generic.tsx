@@ -3,7 +3,7 @@
  * video, form... Loaded on demand by BlockRenderer only when a page uses one,
  * so the designed public pages never download them.
  */
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CalendarDays, ShieldCheck } from 'lucide-react';
@@ -26,6 +26,12 @@ import type { Block } from './registry';
 const mediaUrl = (ref: unknown, variant: 'thumb' | 'md' | 'lg' = 'lg') => imageSrc(ref, variant);
 /** srcset over the library variants (320 / 960 / 1600 px) so phones download the small file (BACKLOG P2-20). */
 export const mediaSrcSet = (ref: unknown) => imageSrcSet(ref, { full: true });
+
+/** «5 de diciembre de 2026» from an ISO date (YYYY-MM-DD), read at noon so no time zone moves the day. */
+export function formatDateMx(iso: string): string {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 /** One generic block (CMS-PLAN phase 2). Unknown types render nothing. */
 export default function GenericBlockView({ block }: { block: Block }) {
@@ -64,7 +70,7 @@ export default function GenericBlockView({ block }: { block: Block }) {
         <div className="text-center text-white">
           <h2 className="font-head text-fluid-3xl font-black tracking-[-0.025em]">{p.title}</h2>
           {p.text && <p className="mx-auto mt-3 max-w-xl opacity-90">{p.text}</p>}
-          {cta.href && <Link to={cta.href} className="btn btn-lg mt-7 bg-white text-purple">{cta.label ?? 'Más información'} <ArrowRight size={17} /></Link>}
+          {cta.href && <Link to={cta.href} className="btn btn-lg mt-7 bg-white text-purple">{cta.label ?? 'Más información'} <ArrowRight size={16} aria-hidden="true" /></Link>}
         </div>
       </Section>
     ); }
@@ -106,15 +112,34 @@ export default function GenericBlockView({ block }: { block: Block }) {
 }
 
 interface HeroProps { title: string; subtitle?: string; image?: number; cta?: { label?: string; href?: string } }
+/**
+ * The page's h1, once: a second hero on the same page (or a hero under a
+ * designed section that already has the h1) titles itself with an h2.
+ * Decided before paint, from the headings already on the page.
+ */
+function useFirstH1(ref: React.RefObject<HTMLHeadingElement>): boolean {
+  const [first, setFirst] = useState(true);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const earlier = Array.from(document.querySelectorAll('h1')).some(
+      (h) => h !== el && !!(h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING),
+    );
+    if (earlier) setFirst(false);
+  }, [ref]);
+  return first;
+}
 function HeroBlock({ title, subtitle, image, cta }: HeroProps) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const H = useFirstH1(headingRef) ? 'h1' : 'h2';
   return (
     <section className="relative flex min-h-[60svh] items-end overflow-hidden bg-dark text-white">
       {image && <img src={mediaUrl(image)} srcSet={mediaSrcSet(image)} sizes="100vw" alt="" fetchPriority="high" className="absolute inset-0 h-full w-full object-cover" />}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(8,5,22,0.35) 0%, rgba(8,5,22,0.92) 100%)' }} />
       <div className="relative mx-auto w-full max-w-6xl px-4 pb-12 pt-28 sm:px-6">
-        <h1 className="font-head text-fluid-5xl font-black tracking-[-0.03em]">{title}</h1>
+        <H ref={headingRef} className="font-head text-fluid-5xl font-black tracking-[-0.03em]">{title}</H>
         {subtitle && <p className="mt-4 max-w-2xl text-fluid-lg text-white/80">{subtitle}</p>}
-        {cta?.href && <Link to={cta.href} className="btn-pink mt-7">{cta.label ?? 'Conocer más'} <ArrowRight size={16} /></Link>}
+        {cta?.href && <Link to={cta.href} className="btn-pink mt-7">{cta.label ?? 'Conocer más'} <ArrowRight size={16} aria-hidden="true" /></Link>}
       </div>
     </section>
   );
@@ -123,12 +148,16 @@ function HeroBlock({ title, subtitle, image, cta }: HeroProps) {
 function GalleryBlock({ images }: { images: { image: number | string; caption?: string }[] }) {
   const altOf = useMediaAlt();
   return (
+    // A row-ordered grid of 4:3 tiles: the space is reserved before each photo
+    // loads (no layout shift) and the reading and Tab order runs by row.
     <Section bg="cream">
-      <ul className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {images.filter((im) => im.image).map((im, i) => (
-          <li key={i} className="mb-4 break-inside-avoid overflow-hidden rounded-md bg-white shadow-card">
-            <img src={mediaUrl(im.image, 'md')} srcSet={mediaSrcSet(im.image)} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" alt={altOf(im.image, im.caption ?? '')} loading="lazy" decoding="async" className="w-full object-cover" />
-            {im.caption && <p className="px-3 py-2 text-xs text-muted">{im.caption}</p>}
+          <li key={i} className="overflow-hidden rounded-md bg-white shadow-card">
+            <div className="aspect-[4/3] bg-cream-2">
+              <img src={mediaUrl(im.image, 'md')} srcSet={mediaSrcSet(im.image)} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" alt={altOf(im.image, im.caption ?? '')} loading="lazy" decoding="async" width={960} height={720} className="h-full w-full object-cover" />
+            </div>
+            {im.caption && <p className="px-3 py-2 text-sm text-muted">{im.caption}</p>}
           </li>
         ))}
       </ul>
@@ -176,7 +205,7 @@ function CalendarBlock() {
     <Section bg="cream" containerSize="md">
       <h2 className="mb-4 flex items-center gap-2 font-head text-xl font-bold text-ink"><CalendarDays size={20} className="text-purple" aria-hidden="true" /> Próximas fechas</h2>
       <ul className="divide-y divide-line rounded-md bg-white shadow-card">{next.map((e) => (
-        <li key={e.id} className="flex justify-between gap-3 px-4 py-3 text-sm"><span className="text-ink">{e.title}</span><span className="text-muted">{e.start_date}</span></li>
+        <li key={e.id} className="flex justify-between gap-3 px-4 py-3 text-base"><span className="text-ink">{e.title}</span><time dateTime={e.start_date} className="shrink-0 text-sm text-muted">{formatDateMx(e.start_date)}</time></li>
       ))}</ul>
     </Section>
   );
@@ -191,10 +220,10 @@ function OpenSchoolBlock() {
       <h2 className="mb-4 font-head text-xl font-bold text-ink">Clases abiertas</h2>
       {events.length === 0 ? <p className="text-sm text-muted">Por ahora no hay clases abiertas programadas. Puede agendar una visita individual.</p> : (
         <ul className="divide-y divide-line rounded-md bg-white shadow-card">{events.map((e) => (
-          <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><div><p className="font-semibold text-ink">{e.title}</p><p className="text-muted">{e.date}{e.description ? ` · ${e.description}` : ''}</p></div><span className="shrink-0 text-xs text-subtle">{e.spots_remaining} lugares</span></li>
+          <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><div><p className="text-base font-semibold text-ink">{e.title}</p><p className="text-muted"><time dateTime={e.date}>{formatDateMx(e.date)}</time>{e.description ? ` · ${e.description}` : ''}</p></div><span className="shrink-0 text-sm text-subtle">{e.spots_remaining} lugares</span></li>
         ))}</ul>
       )}
-      <Link to="/agendar-visita" className="btn-pink mt-5">Agendar visita <ArrowRight size={16} /></Link>
+      <Link to="/agendar-visita" className="btn-pink mt-5">Agendar visita <ArrowRight size={16} aria-hidden="true" /></Link>
     </Section>
   );
 }
@@ -212,7 +241,7 @@ const BUILTIN_FORMS: Record<string, { label: string; to: string }> = {
 };
 function FormBlock({ slug }: { slug: string }) {
   const f = BUILTIN_FORMS[slug];
-  if (f) return <Section bg="cream" containerSize="md"><div className="text-center"><Link to={f.to} className="btn-pink">{f.label} <ArrowRight size={16} /></Link></div></Section>;
+  if (f) return <Section bg="cream" containerSize="md"><div className="text-center"><Link to={f.to} className="btn-pink">{f.label} <ArrowRight size={16} aria-hidden="true" /></Link></div></Section>;
   if (!slug) return null;
   return <Section bg="cream" containerSize="md"><div className="card"><CmsForm slug={slug} /></div></Section>;
 }

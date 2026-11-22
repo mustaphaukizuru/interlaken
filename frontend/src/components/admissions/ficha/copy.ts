@@ -33,15 +33,15 @@ export const FICHA_TEXT = {
   saving: 'Guardando…',
   saved: 'Guardado',
   saveError: 'No se pudo guardar. Revise su conexión e intente de nuevo.',
-  errorSummary: 'Revise estos datos para continuar:',
+  errorSummary: 'Datos por revisar: {n}',
   errRequired: 'Este dato es obligatorio.',
   loadError: 'No pudimos abrir la ficha. Revise su conexión e intente de nuevo.',
   retryLabel: 'Intentar de nuevo',
   expiredTitle: 'Su sesión terminó',
-  sessionExpired: 'Por seguridad, su sesión venció. Pida un enlace nuevo con su correo para continuar; lo que ya guardó sigue ahí.',
+  sessionExpired: 'Su sesión venció por seguridad. Pida un enlace nuevo; lo que guardó sigue ahí.',
   // Antes de empezar
   startTitle: 'Antes de empezar',
-  startIntro: 'Con estos datos guardamos su ficha y le enviamos a su correo un enlace para continuarla. Toda la ficha toma unos 15 minutos y puede guardarla y continuar después.',
+  startIntro: 'Guardamos su ficha y le enviamos a su correo un enlace para continuarla.',
   checklistTitle: 'Tenga a la mano',
   whoTitle: 'Sus datos',
   childTitle: 'Datos del alumno',
@@ -50,14 +50,14 @@ export const FICHA_TEXT = {
   startError: 'No pudimos guardar sus datos. Revise su conexión e intente de nuevo.',
   // Continuar una ficha
   resumeToggle: '¿Ya recibió su enlace y venció? Reciba uno nuevo',
-  resumeText: 'Escriba el correo al que le enviamos la ficha de inscripción y le mandamos un enlace nuevo para continuarla.',
+  resumeText: 'Escriba el correo donde recibió la ficha y le enviamos un enlace nuevo.',
   resumeEmail: 'Correo electrónico',
   resumeSubmit: 'Enviar enlace',
-  resumeDone: 'Si hay una ficha en proceso con ese correo, le enviamos un enlace para continuarla. Revise su bandeja de entrada y la carpeta de correo no deseado.',
+  resumeDone: 'Si ese correo tiene una ficha, le enviamos un enlace. Revise también el correo no deseado.',
   resumeError: 'No pudimos enviar la solicitud. Intente de nuevo en un momento.',
   // Ficha personal: /pre-registro without a link (the school sends it after admission)
   privateTitle: 'La ficha de inscripción es personal',
-  privateText: 'El colegio envía la ficha de inscripción por correo o WhatsApp a cada familia cuando su hijo/a es admitido.',
+  privateText: 'Ábrala con el enlace que el colegio le envió por correo o WhatsApp.',
   privateStepsTitle: 'Así es el proceso de admisión',
   privateWhatsapp: 'Escribir por WhatsApp',
   privateWaMessage: 'Hola, me gustaría recibir informes de admisión del Colegio Interlaken.',
@@ -67,7 +67,7 @@ export const FICHA_TEXT = {
   invitedTitle: 'Su ficha ya tiene los primeros datos.',
   invitedText: 'Revíselos y complete los pasos que faltan. Cada paso se guarda al continuar.',
   inviteErrorTitle: 'El enlace ya no es válido',
-  inviteErrorText: 'El enlace ya se usó o venció. Escriba su correo y le enviamos uno nuevo; lo que ya guardó sigue ahí.',
+  inviteErrorText: 'Escriba su correo y le enviamos uno nuevo. Lo que guardó sigue ahí.',
   sentTitle: 'Esta ficha ya fue enviada',
   sentText: 'Si necesita corregir algún dato, responda al correo de confirmación o llame a admisiones.',
   // Paso: alumno
@@ -147,12 +147,12 @@ export const FICHA_TEXT = {
   fixLabel: 'Corregir',
   // Guardar y continuar después
   laterTitle: 'Guardamos su avance',
-  laterText: 'Le enviamos a {correo} un enlace para continuar cuando guste. Si no lo ve en unos minutos, revise la carpeta de correo no deseado.',
+  laterText: 'Enviamos a {correo} un enlace para continuar. Si no llega, revise el correo no deseado.',
   laterBack: 'Seguir llenando ahora',
   laterError: 'Guardamos su avance, pero no pudimos enviar el correo. Intente de nuevo en un minuto.',
   // Confirmación
   doneTitle: 'Recibimos su ficha de inscripción',
-  doneText: 'Gracias. La ficha de {nombre} ya está con el equipo de Admisiones. Le enviamos la confirmación a su correo.',
+  doneText: 'La ficha de {nombre} ya está con Admisiones. Le enviamos la confirmación por correo.',
   doneStepsTitle: 'Qué sigue',
 } as const;
 
@@ -180,7 +180,7 @@ export const FICHA_LISTS = {
   privateSteps: [
     'Agende una visita o solicite informes.',
     'Su hijo/a presenta el examen de valoración.',
-    'Si su hijo/a es admitido, el colegio le envía su ficha de inscripción por correo o WhatsApp.',
+    'Si su hijo/a es admitido, le enviamos su ficha de inscripción.',
   ],
 } as const;
 
@@ -232,6 +232,16 @@ export const RETIRED_DEFAULTS: Partial<Record<TextKey, readonly string[]>> = {
   saludTitle: ['Salud'],
   padreTitle: ['Datos del padre'],
   madreTitle: ['Datos de la madre'],
+  // 2026-11-21 (UX refinement): one error line and messages of 15 words or fewer.
+  errorSummary: ['Revise estos datos para continuar:'],
+  sessionExpired: ['Por seguridad, su sesión venció. Pida un enlace nuevo con su correo para continuar; lo que ya guardó sigue ahí.'],
+  startIntro: ['Con estos datos guardamos su ficha y le enviamos a su correo un enlace para continuarla. Toda la ficha toma unos 15 minutos y puede guardarla y continuar después.'],
+  resumeText: ['Escriba el correo al que le enviamos la ficha de inscripción y le mandamos un enlace nuevo para continuarla.'],
+  resumeDone: ['Si hay una ficha en proceso con ese correo, le enviamos un enlace para continuarla. Revise su bandeja de entrada y la carpeta de correo no deseado.'],
+  privateText: ['El colegio envía la ficha de inscripción por correo o WhatsApp a cada familia cuando su hijo/a es admitido.'],
+  inviteErrorText: ['El enlace ya se usó o venció. Escriba su correo y le enviamos uno nuevo; lo que ya guardó sigue ahí.'],
+  laterText: ['Le enviamos a {correo} un enlace para continuar cuando guste. Si no lo ve en unos minutos, revise la carpeta de correo no deseado.'],
+  doneText: ['Gracias. La ficha de {nombre} ya está con el equipo de Admisiones. Le enviamos la confirmación a su correo.'],
 };
 
 /**
@@ -254,7 +264,7 @@ export const FICHA_GROUPS: { group: string; texts: [TextKey, string][]; links?: 
     group: 'Guardado y errores',
     texts: [
       ['saving', 'Mientras guarda'], ['saved', 'Al guardar'], ['saveError', 'Si no se pudo guardar'],
-      ['errorSummary', 'Encabezado de la lista de errores'], ['errRequired', 'Dato obligatorio vacío'],
+      ['errorSummary', 'Aviso de datos por revisar ({n} = cuántos)'], ['errRequired', 'Dato obligatorio vacío'],
       ['loadError', 'Si no se pudo abrir la ficha'], ['retryLabel', 'Botón para intentar de nuevo'],
       ['expiredTitle', 'Sesión vencida: título'], ['sessionExpired', 'Sesión vencida: texto'],
     ],

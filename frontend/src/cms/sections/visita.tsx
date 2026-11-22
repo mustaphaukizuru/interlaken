@@ -4,14 +4,13 @@
  * section that owns its own state; its titles and messages are editable.
  * The open slots are edited in Visitas (availability).
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import toast from 'react-hot-toast';
-import { CalendarDays, Clock, MapPin, CheckCircle, MessageCircle } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Clock, MapPin, CheckCircle, MessageCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { bookingsApi } from '@/services/api';
@@ -149,8 +148,15 @@ function VisitBookingView(p: BookingProps) {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
+  // The outcome shows on the page: the confirmation replaces the form, a
+  // failure sits above the button (react-hook-form focuses the first invalid field).
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (confirmed || bookingError) resultRef.current?.focus(); }, [confirmed, bookingError]);
+
   const onSubmit = async (values: FormData) => {
     if (!selectedSlot) return;
+    setBookingError(null);
     try {
       await bookingsApi.createBooking({
         slot: selectedSlot.id,
@@ -168,7 +174,7 @@ function VisitBookingView(p: BookingProps) {
       setSelectedDate(null);
       reset();
     } catch (err: any) {
-      toast.error(
+      setBookingError(
         err?.response?.data?.detail ??
           (c('bookingError') || 'No fue posible completar la reserva. Intente de nuevo.'),
       );
@@ -178,9 +184,9 @@ function VisitBookingView(p: BookingProps) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {confirmed ? (
-        <div className="text-center py-12 sm:py-16" role="status">
-          <div className="w-16 h-16 bg-brand-50 rounded-sm flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-brand-600" />
+        <div ref={resultRef} tabIndex={-1} className="text-center py-12 sm:py-16 focus:outline-none" role="status">
+          <div className="w-16 h-16 bg-success-bg rounded-sm flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-success" aria-hidden="true" />
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-2">{t(p.confirmedTitle) || '¡Visita confirmada!'}</h2>
           <p className="text-muted mb-1">
@@ -235,7 +241,7 @@ function VisitBookingView(p: BookingProps) {
                         rel="noopener noreferrer"
                         className="btn-green inline-flex min-h-[44px] items-center"
                       >
-                        <MessageCircle className="h-4 w-4" /> {whatsappLabel}
+                        <MessageCircle className="h-4 w-4" aria-hidden="true" /> {whatsappLabel}
                       </a>
                     ) : (
                       <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
@@ -272,7 +278,7 @@ function VisitBookingView(p: BookingProps) {
                                 : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50'
                             }`}
                           >
-                            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Clock className="h-4 w-4" aria-hidden="true" />
                             {slot.start_time.slice(0, 5)}
                           </button>
                         ))}
@@ -287,37 +293,44 @@ function VisitBookingView(p: BookingProps) {
             <div>
               {p.formTitle && <h2 className="font-semibold text-fluid-lg text-ink mb-4">{t(p.formTitle)}</h2>}
               {!selectedSlot ? (
-                <div className="card bg-cream border-dashed border-2 border-line text-center py-10 text-subtle text-sm">
+                <div className="rounded-md bg-cream px-6 py-10 text-center text-base text-muted">
                   {t(p.pickHint)}
                 </div>
               ) : (
-                <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4" noValidate>
                   <div className="bg-brand-50 rounded-md p-3 text-sm text-brand-700">
                     <div className="flex items-center gap-2">
-                      <CalendarDays className="w-4 h-4 flex-shrink-0" />
+                      <CalendarDays className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                       <strong className="capitalize">
                         {format(parseISO(selectedSlot.date), "d 'de' MMMM, yyyy", { locale: es })}
                       </strong>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Clock className="w-4 h-4 flex-shrink-0" />
+                      <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                       {selectedSlot.start_time.slice(0, 5)} - {selectedSlot.end_time.slice(0, 5)} h
                     </div>
                     {selectedSlot.location && (
                       <div className="flex items-center gap-2 mt-1">
-                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <MapPin className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                         {selectedSlot.location}
                       </div>
                     )}
                   </div>
 
-                  <Input label={c('nameLabel')} error={err(errors.parent_name)} className={inputClass} {...register('parent_name')} />
-                  <Input label={c('emailLabel')} type="email" inputMode="email" autoComplete="email" error={err(errors.parent_email)} className={inputClass} {...register('parent_email')} />
-                  <Input label={c('phoneLabel')} type="tel" inputMode="tel" autoComplete="tel" error={err(errors.parent_phone)} className={inputClass} {...register('parent_phone')} />
-                  <Input label={c('childLabel')} className={inputClass} {...register('child_name')} />
-                  <Input label={c('gradeLabel')} className={inputClass} {...register('child_grade')} />
+                  {/* Own data autofills; the child's fields don't (they are another person). */}
+                  <Input id="visit-name" label={c('nameLabel')} autoComplete="name" aria-required="true" error={err(errors.parent_name)} className={inputClass} {...register('parent_name')} />
+                  <Input id="visit-email" label={c('emailLabel')} type="email" inputMode="email" autoComplete="email" aria-required="true" error={err(errors.parent_email)} className={inputClass} {...register('parent_email')} />
+                  <Input id="visit-phone" label={c('phoneLabel')} type="tel" inputMode="tel" autoComplete="tel" aria-required="true" error={err(errors.parent_phone)} className={inputClass} {...register('parent_phone')} />
+                  <Input id="visit-child" label={c('childLabel')} autoComplete="off" className={inputClass} {...register('child_name')} />
+                  <Input id="visit-grade" label={c('gradeLabel')} autoComplete="off" className={inputClass} {...register('child_grade')} />
 
                   <PrivacyNote />
+                  {bookingError ? (
+                    <div ref={resultRef} tabIndex={-1} role="alert" className="flex items-start gap-2 rounded-sm bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger focus:outline-none">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span>{bookingError}</span>
+                    </div>
+                  ) : null}
 
                   <Button type="submit" loading={isSubmitting} className="w-full justify-center min-h-[44px]">
                     {t(p.submitLabel) || 'Confirmar visita'}
@@ -340,7 +353,7 @@ function VisitBookingView(p: BookingProps) {
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-sm text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-4 h-4" aria-hidden="true" />
               {whatsappLabel}
             </a>
           </div>

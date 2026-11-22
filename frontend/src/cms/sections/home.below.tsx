@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowRight, Award, Check, FlaskConical, Heart, Languages, Mail, Palette, Send, ShieldCheck, Star, Trophy } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Award, Check, FlaskConical, Heart, Languages, Mail, Palette, Send, ShieldCheck, Star, Trophy } from 'lucide-react';
 import type { Variants } from 'framer-motion';
 import { m } from '@/lib/motion';
 import { contactApi, contentApi } from '@/services/api';
@@ -26,21 +26,24 @@ const cmsIcon = iconResolver({ Languages, Trophy, Palette, FlaskConical, Heart, 
 
 const VIEWPORT = { once: true, margin: '0px 0px -60px 0px' } as const;
 
+// Motion standard (DESIGN.md §3.5): rise/slide ≤ 12px, ≤ 300ms, stagger 60ms, standard ease.
+// Reduced motion is honoured by SiteMotionProvider (MotionConfig reducedMotion="user").
+const EASE = [0.4, 0, 0.2, 1] as const;
 const sectionReveal: Variants = {
-  hidden: { opacity: 0, y: 26 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: EASE } },
 };
 const fadeRight: Variants = {
-  hidden: { opacity: 0, x: -24 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  hidden: { opacity: 0, x: -12 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE } },
 };
 const fadeLeft: Variants = {
-  hidden: { opacity: 0, x: 24 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  hidden: { opacity: 0, x: 12 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE } },
 };
 const staggerGroup: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
+  show: { transition: { staggerChildren: 0.06 } },
 };
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -219,7 +222,7 @@ function HomePromosView({ items }: { items?: PromoItem[] }) {
                   {it.label && <span className="text-xs font-bold uppercase tracking-[1.5px] opacity-85">{t(it.label)}</span>}
                   <h3 className="mt-2 font-head text-[26px] font-extrabold leading-tight tracking-[-0.02em]">{t(it.title)}</h3>
                   {it.text && <p className="mt-3 max-w-[420px] text-[14.5px] leading-relaxed opacity-90">{t(it.text)}</p>}
-                  <CmsAnchor link={link} className="mt-5 inline-flex items-center gap-1.5 border-b-2 border-white/50 pb-0.5 text-sm font-bold text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 rounded-sm">{link.label} <ArrowRight size={15} /></CmsAnchor>
+                  <CmsAnchor link={link} className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-white underline decoration-2 decoration-white/50 underline-offset-4 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 rounded-sm">{link.label} <ArrowRight size={16} aria-hidden="true" /></CmsAnchor>
                 </div>
               </div>
             </m.div>
@@ -315,11 +318,15 @@ function LeadForm(p: LeadProps) {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
 
+  // The browser's own check (required, type=email) stops the submit and
+  // focuses the first empty field; a server failure shows above the button.
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (sending) return;
     setSending(true);
+    setFailed(false);
     try {
       await contactApi.send({
         name: name.trim(),
@@ -328,9 +335,9 @@ function LeadForm(p: LeadProps) {
         message: fill(t(p.message) || '{nombre} solicita informes desde la página de inicio.', { nombre: name.trim() }),
       });
       setDone(true);
-      toast.success(t(p.sentToast) || '¡Gracias! Te contactaremos muy pronto.');
+      toast.success(t(p.sentToast) || '¡Gracias! Le contactaremos muy pronto.');
     } catch {
-      toast.error(t(p.errorToast) || 'No fue posible enviar tu solicitud. Intenta de nuevo.');
+      setFailed(true);
     } finally {
       setSending(false);
     }
@@ -340,14 +347,14 @@ function LeadForm(p: LeadProps) {
     <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-purple to-brand-500 text-white px-6 py-10 text-center sm:px-10 sm:py-12 lg:py-14">
       <div className="pointer-events-none absolute -top-16 -right-10 hidden h-56 w-56 rounded-full bg-white/[0.06] sm:block" />
       <div className="relative mx-auto max-w-[620px]">
-        <div className="mx-auto mb-4 inline-flex h-[52px] w-[52px] items-center justify-center rounded-md bg-white/[0.14]">
-          <Mail size={24} />
+        <div className="mx-auto mb-4 inline-flex h-[52px] w-[52px] items-center justify-center rounded-sm bg-white/[0.14]">
+          <Mail size={24} aria-hidden="true" />
         </div>
         <h2 className="font-head font-extrabold text-fluid-3xl tracking-tight">{t(p.title)}</h2>
         {p.text && <p className="mt-2.5 text-base leading-relaxed opacity-90">{t(p.text)}</p>}
         {done ? (
-          <div role="status" className="mt-6 inline-flex items-center gap-2 rounded-full bg-green-400/20 px-5 py-3 font-semibold">
-            <Check size={18} color="var(--green-mid)" strokeWidth={3} /> {t(p.success) || '¡Solicitud recibida! Le contactaremos pronto.'}
+          <div role="status" className="mt-6 inline-flex items-center gap-2 rounded-md bg-white/[0.14] px-5 py-3 font-semibold">
+            <Check size={20} color="var(--green-mid)" strokeWidth={3} aria-hidden="true" /> {t(p.success) || '¡Solicitud recibida! Le contactaremos pronto.'}
           </div>
         ) : (
           <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 text-left sm:mt-6 sm:flex-row sm:items-end">
@@ -362,7 +369,8 @@ function LeadForm(p: LeadProps) {
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-sm border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+                aria-describedby={failed ? 'home-lead-error' : undefined}
+                className="w-full rounded-sm border-none px-5 py-3.5 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
               />
             </label>
             <label className="min-w-0 flex-1 sm:flex-[1_1_220px]">
@@ -372,22 +380,29 @@ function LeadForm(p: LeadProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-sm border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+                aria-describedby={failed ? 'home-lead-error' : undefined}
+                className="w-full rounded-sm border-none px-5 py-3.5 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
               />
             </label>
+            {failed ? (
+              <p id="home-lead-error" role="alert" className="flex w-full basis-full items-start gap-2 rounded-sm bg-white px-3 py-2.5 text-sm font-semibold text-danger">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>{t(p.errorToast) || 'No fue posible enviar su solicitud. Intente de nuevo.'}</span>
+              </p>
+            ) : null}
             <button
               type="submit"
               className="btn btn-lg shrink-0 justify-center bg-pink text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple disabled:opacity-70"
               disabled={sending}
             >
-              {sending ? t(p.sending) || 'Enviando…' : <>{t(p.button) || 'Solicitar'} <Send size={16} /></>}
+              {sending ? t(p.sending) || 'Enviando…' : <>{t(p.button) || 'Solicitar'} <Send size={16} aria-hidden="true" /></>}
             </button>
           </form>
         )}
         {!done && (
           // LFPDPPP notice at the point of collection (editable wording; the link always goes to the notice).
           <p className="mx-auto mt-4 flex max-w-[520px] items-start justify-center gap-2 text-xs leading-relaxed text-white/80">
-            <ShieldCheck size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <ShieldCheck size={16} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
             <span>
               {t(p.privacyText)}{' '}
               <Link to="/aviso-de-privacidad" className="font-semibold text-white underline underline-offset-2">

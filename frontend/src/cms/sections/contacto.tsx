@@ -4,16 +4,17 @@
  * (useSiteSettings); the copy around them is editable here. The message form
  * is a locked section: it owns its own form state and validation.
  */
-import { Phone, Mail, MapPin, Clock, Navigation, ArrowRight } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Phone, Mail, MapPin, Clock, Navigation, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import toast from 'react-hot-toast';
 import { contactApi } from '@/services/api';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { FieldError } from '@/components/public/FormMessages';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
@@ -33,7 +34,7 @@ function ContactHeroView(p: HeroProps) {
       <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
       <Blob tone="pink" opacity={0.4} size={460} shape={1} className="hidden sm:block" style={{ top: -150, left: -110 }} />
       <Blob tone="purple" opacity={0.4} size={420} shape={0} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
-      <div className="relative mx-auto w-full max-w-[1120px] px-5 py-14 sm:px-6 sm:py-16">
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
         {p.label && <span className="section-label-pink inline-flex">{t(p.label)}</span>}
         <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
           <Lines text={t(p.title)} />
@@ -81,22 +82,34 @@ function ContactMainView(p: MainProps) {
     { icon: Clock,  label: t(p.hoursLabel), value: settings.office_hours },
   ].filter((item) => item.value);
 
+  // react-hook-form focuses the first invalid field on submit (shouldFocusError).
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
+  // The outcome shows on the page, where the form was (not only in a passing toast).
+  const [result, setResult] = useState<'idle' | 'sent' | 'failed'>('idle');
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (result !== 'idle') resultRef.current?.focus(); }, [result]);
 
   const onSubmit = async (data: FormData) => {
+    setResult('idle');
     try {
       await contactApi.send(data);
-      toast.success(t(p.success) || 'Mensaje enviado. Le responderemos pronto.');
+      setResult('sent');
       reset();
     } catch {
-      toast.error(t(p.error) || 'No se pudo enviar el mensaje. Intente nuevamente.');
+      setResult('failed');
     }
   };
+  /** Error and its id for aria-describedby (only while there is one). */
+  const fieldError = (key: keyof FormData) => {
+    const text = err(errors[key]);
+    return text ? { id: `contact-${key}-error`, text } : null;
+  };
+  const described = (key: keyof FormData) => fieldError(key)?.id;
 
   return (
     <Section bg="white">
@@ -108,12 +121,12 @@ function ContactMainView(p: MainProps) {
             {INFO.map(({ icon: Icon, label, value, href }, i) => {
               const inner = (
                 <>
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple/[0.08]">
-                    <Icon className="h-5 w-5 text-purple" />
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-sm bg-purple/[0.08]">
+                    <Icon className="h-5 w-5 text-purple" aria-hidden="true" />
                   </div>
                   <div>
                     <p className="mb-0.5 text-xs text-subtle">{label}</p>
-                    <p className="text-[14.5px] font-semibold text-ink">{value}</p>
+                    <p className="text-base font-semibold text-ink">{value}</p>
                   </div>
                 </>
               );
@@ -176,7 +189,7 @@ function ContactMainView(p: MainProps) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Escribir por WhatsApp al Colegio Interlaken"
-              className="inline-flex items-center gap-2 rounded-md bg-green-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-sm bg-green-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
             >
               <WhatsAppIcon className="h-4 w-4" aria-hidden="true" />
               {t(p.whatsappLabel)}
@@ -189,21 +202,30 @@ function ContactMainView(p: MainProps) {
         <Reveal direction="left">
           <div className="card">
             {p.formTitle && <h2 className="mb-[18px] font-head text-fluid-xl font-extrabold tracking-tight text-ink">{t(p.formTitle)}</h2>}
+            {result === 'sent' ? (
+              <div ref={resultRef} tabIndex={-1} role="status" className="rounded-md bg-success-bg p-6 text-center focus:outline-none">
+                <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-success" aria-hidden="true" />
+                <p className="font-semibold text-ink">{t(p.success) || 'Mensaje enviado. Le responderemos pronto.'}</p>
+                <button type="button" onClick={() => setResult('idle')} className="mt-3 inline-flex min-h-[44px] items-center rounded-sm px-3 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                  Escribir otro mensaje
+                </button>
+              </div>
+            ) : (
             <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
               <div>
                 <label className="label" htmlFor="contact-name">{c('nameLabel')}</label>
-                <input id="contact-name" className="input-field text-base" placeholder={c('namePlaceholder')} aria-invalid={!!errors.name} {...register('name')} />
-                {errors.name && <p className="mt-1.5 text-xs text-red-600">{err(errors.name)}</p>}
+                <input id="contact-name" className="input-field text-base" autoComplete="name" placeholder={c('namePlaceholder')} aria-required="true" aria-invalid={!!errors.name} aria-describedby={described('name')} {...register('name')} />
+                <FieldError error={fieldError('name')} />
               </div>
               <div>
                 <label className="label" htmlFor="contact-email">{c('emailLabel')}</label>
-                <input id="contact-email" className="input-field text-base" type="email" inputMode="email" autoComplete="email" placeholder={c('emailPlaceholder')} aria-invalid={!!errors.email} {...register('email')} />
-                {errors.email && <p className="mt-1.5 text-xs text-red-600">{err(errors.email)}</p>}
+                <input id="contact-email" className="input-field text-base" type="email" inputMode="email" autoComplete="email" placeholder={c('emailPlaceholder')} aria-required="true" aria-invalid={!!errors.email} aria-describedby={described('email')} {...register('email')} />
+                <FieldError error={fieldError('email')} />
               </div>
               <div>
                 <label className="label" htmlFor="contact-subject">{c('subjectLabel')}</label>
-                <input id="contact-subject" className="input-field text-base" placeholder={c('subjectPlaceholder')} aria-invalid={!!errors.subject} {...register('subject')} />
-                {errors.subject && <p className="mt-1.5 text-xs text-red-600">{err(errors.subject)}</p>}
+                <input id="contact-subject" className="input-field text-base" autoComplete="off" placeholder={c('subjectPlaceholder')} aria-required="true" aria-invalid={!!errors.subject} aria-describedby={described('subject')} {...register('subject')} />
+                <FieldError error={fieldError('subject')} />
               </div>
               <div>
                 <label className="label" htmlFor="contact-message">{c('messageLabel')}</label>
@@ -211,16 +233,25 @@ function ContactMainView(p: MainProps) {
                   id="contact-message"
                   className="input-field min-h-[120px] resize-none text-base"
                   placeholder={c('messagePlaceholder')}
+                  aria-required="true"
                   aria-invalid={!!errors.message}
+                  aria-describedby={described('message')}
                   {...register('message')}
                 />
-                {errors.message && <p className="mt-1.5 text-xs text-red-600">{err(errors.message)}</p>}
+                <FieldError error={fieldError('message')} />
               </div>
               <PrivacyNote />
+              {result === 'failed' ? (
+                <div ref={resultRef} tabIndex={-1} role="alert" className="flex items-start gap-2 rounded-sm bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger focus:outline-none">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{t(p.error) || 'No se pudo enviar el mensaje. Intente nuevamente.'}</span>
+                </div>
+              ) : null}
               <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center disabled:opacity-60">
                 {isSubmitting ? c('sending') || 'Enviando…' : t(p.submitLabel) || 'Enviar mensaje'}
               </button>
             </form>
+            )}
           </div>
         </Reveal>
       </div>
@@ -235,7 +266,7 @@ function ContactDirectoryView(p: { eyebrow?: string; title?: string; items?: Dir
   const settings = useSiteSettings();
   return (
     <Section bg="cream">
-      <div className="mx-auto w-full max-w-[1120px]">
+      <div>
         {p.eyebrow && <span className="section-label-green inline-flex">{t(p.eyebrow)}</span>}
         {p.title && (
           <h2 className="mt-2 font-head text-fluid-xl font-bold text-ink">
@@ -292,7 +323,7 @@ function ContactMapView(p: MapProps) {
   const embed = (p.embed || '').trim();
   return (
     <section className="bg-white pb-14 pt-4">
-      <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         {p.title && <h2 className="font-head text-fluid-xl font-bold text-ink">{t(p.title)}</h2>}
         <p className="mt-1 text-sm text-muted">
           {settings.address}

@@ -24,7 +24,7 @@ function CostosHeroView(p: HeroProps) {
         {p.label && <span className="section-label-pink inline-flex">{t(p.label)}</span>}
         <h1 className="mt-3 font-head text-fluid-3xl font-black tracking-[-0.02em]">{t(p.title)}</h1>
         {p.badge && (
-          <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm font-semibold">
+          <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-white/85">
             <CalendarDays className="h-4 w-4" aria-hidden="true" />
             {t(p.badge)}
           </p>

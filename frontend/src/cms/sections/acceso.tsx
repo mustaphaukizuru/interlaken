@@ -95,13 +95,13 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
 
             <div className="rounded-md bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
               <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">{c('heading')}</h2>
-              <p className="mb-6 mt-1 text-center text-[13px] text-muted">{c('subheading')}</p>
+              <p className="mb-6 mt-1 text-center text-sm text-muted">{c('subheading')}</p>
 
               {s.bootstrapping && (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="mb-[18px] rounded-md border border-purple/25 bg-purple/[0.06] px-3.5 py-3 text-center text-[13px] text-ink"
+                  className="mb-[18px] rounded-sm bg-info-bg px-3.5 py-3 text-center text-sm text-ink"
                 >
                   {c('googleBusy')}
                 </div>
@@ -111,7 +111,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                 <div
                   id="login-error"
                   role="alert"
-                  className="mb-[18px] rounded-md border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark"
+                  className="mb-[18px] rounded-sm bg-danger-bg px-3.5 py-2.5 text-sm font-medium text-danger"
                 >
                   {s.alert}
                 </div>

@@ -1,21 +1,29 @@
 /**
  * Small shared pieces of the ficha: the heading of an unnumbered screen
- * (focused on every change), the numbered step title, the error summary at
- * the top of a step, the «Guardado» status, the titled blocks a step is made
- * of and the full-width status panels (link sent, closed start, invalid link…).
+ * (focused on every change), the numbered step title, the one-line error
+ * notice at the top of a step (and the focus move to the first field with a
+ * problem), the unsaved-changes warning, the «Guardado» status, the titled
+ * blocks a step is made of and the full-width status panels (link sent,
+ * closed start, invalid link…).
  */
-import { forwardRef, useId, type ReactNode, type Ref } from 'react';
+import { forwardRef, useCallback, useEffect, useId, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
 import { clsx } from 'clsx';
 import { AlertTriangle, Check, CloudOff, Loader2 } from 'lucide-react';
 
-export const StepHeading = forwardRef<HTMLHeadingElement, { title: string; intro?: string; eyebrow?: string }>(
-  ({ title, intro, eyebrow }, ref) => (
-    <header className="mb-6">
-      {eyebrow ? <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-pink">{eyebrow}</p> : null}
-      <h2 ref={ref} tabIndex={-1} className="scroll-mt-28 font-head text-fluid-xl font-bold text-ink focus:outline-none">{title}</h2>
-      {intro ? <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{intro}</p> : null}
-    </header>
-  ),
+/** h1 when the page's hero is not on screen (steps, review, confirmation), else h2 under the hero's h1. */
+export type HeadingLevel = 1 | 2;
+
+export const StepHeading = forwardRef<HTMLHeadingElement, { title: string; intro?: string; eyebrow?: string; level?: HeadingLevel }>(
+  ({ title, intro, eyebrow, level = 2 }, ref) => {
+    const H = level === 1 ? 'h1' : 'h2';
+    return (
+      <header className="mb-6">
+        {eyebrow ? <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-pink">{eyebrow}</p> : null}
+        <H ref={ref} tabIndex={-1} className="scroll-mt-28 font-head text-fluid-xl font-bold text-ink focus:outline-none">{title}</H>
+        {intro ? <p className="mt-1.5 text-base leading-relaxed text-muted">{intro}</p> : null}
+      </header>
+    );
+  },
 );
 StepHeading.displayName = 'StepHeading';
 
@@ -28,7 +36,7 @@ export function NumberedTitle({ number, title }: { number?: string; title: strin
     <>
       {number ? (
         <>
-          <span aria-hidden="true" className="mb-0.5 block text-[11px] font-bold uppercase leading-4 tracking-[0.12em] text-pink">{number}</span>
+          <span aria-hidden="true" className="mb-0.5 block text-xs font-bold uppercase leading-4 tracking-[0.12em] text-pink">{number}</span>
           <span className="sr-only">{number}: </span>
         </>
       ) : null}
@@ -40,43 +48,24 @@ export function NumberedTitle({ number, title }: { number?: string; title: strin
 export interface SummaryItem { id: string; label: string; message: string }
 
 /**
- * «Revise estos datos»: every problem of the step with a link that moves
- * focus to the field. Focused when it appears, so a screen reader reads it.
+ * One line at the top of a step: «Datos por revisar: 3» (or the server's
+ * message when no field is to blame). Each field keeps its own message under
+ * it; the focus goes to the first of them (`focusFirstInvalid`) and to this
+ * line only when no field can take it. `children` (the review's sections to
+ * correct) come under the line.
  */
-export const ErrorSummary = forwardRef<HTMLDivElement, { title: string; items: SummaryItem[]; detail?: string; children?: ReactNode }>(
-  ({ title, items, detail, children }, ref) => {
-    if (!items.length && !detail && !children) return null;
-    const go = (id: string) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const target = el.tagName === 'FIELDSET' ? (el.querySelector('input') as HTMLElement | null) ?? el : el;
-      el.scrollIntoView?.({ block: 'center' });
-      target.focus({ preventScroll: true });
-    };
+export const ErrorSummary = forwardRef<HTMLDivElement, { line?: string; detail?: string; children?: ReactNode }>(
+  ({ line, detail, children }, ref) => {
+    if (!line && !children) return null;
     return (
-      <div ref={ref} tabIndex={-1} role="alert" className="mb-6 rounded-md border border-coral-200 bg-coral-50 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400/40">
-        <p className="flex items-start gap-2 font-semibold text-coral-800">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-          <span>{title}</span>
-        </p>
-        {detail ? <p className="mt-1.5 pl-7 text-sm text-coral-800">{detail}</p> : null}
-        {items.length ? (
-          <ul className="mt-2 space-y-1 pl-7 text-sm">
-            {items.map((it) => (
-              <li key={it.id}>
-                {/* Inline padding: a taller target without changing how the line wraps. */}
-                <a
-                  href={`#${it.id}`}
-                  className="py-3 font-medium text-coral-800 underline underline-offset-2 hover:text-coral-900"
-                  onClick={(e) => { e.preventDefault(); go(it.id); }}
-                >
-                  {it.label}
-                </a>
-                <span className="text-coral-800">: {it.message}</span>
-              </li>
-            ))}
-          </ul>
+      <div ref={ref} tabIndex={-1} role="alert" className="mb-6 rounded-sm bg-danger-bg px-3 py-2.5 text-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400/40">
+        {line ? (
+          <p className="flex items-start gap-2 font-semibold">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <span>{line}</span>
+          </p>
         ) : null}
+        {detail ? <p className="mt-1 pl-7 text-sm">{detail}</p> : null}
         {children}
       </div>
     );
@@ -84,42 +73,107 @@ export const ErrorSummary = forwardRef<HTMLDivElement, { title: string; items: S
 );
 ErrorSummary.displayName = 'ErrorSummary';
 
+/**
+ * Focus the first of these fields that is on screen, in the order the page
+ * shows them (a radio group focuses its chosen or first option; «Otro país»
+ * its text box), else `fallback` (the error line).
+ */
+export function focusFirstInvalid(ids: string[], fallback?: HTMLElement | null) {
+  const els = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el);
+  els.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const el = els[0];
+  if (!el) {
+    fallback?.focus();
+    return;
+  }
+  const target = el.tagName === 'FIELDSET'
+    ? document.getElementById(`${el.id}-text`) ?? el.querySelector<HTMLElement>('input:checked') ?? el.querySelector<HTMLElement>('input') ?? el
+    : el;
+  el.scrollIntoView?.({ block: 'center' });
+  target.focus({ preventScroll: true });
+}
+
+/** `request(ids, fallback)` moves the focus once the errors it set are on screen (after the next render). */
+export function useFocusFirstInvalid() {
+  const [tick, setTick] = useState(0);
+  const pending = useRef<{ ids: string[]; fallback: RefObject<HTMLElement> } | null>(null);
+  useEffect(() => {
+    const next = pending.current;
+    if (!next) return;
+    pending.current = null;
+    focusFirstInvalid(next.ids, next.fallback.current);
+  }, [tick]);
+  return useCallback((ids: string[], fallback: RefObject<HTMLElement>) => {
+    pending.current = { ids, fallback };
+    setTick((t) => t + 1);
+  }, []);
+}
+
+/**
+ * The browser's «¿Salir del sitio?» prompt while the screen holds edits that
+ * are not saved yet. `isUnsaved` is asked when the visitor leaves (so it may
+ * read refs); the listener exists only while `active`. Nothing is saved or
+ * sent here: it only warns.
+ */
+export function useUnsavedWarning(active: boolean, isUnsaved: () => boolean = () => true) {
+  const check = useRef(isUnsaved);
+  useEffect(() => { check.current = isUnsaved; });
+  useEffect(() => {
+    if (!active) return undefined;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!check.current()) return;
+      e.preventDefault();
+      // Older browsers show the prompt only when returnValue is set.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [active]);
+}
+
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /** «Guardando…» / «Guardado» / «No se pudo guardar», announced politely. */
 export function SaveStatus({ state, labels }: { state: SaveState; labels: { saving: string; saved: string; error: string } }) {
   return (
-    <p role="status" aria-live="polite" className="flex min-h-[20px] items-center gap-1.5 text-xs font-medium">
+    <p role="status" aria-live="polite" className="flex min-h-[20px] items-center gap-1.5 text-sm font-medium">
       {state === 'saving' ? (
-        <span className="inline-flex items-center gap-1.5 text-muted"><Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden="true" />{labels.saving}</span>
+        <span className="inline-flex items-center gap-1.5 text-muted"><Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />{labels.saving}</span>
       ) : state === 'saved' ? (
-        <span className="inline-flex items-center gap-1.5 text-green-dark"><Check className="h-3.5 w-3.5" aria-hidden="true" />{labels.saved}</span>
+        <span className="inline-flex items-center gap-1.5 text-success"><Check className="h-4 w-4" aria-hidden="true" />{labels.saved}</span>
       ) : state === 'error' ? (
-        <span className="inline-flex items-center gap-1.5 text-coral-700"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" />{labels.error}</span>
+        <span className="inline-flex items-center gap-1.5 text-danger"><CloudOff className="h-4 w-4" aria-hidden="true" />{labels.error}</span>
       ) : null}
     </p>
   );
 }
 
 /** A centred status screen (link sent, link invalid, start closed, already sent). */
-export function Panel({ icon, tone = 'neutral', title, children, headingRef }: {
+export function Panel({ icon, tone = 'neutral', title, children, after, headingRef, level = 2 }: {
   icon: ReactNode;
   tone?: 'neutral' | 'success' | 'warn';
   title: string;
   children?: ReactNode;
+  /** Left-aligned content under the message, in the same card (the «enlace nuevo» form). */
+  after?: ReactNode;
   headingRef?: Ref<HTMLHeadingElement>;
+  level?: HeadingLevel;
 }) {
+  const H = level === 1 ? 'h1' : 'h2';
   return (
-    <div className="card p-6 text-center sm:p-10">
-      <div className={clsx('mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-sm', {
-        'bg-cream text-purple': tone === 'neutral',
-        'bg-green-light text-green-dark': tone === 'success',
-        'bg-coral-50 text-coral-700': tone === 'warn',
-      })} aria-hidden="true">
-        {icon}
+    <div className="card p-6 sm:p-10">
+      <div className="text-center">
+        <div className={clsx('mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-sm', {
+          'bg-cream text-purple': tone === 'neutral',
+          'bg-success-bg text-success': tone === 'success',
+          'bg-danger-bg text-danger': tone === 'warn',
+        })} aria-hidden="true">
+          {icon}
+        </div>
+        <H ref={headingRef} tabIndex={-1} className="font-head text-fluid-xl font-bold text-ink focus:outline-none">{title}</H>
+        <div className="mx-auto mt-3 max-w-md text-base leading-relaxed text-muted">{children}</div>
       </div>
-      <h2 ref={headingRef} tabIndex={-1} className="font-head text-fluid-xl font-bold text-ink focus:outline-none">{title}</h2>
-      <div className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">{children}</div>
+      {after ? <div className="mx-auto mt-8 max-w-md">{after}</div> : null}
     </div>
   );
 }
@@ -134,15 +188,15 @@ export const HALF = 'sm:max-w-[50%] sm:pr-2.5';
 
 /** The blocks of a step, one under the other. */
 export function Blocks({ children }: { children: ReactNode }) {
-  return <div className="space-y-6">{children}</div>;
+  return <div className="space-y-10">{children}</div>;
 }
 
 /**
  * A titled block inside a step («Nombre», «Nacimiento», «Contacto») with a
  * one-line hint, so a long step reads as a few short groups. Only a visual
  * group: every block of a step still saves with that step. A screen reader
- * hears the title (and the hint) on entering the group; a divider separates
- * it from what comes before.
+ * hears the title (and the hint) on entering the group; space (no rule)
+ * separates it from what comes before.
  */
 export function Block({ title, hint, children }: { title?: string; hint?: string; children: ReactNode }) {
   const id = useId();
@@ -152,10 +206,10 @@ export function Block({ title, hint, children }: { title?: string; hint?: string
       role="group"
       aria-labelledby={`${id}-title`}
       aria-describedby={hint ? `${id}-hint` : undefined}
-      className="space-y-5 border-t border-line pt-6 first:border-t-0 first:pt-0"
+      className="space-y-5"
     >
       <div>
-        <h3 id={`${id}-title`} className="font-head text-base font-bold leading-snug text-ink">{title}</h3>
+        <h2 id={`${id}-title`} className="font-head text-base font-bold leading-snug text-ink">{title}</h2>
         {hint ? <p id={`${id}-hint`} className="mt-0.5 text-sm leading-snug text-muted">{hint}</p> : null}
       </div>
       {children}

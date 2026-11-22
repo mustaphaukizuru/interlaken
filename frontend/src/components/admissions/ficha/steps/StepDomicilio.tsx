@@ -1,4 +1,8 @@
-/** Paso 2 · Domicilio, in the order of a Mexican address, then the home phone. */
+/**
+ * Paso 2 · Domicilio, in the order of a Mexican address, then the home phone.
+ * The family's own address: the browser may offer it (colonia = address-level3,
+ * municipio = address-level2, estado = address-level1).
+ */
 import { Field, RestFields } from '../fields';
 import { useFichaForm } from '../context';
 import { Block, Blocks, HALF, Row } from '../parts';
@@ -20,12 +24,12 @@ export function StepDomicilio() {
         </Row>
         <Field name="address_between_streets" />
         <Row>
-          <Field name="address_neighborhood" />
-          <Field name="address_postal_code" />
+          <Field name="address_neighborhood" autoComplete="address-level3" />
+          <Field name="address_postal_code" autoComplete="postal-code" />
         </Row>
         <Row>
-          <Field name="address_municipality" />
-          <Field name="address_state" />
+          <Field name="address_municipality" autoComplete="address-level2" />
+          <Field name="address_state" autoComplete="address-level1" />
         </Row>
       </Block>
       <Block title={copy.t('domicilioPhoneTitle')} hint={copy.t('domicilioPhoneHint')}>

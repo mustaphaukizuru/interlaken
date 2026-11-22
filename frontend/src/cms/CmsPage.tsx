@@ -45,6 +45,10 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
       <Seo priority={2} title={data.seo?.title || data.title} description={data.seo?.description || undefined}
         image={absoluteImageUrl(data.seo?.og_image, SITE_URL) || undefined} noindex={data.seo?.noindex || !!preview || undefined} />
       {preview && <div className="sticky top-0 z-sticky bg-amber px-4 py-2 text-center text-xs font-bold text-white">Vista previa del borrador: lo que ve aquí aún no está publicado.</div>}
+      {/* One h1 per page: a page built without a hero block still gets its title as the h1. */}
+      {!data.blocks?.some((b) => b.type === 'hero' || String(b.type).endsWith('.hero')) && (
+        <h1 className="sr-only">{data.title}</h1>
+      )}
       <CmsMediaProvider media={data.media}>
         {/* A draft preview shows the app screens (sign-in, invitation links) in their sample state. */}
         {preview ? <CmsPreviewProvider><BlockRenderer blocks={data.blocks} /></CmsPreviewProvider> : <BlockRenderer blocks={data.blocks} />}

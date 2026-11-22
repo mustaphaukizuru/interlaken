@@ -4,7 +4,7 @@ import { ArrowRight, UserCog } from 'lucide-react';
 /** On top of the ficha when the staff opens it without a family's link. */
 export function StaffBanner() {
   return (
-    <aside aria-label="Vista del personal" className="mb-4 flex flex-col gap-3 rounded-md border border-purple/30 bg-purple-light px-4 py-3 text-[15px] text-ink sm:flex-row sm:items-center sm:justify-between">
+    <aside aria-label="Vista del personal" className="mb-4 flex flex-col gap-3 rounded-md bg-info-bg px-4 py-3 text-base text-ink sm:flex-row sm:items-center sm:justify-between">
       <p className="flex items-start gap-3">
         <UserCog className="mt-0.5 h-5 w-5 shrink-0 text-purple" aria-hidden="true" />
         <span>

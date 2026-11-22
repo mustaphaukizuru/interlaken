@@ -4,6 +4,7 @@ import {
   ArrowRight, CircleDollarSign, Clock, GraduationCap, Hourglass, Info,
   ShieldCheck, Sparkles, Wallet,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
@@ -122,41 +123,38 @@ const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
 export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, pending, children }: {
   tone: 'green' | 'purple' | 'coral' | 'pink';
   icon: any; label: string; title: string; subtitle?: string;
-  /** Short pill next to the title, e.g. «Precios 2027». */
+  /** Short note next to the title, e.g. «Precios 2027» (plain text: badges are for status only). */
   badge?: string;
-  /** Amber status pill after the badge, e.g. «Precios 2027: pendientes». */
+  /** The card's one status badge (warning), e.g. «Precios 2027: pendientes». */
   pending?: string;
   children: React.ReactNode;
 }) {
   const tones = {
-    green:  { border: 'border-green/25',  bg: 'bg-green/5',        chip: 'bg-green/15 text-green-dark',  label: 'text-green-dark' },
-    purple: { border: 'border-purple/20', bg: 'bg-purple-light/60', chip: 'bg-purple/15 text-purple',     label: 'text-purple' },
-    coral:  { border: 'border-coral/25',  bg: 'bg-coral/5',        chip: 'bg-coral/15 text-coral-dark',  label: 'text-coral-dark' },
-    pink:   { border: 'border-pink/25',   bg: 'bg-pink-light/60',  chip: 'bg-pink/15 text-pink-dark',    label: 'text-pink-dark' },
+    green:  { bg: 'bg-green/5',        chip: 'bg-green/15 text-green-dark',  label: 'text-green-dark' },
+    purple: { bg: 'bg-purple-light/60', chip: 'bg-purple/15 text-purple',     label: 'text-purple' },
+    coral:  { bg: 'bg-coral/5',        chip: 'bg-coral/15 text-coral-dark',  label: 'text-coral-dark' },
+    pink:   { bg: 'bg-pink-light/60',  chip: 'bg-pink/15 text-pink-dark',    label: 'text-pink-dark' },
   }[tone];
   return (
-    <div className={`overflow-hidden rounded-md border ${tones.border} bg-white shadow-card`}>
-      <div className={`flex items-start gap-3 border-b border-ink/10 ${tones.bg} px-5 py-4`}>
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${tones.chip}`}>
+    // Borderless surface: the tinted header and the shadow separate it.
+    <div className="overflow-hidden rounded-md bg-white shadow-card">
+      <div className={`flex items-start gap-3 ${tones.bg} px-5 py-4`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-sm ${tones.chip}`}>
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className={`text-[11px] font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
+          <p className={`text-xs font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
           {/* Without a badge the heading renders exactly as before (the generic «Tabla» block uses this card too). */}
           {badge || pending ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
-              {badge && <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tones.chip}`}>{badge}</span>}
-              {pending && (
-                <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber/10 px-2.5 py-0.5 text-[11px] font-bold text-amber">
-                  <Hourglass className="h-3 w-3" aria-hidden="true" />{pending}
-                </span>
-              )}
+              {badge && <span className={`whitespace-nowrap text-xs font-semibold ${tones.label}`}>{badge}</span>}
+              {pending && <Badge variant="warning" icon={Hourglass} className="whitespace-nowrap">{pending}</Badge>}
             </div>
           ) : (
             <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
           )}
-          {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
         </div>
       </div>
       {children}

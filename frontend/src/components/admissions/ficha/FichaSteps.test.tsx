@@ -1,6 +1,6 @@
 /**
  * The step-by-step presentation of the ficha (2026-11-21): every numbered
- * step reads «Paso n de 7: título» (its focused H2, «Ver los pasos», the
+ * step reads «Paso n de 7: título» (its focused h1, «Ver los pasos», the
  * review and «Corregir»); a step is made of short titled blocks with a hint
  * that all save with that step's PATCH; on a phone the action bar
  * («Anterior» / «Guardar y continuar») is sticky, docks while the keyboard
@@ -79,9 +79,9 @@ beforeEach(() => {
 });
 
 describe('numbered step titles', () => {
-  it('the focused H2 reads «Paso 1 de 7: Información del alumno»; the eyebrow is not read twice', async () => {
+  it('the focused h1 reads «Paso 1 de 7: Información del alumno»; the eyebrow is not read twice', async () => {
     openWith(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
-    const heading = await screen.findByRole('heading', { level: 2, name: TITLES[0] });
+    const heading = await screen.findByRole('heading', { level: 1, name: TITLES[0] });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(heading).toHaveTextContent('Información del alumno');
     expect(screen.getByText('Paso 1 de 7')).toHaveAttribute('aria-hidden', 'true');
@@ -91,7 +91,7 @@ describe('numbered step titles', () => {
   it('«Ver los pasos» lists the seven numbered titles with their state, one tap per reachable step', async () => {
     const user = userEvent.setup();
     openWith(payload(FILLED, SECTIONS));
-    await screen.findByRole('heading', { level: 2, name: TITLES[6] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[6] });
     const toggle = screen.getByRole('button', { name: 'Ver los pasos' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('navigation', { name: 'Pasos de la ficha' })).not.toBeInTheDocument(); // hidden
@@ -106,15 +106,15 @@ describe('numbered step titles', () => {
     expect(within(rows[6]).getByText(/Revisión y firma/).closest('[aria-current="step"]')).not.toBeNull();
     // A done step is a button named with its number, title and state.
     await user.click(within(nav).getByRole('button', { name: /^Paso 2 de 7: Domicilio\s*, Completo$/ }));
-    const heading = await screen.findByRole('heading', { level: 2, name: TITLES[1] });
+    const heading = await screen.findByRole('heading', { level: 1, name: TITLES[1] });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByRole('button', { name: 'Ver los pasos' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('the review numbers every section and keeps «Quién llena la ficha» (unnumbered) last', async () => {
     openWith(payload(FILLED, SECTIONS));
-    await screen.findByRole('heading', { level: 2, name: TITLES[6] });
-    const headings = [...TITLES.slice(0, 6), 'Quién llena la ficha'].map((name) => screen.getByRole('heading', { level: 3, name }));
+    await screen.findByRole('heading', { level: 1, name: TITLES[6] });
+    const headings = [...TITLES.slice(0, 6), 'Quién llena la ficha'].map((name) => screen.getByRole('heading', { level: 2, name }));
     headings.reduce((prev, h) => {
       expect(prev.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       return h;
@@ -127,9 +127,9 @@ describe('numbered step titles', () => {
   it('«Quién llena la ficha», opened from the review, has no number and no step list', async () => {
     const user = userEvent.setup();
     openWith(payload(FILLED, SECTIONS));
-    await screen.findByRole('heading', { level: 2, name: TITLES[6] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[6] });
     await user.click(screen.getByRole('button', { name: 'Editar: Quién llena la ficha' }));
-    expect(await screen.findByRole('heading', { level: 2, name: 'Quién llena la ficha' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Quién llena la ficha' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ver los pasos' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Paso \d de 7/)).not.toBeInTheDocument();
   });
@@ -140,14 +140,14 @@ describe('numbered step titles', () => {
       t: (k) => ({ alumnoTitle: 'Datos del menor', stepOf: 'Etapa {n} de {total}' } as Partial<Record<keyof typeof FICHA_TEXT, string>>)[k] ?? defaultCopy.t(k),
     };
     openWith(payload({ contacto: CONTACT, alumno: ALUMNO_START }), custom);
-    expect(await screen.findByRole('heading', { level: 2, name: 'Etapa 1 de 7: Datos del menor' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Etapa 1 de 7: Datos del menor' })).toBeInTheDocument();
   });
 });
 
 describe('short titled blocks', () => {
   it('Información del alumno: Nombre, Nacimiento and Escuela, each with its hint', async () => {
     openWith(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
-    await screen.findByRole('heading', { level: 2, name: TITLES[0] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[0] });
     const nombre = screen.getByRole('group', { name: 'Nombre' });
     expect(nombre).toHaveAccessibleDescription('Como aparecen en el acta de nacimiento.');
     expect(within(nombre).getByLabelText('Apellido paterno')).toHaveValue('López');
@@ -164,7 +164,7 @@ describe('short titled blocks', () => {
 
   it('Domicilio: Dirección, then Teléfono', async () => {
     openWith(payload({ contacto: CONTACT, alumno: FILLED.alumno }, ['contacto', 'alumno']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[1] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[1] });
     const address = screen.getByRole('group', { name: 'Dirección' });
     expect(address).toHaveAccessibleDescription('Como aparece en un recibo de luz, agua o teléfono.');
     expect(within(address).getByLabelText('Código postal')).toBeInTheDocument();
@@ -173,7 +173,7 @@ describe('short titled blocks', () => {
 
   it('Contacto de emergencia is one block', async () => {
     openWith(payload({ contacto: CONTACT, alumno: FILLED.alumno, padre: { not_applicable: true } }, SECTIONS.filter((k) => k !== 'emergencia')));
-    await screen.findByRole('heading', { level: 2, name: TITLES[5] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[5] });
     const block = screen.getByRole('group', { name: 'Datos del contacto' });
     expect(block).toHaveAccessibleDescription('Escriba al menos un teléfono.');
     for (const label of ['Nombre(s)', 'Apellido(s)', /Parentesco/, /Celular/, /^Teléfono/]) expect(within(block).getByLabelText(label)).toBeInTheDocument();
@@ -182,7 +182,7 @@ describe('short titled blocks', () => {
   it('Información de salud: three blocks; «¿Cuáles?» only after «Sí»', async () => {
     const user = userEvent.setup();
     openWith(payload({ contacto: CONTACT, alumno: FILLED.alumno }, ['contacto', 'alumno', 'domicilio']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[2] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[2] });
     expect(within(screen.getByRole('group', { name: 'Datos generales' })).getByLabelText(/Estatura/)).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Autorización' })).getByLabelText(/Autorizo al Colegio Interlaken/)).toBeInTheDocument();
     const care = screen.getByRole('group', { name: 'Alergias y padecimientos' });
@@ -194,7 +194,7 @@ describe('short titled blocks', () => {
   it('Información del padre: four blocks that all save with the step\'s one PATCH', async () => {
     const user = userEvent.setup();
     openWith(payload({ contacto: CONTACT, alumno: FILLED.alumno }, ['contacto', 'alumno', 'domicilio', 'salud']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[3] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[3] });
     const personal = screen.getByRole('group', { name: 'Datos personales' });
     const birth = screen.getByRole('group', { name: 'Nacimiento y CURP' });
     const work = screen.getByRole('group', { name: 'Estudios y ocupación' });
@@ -216,7 +216,7 @@ describe('short titled blocks', () => {
   it('«No aplica» folds the four blocks away', async () => {
     const user = userEvent.setup();
     openWith(payload({ contacto: CONTACT }, ['contacto', 'alumno', 'domicilio', 'salud']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[3] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[3] });
     await user.click(screen.getByRole('switch', { name: /No aplica/ }));
     expect(screen.getByText(/Marcó que este bloque no aplica/)).toBeInTheDocument();
     for (const name of ['Datos personales', 'Nacimiento y CURP', 'Estudios y ocupación', 'Contacto']) {
@@ -233,7 +233,7 @@ describe('the phone action bar', () => {
 
   it('is sticky with «Anterior» and «Guardar y continuar», then «continuar después» after it', async () => {
     const { container } = openWith(payload({ ...FILLED, madre: {}, padre: {} }, ['contacto', 'alumno']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[1] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[1] });
     const bar = actionBar(container);
     expect(bar).toHaveAttribute('data-sticky');
     expect(bar).toHaveClass('sticky', 'bottom-0', 'sm:static');
@@ -247,13 +247,13 @@ describe('the phone action bar', () => {
 
   it('has no «Anterior» on the first step', async () => {
     const { container } = openWith(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
-    await screen.findByRole('heading', { level: 2, name: TITLES[0] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[0] });
     expect(within(actionBar(container)).queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument();
   });
 
   it('docks at the end of the form while a field has the keyboard up, and floats again after', async () => {
     const { container } = openWith(payload({ ...FILLED, madre: {}, padre: {} }, ['contacto', 'alumno']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[1] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[1] });
     const bar = actionBar(container);
     act(() => { screen.getByLabelText('Calle').focus(); });
     expect(bar).not.toHaveAttribute('data-sticky');
@@ -275,7 +275,7 @@ describe('the phone action bar', () => {
     Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
     const { container } = openWith(payload({ ...FILLED, madre: {}, padre: {} }, ['contacto', 'alumno']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[1] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[1] });
     const bar = actionBar(container);
     act(() => { screen.getByLabelText('Calle').focus(); });
     expect(bar).toHaveAttribute('data-sticky');
@@ -288,7 +288,7 @@ describe('the phone action bar', () => {
 
   it('marks <html> while the steps show, so the floating WhatsApp button steps aside on a phone', async () => {
     const { unmount } = openWith(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
-    await screen.findByRole('heading', { level: 2, name: TITLES[0] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[0] });
     expect(document.documentElement).toHaveAttribute('data-ficha-steps');
     unmount();
     expect(document.documentElement).not.toHaveAttribute('data-ficha-steps');
@@ -296,7 +296,7 @@ describe('the phone action bar', () => {
 
   it('Enter in a field still sends the step', async () => {
     openWith(payload({ ...FILLED, madre: {}, padre: {} }, ['contacto', 'alumno']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[1] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[1] });
     savesAs('domicilio');
     fireEvent.submit(screen.getByLabelText('Calle').closest('form')!);
     await waitFor(() => expect(patch).toHaveBeenCalledWith(`/admissions/register/${RID}/ficha/domicilio/`, expect.anything(), expect.anything()));
@@ -317,7 +317,7 @@ describe('accessibility on a 320 px phone (axe)', () => {
   it('a step with its blocks and the list of steps open', async () => {
     const user = userEvent.setup();
     const { container } = openWith(payload({ contacto: CONTACT, alumno: FILLED.alumno }, ['contacto', 'alumno', 'domicilio', 'salud']));
-    await screen.findByRole('heading', { level: 2, name: TITLES[3] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[3] });
     await user.click(screen.getByRole('button', { name: 'Ver los pasos' }));
     expect(await run(container)).toEqual([]);
   });
@@ -325,7 +325,7 @@ describe('accessibility on a 320 px phone (axe)', () => {
   it('a step with its error summary', async () => {
     const user = userEvent.setup();
     const { container } = openWith(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
-    await screen.findByRole('heading', { level: 2, name: TITLES[0] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[0] });
     patch.mockImplementation((_url: string, body: unknown) => Promise.resolve({ data: {
       section: 'alumno', data: body as Values,
       completeness: { ...completeness(['contacto']), sections: { ...completeness(['contacto']).sections, alumno: { complete: false, missing: ['child_dob', 'child_sex'] } } },
@@ -338,7 +338,7 @@ describe('accessibility on a 320 px phone (axe)', () => {
 
   it('the review and signature', async () => {
     const { container } = openWith(payload(FILLED, SECTIONS));
-    await screen.findByRole('heading', { level: 2, name: TITLES[6] });
+    await screen.findByRole('heading', { level: 1, name: TITLES[6] });
     expect(await run(container)).toEqual([]);
   });
 });
@@ -358,7 +358,7 @@ describe('Contenido: a page that stored a retired default', () => {
     sessionStorage.setItem('interlaken:ficha-session', JSON.stringify({ id: RID, token: 'S1', expires: '2099-01-01T00:00:00Z' }));
     const stored = { ...spec.defaults, alumnoTitle: 'Datos del alumno', backLabel: 'Atrás', alumnoNameTitle: 'Nombre completo' };
     const { unmount } = renderWithProviders(<Form {...stored} />, { route: '/pre-registro' });
-    expect(await screen.findByRole('heading', { level: 2, name: TITLES[0] })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: TITLES[0] })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Nombre completo' })).toBeInTheDocument();
     unmount();
   }, 30_000);

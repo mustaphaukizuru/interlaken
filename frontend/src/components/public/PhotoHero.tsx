@@ -49,7 +49,7 @@ export function PhotoHero({
         onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-dark/92 via-dark/75 to-dark/45" aria-hidden="true" />
-      <div className="relative mx-auto max-w-[1120px] px-5 py-14 sm:px-6 sm:py-16 lg:py-[72px]">
+      <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16 lg:py-[72px]">
         <span className={`${labelClass} inline-flex`}>{label}</span>
         <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-[-0.03em]">{title}</h1>
         {subtitle && (

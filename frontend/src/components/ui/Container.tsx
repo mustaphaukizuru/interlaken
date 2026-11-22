@@ -1,29 +1,24 @@
 import { type HTMLAttributes } from 'react';
 
 interface ContainerProps extends HTMLAttributes<HTMLDivElement> {
-  /** Horizontal max-width. Defaults to the standard 6xl content width. */
+  /** Horizontal max-width. Defaults to `lg`, the public header/footer width. */
   size?: 'md' | 'lg' | 'xl';
 }
 
-const MAX: Record<NonNullable<ContainerProps['size']>, number> = {
-  md: 880,
-  lg: 1120,
-  xl: 1280,
+// `lg` = the public header and footer (`max-w-6xl px-4 sm:px-6`,
+// PublicLayout.tsx), so section content lines up with the logo and the
+// footer columns at every width. `md` is the reading width, `xl` the wide one.
+// Hand-built bands (heroes) use the same `mx-auto max-w-6xl px-4 sm:px-6`.
+const MAX: Record<NonNullable<ContainerProps['size']>, string> = {
+  md: 'max-w-4xl',
+  lg: 'max-w-6xl',
+  xl: 'max-w-7xl',
 };
 
-/**
- * Centered max-width wrapper with consistent horizontal padding.
- * Replaces the repeated `margin: 0 auto; padding: 0 24px; max-width` inline blocks.
- */
-export function Container({ size = 'lg', className = '', style, children, ...props }: ContainerProps) {
+/** Centered max-width wrapper with the site's gutter (16px on phones, 24px from `sm`). */
+export function Container({ size = 'lg', className = '', children, ...props }: ContainerProps) {
   return (
-    <div
-      // Gutter as classes (not inline) so pages can override it and phones get
-      // 20px instead of a fixed 24px; nested containers no longer double up.
-      className={`mx-auto w-full px-5 sm:px-6 lg:px-8 ${className}`.trim()}
-      style={{ maxWidth: MAX[size], ...style }}
-      {...props}
-    >
+    <div className={`mx-auto w-full ${MAX[size]} px-4 sm:px-6 ${className}`.trim()} {...props}>
       {children}
     </div>
   );

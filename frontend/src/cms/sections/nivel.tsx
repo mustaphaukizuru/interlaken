@@ -18,9 +18,9 @@ import type { PageTemplate } from './types';
 const section = sectionsOf('nivel');
 
 const ACCENT = {
-  green: { label: 'section-label-green', text: 'text-green-dark', ring: 'border-green/30', soft: 'bg-green/5' },
-  coral: { label: 'section-label-pink', text: 'text-coral-dark', ring: 'border-coral/30', soft: 'bg-coral/5' },
-  purple: { label: 'section-label-purple', text: 'text-purple', ring: 'border-purple/30', soft: 'bg-purple/5' },
+  green: { label: 'section-label-green', text: 'text-green-dark', soft: 'bg-green/5' },
+  coral: { label: 'section-label-pink', text: 'text-coral-dark', soft: 'bg-coral/5' },
+  purple: { label: 'section-label-purple', text: 'text-purple', soft: 'bg-purple/5' },
 } as const;
 type AccentKey = keyof typeof ACCENT;
 const accentOf = (v: unknown) => ACCENT[(typeof v === 'string' && v in ACCENT ? v : 'green') as AccentKey];
@@ -228,7 +228,7 @@ function NivelContentView(p: ContentProps) {
                 {p.groupsTitle && <h2 className="font-head text-fluid-xl font-bold text-ink">{t(p.groupsTitle)}</h2>}
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   {groups.map((g, i) => (
-                    <div key={i} className={`rounded-md border ${accent.ring} ${accent.soft} p-5`}>
+                    <div key={i} className={`rounded-md ${accent.soft} p-5`}>
                       <p className="flex items-center gap-2 font-head font-bold text-ink">
                         <Users size={17} className={accent.text} aria-hidden="true" /> {t(g.name)}
                       </p>
@@ -309,12 +309,12 @@ function NivelOthersView(p: { title?: string; items?: OtherItem[] }) {
             <CmsAnchor
               key={i}
               link={{ label: o.name, href: o.href }}
-              className="group flex items-center justify-between rounded-md border border-ink/10 bg-white p-5 hover:border-green/40"
+              className="group flex items-center justify-between rounded-md bg-white p-5 shadow-card transition-shadow hover:shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green/40"
             >
               <span className="font-head text-lg font-bold text-ink group-hover:text-green-dark">
                 {t(o.name)}
               </span>
-              <ArrowRight size={18} className="text-green-dark" aria-hidden="true" />
+              <ArrowRight size={20} className="text-green-dark" aria-hidden="true" />
             </CmsAnchor>
           ))}
         </div>

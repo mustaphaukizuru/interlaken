@@ -6,6 +6,11 @@
  * Phone-first: every control is ≥44 px tall with 16 px text (no iOS zoom),
  * short lists are tap-to-choose option cards (native radios, so arrows and
  * Space work), errors sit under the field and are announced with it.
+ *
+ * Autofill: only the person filling the ficha gets their own data offered
+ * (the step passes `autoComplete="name" | "email" | "tel-national"`); emails
+ * and phones of other people (padre, madre, emergencia) default to `off`, so
+ * the browser never pours the filler's own email into the madre's block.
  */
 import { useState, type ReactNode } from 'react';
 import { clsx } from 'clsx';
@@ -24,7 +29,7 @@ function Help({ id, text }: { id: string; text?: string }) {
 
 function ErrorText({ id, text }: { id: string; text?: string }) {
   if (!text) return null;
-  return <p id={id} className="mt-1.5 text-sm font-medium text-coral-700">{text}</p>;
+  return <p id={id} className="mt-1.5 text-sm font-medium text-danger">{text}</p>;
 }
 
 function Label({ htmlFor, text, optional, as = 'label' }: { htmlFor?: string; text: string; optional?: string; as?: 'label' | 'legend' }) {
@@ -100,7 +105,8 @@ function useFieldBits(spec: FichaField) {
 }
 
 const INPUT_TYPES: Record<string, { type: string; inputMode?: 'text' | 'tel' | 'email' | 'numeric' | 'decimal'; autoComplete?: string; maxLength?: number; pattern?: string }> = {
-  email: { type: 'email', inputMode: 'email', autoComplete: 'email' },
+  // Third-party by default: the steps opt the filler's own fields in.
+  email: { type: 'email', inputMode: 'email', autoComplete: 'off' },
   phone: { type: 'tel', inputMode: 'tel', autoComplete: 'off' },
   extension: { type: 'text', inputMode: 'numeric', maxLength: 6, pattern: '[0-9]*' },
   postal_code: { type: 'text', inputMode: 'numeric', autoComplete: 'postal-code', maxLength: 5, pattern: '[0-9]*' },
@@ -210,7 +216,7 @@ function OptionCards({ spec, label, className, after }: SpecProps) {
               key={o.value}
               className={clsx(
                 // relative: the visually hidden radio stays inside its card (no scroll jump on focus).
-                'relative flex min-h-[48px] cursor-pointer items-center rounded-md border bg-white text-[15px] leading-snug transition-colors',
+                'relative flex min-h-[48px] cursor-pointer items-center rounded-sm border bg-white text-base leading-snug transition-colors',
                 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
                 compact ? 'justify-center px-2 py-2 text-center' : 'px-3.5 py-2.5',
                 checked ? 'border-purple bg-purple-light font-semibold text-purple ring-1 ring-purple' : error ? 'border-coral-400 text-ink' : 'border-line text-ink hover:border-purple/40',
@@ -236,12 +242,15 @@ function OptionCards({ spec, label, className, after }: SpecProps) {
   );
 }
 
-function NativeSelect({ id, value, onChange, error, required, describedBy, placeholder, children }: {
-  id: string; value: string; onChange: (v: string) => void; error?: string; required: boolean; describedBy?: string; placeholder: string; children: ReactNode;
+function NativeSelect({ id, name, value, onChange, error, required, describedBy, placeholder, autoComplete, children }: {
+  id: string; name: string; value: string; onChange: (v: string) => void; error?: string; required: boolean; describedBy?: string; placeholder: string;
+  autoComplete?: string; children: ReactNode;
 }) {
   return (
     <select
       id={id}
+      name={name}
+      autoComplete={autoComplete ?? 'off'}
       className={inputClass(error)}
       value={value}
       aria-required={required || undefined}
@@ -265,7 +274,7 @@ function GradeSelect({ spec, label, className, after }: SpecProps) {
   return (
     <div className={className}>
       <Label htmlFor={id} text={label ?? spec.label} optional={optional} />
-      <NativeSelect id={id} value={String(value ?? '')} onChange={(v) => form.set(spec.name, v)} error={error} required={required}
+      <NativeSelect id={id} name={spec.name} value={String(value ?? '')} onChange={(v) => form.set(spec.name, v)} error={error} required={required}
         describedBy={describedBy} placeholder={form.copy.t('selectPlaceholder')}>
         {levels.map((l) => (
           <optgroup key={l.value} label={l.label}>
@@ -276,8 +285,8 @@ function GradeSelect({ spec, label, className, after }: SpecProps) {
       <ErrorText id={errorId} text={error} />
       <Help id={helpId} text={spec.help} />
       {level ? (
-        <p className="mt-2 inline-flex items-center rounded-full bg-cream px-3 py-1 text-xs font-semibold text-ink">
-          {form.copy.t('levelLabel')}: {level.label}
+        <p className="mt-2 text-sm text-muted">
+          {form.copy.t('levelLabel')}: <strong className="font-semibold text-ink">{level.label}</strong>
         </p>
       ) : null}
       {after}
@@ -286,15 +295,15 @@ function GradeSelect({ spec, label, className, after }: SpecProps) {
 }
 
 /** The 32 states while born in México (or always, for the address); free text abroad. */
-function StateField({ spec, label, className }: SpecProps) {
+function StateField({ spec, label, className, autoComplete }: SpecProps) {
   const { form, id, error, required, helpId, errorId, describedBy, optional, value } = useFieldBits(spec);
   const listed = !spec.choices_if || conditionMet(spec.choices_if, form.values);
   if (!listed) {
     return (
       <div className={className}>
         <Label htmlFor={id} text={form.copy.t('stateOtherLabel')} optional={optional} />
-        <input id={id} type="text" autoComplete="off" className={inputClass(error)} maxLength={spec.max_length ?? undefined}
-          aria-invalid={error ? true : undefined} aria-describedby={describedBy} value={String(value ?? '')}
+        <input id={id} name={spec.name} type="text" autoComplete={autoComplete ?? 'off'} className={inputClass(error)} maxLength={spec.max_length ?? undefined}
+          aria-required={required || undefined} aria-invalid={error ? true : undefined} aria-describedby={describedBy} value={String(value ?? '')}
           onChange={(e) => form.set(spec.name, e.target.value)} />
         <ErrorText id={errorId} text={error} />
       </div>
@@ -304,8 +313,8 @@ function StateField({ spec, label, className }: SpecProps) {
   return (
     <div className={className}>
       <Label htmlFor={id} text={label ?? spec.label} optional={optional} />
-      <NativeSelect id={id} value={String(value ?? '')} onChange={(v) => form.set(spec.name, v)} error={error} required={required}
-        describedBy={describedBy} placeholder={form.copy.t('selectPlaceholder')}>
+      <NativeSelect id={id} name={spec.name} value={String(value ?? '')} onChange={(v) => form.set(spec.name, v)} error={error} required={required}
+        describedBy={describedBy} placeholder={form.copy.t('selectPlaceholder')} autoComplete={autoComplete}>
         {states.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         {/* A state on file that is not on the list (an old draft) still shows. */}
         {value && !states.some((s) => s.value === value) ? <option value={String(value)}>{String(value)}</option> : null}
@@ -320,7 +329,7 @@ const MEXICO = 'México';
 
 /** México (the default) or another country typed in. */
 function CountryField({ spec, className }: SpecProps) {
-  const { form, id, error, optional, value, errorId } = useFieldBits(spec);
+  const { form, id, error, required, optional, value, errorId } = useFieldBits(spec);
   const text = String(value ?? '');
   // «Otro país» while a country other than México is typed, or picked and still blank.
   const [picked, setPicked] = useState(false);
@@ -330,13 +339,14 @@ function CountryField({ spec, className }: SpecProps) {
     form.set(spec.name, abroad ? '' : MEXICO);
   };
   const card = (checked: boolean) => clsx(
-    'relative flex min-h-[48px] cursor-pointer items-center justify-center rounded-md border bg-white px-3 py-2 text-center text-[15px] transition-colors',
+    'relative flex min-h-[48px] cursor-pointer items-center justify-center rounded-sm border bg-white px-3 py-2 text-center text-base transition-colors',
     'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
     checked ? 'border-purple bg-purple-light font-semibold text-purple ring-1 ring-purple' : 'border-line text-ink hover:border-purple/40',
   );
   return (
     <div className={className}>
-      <fieldset id={id} tabIndex={-1} className="min-w-0 focus:outline-none" aria-describedby={error && !other ? errorId : undefined}>
+      <fieldset id={id} role="radiogroup" tabIndex={-1} className="min-w-0 focus:outline-none" aria-required={required || undefined}
+        aria-invalid={error && !other ? true : undefined} aria-describedby={error && !other ? errorId : undefined}>
         <Label as="legend" text={spec.label} optional={optional} />
         <div className="grid grid-cols-2 gap-2">
           <label className={card(!other)}>
@@ -352,8 +362,8 @@ function CountryField({ spec, className }: SpecProps) {
       {other ? (
         <div className="mt-3">
           <Label htmlFor={`${id}-text`} text={form.copy.t('countryOtherLabel')} />
-          <input id={`${id}-text`} type="text" autoComplete="off" className={inputClass(error)} maxLength={spec.max_length ?? undefined}
-            aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}
+          <input id={`${id}-text`} name={spec.name} type="text" autoComplete="off" className={inputClass(error)} maxLength={spec.max_length ?? undefined}
+            aria-required={required || undefined} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}
             value={text} onChange={(e) => form.set(spec.name, e.target.value)} />
         </div>
       ) : null}
@@ -363,28 +373,30 @@ function CountryField({ spec, className }: SpecProps) {
 }
 
 function SwitchRow({ spec, label, className }: SpecProps) {
-  const { form, id, error, helpId, errorId, describedBy, value } = useFieldBits(spec);
+  const { form, id, error, required, helpId, errorId, describedBy, value } = useFieldBits(spec);
   const on = value === true;
   return (
     <div className={className}>
       <label
         htmlFor={id}
         className={clsx(
-          'relative flex min-h-[56px] cursor-pointer items-center justify-between gap-4 rounded-md border bg-white px-4 py-3',
+          'relative flex min-h-[56px] cursor-pointer items-center justify-between gap-4 rounded-sm border bg-white px-4 py-3',
           'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
           error ? 'border-coral-400' : on ? 'border-purple/50' : 'border-line',
         )}
       >
         <span className="min-w-0">
-          <span className="block text-[15px] font-semibold text-ink">{label ?? spec.label}</span>
+          <span className="block text-base font-semibold text-ink">{label ?? spec.label}</span>
           {spec.help ? <span id={helpId} className="mt-0.5 block text-sm text-muted">{spec.help}</span> : null}
         </span>
         <input
           id={id}
+          name={spec.name}
           type="checkbox"
           role="switch"
           className="peer sr-only"
           checked={on}
+          aria-required={required || undefined}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           onChange={(e) => form.set(spec.name, e.target.checked)}
@@ -405,27 +417,29 @@ function SwitchRow({ spec, label, className }: SpecProps) {
 }
 
 function CheckboxCard({ spec, label, className }: SpecProps) {
-  const { form, id, error, helpId, errorId, describedBy, value } = useFieldBits(spec);
+  const { form, id, error, required, helpId, errorId, describedBy, value } = useFieldBits(spec);
   return (
     <div className={className}>
       <label
         htmlFor={id}
         className={clsx(
-          'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-md border bg-white px-4 py-3.5',
+          'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-sm border bg-white px-4 py-3.5',
           'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
           error ? 'border-coral-400' : value === true ? 'border-purple/50 bg-purple-light/40' : 'border-line',
         )}
       >
         <input
           id={id}
+          name={spec.name}
           type="checkbox"
           className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-line text-purple focus:outline-none"
           checked={value === true}
+          aria-required={required || undefined}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           onChange={(e) => form.set(spec.name, e.target.checked)}
         />
-        <span className="min-w-0 text-[15px] leading-snug text-ink">
+        <span className="min-w-0 text-base leading-snug text-ink">
           {label ?? spec.label}
           {spec.help ? <span id={helpId} className="mt-1 block text-sm text-muted">{spec.help}</span> : null}
         </span>
@@ -505,7 +519,7 @@ function CurpField({ spec, label, className, after }: SpecProps) {
       />
       <ErrorText id={errorId} text={shown} />
       <Help id={helpId} text={spec.help} />
-      <p id={`${id}-filled`} aria-live="polite" className={clsx('flex items-start gap-1.5 text-sm text-green-dark', filled ? 'mt-1.5' : 'sr-only')}>
+      <p id={`${id}-filled`} aria-live="polite" className={clsx('flex items-start gap-1.5 text-sm text-success', filled ? 'mt-1.5' : 'sr-only')}>
         {filled ? <><Sparkles className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{form.copy.t('curpFilled')}</> : null}
       </p>
       {after}
@@ -516,9 +530,9 @@ function CurpField({ spec, label, className, after }: SpecProps) {
 /** A soft note (not an error) under a field: the age hint, the CURP help. */
 export function FieldNote({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'warn' }) {
   return (
-    <p className={clsx('mt-2 flex items-start gap-2 rounded-md px-3 py-2 text-sm leading-snug',
-      tone === 'warn' ? 'bg-amber-bright/15 text-ink' : 'bg-cream text-muted')} role={tone === 'warn' ? 'status' : undefined}>
-      <Info className={clsx('mt-0.5 h-4 w-4 shrink-0', tone === 'warn' ? 'text-amber' : 'text-purple')} aria-hidden="true" />
+    <p className={clsx('mt-2 flex items-start gap-2 rounded-sm px-3 py-2 text-sm leading-snug',
+      tone === 'warn' ? 'bg-warning-bg text-ink' : 'bg-cream text-muted')} role={tone === 'warn' ? 'status' : undefined}>
+      <Info className={clsx('mt-0.5 h-4 w-4 shrink-0', tone === 'warn' ? 'text-warning' : 'text-purple')} aria-hidden="true" />
       <span>{children}</span>
     </p>
   );

@@ -150,9 +150,9 @@ function AboutValuesView(p: CardsProps) {
 // Levels use brand scales/tokens (green/brand/coral have numeric ramps).
 // Mirrors the levels offered in the ficha de inscripción grade picker.
 const LEVEL_TONES: Record<string, string> = {
-  green: 'bg-green-50 border-green-200 text-green-700',
-  brand: 'bg-brand-50 border-brand-200 text-brand-700',
-  coral: 'bg-coral-50 border-coral-200 text-coral-700',
+  green: 'bg-green-50 text-green-700',
+  brand: 'bg-brand-50 text-brand-700',
+  coral: 'bg-coral-50 text-coral-700',
 };
 const LEVEL_TONE_OPTIONS = [
   { value: 'green', label: 'Verde' },
@@ -171,8 +171,8 @@ function AboutLevelsView(p: { eyebrow?: string; title?: string; items?: LevelIte
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {asList<LevelItem>(p.items).map((l, i) => (
           <Reveal key={i} delay={i * 80}>
-            <div className={`rounded-md border-2 p-5 ${LEVEL_TONES[l.tone ?? ''] ?? LEVEL_TONES.green}`}>
-              <h4 className="font-bold text-lg mb-1">{t(l.name)}</h4>
+            <div className={`rounded-md p-5 ${LEVEL_TONES[l.tone ?? ''] ?? LEVEL_TONES.green}`}>
+              <h3 className="font-bold text-lg mb-1">{t(l.name)}</h3>
               {l.grades && <p className="text-sm opacity-80">{t(l.grades)}</p>}
               {l.age && <p className="text-xs opacity-60 mt-1">{t(l.age)}</p>}
             </div>

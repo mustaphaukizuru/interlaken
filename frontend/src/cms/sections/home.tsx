@@ -23,17 +23,19 @@ const below = () => import('./home.below');
 const section = sectionsOf('home');
 
 const VIEWPORT = { once: true, margin: '0px 0px -60px 0px' } as const;
+// Motion standard (DESIGN.md §3.5): rise ≤ 12px, ≤ 300ms, stagger 60ms, standard ease.
+// Reduced motion is honoured by SiteMotionProvider (MotionConfig reducedMotion="user").
 const sectionReveal: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] } },
 };
-const staggerGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
-/* Hero entrance: ONE orchestrated run on first mount (~540ms). Opacity/transform
+const staggerGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+/* Hero entrance: ONE orchestrated run on first mount (~480ms). Opacity/transform
  * only, and the hero IMAGE is deliberately not animated so the LCP paint is untouched. */
-const heroGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
+const heroGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const heroItem: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.38, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] } },
 };
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
@@ -255,7 +257,7 @@ export const sections = [
     fields: [
       ...grouped('Textos', [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.text('button', 'Texto del botón'), f.text('success', 'Mensaje al enviar')]),
       ...grouped('Formulario', [f.text('nameLabel', 'Etiqueta del nombre'), f.text('emailLabel', 'Etiqueta del correo'), f.text('sending', 'Botón mientras envía')]),
-      ...grouped('Avisos', [f.text('sentToast', 'Aviso emergente al enviar'), f.text('errorToast', 'Aviso emergente si falla')]),
+      ...grouped('Avisos', [f.text('sentToast', 'Aviso emergente al enviar'), f.text('errorToast', 'Aviso si falla (bajo el formulario)')]),
       ...grouped('Aviso de privacidad', [f.textarea('privacyText', 'Texto antes del enlace'), f.text('privacyLink', 'Texto del enlace')]),
       ...grouped('Lo que llega a Mensajes', [f.text('subject', 'Asunto en Mensajes'), f.text('message', 'Mensaje en Mensajes')]),
     ],
@@ -263,7 +265,7 @@ export const sections = [
       title: 'Solicite informes', text: 'Déjenos sus datos y un asesor le compartirá costos, fechas y todo lo que necesita saber sobre Interlaken.',
       button: 'Solicitar', success: '¡Solicitud recibida! Le contactaremos pronto.', subject: 'Solicitud de informes',
       nameLabel: 'Nombre completo', emailLabel: 'Correo electrónico', sending: 'Enviando…',
-      sentToast: '¡Gracias! Te contactaremos muy pronto.', errorToast: 'No fue posible enviar tu solicitud. Intenta de nuevo.',
+      sentToast: '¡Gracias! Le contactaremos muy pronto.', errorToast: 'No fue posible enviar su solicitud. Intente de nuevo.',
       privacyText: 'Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el',
       privacyLink: 'Aviso de Privacidad',
       message: '{nombre} solicita informes desde la página de inicio.',

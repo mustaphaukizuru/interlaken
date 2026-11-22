@@ -5,20 +5,28 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
+  /** Marks an optional field «(opcional)» after the label (forms mark the optional ones, not the required). */
+  optional?: boolean;
 }
 
+/**
+ * Label, field, then the inline error and the hint. The hint stays on screen
+ * while there is an error, and the field is described by both (error first),
+ * so a screen reader hears what went wrong and how to fill it.
+ */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, className, id, ...props }, ref) => {
+  ({ label, error, hint, optional, className, id, ...props }, ref) => {
     const autoId = useId();
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-') ?? autoId;
     const errorId = `${inputId}-error`;
     const hintId = `${inputId}-hint`;
-    const describedBy = error ? errorId : hint ? hintId : undefined;
+    const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
     return (
       <div className="w-full">
         {label && (
           <label htmlFor={inputId} className="label">
             {label}
+            {optional ? <>{' '}<span className="ml-1 text-xs font-normal text-subtle">(opcional)</span></> : null}
           </label>
         )}
         <input
@@ -33,8 +41,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           {...props}
         />
-        {hint && !error && <p id={hintId} className="mt-1.5 text-xs text-muted">{hint}</p>}
-        {error && <p id={errorId} className="mt-1.5 text-xs text-coral-600">{error}</p>}
+        {error && <p id={errorId} className="mt-1.5 text-sm font-medium text-danger">{error}</p>}
+        {hint && <p id={hintId} className="mt-1.5 text-sm text-muted">{hint}</p>}
       </div>
     );
   }

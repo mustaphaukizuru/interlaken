@@ -45,7 +45,7 @@ function FacturacionHeroView(p: HeroProps) {
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-dark/92 via-dark/75 to-dark/45" />
-      <div className="relative mx-auto max-w-[1120px] px-4 py-14 sm:px-6 sm:py-16 lg:py-[72px]">
+      <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16 lg:py-[72px]">
         {p.label && <span className="section-label-green inline-flex">{t(p.label)}</span>}
         <h1 className="mt-3 font-head text-fluid-4xl font-black tracking-[-0.03em]">
           <Lines text={t(p.title)} />

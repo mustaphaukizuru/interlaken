@@ -4,8 +4,9 @@
  * exam, once the child is admitted (Expediente «Enviar resultado y ficha»).
  * This panel shows the three steps that lead there, the way to start (a
  * visit, or WhatsApp for informes) and, for a family whose link expired, a
- * new one by email (ResumeForm). Every word is a CMS prop (copy.ts
- * «Ficha personal (sin enlace)»).
+ * new one by email (ResumeForm), all in one card. Every word is a CMS
+ * prop (copy.ts «Ficha personal (sin enlace)»). Its heading is an h2 under
+ * the hero's h1.
  */
 import type { Ref } from 'react';
 import { CalendarDays, Lock } from 'lucide-react';
@@ -27,12 +28,12 @@ export function PrivateFicha({ copy, headingRef }: { copy: FichaCopy; headingRef
       <section className="card p-6 sm:p-10" aria-labelledby="ficha-private-title">
         <div className="text-center">
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-sm bg-cream text-purple" aria-hidden="true">
-            <Lock className="h-7 w-7" />
+            <Lock className="h-8 w-8" />
           </div>
           <h2 id="ficha-private-title" ref={headingRef} tabIndex={-1} className="font-head text-fluid-xl font-bold text-ink focus:outline-none">
             {copy.t('privateTitle')}
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">{copy.t('privateText')}</p>
+          <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-muted">{copy.t('privateText')}</p>
         </div>
         {steps.length ? (
           <div className="mx-auto mt-8 max-w-md">
@@ -41,7 +42,7 @@ export function PrivateFicha({ copy, headingRef }: { copy: FichaCopy; headingRef
               {steps.map((s, i) => (
                 <li key={`${i}-${s}`} className="flex items-start gap-3">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-light text-sm font-bold text-purple" aria-hidden="true">{i + 1}</span>
-                  <span className="pt-0.5 text-[15px] text-ink">{s}</span>
+                  <span className="pt-0.5 text-base text-ink">{s}</span>
                 </li>
               ))}
             </ol>
@@ -49,11 +50,11 @@ export function PrivateFicha({ copy, headingRef }: { copy: FichaCopy; headingRef
         ) : null}
         <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
           <CmsAnchor link={visit} className="btn-pink min-h-[44px] justify-center">
-            <CalendarDays className="h-4 w-4" aria-hidden="true" /> {visit.label}
+            <CalendarDays className="h-5 w-5" aria-hidden="true" /> {visit.label}
           </CmsAnchor>
           {wa ? (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-outline min-h-[44px] justify-center">
-              <WhatsAppIcon className="h-4 w-4" aria-hidden="true" /> {copy.t('privateWhatsapp')}
+              <WhatsAppIcon className="h-5 w-5" aria-hidden="true" /> {copy.t('privateWhatsapp')}
             </a>
           ) : null}
         </div>
@@ -65,8 +66,8 @@ export function PrivateFicha({ copy, headingRef }: { copy: FichaCopy; headingRef
             </a>
           </p>
         ) : null}
+        <div className="mx-auto mt-8 max-w-md"><ResumeForm copy={copy} /></div>
       </section>
-      <div className="card mt-4 p-4 sm:p-6"><ResumeForm copy={copy} /></div>
     </>
   );
 }

@@ -81,7 +81,7 @@ export function FunnelHero({
         className="hidden sm:block"
         style={{ top: -160, left: -120 }}
       />
-      <div className="relative mx-auto max-w-[1120px] px-4 py-10 sm:px-6 sm:py-14">
+      <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         {label ? <span className="section-label-pink inline-flex">{label}</span> : null}
         <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-[-0.04em]">
           {title}
@@ -103,7 +103,7 @@ export function FunnelHero({
               <li key={s.n} className="min-w-[7.5rem] flex-1 snap-start sm:min-w-0">
                 <Link
                   to={s.to}
-                  className={`block rounded-md border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                  className={`block rounded-sm border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                     current
                       ? 'border-pink/50 bg-white/10'
                       : done
@@ -112,9 +112,9 @@ export function FunnelHero({
                   }`}
                   aria-current={current ? 'step' : undefined}
                 >
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                  <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/60">
                     {done ? (
-                      <Check className="h-3 w-3 text-[var(--green-bright)]" aria-hidden="true" />
+                      <Check className="h-4 w-4 text-[var(--green-bright)]" aria-hidden="true" />
                     ) : (
                       <span className={current ? 'text-pink' : ''}>{s.n}</span>
                     )}

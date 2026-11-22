@@ -41,7 +41,7 @@ function AdmHeroView(p: HeroProps) {
       <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
       <Blob tone="green" opacity={0.42} size={480} shape={2} className="hidden sm:block" style={{ top: -160, left: -120 }} />
       <Blob tone="pink" opacity={0.16} size={400} shape={1} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
-      <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-[72px]">
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-[72px]">
         {p.label && <span className="section-label-pink inline-flex">{t(p.label)}</span>}
         <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
           {t(p.title)}
@@ -310,8 +310,8 @@ function AdmDocsCtaView(p: DocsCtaProps) {
                     <span className="text-ink/90">
                       {d.name}
                       {d.levels.length < LEVELS.length && (
-                        <span className="ml-1.5 whitespace-nowrap rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-muted">
-                          {t(p.docsOnlyLabel)} {levelsLabel(d.levels)}
+                        <span className="ml-1.5 whitespace-nowrap text-xs font-semibold text-muted">
+                          ({t(p.docsOnlyLabel)} {levelsLabel(d.levels)})
                         </span>
                       )}
                       {d.link_url && (
@@ -364,10 +364,10 @@ function AdmDocsCtaView(p: DocsCtaProps) {
             <div className="absolute inset-0 bg-gradient-to-br from-purple/45 via-transparent to-transparent" />
             <div className="relative p-6 text-white sm:p-8">
               {p.badge && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
-                  <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/85">
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
                   {t(p.badge)}
-                </span>
+                </p>
               )}
               <h3 className="mt-4 font-head text-fluid-2xl font-extrabold leading-tight tracking-tight">
                 {t(p.title)}
