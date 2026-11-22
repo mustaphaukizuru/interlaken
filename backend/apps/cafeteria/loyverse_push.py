@@ -84,9 +84,16 @@ def push_mode() -> str:
 
 
 def unverified_max() -> Decimal:
-    """``instant`` mode: the largest approval written before it is verified."""
+    """``instant`` mode: the largest approval written before it is verified.
+    Unset means the top-up maximum itself (school, 2026-11-22: every card
+    top-up loads at once); a malformed value means nothing unverified loads."""
+    from apps.cafeteria.serializers import topup_max_amount
+
+    raw = getattr(settings, "CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX", None)
+    if raw in (None, ""):
+        return topup_max_amount()
     try:
-        value = Decimal(str(getattr(settings, "CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX", "500")))
+        value = Decimal(str(raw))
     except (InvalidOperation, ValueError, TypeError):
         return Decimal("0")
     return max(value, Decimal("0")).quantize(CENT)

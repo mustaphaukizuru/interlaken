@@ -55,7 +55,8 @@ const TX_SORT_OPTIONS: SortOption[] = [
 const TOPUP_MIN = 20;
 /** Wizard: alumno y monto → método → titular de la tarjeta → revisar. */
 type Step = 1 | 2 | 3 | 4;
-const TOPUP_MAX = 2000;
+// Fallback until /payments/availability/ answers (`max_amount`, $1,000 since 2026-11-22).
+const TOPUP_MAX = 1000;
 // Quick amounts in the top-up form ($20 and $50 for a snack or a lunch).
 const TOPUP_PRESETS = [20, 50, 100, 200, 300, 500];
 
@@ -115,6 +116,7 @@ export default function CafeteriaPage() {
   // The server's minimum: $20 for every account, test accounts included (owner,
   // 2026-11-08: the "$1 (prueba)" option is gone).
   const topupMin = availability?.min_amount ? Number(availability.min_amount) || TOPUP_MIN : TOPUP_MIN;
+  const topupMax = availability?.max_amount ? Number(availability.max_amount) || TOPUP_MAX : TOPUP_MAX;
   // Families pay by card only; there is no "pago en caja escolar" request.
   const topupMethod = 'online' as const;
   // Card top-ups reach the balance at the school's next POS load (7:30 on
@@ -282,7 +284,7 @@ export default function CafeteriaPage() {
       balances.find((b) => b.student.id === hijo && canTopUp(b))
       ?? balances.find((b) => b.student.id === childId && canTopUp(b))
       ?? balances.find(canTopUp);
-    if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) return;
+    if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > topupMax) return;
     // Suppressed: one-shot URL command — the param is external navigation
     // state consumed (deleted) right above, so the modal state cannot be
     // derived from it and these one-time writes cannot cascade.
@@ -291,13 +293,13 @@ export default function CafeteriaPage() {
     setTopupAmount(String(amount));
     setShowTopup(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [searchParams, setSearchParams, balances, childId]);
+  }, [searchParams, setSearchParams, balances, childId, topupMax]);
 
   const topupAmountNum = parseFloat(topupAmount);
   const topupAmountValid =
     Number.isFinite(topupAmountNum)
     && topupAmountNum >= topupMin
-    && topupAmountNum <= TOPUP_MAX;
+    && topupAmountNum <= topupMax;
 
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
@@ -771,15 +773,15 @@ export default function CafeteriaPage() {
                 type="number"
                 inputMode="decimal"
                 min={topupMin}
-                max={TOPUP_MAX}
+                max={topupMax}
                 className="input-field min-h-[44px] text-base"
                 placeholder="Ej. 200"
                 value={topupAmount}
                 onChange={(e) => setTopupAmount(e.target.value)}
               />
-              <p className="mt-1 text-xs text-subtle">Mínimo ${topupMin} · Máximo ${TOPUP_MAX.toLocaleString('es-MX')}</p>
-              {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > TOPUP_MAX && (
-                <p className="mt-1 text-xs text-coral">El monto máximo por recarga es ${TOPUP_MAX.toLocaleString('es-MX')}.</p>
+              <p className="mt-1 text-xs text-subtle">Mínimo ${topupMin} · Máximo ${topupMax.toLocaleString('es-MX')}</p>
+              {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > topupMax && (
+                <p className="mt-1 text-xs text-coral">El monto máximo por recarga es ${topupMax.toLocaleString('es-MX')}.</p>
               )}
               {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > 0 && topupAmountNum < topupMin && (
                 <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${topupMin}.</p>

@@ -23,6 +23,19 @@ from .models import (
 TOPUP_MIN_AMOUNT = Decimal('20.00')
 
 
+def topup_max_amount() -> Decimal:
+    """The largest single top-up (``settings.CAFETERIA_TOPUP_MAX``, $1,000 since
+    2026-11-22). Read per call so a settings change needs no code change; a
+    malformed value falls back to $1,000."""
+    from django.conf import settings
+
+    try:
+        value = Decimal(str(getattr(settings, 'CAFETERIA_TOPUP_MAX', '1000')))
+    except (ArithmeticError, ValueError, TypeError):
+        return Decimal('1000.00')
+    return value.quantize(Decimal('0.01')) if value >= TOPUP_MIN_AMOUNT else Decimal('1000.00')
+
+
 class LoyverseProfileSerializer(serializers.ModelSerializer):
     """Read-only Loyverse customer snapshot for the admin student console."""
     class Meta:
@@ -259,11 +272,17 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
     # DEBIT the child's balance (add_points_to_customer(points<0)). Match the
     # payment-initiation floor and add a sane ceiling against fat-finger typos.
     # Match parent UI copy: mínimo $20 for every account (test accounts too)
-    # · máximo $2,000 (fat-finger guard).
+    # · máximo ``topup_max_amount()`` ($1,000, school 2026-11-22).
     amount = serializers.DecimalField(
         max_digits=10, decimal_places=2,
-        min_value=TOPUP_MIN_AMOUNT, max_value=Decimal('2000.00'),
+        min_value=TOPUP_MIN_AMOUNT,
         error_messages={'min_value': f'El monto mínimo por recarga es ${TOPUP_MIN_AMOUNT:.0f}.'})
+
+    def validate_amount(self, value):
+        top = topup_max_amount()
+        if value > top:
+            raise serializers.ValidationError(f'El monto máximo por recarga es ${top:,.0f}.')
+        return value
 
     class Meta:
         model = TopUpRequest

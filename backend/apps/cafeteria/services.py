@@ -1137,6 +1137,14 @@ def _credit_topup_locked(topup, payment, cb, *, via, actor=None, pos_loaded=Fals
         topup.pos_loaded_at = now
         topup.pos_loaded_by = actor
         fields += ['pos_loaded_at', 'pos_loaded_by']
+    if (via != TopUpRequest.AppliedVia.AUTO_POS
+            and topup.loyverse_push_state == TopUpRequest.PushState.WAITING):
+        # The app was still waiting to write it (``loyverse_push``) when it was
+        # applied another way: close that label so it does not read «Esperando
+        # para cargarla en Loyverse» on a top-up already in the wallet.
+        topup.loyverse_push_state = TopUpRequest.PushState.NONE
+        topup.loyverse_push_note = 'Aplicada por otra vía antes de la carga automática.'
+        fields += ['loyverse_push_state', 'loyverse_push_note']
     topup.save(update_fields=fields)
     return tx
 

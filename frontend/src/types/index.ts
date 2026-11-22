@@ -492,6 +492,8 @@ export interface DashboardData {
   topups_to_verify?: number;
   topups_to_verify_total?: string;
   topups_to_verify_oldest?: string | null;
+  /** How many of them the app already loaded into the wallet and Loyverse. */
+  topups_to_verify_loaded?: number;
   visits_today?: number;
   open_password_requests?: number;
   unhandled_messages?: number;

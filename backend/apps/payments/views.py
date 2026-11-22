@@ -82,12 +82,13 @@ class PaymentAvailabilityView(APIView):
 
     def get(self, request):
         from apps.cafeteria.schedule import policy
-        from apps.cafeteria.serializers import TOPUP_MIN_AMOUNT
+        from apps.cafeteria.serializers import TOPUP_MIN_AMOUNT, topup_max_amount
 
         from .gateways.banorte import online_payments_status
 
         return Response({**online_payments_status(request.user),
                          'min_amount': f'{TOPUP_MIN_AMOUNT:.2f}',
+                         'max_amount': f'{topup_max_amount():.2f}',
                          # When a card top-up reaches the wallet (scheduled POS
                          # load) and the WhatsApp for same-day requests.
                          'topup_policy': policy()})
