@@ -10,32 +10,41 @@
 <title>{{ subject }}</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <style>
+  /* Colours are the site's tokens (apps/portal/emailing.py PALETTE / TONES,
+     checked against frontend/src/index.css by apps/portal/test_email_tokens.py). */
+  :root { color-scheme: light; supported-color-schemes: light; }
   body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
   table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
   img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
   a { color: #401A8E; }
   @media (max-width: 620px) {
-    .card-pad { padding: 28px 22px 30px 22px !important; }
-    .h1 { font-size: 21px !important; line-height: 28px !important; }
+    .card-pad { padding: 28px 20px 30px 20px !important; }
+    .h1 { font-size: 22px !important; line-height: 30px !important; }
     .btn-table { width: 100% !important; }
     .btn-a { display: block !important; text-align: center !important; }
     .stack { display: block !important; width: auto !important; box-sizing: border-box; }
-    .detail-label { padding: 12px 16px 0 16px !important; }
-    .detail-value { padding: 2px 16px 12px 16px !important; border-top: 0 !important; }
+    .detail-label { padding: 8px 20px 0 20px !important; }
+    .detail-value { padding: 2px 20px 8px 20px !important; }
+    .stat { padding: 0 0 12px 0 !important; }
     .foot-pad { padding: 22px 16px 0 16px !important; }
   }
+  /* Forced dark mode (Outlook.com and the Outlook apps rewrite inline colours
+     and keep the originals in data-ogsc / data-ogsb): keep the one action
+     purple with a white label. These selectors match nothing in light mode. */
+  [data-ogsb] .btn-td { background-color: #401A8E !important; }
+  [data-ogsc] .btn-a { color: #FFFFFF !important; }
 </style>
 </head>
-<body style="margin:0;padding:0;background-color:#F4F1EA;word-spacing:normal;">
-<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:#F4F1EA;">{{ preheader }}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F4F1EA;">
+<body style="margin:0;padding:0;background-color:#F5F4FA;word-spacing:normal;">
+<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:#F5F4FA;">{{ preheader }}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F5F4FA" style="background-color:#F5F4FA;">
   <tr>
     <td align="center" style="padding:32px 12px 40px 12px;">
       <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
         <tr>
-          <td style="background-color:#FFFFFF;border:1px solid #E6E1EF;border-radius:16px;overflow:hidden;">
-            <!-- brand stripe: the logo's three colors -->
+          <td bgcolor="#FFFFFF" style="background-color:#FFFFFF;border-radius:12px;overflow:hidden;">
+            <!-- brand stripe: the logo's three colours -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td height="4" width="34%" style="height:4px;line-height:4px;font-size:0;background-color:#47A028;">&nbsp;</td>
@@ -45,42 +54,67 @@
             </table>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td class="card-pad" style="padding:32px 40px 36px 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1B1536;">
-                  <a href="{{ portal_home }}" target="_blank" style="text-decoration:none;"><img src="{{ logo_url }}" width="168" height="54" alt="Colegio Interlaken" style="display:block;width:168px;height:auto;max-width:168px;"></a>
+                <td class="card-pad" style="padding:32px 40px 36px 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1A1130;">
+                  <a href="{{ portal_home }}" target="_blank" style="text-decoration:none;color:#401A8E;"><img src="{{ logo_url }}" width="168" height="54" alt="Colegio Interlaken" style="display:block;width:168px;height:auto;max-width:168px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:18px;line-height:24px;font-weight:700;color:#401A8E;"></a>
+
+                  {% if notice.hero %}<!-- notice:hero -->
+                  <img class="notice-hero" src="{{ notice.hero.url }}" width="520" alt="{{ notice.hero.alt }}" style="display:block;width:100%;max-width:520px;height:auto;margin-top:24px;border-radius:12px;font-size:14px;line-height:20px;color:#6E6885;">
+                  {% endif %}
 
                   {% if c.category %}
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
-                    <tr><td style="background-color:{{ tone.bg }};border-radius:999px;padding:5px 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:{{ tone.fg }};">{{ c.category }}</td></tr>
+                    <tr><td bgcolor="{{ tone.bg }}" style="background-color:{{ tone.bg }};border-radius:999px;padding:5px 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:{{ tone.fg }};">{{ c.category }}</td></tr>
                   </table>
-                  <h1 class="h1" style="margin:14px 0 0 0;font-size:24px;line-height:32px;font-weight:700;color:#1B1536;">{{ c.title }}</h1>
+                  <h1 class="h1" style="margin:14px 0 0 0;font-size:24px;line-height:32px;font-weight:700;color:#1A1130;">{{ c.title }}</h1>
                   {% else %}
-                  <h1 class="h1" style="margin:28px 0 0 0;font-size:24px;line-height:32px;font-weight:700;color:#1B1536;">{{ c.title }}</h1>
+                  <h1 class="h1" style="margin:28px 0 0 0;font-size:24px;line-height:32px;font-weight:700;color:#1A1130;">{{ c.title }}</h1>
                   {% endif %}
 
-                  {% if c.intro %}<p style="margin:12px 0 0 0;font-size:16px;line-height:26px;color:#3D3852;white-space:pre-line;">{{ c.intro }}</p>{% endif %}
+                  {% if c.intro %}<p style="margin:12px 0 0 0;font-size:16px;line-height:24px;color:#3D3852;">{{ c.intro|linebreaksbr }}</p>{% endif %}
+
+                  {% if notice.stats %}<!-- notice:stats -->
+                  <table role="presentation" class="notice-stats" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+                    <tr>
+                      {% for label, value in notice.stats %}
+                      <td class="stack stat" valign="top" width="{{ notice.stat_width }}" style="padding:0 {% if forloop.last %}0{% else %}12px{% endif %} 0 0;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr><td bgcolor="#F5F4FA" style="background-color:#F5F4FA;border-radius:12px;padding:14px 16px;">
+                            <div style="font-size:22px;line-height:28px;font-weight:800;color:#1A1130;">{{ value }}</div>
+                            <div style="margin-top:2px;font-size:13px;line-height:18px;color:#6E6885;">{{ label }}</div>
+                          </td></tr>
+                        </table>
+                      </td>
+                      {% endfor %}
+                    </tr>
+                  </table>
+                  {% endif %}
 
                   {% if c.highlight %}
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
-                    <tr><td style="background-color:{{ tone.bg }};border-radius:12px;padding:18px 20px;">
+                    <tr><td bgcolor="{{ tone.bg }}" style="background-color:{{ tone.bg }};border-radius:12px;padding:18px 20px;">
                       <div style="font-size:13px;line-height:18px;font-weight:600;color:{{ tone.fg }};">{{ c.highlight.0 }}</div>
-                      <div style="margin-top:4px;font-size:30px;line-height:38px;font-weight:800;color:#1B1536;">{{ c.highlight.1 }}</div>
+                      <div style="margin-top:4px;font-size:30px;line-height:38px;font-weight:800;color:#1A1130;">{{ c.highlight.1 }}</div>
                     </td></tr>
                   </table>
                   {% endif %}
 
                   {% if c.details %}
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;background-color:#F8F6FB;border:1px solid #ECE8F3;border-radius:12px;">
-                    {% for label, value in c.details %}
-                    <tr>
-                      <td class="stack detail-label" width="38%" valign="top" style="padding:12px 0 12px 18px;{% if not forloop.first %}border-top:1px solid #ECE8F3;{% endif %}font-size:13px;line-height:20px;color:#6B6680;">{{ label }}</td>
-                      <td class="stack detail-value" valign="top" style="padding:12px 18px 12px 12px;{% if not forloop.first %}border-top:1px solid #ECE8F3;{% endif %}font-size:15px;line-height:22px;font-weight:600;color:#1B1536;white-space:pre-line;">{{ value }}</td>
-                    </tr>
-                    {% endfor %}
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+                    <tr><td bgcolor="#F5F4FA" style="background-color:#F5F4FA;border-radius:12px;padding:10px 0;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        {% for label, value in c.details %}
+                        <tr>
+                          <td class="stack detail-label" width="38%" valign="top" style="padding:8px 0 8px 20px;font-size:13px;line-height:20px;color:#6E6885;">{{ label }}</td>
+                          <td class="stack detail-value" valign="top" style="padding:8px 20px 8px 12px;font-size:15px;line-height:22px;font-weight:600;color:#1A1130;">{{ value|linebreaksbr }}</td>
+                        </tr>
+                        {% endfor %}
+                      </table>
+                    </td></tr>
                   </table>
                   {% endif %}
 
                   {% if c.items %}
-                  {% if c.list_title %}<p style="margin:24px 0 0 0;font-size:15px;line-height:22px;font-weight:700;color:#1B1536;">{{ c.list_title }}</p>{% endif %}
+                  {% if c.list_title %}<p style="margin:24px 0 0 0;font-size:15px;line-height:22px;font-weight:700;color:#1A1130;">{{ c.list_title }}</p>{% endif %}
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:{% if c.list_title %}10px{% else %}20px{% endif %};">
                     {% for item in c.items %}
                     <tr>
@@ -91,35 +125,51 @@
                   </table>
                   {% endif %}
 
-                  {% for paragraph in c.paragraphs %}<p style="margin:16px 0 0 0;font-size:16px;line-height:26px;color:#3D3852;white-space:pre-line;">{{ paragraph }}</p>{% endfor %}
+                  {% for paragraph in c.paragraphs %}<p style="margin:16px 0 0 0;font-size:16px;line-height:24px;color:#3D3852;">{{ paragraph|linebreaksbr }}</p>{% endfor %}
+
+                  {% if notice.cards %}<!-- notice:cards -->
+                  {% for card in notice.cards %}
+                  <table role="presentation" class="notice-card" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:{% if forloop.first %}28px{% else %}24px{% endif %};">
+                    <tr><td bgcolor="#F5F4FA" style="background-color:#F5F4FA;border-radius:12px;padding:20px 22px;">
+                      <p style="margin:0;font-size:17px;line-height:24px;font-weight:700;color:#1A1130;">{{ card.title }}</p>
+                      {% if card.text %}<p style="margin:6px 0 0 0;font-size:15px;line-height:22px;color:#3D3852;">{{ card.text|linebreaksbr }}</p>{% endif %}
+                      {% if card.link %}<p style="margin:10px 0 0 0;font-size:15px;line-height:22px;font-weight:600;"><a href="{{ card.link }}" target="_blank" style="color:#401A8E;text-decoration:underline;">{{ card.link_label|default:"Ver más" }}</a></p>{% endif %}
+                    </td></tr>
+                  </table>
+                  {% endfor %}
+                  {% endif %}
 
                   {% if c.cta_url %}
+                  <!-- One primary action (D18: the site's purple). Outlook desktop
+                       ignores padding on the link, so the cell gets it through
+                       mso-padding-alt (14 + 20 + 14 = 48px tall); every other
+                       client pads the link, so the whole button is tappable. -->
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn-table" style="margin-top:28px;">
                     <tr>
-                      <td align="center" bgcolor="#316F1C" style="border-radius:10px;background-color:#316F1C;">
-                        <a class="btn-a" href="{{ c.cta_url }}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;">{{ c.cta_label|default:"Abrir el portal" }}</a>
+                      <td class="btn-td" align="center" bgcolor="#401A8E" style="border-radius:8px;background-color:#401A8E;mso-padding-alt:14px 28px;">
+                        <a class="btn-a" href="{{ c.cta_url }}" target="_blank" style="display:inline-block;padding:14px 28px;mso-padding-alt:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:8px;">{{ c.cta_label|default:"Abrir el portal" }}</a>
                       </td>
                     </tr>
                   </table>
                   {% if c.link_fallback %}
-                  <p style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#6B6680;">¿El botón no funciona? Copie y pegue este enlace en su navegador:<br><a href="{{ c.cta_url }}" target="_blank" style="color:#401A8E;word-break:break-all;">{{ c.cta_url }}</a></p>
+                  <p style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#6E6885;">¿El botón no funciona? Copie y pegue este enlace en su navegador:<br><a href="{{ c.cta_url }}" target="_blank" style="color:#401A8E;word-break:break-all;">{{ c.cta_url }}</a></p>
                   {% endif %}
                   {% endif %}
 
                   {% if c.note %}
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
-                    <tr><td style="background-color:{{ note_colors.bg }};border-left:3px solid {{ note_colors.fg }};border-radius:8px;padding:14px 16px;font-size:14px;line-height:21px;color:#3D3852;white-space:pre-line;">{{ c.note }}</td></tr>
+                    <tr><td bgcolor="{{ note_colors.bg }}" style="background-color:{{ note_colors.bg }};border-radius:12px;padding:16px 20px;font-size:14px;line-height:21px;color:#3D3852;">{{ c.note|linebreaksbr }}</td></tr>
                   </table>
                   {% endif %}
 
-                  {% if c.signoff %}<p style="margin:28px 0 0 0;font-size:15px;line-height:22px;color:#3D3852;white-space:pre-line;">{{ c.signoff }}</p>{% endif %}
+                  {% if c.signoff %}<p style="margin:28px 0 0 0;font-size:15px;line-height:22px;color:#3D3852;">{{ c.signoff|linebreaksbr }}</p>{% endif %}
                 </td>
               </tr>
             </table>
           </td>
         </tr>
         <tr>
-          <td class="foot-pad" align="center" style="padding:24px 24px 0 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#6B6680;">
+          <td class="foot-pad" align="center" style="padding:24px 24px 0 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#6E6885;">
             <strong style="color:#3D3852;">{{ contact.name }}</strong><br>
             {{ contact.address }}<br>
             Tel. {{ contact.phone }} &middot; <a href="mailto:{{ contact.email }}" style="color:#401A8E;">{{ contact.email }}</a><br>

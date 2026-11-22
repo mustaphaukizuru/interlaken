@@ -643,7 +643,9 @@ UNFOLD = {
             '100': '#F5F4FA',   # cream
             '200': '#EEEBF5',   # line-2 / --border-2
             '300': '#ECEAF3',   # line / --border
-            '400': '#9A93AE',   # subtle / --text-light
+            # Dark-mode subtle text only (#9A93AE on #0f0a24 = 6.5:1); light mode
+            # uses font.subtle-light below. Allow-listed in the parity test.
+            '400': '#9A93AE',
             '500': '#6E6885',   # muted / --text-muted
             '600': '#2a2342',   # dark-card
             '700': '#1A1130',   # ink / --text-main
@@ -653,7 +655,7 @@ UNFOLD = {
         },
         # Text hierarchy mapped 1:1 to the text tokens.
         'font': {
-            'subtle-light': '#9A93AE',      # --text-light
+            'subtle-light': '#6B6482',      # --text-light (AA on white and cream)
             'subtle-dark': 'var(--color-base-400)',
             'default-light': '#6E6885',     # --text-muted
             'default-dark': 'var(--color-base-300)',
@@ -661,6 +663,8 @@ UNFOLD = {
             'important-dark': 'var(--color-base-100)',
         },
     },
+    # D1: controls use radius-sm (8px), the same as the SPA's buttons and inputs.
+    'BORDER_RADIUS': '8px',
     # KPI landing on the admin index (numbers + links only; charts live in the
     # staff dashboard app view). See apps/core/dashboard.py.
     'DASHBOARD_CALLBACK': 'apps.core.dashboard.dashboard_callback',

@@ -26,8 +26,12 @@ class PaymentAdmin(ModelAdmin):
     readonly_fields = ('user', 'payment_type', 'amount', 'currency', 'status', 'description',
                        'gateway', 'gateway_ref', 'gateway_raw', 'gateway_tx_id',
                        'related_topup', 'completed_at', 'created_at', 'updated_at')
+    actions = None
 
     def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):

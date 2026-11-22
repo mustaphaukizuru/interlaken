@@ -8,11 +8,13 @@ from .models import Announcement, AnnouncementComment, Notification
 class AnnouncementAdmin(ModelAdmin):
     list_display = ('title', 'audience', 'created_by', 'is_active', 'created_at')
     list_filter = ('audience', 'is_active')
-    list_editable = ('is_active',)
     search_fields = ('title', 'body')
     date_hierarchy = 'created_at'
     list_select_related = ('created_by',)
-    readonly_fields = ('created_at', 'updated_at')
+    # «Activo» is read-only here: activating a comunicado from the Django admin
+    # skipped its fan-out (no notice, no email, no push). It is published and
+    # retired from the console (/admin/comunicados), which runs the fan-out.
+    readonly_fields = ('is_active', 'created_at', 'updated_at')
 
     # Comunicados are authored and dispatched (email/WhatsApp/push) from the
     # portal (/admin/comunicados); creating one here would skip delivery.
@@ -51,9 +53,21 @@ class AnnouncementCommentAdmin(ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(ModelAdmin):
-    list_display = ('user', 'title', 'notif_type', 'is_read', 'created_at')
-    list_filter = ('notif_type', 'is_read')
+    """Read-only delivery log. A row added here has ``delivered_at=NULL``, so
+    ``dispatch_pending_notifications`` would email and push it to the family
+    within 5 minutes: notices are created only by the services and the console."""
+    list_display = ('user', 'title', 'notif_type', 'is_read', 'email_status', 'created_at')
+    list_filter = ('notif_type', 'is_read', 'email_status')
     search_fields = ('user__email', 'title')
     date_hierarchy = 'created_at'
     list_select_related = ('user',)
-    readonly_fields = ('created_at',)
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

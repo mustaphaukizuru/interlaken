@@ -520,7 +520,7 @@ def _record_receipt(student, receipt: dict, *, apply=None):
 def _notify_purchase(tx):
     """Fan out an in-app + email purchase notification to every guardian."""
     from apps.cafeteria.models import CafeteriaTransaction
-    from apps.portal.emailing import long_date, money
+    from apps.portal.emailing import long_date, money, person_initial
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
@@ -536,7 +536,8 @@ def _notify_purchase(tx):
     balance = f' Saldo actual: ${tx.balance_after:.2f}.' if tx.balance_after is not None else ''
     message = f'{student.user.full_name}: {head}{detail}.{balance}'
     # Email only: the same facts as a card, the balance left as the figure that matters.
-    details = [('Alumno', student.user.full_name),
+    # D13: the email names the child «Carla R.».
+    details = [('Alumno', person_initial(student.user)),
                ('Devolución' if refund else 'Compra', money(tx.amount))]
     if tx.description:
         details.append(('Detalle', tx.description))
@@ -607,7 +608,7 @@ def _maybe_low_balance_alert(cb, now):
         f'${cb.low_balance_threshold:.2f}. Le recomendamos recargar para evitar '
         f'contratiempos a la hora del almuerzo.'
     )
-    from apps.portal.emailing import money
+    from apps.portal.emailing import money, person_initial
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
@@ -618,7 +619,7 @@ def _maybe_low_balance_alert(cb, now):
                whatsapp=use_wa, fanout=False, tone='warning',
                url='/portal/cafeteria',
                highlight=('Saldo actual', money(cb.balance)),
-               details=[('Alumno', student.user.full_name),
+               details=[('Alumno', person_initial(student.user)),
                         ('Saldo mínimo configurado', money(cb.low_balance_threshold))],
                cta_label='Recargar saldo',
                intro=(f'El saldo de cafetería de {student.user.first_name or student.user.full_name} '
@@ -694,19 +695,23 @@ def _maybe_budget_alert(cb, now):
         return 0
     cb.last_budget_alert_at = now
 
+    from apps.portal.emailing import person_initial
+
     title = 'Límite de gasto alcanzado'
     message = (
         f'{student.user.full_name} superó su presupuesto de cafetería: '
         f'{" y ".join(over)}.'
     )
+    short = person_initial(student.user)
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
                whatsapp=use_wa, fanout=False, tone='warning',
-               details=[('Alumno', student.user.full_name), ('Límite superado', ' y '.join(over))],
-               cta_label='Revisar límites')
+               details=[('Alumno', short), ('Límite superado', ' y '.join(over))],
+               cta_label='Revisar límites',
+               intro=f'{short} superó su presupuesto de cafetería: {" y ".join(over)}.')
         notified += 1
     # Any other account of the child's family sees it in the bell (no extra email).
     from apps.portal.services import copy_to_family
@@ -1398,7 +1403,11 @@ def notify_staff_held_unverified(held, now=None) -> int:
             details=details, items=items, paragraphs=[todo],
             cta_label='Abrir «Por aplicar»', cta_url=portal_url(PAID_QUEUE_PATH),
             link_fallback=False, reason='Aviso interno de la consola del Colegio Interlaken.')
-        send_email(f'Interlaken: {title}', message, emails, content=content)
+        # D13: the subject carries no student name and no amount (the body does).
+        subject = 'Recarga por verificar' if one else f'{len(claimed)} recargas por verificar'
+        if reminder:
+            subject = f'Recordatorio · {subject}'
+        send_email(f'Interlaken: {subject}', message, emails, content=content)
     logger.info('Held-unverified notice (%s) for top-up(s) %s sent to %d staff.',
                 'reminder' if reminder else 'first',
                 ', '.join(str(t.pk) for _, _, t, _ in claimed), len(people))
@@ -1688,7 +1697,10 @@ def refund_paid_topup(topup, *, actor=None, note: str = '', bank_refund_confirme
             f'Se devolvió a su tarjeta el pago de {format_amount(topup.amount)} de la recarga de '
             f'cafetería de {topup.student.user.full_name}; no se aplicó saldo. Motivo: {note}.',
             details=[('Monto devuelto a su tarjeta', format_amount(topup.amount)), ('Motivo', note)],
-            tone='neutral')
+            tone='neutral',
+            intro=(f'Se devolvió a su tarjeta el pago de {format_amount(topup.amount)} de la recarga de '
+                   f'cafetería de {topup.student.user.first_name or topup.student.user.full_name}; '
+                   f'no se aplicó saldo.'))
     except Exception:  # noqa: BLE001
         logger.exception('Refund notification failed for top-up #%s', topup.pk)
     return topup
@@ -1803,9 +1815,13 @@ def notify_topup_result(payment, *, success: bool) -> int:
         # The app already wrote it into Loyverse on approval and the family got
         # one message saying so («Recarga de cafetería lista», loyverse_push).
         return 0
+    from apps.portal.emailing import person_initial
+
     student = topup.student
     name = student.user.full_name
-    details, highlight, tone, cta_label, intro = [('Alumno', name)], None, None, None, None
+    # D13: the email names the child «Carla R.» (the in-app text is unchanged).
+    short = person_initial(student.user)
+    details, highlight, tone, cta_label, intro = [('Alumno', short)], None, None, None, None
     if success and topup.status == TopUpRequest.Status.PAID:
         title = 'Pago de recarga recibido'
         when = (f'el {format_apply_at(topup.apply_due_at)}' if topup.apply_due_at
@@ -1833,6 +1849,8 @@ def notify_topup_result(payment, *, success: bool) -> int:
         )
         tone, highlight = 'success', ('Monto pagado', format_amount(payment.amount))
         details.append(('Referencia', str(payment.gateway_tx_id or payment.id)))
+        intro = (f'Se registró el pago para el saldo de cafetería de {short}. Ya puede verlo en el '
+                 f'portal; el colegio cargará el monto en el POS para que pueda usarlo al comprar.')
     elif payment.is_soft_failed():
         # The bank did not confirm (Payworks T, "sin respuesta del banco"): the
         # card may have been charged, and staff look it up in MultiCobros. "No
@@ -1858,6 +1876,8 @@ def notify_topup_result(payment, *, success: bool) -> int:
         )
         tone, cta_label = 'danger', 'Intentar de nuevo'
         details += [('Monto', format_amount(payment.amount)), ('Cargo', 'No se realizó ningún cargo')]
+        intro = (f'No fue posible procesar la recarga de {format_amount(payment.amount)} para {short}. '
+                 f'No se realizó ningún cargo a su saldo. Puede intentarlo nuevamente desde el portal.')
 
     notified = 0
     from apps.accounts.family import family_notify_recipients
@@ -1879,6 +1899,7 @@ def notify_topup_not_charged(payment) -> int:
     number of guardians notified."""
     from apps.accounts.family import family_notify_recipients
     from apps.cafeteria.schedule import format_amount
+    from apps.portal.emailing import person_initial
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
@@ -1887,6 +1908,7 @@ def notify_topup_not_charged(payment) -> int:
         return 0
     student = topup.student
     name = student.user.full_name
+    short = person_initial(student.user)
     amount = format_amount(payment.amount)
     message = (f'Revisamos con Banorte el pago de {amount} para la cafetería de {name} '
                f'(folio {payment.id}): no se realizó ningún cargo a su tarjeta. Puede volver '
@@ -1896,7 +1918,7 @@ def notify_topup_not_charged(payment) -> int:
         notify(parent, Notification.NotifType.PAYMENT, 'Pago de recarga no realizado', message,
                fanout=False, tone='neutral', cta_label='Intentar de nuevo',
                url='/portal/cafeteria',
-               details=[('Alumno', name), ('Monto', amount),
+               details=[('Alumno', short), ('Monto', amount),
                         ('Cargo', 'No se realizó ningún cargo'), ('Folio', str(payment.id))],
                intro=(f'Revisamos con Banorte su pago para la cafetería de '
                       f'{student.user.first_name or name}: no se realizó ningún cargo.'))
@@ -1986,10 +2008,12 @@ def _notify_balance_change(student, title, message, *, details=None, highlight=N
     amount, the reason and the new balance as ``highlight``.
     """
     from apps.accounts.family import family_notify_recipients
+    from apps.portal.emailing import person_initial
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
-    card = [('Alumno', student.user.full_name), *(details or [])]
+    # D13: the email names the child «Carla R.».
+    card = [('Alumno', person_initial(student.user)), *(details or [])]
     notified = 0
     for parent in family_notify_recipients(student):
         notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False,

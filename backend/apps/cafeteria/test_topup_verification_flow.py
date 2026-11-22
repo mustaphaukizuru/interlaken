@@ -90,7 +90,8 @@ class TestHeldUnverifiedNotice:
         assert staff_notes(cashier).count() == 1
         assert not Notification.objects.filter(user=office).exists()
         subject, _body, recipients = send.call_args.args[:3]
-        assert subject == f'Interlaken: {note.title}'
+        # D13: the email subject carries neither the name nor the amount; the title does.
+        assert subject == 'Interlaken: Recarga por verificar'
         assert set(recipients) == {admin.email, cashier.email}
         content = send.call_args.kwargs['content']
         assert content.cta_url.endswith(QUEUE)

@@ -19,6 +19,18 @@ describes *what* to say; the design lives here, once:
 Callers that still pass plain ``message`` text get the same design through
 ``content_from_text`` (paragraphs on blank lines), so no email is left on the
 old template.
+
+Two families (UI/UX Phase 9, docs/UIUX-REFINEMENT-PROMPT.md §14):
+
+* ``transactional`` (default): access, cafetería, admissions, visits, staff
+  alerts and emergencies. One message, one action, no promotional blocks.
+* ``notice``: school comunicados. May add a hero image, up to three content
+  cards and a stat strip. Those blocks never render in a transactional email,
+  whatever the caller passes.
+
+Colours are the site's tokens (frontend/src/index.css ``:root``); the parity
+test (apps/portal/test_email_tokens.py) fails when one drifts. ``EMAIL_ONLY``
+lists the few values that exist only in email, with the reason.
 """
 from __future__ import annotations
 
@@ -32,15 +44,48 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-# Tone of the category chip and the highlight. Colors are the brand's, picked
-# for 4.5:1 text contrast on their tint.
+# Tone of the category chip, the highlight and the note: the site's status
+# pairs (index.css --info/--success/--warning/--danger/--neutral -fg/-bg), each
+# fg on its own bg at 4.5:1 or more. Keys are frozen: callers pass them.
 TONES: dict[str, dict[str, str]] = {
-    'brand':   {'fg': '#401A8E', 'bg': '#F1ECFA'},
-    'success': {'fg': '#2F6B1A', 'bg': '#EAF5E4'},
-    'warning': {'fg': '#8A4B00', 'bg': '#FFF3DC'},
-    'danger':  {'fg': '#B0123E', 'bg': '#FDE8EE'},
-    'neutral': {'fg': '#4A4560', 'bg': '#F1EFF5'},
+    'brand':   {'fg': '#401A8E', 'bg': '#EDE8F7'},   # --info-fg / --info-bg (purple)
+    'success': {'fg': '#316F1C', 'bg': '#EEF7E9'},   # --success-fg / --success-bg
+    'warning': {'fg': '#B45309', 'bg': '#FDF3E4'},   # --warning-fg / --warning-bg
+    'danger':  {'fg': '#C51D1A', 'bg': '#FDECEC'},   # --danger-fg / --danger-bg
+    'neutral': {'fg': '#6E6885', 'bg': '#F5F4FA'},   # --neutral-fg / --neutral-bg
 }
+
+# The rest of the palette base.html uses, by role (all tokens unless listed in
+# EMAIL_ONLY). The template repeats them as literals, because email clients
+# ignore CSS variables; the parity test reads both.
+PALETTE: dict[str, str] = {
+    'page': '#F5F4FA',           # --cream: the page around the white panel
+    'panel': '#FFFFFF',          # white panel (EMAIL_ONLY)
+    'tint': '#F5F4FA',           # --cream: details and card blocks inside the panel
+    'ink': '#1A1130',            # --text-main: headings and values
+    'body': '#3D3852',           # paragraphs (EMAIL_ONLY)
+    'muted': '#6E6885',          # --text-muted: labels and fine print
+    'link': '#401A8E',           # --purple
+    'button': '#401A8E',         # --purple: the one primary button (D18)
+    'button_label': '#FFFFFF',   # white label, 11.96:1 on the button
+    'bullet': '#47A028',         # --green: list bullets (decorative)
+    'stripe_green': '#47A028',   # --green
+    'stripe_purple': '#401A8E',  # --purple
+    'stripe_pink': '#E01A4E',    # --pink
+}
+
+# Values that exist only in email, with why. Everything else must be a token.
+EMAIL_ONLY: dict[str, str] = {
+    '#3D3852': 'Paragraph text: a softer ink than --text-main for long reading '
+               '(about 11:1 on white), kept from the 2026-11-08 design.',
+    '#FFFFFF': 'White: the panel and the button label.',
+}
+
+# Inbox preview line (what Gmail and Apple Mail show after the subject).
+PREHEADER_MAX = 90
+# Notice-only blocks (family «notice»): at most this many cards and stats.
+MAX_CARDS = 3
+MAX_STATS = 3
 
 MONTHS = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
           'septiembre', 'octubre', 'noviembre', 'diciembre')
@@ -72,12 +117,42 @@ class EmailContent:
     reason: str = ''
     # Family notices link to the preferences page; staff and one-off emails do not.
     manage_prefs: bool = False
+    # «transactional» (default) or «notice» (comunicados). Only a notice may
+    # carry the blocks below; a transactional email ignores them.
+    family: str = 'transactional'
+    hero_image_url: str = ''
+    hero_image_alt: str = ''
+    # Up to MAX_CARDS dicts: {'title', 'text', 'link', optional 'link_label'}.
+    cards: list[dict] = field(default_factory=list)
+    # Up to MAX_STATS (label, value) pairs shown side by side.
+    stats: list[tuple[str, str]] = field(default_factory=list)
 
     def tone_colors(self) -> dict[str, str]:
         return TONES.get(self.tone, TONES['brand'])
 
     def note_colors(self) -> dict[str, str]:
         return TONES.get(self.note_tone, TONES['neutral'])
+
+    @property
+    def is_notice(self) -> bool:
+        return self.family == 'notice'
+
+    def notice_blocks(self) -> dict:
+        """The notice-only blocks to render: always empty for a transactional email."""
+        if not self.is_notice:
+            return {'hero': None, 'cards': [], 'stats': [], 'stat_width': ''}
+        hero = None
+        if self.hero_image_url:
+            hero = {'url': self.hero_image_url, 'alt': self.hero_image_alt or self.title}
+        cards = [c for c in (self.cards or []) if (c or {}).get('title')][:MAX_CARDS]
+        stats = [st for st in (self.stats or []) if st and st[0]][:MAX_STATS]
+        return {'hero': hero, 'cards': cards, 'stats': stats,
+                'stat_width': f'{100 // len(stats)}%' if stats else ''}
+
+    def preheader_text(self) -> str:
+        """The inbox preview: the preheader, else the intro, else the title, cut
+        to PREHEADER_MAX characters on a word boundary."""
+        return clip(self.preheader or self.intro or self.title, PREHEADER_MAX)
 
 
 def content_from_text(subject: str, message: str, *, cta_url: str = '', cta_label: str = '') -> EmailContent:
@@ -95,6 +170,17 @@ def content_from_text(subject: str, message: str, *, cta_url: str = '', cta_labe
 
 
 # ── formatting helpers shared by the callers ──────────────────────────────
+def clip(text: str, limit: int) -> str:
+    """``text`` on one line, at most ``limit`` characters, cut on a word boundary with «…»."""
+    text = ' '.join((text or '').split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit - 1]
+    if ' ' in cut and text[limit - 1] != ' ':
+        cut = cut[:cut.rindex(' ')]
+    return cut.rstrip(' ,;:.') + '…'
+
+
 def money(value) -> str:
     """$1,234.50 (es-MX)."""
     try:
@@ -127,6 +213,29 @@ def first_name_initial(full_name: str) -> str:
     return f'{parts[0]} {parts[1][0]}.'
 
 
+def name_initial(first: str, last: str = '') -> str:
+    """«Ana María» + «Pérez López» → «Ana P.»: the first given name and the
+    first surname's initial (D13). With one part missing, what is there."""
+    given = (first or '').split()
+    surnames = (last or '').split()
+    if not given:
+        return first_name_initial(last)
+    if not surnames:
+        return first_name_initial(first)
+    return f'{given[0]} {surnames[0][0]}.'
+
+
+def person_initial(user) -> str:
+    """A student as emails name them (D13): «Carla R.»."""
+    if user is None:
+        return ''
+    first = getattr(user, 'first_name', '') or ''
+    last = getattr(user, 'last_name', '') or ''
+    if first or last:
+        return name_initial(first, last)
+    return first_name_initial(getattr(user, 'full_name', '') or '')
+
+
 def portal_url(path: str = '/portal') -> str:
     return f"{(getattr(settings, 'FRONTEND_URL', '') or '').rstrip('/')}{path}"
 
@@ -153,8 +262,14 @@ def school_contact() -> dict[str, str]:
     return data
 
 
+# Images need an absolute URL in an email: when FRONTEND_URL is empty (a bare
+# dev shell) the logo still loads from the public site.
+PUBLIC_SITE_URL = 'https://interlaken.edu.mx'
+
+
 def logo_url() -> str:
-    return portal_url('/assets/email/logo.png')
+    base = (getattr(settings, 'FRONTEND_URL', '') or '').rstrip('/') or PUBLIC_SITE_URL
+    return f'{base}/assets/email/logo.png'
 
 
 # ── notifications (portal.services.notify and the comunicados dispatcher) ──
@@ -182,8 +297,13 @@ def notification_content(*, user, notif_type: str, title: str, message: str, det
     """
     category, default_tone, label, path = NOTIFICATION_STYLE.get(notif_type, NOTIFICATION_STYLE['info'])
     staff = getattr(user, 'role', '') in STAFF_ROLES
+    # An emergency broadcast is a comunicado of type «warning»: it keeps its
+    # «Aviso importante» chip and the transactional layout (spec §14).
+    emergency = comunicado and notif_type in URGENT_TYPES
     if comunicado:
-        category, label = 'Comunicado', 'Ver comunicado'
+        label = 'Ver aviso' if emergency else 'Ver comunicado'
+        if not emergency:
+            category = 'Comunicado'
     if staff and not url:
         label, path = 'Abrir la consola', '/admin'
     # Senders email a family only when its Avisos tab has email on, except for
@@ -207,6 +327,7 @@ def notification_content(*, user, notif_type: str, title: str, message: str, det
         link_fallback=False,
         manage_prefs=not staff,
         reason=reason,
+        family='notice' if comunicado and not emergency else 'transactional',
     )
 
 
@@ -221,7 +342,8 @@ def render_html(subject: str, content: EmailContent, *, reply_to: str = '') -> s
             'c': content,
             'tone': content.tone_colors(),
             'note_colors': content.note_colors(),
-            'preheader': content.preheader or content.intro or content.title,
+            'notice': content.notice_blocks(),
+            'preheader': content.preheader_text(),
             'contact': school_contact(),
             'reply_to': reply_to,
             'logo_url': logo_url(),
@@ -240,8 +362,14 @@ def render_text(content: EmailContent, *, reply_to: str = '') -> str:
         out.append(content.category.upper())
     out.append(content.title)
     out.append('')
+    notice = content.notice_blocks()
+    if notice['hero']:
+        out += [f"[Imagen: {notice['hero']['alt']}]", '']
     if content.intro:
         out += [content.intro, '']
+    if notice['stats']:
+        out += [f'{label}: {value}' for label, value in notice['stats']]
+        out.append('')
     if content.highlight:
         out += [f'{content.highlight[0]}: {content.highlight[1]}', '']
     if content.details:
@@ -254,6 +382,13 @@ def render_text(content: EmailContent, *, reply_to: str = '') -> str:
         out.append('')
     for p in content.paragraphs:
         out += [p, '']
+    for card in notice['cards']:
+        out.append(card['title'])
+        if card.get('text'):
+            out.append(card['text'])
+        if card.get('link'):
+            out.append(f"{card.get('link_label') or 'Ver más'}: {card['link']}")
+        out.append('')
     if content.cta_url:
         out += [f'{content.cta_label or "Abrir"}:', content.cta_url, '']
     if content.note:

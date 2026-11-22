@@ -1,5 +1,5 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, StackedInline
 
 # OpenSchoolDay is retired for publishing — live /puertas-abiertas reads
 # bookings.AvailabilitySlot(visit_type=open_class). Manage dates in
@@ -14,7 +14,7 @@ from .models import (
 )
 
 
-class RegistrationGuardianInline(admin.StackedInline):
+class RegistrationGuardianInline(StackedInline):
     model = RegistrationGuardian
     extra = 0
     max_num = 2
@@ -56,15 +56,18 @@ class RegistrationAdmin(ModelAdmin):
 
 @admin.register(RegistrationDocument)
 class RegistrationDocumentAdmin(ModelAdmin):
-    list_display = ('registration', 'doc_type', 'filename', 'is_verified', 'uploaded_at')
-    list_filter = ('doc_type', 'is_verified')
-    list_editable = ('is_verified',)
+    list_display = ('registration', 'doc_type', 'filename', 'status', 'uploaded_at')
+    list_filter = ('doc_type', 'status')
     search_fields = ('filename', 'registration__child_first_name',
                      'registration__child_last_name')
     date_hierarchy = 'uploaded_at'
     raw_id_fields = ('registration',)
     list_select_related = ('registration',)
-    readonly_fields = ('filename', 'file_size', 'uploaded_at')
+    # The review (status, note, «verificado») happens only in the console
+    # (set_document_review: the rejection email, the expediente and the audit
+    # row). Ticking «verificado» here skipped all of that.
+    readonly_fields = ('status', 'review_note', 'is_verified', 'filename', 'file_size',
+                       'uploaded_at')
 
 
 class _ExpedienteRecordAdmin(ModelAdmin):

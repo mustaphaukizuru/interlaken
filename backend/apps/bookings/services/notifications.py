@@ -52,17 +52,10 @@ def _visit_email(booking, subject, body, content):
     return email
 
 
-def send_booking_confirmation(booking):
-    """Send a Spanish confirmation email (with a .ics calendar invite) for a
-    booking and flag it as sent.
-
-    Best-effort: email failures never block the booking (fail_silently). The
-    .ics attachment lets the parent add the visit to their calendar in one tap;
-    if generation ever fails, the email still goes out without it.
-    """
+def confirmation_content(booking):
+    """``(subject, EmailContent)`` of the confirmation (pure; render_emails previews it)."""
     from apps.portal.emailing import EmailContent
 
-    subject = f'Visita confirmada: {_visit_type_label(booking)}'
     content = EmailContent(
         category='Visitas', tone='success',
         title='Su visita al Colegio Interlaken está confirmada',
@@ -73,6 +66,34 @@ def send_booking_confirmation(booking):
         signoff='¡Le esperamos!\nEquipo de Admisiones',
         reason=VISIT_REASON,
     )
+    return f'Visita confirmada: {_visit_type_label(booking)}', content
+
+
+def reminder_content(booking):
+    """``(subject, EmailContent)`` of the day-before reminder (pure)."""
+    from apps.portal.emailing import EmailContent
+
+    content = EmailContent(
+        category='Visitas',
+        title='Su visita al Colegio Interlaken es mañana',
+        intro=f'Estimado/a {booking.parent_name}: le recordamos su visita programada para mañana.',
+        details=_visit_details(booking),
+        note='Si ya no puede asistir, avísenos respondiendo a este correo.',
+        signoff='¡Le esperamos!\nEquipo de Admisiones',
+        reason=VISIT_REASON,
+    )
+    return 'Recordatorio: su visita es mañana', content
+
+
+def send_booking_confirmation(booking):
+    """Send a Spanish confirmation email (with a .ics calendar invite) for a
+    booking and flag it as sent.
+
+    Best-effort: email failures never block the booking (fail_silently). The
+    .ics attachment lets the parent add the visit to their calendar in one tap;
+    if generation ever fails, the email still goes out without it.
+    """
+    subject, content = confirmation_content(booking)
     email = _visit_email(booking, subject, '', content)
 
     # send() returns the number of messages delivered (0 on a silent failure).
@@ -94,18 +115,7 @@ def send_booking_reminder(booking):
     Best-effort and idempotent per booking via ``reminder_sent`` (the caller
     filters on it). Same fail-soft contract as the confirmation.
     """
-    from apps.portal.emailing import EmailContent
-
-    subject = 'Recordatorio: su visita es mañana'
-    content = EmailContent(
-        category='Visitas',
-        title='Su visita al Colegio Interlaken es mañana',
-        intro=f'Estimado/a {booking.parent_name}: le recordamos su visita programada para mañana.',
-        details=_visit_details(booking),
-        note='Si ya no puede asistir, avísenos respondiendo a este correo.',
-        signoff='¡Le esperamos!\nEquipo de Admisiones',
-        reason=VISIT_REASON,
-    )
+    subject, content = reminder_content(booking)
     email = _visit_email(booking, subject, '', content)
 
     delivered = bool(email.send(fail_silently=True))
