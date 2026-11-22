@@ -328,13 +328,12 @@ export function PublicLayout() {
 
       {/* Main nav */}
       <div className="accent-bar print:hidden" />
-      {/* Sticky and solid (owner, 2026-11-22: it looked see-through over white
-          cards and lagged below the top while scrolling the busy home page).
-          transform-gpu (translate3d) gives it its own compositor layer, so it moves in the
-          same frame as the scroll; the stronger shadow keeps its edge visible
-          over white sections. Nothing inside is position: fixed, so the
-          transform changes no containing block. */}
-      <header className="sticky top-0 z-header border-b border-line bg-white shadow-md transform-gpu print:hidden">
+      {/* Sticky and solid. z-header must stay: without it (a dev server on a
+          stale Tailwind config dropped the rule, 2026-11-22) any positioned
+          section (card photos, the round extracurricular photos) paints over
+          the bar. The stronger shadow keeps its edge visible over white
+          sections. */}
+      <header className="sticky top-0 z-header border-b border-line bg-white shadow-md print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">

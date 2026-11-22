@@ -220,10 +220,13 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
   its optional third button is empty by default. «Familias → Colegiaturas y
   cafetería» stays in the menu. The icon-only squeeze (1024-1149 px) now runs
   only when Navegación has three or more buttons.
-- **Sticky bar.** The owner saw the bar sit below the top with content above
-  it while scrolling the home page, and read it as see-through over white
-  cards. The header now has its own compositor layer (`transform-gpu`) and a
-  stronger shadow (`shadow-md`). Nothing inside it is `position: fixed`.
+- **Sticky bar.** The owner saw photos (level cards, the round
+  extracurricular photos) drawn over the bar. Cause: a local dev server on a
+  stale Tailwind config never generated `.z-header`, so the header had
+  z-index `auto`; builds and a restarted dev server have the rule. A test now
+  pins `sticky top-0 z-header bg-white`, and the bar has a stronger shadow
+  (`shadow-md`) so its edge shows over white sections. Restart dev servers
+  after editing `tailwind.config.js`.
 - **Live data.** #292 noted that production had no saved header buttons, so
   the defaults apply on deploy. If anyone saved buttons in Navegación since,
   those win and must be edited there; the same holds for a home page saved in
