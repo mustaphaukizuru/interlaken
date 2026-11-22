@@ -40,6 +40,8 @@ export const f = {
   toggle: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'toggle', ...o }),
   // Options come from cms/icons in the editor, so section chunks do not ship the icon set.
   icon: (key: string, label = 'Ícono', o: Opt = {}): FieldSpec => ({ key, label, kind: 'icon', ...o }),
+  // A select of the 3D illustrations (lib/illustrations); the editor fills the 40 labels, so section chunks stay light.
+  illustration: (key: string, label = 'Ilustración', o: Opt = {}): FieldSpec => ({ key, label, kind: 'select', options: [], optionsSet: 'illustrations', ...o }),
   color: (key: string, label = 'Color', o: Opt = {}): FieldSpec => ({ key, label, kind: 'color', options: COLOR_OPTIONS, ...o }),
   select: (key: string, label: string, options: { value: string; label: string }[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'select', options, ...o }),
   items: (key: string, label: string, item: FieldSpec[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'items', item, ...o }),

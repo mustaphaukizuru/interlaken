@@ -40,6 +40,8 @@ export interface FieldSpec {
   slugFrom?: { field: string; keep?: string[] };
   /** Editor (select): options read from a list of the same block, e.g. a photo's category from the gallery filters. */
   optionsFrom?: { list: string; value: string; label: string };
+  /** Editor (select): a shared option list the editor loads itself (lib/illustrationLabels), so section chunks do not ship it. */
+  optionsSet?: 'illustrations';
   /** Editor (textarea): inline marks this text renders, offered as a toolbar: `**negritas**`, `[texto](/ruta)`. */
   marks?: ('bold' | 'link')[];
   /** Editor (image): narrowest width in px that still looks sharp in this slot. */

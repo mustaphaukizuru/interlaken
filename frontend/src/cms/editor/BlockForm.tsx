@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, Copy, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ILLUSTRATION_OPTIONS } from '@/lib/illustrationLabels';
 import type { Block, BlockSpec, FieldSpec } from '../blocks/registry';
 import { blockSpec, withDefaults } from '../blocks/registry';
 import { emptyTable, type TableValue } from '../blocks/table';
@@ -334,7 +335,7 @@ function Field({ spec, value, onChange, path, helpPath, ctx }: FieldProps) {
       const source = from && Array.isArray(ctx.props[from.list]) ? (ctx.props[from.list] as Record<string, unknown>[]) : [];
       const options = from
         ? source.map((o) => ({ value: String(o?.[from.value] ?? ''), label: String(o?.[from.label] || o?.[from.value] || '') })).filter((o) => o.value)
-        : spec.options ?? [];
+        : spec.optionsSet === 'illustrations' ? ILLUSTRATION_OPTIONS : spec.options ?? [];
       const known = options.some((o) => o.value === str);
       control = (
         <div>

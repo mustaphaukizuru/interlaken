@@ -14,6 +14,8 @@ import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
 import { homePath } from '@/lib/areas';
+import { Illustration } from '@/components/ui/Illustration';
+import { isIllustration } from '@/lib/illustrations';
 import type { User } from '@/types';
 import { imageSrc, useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
@@ -38,6 +40,8 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
   const problems = asLink(p.problemsLink);
   const signup = asLink(p.signupLink);
   const t = useTokens();
+  // «none» hides it; content saved before the field existed shows the padlock.
+  const art = p.illustration === 'none' ? undefined : isIllustration(p.illustration) ? p.illustration : 'acceso';
   return (
     <div className="flex min-h-screen flex-col">
       <div className="accent-bar" />
@@ -62,6 +66,16 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
             </Link>
           </div>
           <div className="relative">
+            {art && (
+              <div className="relative mb-8 flex h-44 w-44 items-center justify-center" aria-hidden="true">
+                <span className="absolute inset-0 rounded-full bg-white/[0.06] ring-1 ring-white/10 backdrop-blur-sm" />
+                <span
+                  className="absolute inset-3 rounded-full"
+                  style={{ background: 'radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--pink) 30%, transparent) 0%, transparent 70%)' }}
+                />
+                <Illustration name={art} size={144} className="relative drop-shadow-[0_16px_24px_rgba(8,5,22,0.5)]" />
+              </div>
+            )}
             {p.label && <div className="section-label-pink inline-flex">{c('label')}</div>}
             <h1 className="mt-3 font-head text-[44px] font-black leading-[1.08] tracking-[-1px] text-white">
               {c('title')}{p.titleAccent && <br />}
@@ -348,7 +362,7 @@ function LoginLogic({ c, p }: { c: Copy; p: LoginProps }) {
 }
 
 /* ── The section ─────────────────────────────────────────────────────────── */
-interface LoginProps { image?: number | string; stats?: unknown; problemsLink?: CmsLink; signupLink?: CmsLink; label?: string; titleAccent?: string; text?: string; [copy: string]: unknown }
+interface LoginProps { image?: number | string; stats?: unknown; problemsLink?: CmsLink; signupLink?: CmsLink; label?: string; titleAccent?: string; text?: string; illustration?: string; [copy: string]: unknown }
 
 const PREVIEW: ViewState = { email: '', password: '', totp: '', showPassword: false, needsTotp: false, submitting: false, bootstrapping: false, alert: null, formError: false };
 const NOOP: ViewActions = { onEmail: () => {}, onPassword: () => {}, onTotp: () => {}, onTogglePassword: () => {}, onSubmit: (e) => e.preventDefault(), onGoogle: () => {} };
@@ -373,6 +387,7 @@ export const sections = [
         f.text('titleAccent', 'Título (segunda línea, en degradado)'),
         f.textarea('text', 'Texto'),
         f.image('image', 'Foto de fondo'),
+        f.illustration('illustration', 'Ilustración', { hint: 'Sobre el título del panel. Sin elegir, el candado con llave.' }),
         f.items('stats', 'Cifras', [f.text('value', 'Cifra'), f.text('label', 'Texto')]),
       ]),
       ...grouped('Tarjeta de acceso', [
@@ -407,7 +422,7 @@ export const sections = [
     defaults: {
       label: 'Portal Escolar', title: 'Formando Líderes', titleAccent: 'con Excelencia',
       text: 'Acceda al portal de Colegio Interlaken para consultar cafetería y pagos en línea.',
-      image: '/assets/facade.webp',
+      image: '/assets/facade.webp', illustration: 'acceso',
       stats: [{ value: '{{anios}}', label: 'Años' }, { value: '1,200+', label: 'Alumnos' }, { value: '95%', label: 'Aprovechamiento' }],
       heading: 'Iniciar Sesión', subheading: 'Acceso para familias y personal del colegio',
       googleButton: 'Continuar con Google', googleBusy: 'Completando acceso con Google…', divider: 'O CON CORREO',

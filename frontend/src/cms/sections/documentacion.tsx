@@ -4,10 +4,16 @@
  * edits (Admin → Admisiones → Documentos requeridos, Fase 4), read from
  * /admissions/required-documents/ with a tab per level; the headings, the
  * summary and the call to action are CMS copy.
+ *
+ * Media round (owner 2026-11-22): from lg up the list sits beside a column
+ * with its illustration and the call to action (which stays in view while
+ * the list scrolls); on phones the art moves into the list header.
  */
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, CheckCircle, FileText, FolderOpen, Package, RefreshCw } from 'lucide-react';
+import { Illustration, IllustrationPanel, wash } from '@/components/ui/Illustration';
+import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import { clsx } from 'clsx';
 import { usePublicRequiredDocs, type LevelCode } from '@/hooks/queries/requiredDocsPublic';
 import { LEVELS, docsForLevel, docsSummary, levelLabel } from '@/lib/requiredDocs';
@@ -15,6 +21,11 @@ import { imageSrc, imageSrcSet, useTokens, type CmsLink } from '../runtime';
 import { asLink, CmsAnchor, defineModule, f, sectionsOf, VISIT_CTA } from './kit';
 
 const section = sectionsOf('documentacion');
+
+/** The one chosen in the editor; «none» hides it; nothing chosen (saved before the field existed) keeps the built-in one. */
+const artOf = (chosen: unknown, fallback: IllustrationName): IllustrationName | undefined =>
+  chosen === 'none' ? undefined : isIllustration(chosen) ? chosen : fallback;
+const ART_HINT = 'Sin elegir, se muestra la de siempre. «Sin ilustración» la oculta.';
 
 /* ── Portada ────────────────────────────────────────────────────────────── */
 interface HeroProps { label?: string; title?: string; subtitle?: string; image?: number | string }
@@ -38,6 +49,7 @@ interface ListProps {
   title?: string; summary?: string; tabsLabel?: string; physicalLabel?: string; emptyText?: string;
   errorTitle?: string; errorText?: string; retryLabel?: string;
   ctaTitle?: string; ctaText?: string; cta?: CmsLink;
+  illustration?: string; ctaIllustration?: string;
 }
 
 const isLevel = (v: string | null): v is LevelCode => LEVELS.some((l) => l.value === v);
@@ -51,6 +63,9 @@ function DocsListView(p: ListProps) {
   const { data, isLoading, isError, refetch, isFetching } = usePublicRequiredDocs();
   const docs = docsForLevel(data?.results ?? [], level);
   const cta = asLink(p.cta);
+  const art = artOf(p.illustration, 'documentos');
+  const ctaArt = artOf(p.ctaIllustration, 'agenda');
+  const hasCta = !!(p.ctaTitle || p.ctaText || cta.href);
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     const last = LEVELS.length - 1;
@@ -65,15 +80,17 @@ function DocsListView(p: ListProps) {
 
   return (
     <section className="bg-cream-2 py-10 sm:py-14">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <div className="overflow-hidden rounded-md bg-white shadow-card">
-          <div className="flex items-center gap-3 border-b border-ink/10 bg-green/5 px-5 py-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-green/15 text-green-dark">
+      <div className={`mx-auto grid gap-6 px-4 sm:px-6 lg:items-start lg:gap-8 ${art || hasCta ? 'max-w-6xl lg:grid-cols-12' : 'max-w-4xl'}`}>
+        <div className="overflow-hidden rounded-md bg-white shadow-card lg:col-span-8">
+          <div className="flex items-center gap-4 px-5 py-4 sm:px-6" style={{ background: wash('var(--green)', 10) }}>
+            {/* Phones: the art heads the list; desktop shows it large in the side column. */}
+            {art && <Illustration name={art} size={72} fluid className="w-[60px] shrink-0 lg:hidden" />}
+            <span className={`h-10 w-10 shrink-0 items-center justify-center rounded-md bg-green/15 text-green-dark ${art ? 'hidden lg:flex' : 'flex'}`}>
               <FolderOpen className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="font-head text-lg font-bold text-ink">{t(p.title)}</h2>
-              {p.summary && data && <p className="text-xs text-muted">{docsSummary(t(p.summary), docs, levelLabel(level))}</p>}
+              <h2 className="font-head text-fluid-xl font-bold text-ink">{t(p.title)}</h2>
+              {p.summary && data && <p className="mt-0.5 text-sm text-muted">{docsSummary(t(p.summary), docs, levelLabel(level))}</p>}
             </div>
           </div>
 
@@ -93,7 +110,7 @@ function DocsListView(p: ListProps) {
                   onClick={() => setLevel(l.value)}
                   onKeyDown={(e) => onKey(e, i)}
                   className={clsx(
-                    '-mb-px inline-flex min-h-[44px] shrink-0 items-center border-b-2 px-3.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green/40',
+                    '-mb-px inline-flex min-h-[44px] shrink-0 items-center border-b-2 px-3.5 text-[15px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green/40',
                     on ? 'border-green-strong text-green-dark' : 'border-transparent text-muted hover:text-ink',
                   )}
                 >
@@ -122,17 +139,17 @@ function DocsListView(p: ListProps) {
                 ))}
               </ul>
             ) : docs.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-muted">{t(p.emptyText)}</p>
+              <p className="px-5 py-8 text-center text-base text-muted">{t(p.emptyText)}</p>
             ) : (
               <ul className="divide-y divide-ink/5">
                 {docs.map((d) => (
-                  <li key={d.key} className="flex items-start gap-3 px-5 py-4">
-                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" aria-hidden="true" />
+                  <li key={d.key} className="flex items-start gap-3 px-5 py-4 sm:px-6">
+                    <CheckCircle className="mt-1 h-[18px] w-[18px] flex-shrink-0 text-green-500" aria-hidden="true" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink">{d.name}</p>
-                      {d.description && <p className="mt-0.5 text-sm text-muted">{d.description}</p>}
+                      <p className="text-base font-medium text-ink">{d.name}</p>
+                      {d.description && <p className="mt-0.5 text-[15px] text-muted">{d.description}</p>}
                       {d.physical_note && (
-                        <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-subtle">
+                        <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-subtle">
                           <Package className="h-3.5 w-3.5" aria-hidden="true" /> {t(p.physicalLabel)} <span className="text-ink/80">{d.physical_note}</span>
                         </p>
                       )}
@@ -141,7 +158,7 @@ function DocsListView(p: ListProps) {
                           href={d.link_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-1 flex w-fit items-center gap-1 text-sm font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green"
+                          className="mt-1 flex min-h-[32px] w-fit items-center gap-1 text-[15px] font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green"
                         >
                           {d.link_label} <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </a>
@@ -154,14 +171,27 @@ function DocsListView(p: ListProps) {
           </div>
         </div>
 
-        {(p.ctaTitle || p.ctaText || cta.href) && (
-          <div className="mt-8 flex flex-col items-center gap-3 rounded-md border border-green/25 bg-green/5 px-6 py-7 text-center">
-            <FileText className="h-7 w-7 text-green-dark" aria-hidden="true" />
-            {p.ctaTitle && <p className="font-head text-lg font-bold text-ink">{t(p.ctaTitle)}</p>}
-            {p.ctaText && <p className="max-w-md text-sm text-muted">{t(p.ctaText)}</p>}
-            <CmsAnchor link={cta} className="btn-pink mt-1">
-              {t(cta.label)} <ArrowRight size={16} aria-hidden="true" />
-            </CmsAnchor>
+        {(art || hasCta) && (
+          <div className="space-y-6 lg:sticky lg:top-28 lg:col-span-4">
+            {art && <div className="hidden lg:block"><IllustrationPanel name={art} tint="var(--green)" /></div>}
+            {hasCta && (
+              <div className="overflow-hidden rounded-md bg-white shadow-card">
+                {ctaArt ? (
+                  <div className="flex items-center justify-center py-5" style={{ background: wash('var(--pink)', 9) }}>
+                    <Illustration name={ctaArt} size={120} fluid className="w-[104px] sm:w-[120px]" />
+                  </div>
+                ) : (
+                  <FileText className="mx-auto mt-6 h-7 w-7 text-green-dark" aria-hidden="true" />
+                )}
+                <div className="flex flex-col items-center gap-3 px-6 pb-7 pt-5 text-center">
+                  {p.ctaTitle && <h2 className="font-head text-fluid-xl font-bold text-ink">{t(p.ctaTitle)}</h2>}
+                  {p.ctaText && <p className="max-w-md text-base leading-relaxed text-muted">{t(p.ctaText)}</p>}
+                  <CmsAnchor link={cta} className="btn-pink mt-2 w-full justify-center sm:w-auto lg:w-full">
+                    {t(cta.label)} <ArrowRight size={16} aria-hidden="true" />
+                  </CmsAnchor>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -186,7 +216,7 @@ export const sections = [
     },
   }),
   section({
-    type: 'list', label: 'Documentación · Documentos requeridos', description: 'La lista de documentos por nivel (Preescolar, Primaria, Secundaria) con lo que se entrega en físico y los enlaces a los trámites oficiales, y un llamado a agendar una visita. Los documentos se editan en Admisiones → Documentos requeridos: es la misma lista que ven las familias al subir sus documentos.',
+    type: 'list', label: 'Documentación · Documentos requeridos', description: 'La lista de documentos por nivel (Preescolar, Primaria, Secundaria) con lo que se entrega en físico y los enlaces a los trámites oficiales y, a un lado, su ilustración y un llamado a agendar una visita. Los documentos se editan en Admisiones → Documentos requeridos: es la misma lista que ven las familias al subir sus documentos.',
     component: DocsListView,
     fields: [
       f.action('editList', 'Editar la lista de documentos', '/admin/admisiones/documentos', { hint: 'Los documentos, sus niveles y lo que se entrega en físico se editan en «Documentos requeridos». Aquí, los textos que los acompañan.' }),
@@ -198,9 +228,11 @@ export const sections = [
       f.text('errorTitle', 'Si no carga la lista: título'),
       f.text('errorText', 'Si no carga la lista: texto'),
       f.text('retryLabel', 'Si no carga la lista: botón'),
+      f.illustration('illustration', 'Ilustración de la lista', { hint: ART_HINT }),
       f.text('ctaTitle', 'Llamado: título'),
       f.textarea('ctaText', 'Llamado: texto'),
       f.link('cta', 'Llamado: botón'),
+      f.illustration('ctaIllustration', 'Llamado: ilustración', { hint: ART_HINT }),
     ],
     defaults: {
       title: 'Documentos requeridos', summary: '{total} documentos para {nivel} · {online} con trámite oficial en línea',
@@ -210,6 +242,7 @@ export const sections = [
       ctaTitle: '¿Listo para conocernos?',
       ctaText: 'Agende una visita guiada. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción y coordinamos con usted la entrega de documentos.',
       cta: VISIT_CTA,
+      illustration: 'documentos', ctaIllustration: 'agenda',
     },
   }),
 ];

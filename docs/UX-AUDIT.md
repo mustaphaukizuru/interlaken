@@ -79,9 +79,51 @@ deploy changes. Behaviour on the money path is unchanged.
 2. **Inbox preview line** of receipts still repeats the intro, which can show
    an amount (D13 covers subjects only). Keep, or hide amounts there too?
 3. **Staff «Pendientes» home** (T3) needs the flag channel (D14).
-4. **Media:** Freepik Premium is connected (14,763 credits). Nothing was
-   spent; choose a budget and slots.
+4. **Media:** done in the media round below (owner chose the 3D clay style
+   and the budget on 22 Nov). Review the pages; any illustration or photo
+   can be swapped per section in Contenido.
 5. **Photo consent** (D16) and **marketing email legal review** (T21, T22).
+6. **/admisiones JS budget** 150 → 152 kB for the illustrated admission
+   steps (media round), pending review like the home budget.
+
+### Media round (22 Nov 2026, owner request)
+
+The owner asked for media instead of shorter text: every word of copy is
+kept; pages gained 3D illustrations and photos and the cards were re-arranged.
+
+- **Assets.** 40 3D clay illustrations (Freepik / Magnific, Nano Banana 2.1,
+  objects only, brand palette) in `public/assets/illustrations/` as
+  transparent WebP at 640 and 320 px (9–44 kB). 14 licensed Freepik stock
+  photos with no recognisable faces (D16: hands, materials, places; never
+  presented as Interlaken students) as `public/assets/foto-<slot>.webp` with
+  -960 and -480. School photos stay first for anything that shows the school.
+  Credits: 1,410 (photos cost 0 on Premium). Originals, licence log and media
+  log are kept outside the repo in the owner's client folder
+  (`02_Clients/Interlaken/UI-UX-Refinement/Media-2026-11-22/`).
+- **Code.** `components/ui/Illustration.tsx` (`Illustration`,
+  `IllustrationPanel`, `wash`); `lib/illustrations.ts` (names only, ships with
+  pages), `lib/illustrationTopics.ts` (title matcher, only pages that need
+  it), `lib/illustrationLabels.ts` (editor only). Sections declare
+  `f.illustration(key)`: a select whose 40 options the editor fills
+  (`optionsSet: 'illustrations'`), so public chunks do not carry the labels.
+- **CMS contract.** Only optional fields were added (`illustration` selects,
+  a few `photo`/`image` fields); no key, type or template was renamed. Content
+  already saved in Contenido without the new fields still shows art: each
+  section falls back by title, icon or position; «Sin ilustración» hides it.
+- **Pages.** Levels: each part of the text beside an illustration or photo,
+  alternating sides; program cards illustrated; quote bands; facts panel and
+  link-card row instead of the sidebar. Home: illustrated promos and
+  «Respaldo», stock photos in «Más allá del aula», and the Preescolar card no
+  longer shows the «PRIMARIA» sign (also fixed at render time for saved
+  pages). Nosotros, Modelo, Admisiones, Documentación, Costos, Agendar visita,
+  Contacto, Pagos, Plataformas, Facturación, 404, login, confirmar correo,
+  aviso (light) and offline.html all gained art and cleaner card layouts.
+- **Offline.** `sin-conexion-320.webp` is precached by one narrow
+  `additionalManifestEntries` entry (md5 revision), so offline.html shows it
+  offline; navigateFallback is unchanged.
+- **Open.** The visit page photo row has an optional `photosTitle` (empty, no
+  new copy added; «Así es el colegio» would fit). `PlatformCard.tsx` was
+  removed (no longer used).
 
 ### Deploy notes (when approved)
 Standard `deploy.sh`; no migrations, no env vars, no crontab change. After

@@ -53,6 +53,10 @@ describe('NivelPage: the school\'s own text for each level (owner, 2026-11-08)',
 
     // A photo of the school, and the practical data and SEP block kept below.
     expect(screen.getByRole('img', { name: /Pasillo de salones de Primaria/ })).toBeInTheDocument();
+    // Media round (2026-11-22): photos beside some parts, illustrations (decorative, alt="") beside the rest.
+    expect(screen.getByRole('img', { name: 'Casas de campaña entre pinos junto a un lago' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /alcancía/ })).toBeInTheDocument();
+    expect(document.querySelectorAll('img[src^="/assets/illustrations/"]').length).toBeGreaterThanOrEqual(5);
     expect(screen.getByRole('heading', { name: 'Seis grupos en este nivel' })).toBeInTheDocument();
     expect(screen.getByText(/Clave 15PPR0000X/)).toBeInTheDocument();
   });

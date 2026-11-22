@@ -3,11 +3,17 @@
  * Testimonials, SEP registrations and the cost estimator stay data-driven
  * (Testimonios, Ajustes, Costos); their headings and every other text,
  * photo, step and question are props.
+ *
+ * Media round (owner 2026-11-22): every word stays; the steps are illustrated
+ * cards, the SEP strip, the estimator, the documents card and the questions
+ * carry a 3D illustration (chosen in the editor, «Ilustración»).
  */
 import { lazy, Suspense, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, ShieldCheck } from 'lucide-react';
+import { Illustration, IllustrationPanel, wash } from '@/components/ui/Illustration';
+import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
@@ -30,6 +36,16 @@ import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, INF
 const cmsIcon = iconResolver({ CalendarDays, ClipboardList, FileText });
 
 const section = sectionsOf('admisiones');
+
+/**
+ * The illustration of a section or item: the one chosen in the editor;
+ * «none» hides it; nothing chosen (content saved before the field existed)
+ * keeps the built-in one.
+ */
+const artOf = (chosen: unknown, fallback?: IllustrationName): IllustrationName | undefined =>
+  chosen === 'none' ? undefined : isIllustration(chosen) ? chosen : fallback;
+const artField = (key = 'illustration', label = 'Ilustración') =>
+  f.illustration(key, label, { hint: 'Sin elegir, se muestra la de siempre. «Sin ilustración» la oculta.' });
 
 /* ── Portada ────────────────────────────────────────────────────────────── */
 interface HeroProps { label?: string; title?: string; subtitle?: string; image?: number | string }
@@ -66,37 +82,58 @@ function AdmTestimonialsView(p: { eyebrow?: string; title?: string; limit?: numb
   const { data } = useQuery(testimonialsQuery);
   if ((data ?? []).length === 0) return null;
   return (
-    <Section bg="white">
+    // On cream the white quote cards stand out (the strip below is white).
+    <Section bg="cream">
       <Testimonials eyebrow={t(p.eyebrow)} title={t(p.title)} limit={typeof p.limit === 'number' && p.limit > 0 ? p.limit : 3} />
     </Section>
   );
 }
 
 /* ── Incorporación SEP: señales de confianza (flyer institucional) ──────── */
-function AdmSepView(p: { title?: string; text?: string }) {
+/** Each level's registration card wears its level colour (--nivel-*). */
+const levelColor = (level: string) => {
+  const slug = level.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return ['preescolar', 'primaria', 'secundaria'].includes(slug) ? `var(--nivel-${slug})` : 'var(--purple)';
+};
+
+function AdmSepView(p: { title?: string; text?: string; illustration?: string }) {
   const t = useTokens();
   const sepRows = useSep();
+  const art = artOf(p.illustration, 'academico');
   return (
     <Section bg="white" spacing="sm">
       <Reveal>
-        <div className="rounded-md bg-cream-2/60 px-5 py-5 shadow-card sm:px-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple/10 text-purple">
-                <Award className="h-5 w-5" aria-hidden="true" />
-              </span>
+        <div className="relative overflow-hidden rounded-md px-5 py-6 sm:px-8 sm:py-8" style={{ background: wash('var(--purple)', 7) }}>
+          <span aria-hidden="true" className="absolute -right-16 -top-20 h-56 w-56 rounded-full" style={{ background: wash('var(--purple)', 14), opacity: 0.6 }} />
+          {/* Wide screens: title beside the three registrations; narrower: title above them. */}
+          <div className="relative grid gap-6 xl:grid-cols-12 xl:items-center xl:gap-8">
+            <div className="flex items-center gap-4 xl:col-span-4">
+              {art ? (
+                <Illustration name={art} size={104} fluid className="w-[76px] shrink-0 sm:w-[104px]" />
+              ) : (
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-purple/10 text-purple">
+                  <Award className="h-6 w-6" aria-hidden="true" />
+                </span>
+              )}
               <div>
-                <h2 className="font-head text-[17px] font-bold text-ink">{t(p.title)}</h2>
-                {p.text && <p className="text-xs text-muted">{t(p.text)}</p>}
+                <h2 className="font-head text-fluid-xl font-bold leading-tight text-ink">{t(p.title)}</h2>
+                {p.text && <p className="mt-1 text-[15px] leading-snug text-muted">{t(p.text)}</p>}
               </div>
             </div>
-            <ul className="grid gap-2.5 text-xs leading-relaxed text-ink/80 sm:grid-cols-3 lg:max-w-[660px]">
-              {sepRows.map((r) => (
-                <li key={r.level} className="flex items-start gap-2">
-                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-dark" aria-hidden="true" />
-                  <span>{r.label}</span>
-                </li>
-              ))}
+            <ul className="grid gap-3 lg:grid-cols-3 xl:col-span-8">
+              {sepRows.map((r) => {
+                const rest = r.label.startsWith(r.level) ? r.label.slice(r.level.length) : null;
+                return (
+                  <li key={r.level} className="flex items-start gap-3 rounded-md bg-white p-4 shadow-card">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: wash(levelColor(r.level), 22) }}>
+                      <ShieldCheck className="h-4 w-4 text-ink/80" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 text-[15px] leading-snug text-ink/80">
+                      {rest !== null ? <><strong className="block font-head font-bold text-ink">{r.level}</strong>{rest.trim()}</> : r.label}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
@@ -106,16 +143,22 @@ function AdmSepView(p: { title?: string; text?: string }) {
 }
 
 /* ── Proceso de admisión: 4 pasos, cada uno con su CTA directo ──────────── */
-interface StepItem { icon?: string; step?: string; key?: string; title?: string; text?: string; color?: string; link?: CmsLink }
+interface StepItem { icon?: string; illustration?: string; step?: string; key?: string; title?: string; text?: string; color?: string; link?: CmsLink }
 interface StepsProps { eyebrow?: string; title?: string; items?: StepItem[]; waLabel?: string; contact?: CmsLink }
 
 /** `WhatsApp` is the WhatsApp mark (not in the shared icon set); anything else comes from cms/icons. */
 const stepIcon = (name: unknown): ElementType => (name === 'WhatsApp' ? WhatsAppIcon : cmsIcon(name));
 /** admissions_step_cta `step` value: the stored key, else the title as snake_case («Visita guiada» → visita_guiada). */
 const stepKey = (s: StepItem) =>
-  s.key || (s.title ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, '_');
+  s.key || (s.title ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, '_');
 
-const STEP_LINK = 'mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+/** Each step's illustration when none is chosen: by its key, else by its place in the list. */
+const STEP_ART: Record<string, IllustrationName> = {
+  informes: 'informes', visita_guiada: 'visita', examen: 'examen', examen_de_valoracion: 'examen', inscripcion: 'inscripcion',
+};
+const STEP_ART_ORDER: IllustrationName[] = ['informes', 'visita', 'examen', 'inscripcion'];
+
+const STEP_LINK = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm text-[15px] font-semibold text-purple underline-offset-4 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
 /** Like CmsAnchor, with the analytics click handler the step CTAs need. */
 function TrackedLink({ href, onClick, children }: { href: string; onClick: () => void; children: ReactNode }) {
@@ -126,6 +169,12 @@ function TrackedLink({ href, onClick, children }: { href: string; onClick: () =>
   return <Link to={href} onClick={onClick} className={STEP_LINK}>{children}</Link>;
 }
 
+/**
+ * The four steps as illustrated cards: art on a wash of the step colour with
+ * its number, then the title, the text and the step's own button. A row of
+ * four from lg up (small arrows between them), two per row on tablets, and
+ * art beside the text on phones so the list stays short.
+ */
 function AdmStepsView(p: StepsProps) {
   const t = useTokens();
   // WhatsApp number is admin-editable; CTA hidden (fallback to /contacto)
@@ -134,7 +183,7 @@ function AdmStepsView(p: StepsProps) {
   const steps = asList<StepItem>(p.items);
   const contact = asLink(p.contact);
   return (
-    <Section bg="white">
+    <Section bg="cream">
       {(p.eyebrow || p.title) && (
         <Reveal className="mb-10 text-center sm:mb-12">
           {p.eyebrow && <span className="section-label-purple inline-flex">{t(p.eyebrow)}</span>}
@@ -142,80 +191,70 @@ function AdmStepsView(p: StepsProps) {
         </Reveal>
       )}
 
-      <div className="relative">
-        {/* Connecting line (desktop only) */}
-        <div
-          aria-hidden="true"
-          className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-0.5 opacity-35 lg:block"
-          style={{ background: 'var(--grad-bar)' }}
-        />
-        <ol className="m-0 flex list-none flex-col p-0 lg:grid lg:grid-cols-4 lg:gap-7">
-          {steps.map((s, i) => {
-            const Icon = stepIcon(s.icon);
-            const color = cmsColor(s.color);
-            const link = asLink(s.link);
-            const key = stepKey(s);
-            const last = i === steps.length - 1;
-            return (
-              <Reveal key={i} as="li" delay={i * 100} direction="up" className="relative flex gap-4 lg:block lg:text-center">
-                <div className="contents">
-                  {/* Numbered node + vertical connector (phones/tablets) */}
-                  <div className="flex flex-col items-center lg:block">
-                    <div
-                      className="relative z-10 flex h-[58px] w-[58px] flex-shrink-0 items-center justify-center rounded-sm border-[3px] bg-white lg:mx-auto"
-                      style={{ borderColor: color, boxShadow: `0 12px 26px -12px color-mix(in srgb, ${color} 53%, transparent)` }}
+      <ol className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4 lg:gap-6">
+        {steps.map((s, i) => {
+          const Icon = stepIcon(s.icon);
+          const color = cmsColor(s.color);
+          const link = asLink(s.link);
+          const key = stepKey(s);
+          const art = artOf(s.illustration, STEP_ART[key] ?? STEP_ART_ORDER[i]);
+          const last = i === steps.length - 1;
+          const cta = link.href?.trim() && link.label ? (
+            <TrackedLink href={link.href.trim()} onClick={() => trackEvent(ConversionEvent.AdmissionsStepCta, { step: key })}>
+              {t(link.label)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </TrackedLink>
+          ) : whatsapp_number ? (
+            <a
+              href={waHref(whatsapp_number, waMessage(chrome, 'wa_admissions'))}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                trackEvent(ConversionEvent.AdmissionsStepCta, { step: key });
+                trackEvent(ConversionEvent.WhatsappCta, { context: 'admisiones_informes' });
+              }}
+              className="btn-green"
+            >
+              <WhatsAppIcon className="h-4 w-4" /> {t(p.waLabel)}
+            </a>
+          ) : contact.href?.trim() ? (
+            <TrackedLink href={contact.href.trim()} onClick={() => trackEvent(ConversionEvent.AdmissionsStepCta, { step: key })}>
+              {t(contact.label)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </TrackedLink>
+          ) : null;
+          return (
+            <Reveal key={i} as="li" delay={i * 60} direction="up" className="relative flex">
+              <div className="flex w-full overflow-hidden rounded-md bg-white shadow-card sm:flex-col">
+                <div className="relative flex w-[108px] shrink-0 items-center justify-center py-5 sm:w-auto sm:py-6" style={{ background: wash(color, 12) }}>
+                  {art ? (
+                    <Illustration name={art} size={136} fluid className="w-[72px] sm:w-[128px]" />
+                  ) : (
+                    <Icon className="h-8 w-8" style={{ color }} aria-hidden="true" />
+                  )}
+                  {s.step && (
+                    <span
+                      className="absolute left-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full px-2 font-head text-xs font-bold text-white sm:left-4 sm:top-4"
+                      style={{ background: color }}
                     >
-                      <Icon className="h-6 w-6" style={{ color }} aria-hidden="true" />
-                      {s.step && (
-                        <span
-                          className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 font-head text-xs font-bold text-white"
-                          style={{ background: color }}
-                        >
-                          {t(s.step)}
-                        </span>
-                      )}
-                    </div>
-                    {!last && (
-                      <div className="mt-2 w-0.5 flex-1 rounded-full bg-ink/10 lg:hidden" aria-hidden="true" />
-                    )}
-                  </div>
-
-                  <div className={`min-w-0 pt-2 lg:pt-0 ${!last ? 'pb-9 lg:pb-0' : ''}`}>
-                    <h3 className="font-head text-lg font-bold text-ink lg:mt-4">{t(s.title)}</h3>
-                    {s.text && (
-                      <p className="mt-1.5 max-w-[280px] text-[13.5px] leading-relaxed text-muted lg:mx-auto lg:mt-2 lg:max-w-[240px]">
-                        {t(s.text)}
-                      </p>
-                    )}
-                    {link.href?.trim() && link.label ? (
-                      <TrackedLink href={link.href.trim()} onClick={() => trackEvent(ConversionEvent.AdmissionsStepCta, { step: key })}>
-                        {t(link.label)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </TrackedLink>
-                    ) : whatsapp_number ? (
-                      <a
-                        href={waHref(whatsapp_number, waMessage(chrome, 'wa_admissions'))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => {
-                          trackEvent(ConversionEvent.AdmissionsStepCta, { step: key });
-                          trackEvent(ConversionEvent.WhatsappCta, { context: 'admisiones_informes' });
-                        }}
-                        className="btn-green mt-3"
-                      >
-                        <WhatsAppIcon className="h-4 w-4" /> {t(p.waLabel)}
-                      </a>
-                    ) : contact.href?.trim() ? (
-                      <TrackedLink href={contact.href.trim()} onClick={() => trackEvent(ConversionEvent.AdmissionsStepCta, { step: key })}>
-                        {t(contact.label)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </TrackedLink>
-                    ) : null}
-                  </div>
+                      {t(s.step)}
+                    </span>
+                  )}
                 </div>
-              </Reveal>
-            );
-          })}
-        </ol>
-      </div>
+                <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+                  <h3 className="font-head text-lg font-bold leading-snug text-ink">{t(s.title)}</h3>
+                  {s.text && <p className="mt-1.5 text-base leading-relaxed text-ink/75">{t(s.text)}</p>}
+                  {cta && <div className="mt-auto pt-4">{cta}</div>}
+                </div>
+              </div>
+              {/* The way forward between two cards (desktop row only). */}
+              {!last && (
+                <span aria-hidden="true" className="absolute -right-7 top-[72px] z-10 hidden h-8 w-8 items-center justify-center rounded-full bg-white text-subtle shadow-card lg:flex">
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              )}
+            </Reveal>
+          );
+        })}
+      </ol>
     </Section>
   );
 }
@@ -232,22 +271,30 @@ const ESTIMATOR_SKELETON = (
 /** Text fields of the estimator, one field group each call (C4). */
 const estimatorText = (group: string, pairs: [string, string][]) => grouped(group, pairs.map(([key, label]) => f.text(key, label)));
 
-function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string; title?: string; text?: string } & Partial<EstimatorCopy>) {
+function AdmEstimatorView({ eyebrow, title, text, illustration, ...copy }: { eyebrow?: string; title?: string; text?: string; illustration?: string } & Partial<EstimatorCopy>) {
   const p = { eyebrow, title, text };
   const t = useTokens();
+  const art = artOf(illustration, 'costos');
   return (
-    <Section bg="cream" id="estimador">
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-start">
+    <Section bg="white" id="estimador">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,400px)_1fr] lg:items-start lg:gap-12">
         <Reveal>
-          {p.eyebrow && <span className="section-label-coral inline-flex">{t(p.eyebrow)}</span>}
-          <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">
-            {t(p.title)}
-          </h2>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              {p.eyebrow && <span className="section-label-coral inline-flex">{t(p.eyebrow)}</span>}
+              <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">
+                {t(p.title)}
+              </h2>
+            </div>
+            {/* Phones and tablets: the art sits beside the title; desktop: on its panel below the text. */}
+            {art && <Illustration name={art} size={96} fluid className="w-[84px] shrink-0 sm:w-[104px] lg:hidden" />}
+          </div>
           {p.text && (
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
+            <p className="mt-3 max-w-md text-base leading-relaxed text-muted">
               {t(p.text)}
             </p>
           )}
+          {art && <div className="mt-8 hidden lg:block"><IllustrationPanel name={art} tint="var(--coral)" /></div>}
         </Reveal>
         <Reveal delay={100}>
           <Suspense fallback={ESTIMATOR_SKELETON}>
@@ -261,7 +308,7 @@ function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string;
 
 /* ── Documentos + llamado a agendar la visita ──────────────────────────── */
 interface DocsCtaProps {
-  docsTitle?: string; docsSummary?: string; docsNote?: string; docsLink?: CmsLink; docsOnlyLabel?: string; docsError?: string;
+  docsTitle?: string; docsSummary?: string; docsNote?: string; docsLink?: CmsLink; docsOnlyLabel?: string; docsError?: string; docsIllustration?: string;
   image?: number | string; imageAlt?: string; badge?: string; title?: string; text?: string; primary?: CmsLink; secondary?: CmsLink;
 }
 function AdmDocsCtaView(p: DocsCtaProps) {
@@ -273,23 +320,28 @@ function AdmDocsCtaView(p: DocsCtaProps) {
   const img = useCmsImage(p.image, t(p.imageAlt));
   const primary = asLink(p.primary);
   const secondary = asLink(p.secondary);
+  const docsArt = artOf(p.docsIllustration, 'documentos');
   return (
     <Section bg="cream">
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:gap-8">
         {/* Documentos: tarjeta con encabezado, conteo y enlaces oficiales */}
         <Reveal direction="right">
           <div className="flex h-full flex-col overflow-hidden rounded-md bg-white shadow-card">
-            <div className="flex items-center gap-3 border-b border-ink/10 bg-green/5 px-5 py-4 sm:px-6">
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-green/15 text-green-dark">
-                <FileText className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <h3 className="font-head text-[19px] font-bold text-ink">{t(p.docsTitle)}</h3>
-                {p.docsSummary && data && <p className="text-xs text-muted">{docsSummary(t(p.docsSummary), docs)}</p>}
+            <div className="flex items-center gap-4 px-5 py-4 sm:px-6" style={{ background: wash('var(--green)', 10) }}>
+              {docsArt ? (
+                <Illustration name={docsArt} size={80} fluid className="w-[64px] shrink-0 sm:w-[80px]" />
+              ) : (
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-green/15 text-green-dark">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                </span>
+              )}
+              <div className="min-w-0">
+                <h3 className="font-head text-fluid-xl font-bold text-ink">{t(p.docsTitle)}</h3>
+                {p.docsSummary && data && <p className="mt-0.5 text-sm text-muted">{docsSummary(t(p.docsSummary), docs)}</p>}
               </div>
             </div>
             {isError && !data ? (
-              <p className="flex-1 px-5 py-6 text-sm text-muted sm:px-6" role="alert">
+              <p className="flex-1 px-5 py-6 text-base text-muted sm:px-6" role="alert">
                 {t(p.docsError)}{' '}
                 <CmsAnchor link={docsLink} className="font-semibold text-green-dark underline">{t(docsLink.label)}</CmsAnchor>
               </p>
@@ -305,12 +357,12 @@ function AdmDocsCtaView(p: DocsCtaProps) {
             ) : (
               <ul className="flex-1 divide-y divide-ink/5 px-5 sm:px-6">
                 {docs.map((d) => (
-                  <li key={d.key} className="flex items-start gap-3 py-3 text-sm">
+                  <li key={d.key} className="flex items-start gap-3 py-3 text-[15px] leading-snug">
                     <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" aria-hidden="true" />
                     <span className="text-ink/90">
                       {d.name}
                       {d.levels.length < LEVELS.length && (
-                        <span className="ml-1.5 whitespace-nowrap text-xs font-semibold text-muted">
+                        <span className="ml-1.5 whitespace-nowrap text-[13px] font-semibold text-muted">
                           ({t(p.docsOnlyLabel)} {levelsLabel(d.levels)})
                         </span>
                       )}
@@ -334,13 +386,13 @@ function AdmDocsCtaView(p: DocsCtaProps) {
             )}
             {docsLink.href && data && (
               <p className="px-5 pt-1 sm:px-6">
-                <CmsAnchor link={docsLink} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green">
-                  {t(docsLink.label)} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                <CmsAnchor link={docsLink} className="inline-flex min-h-[44px] items-center gap-1 text-[15px] font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green">
+                  {t(docsLink.label)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </CmsAnchor>
               </p>
             )}
             {p.docsNote && (
-              <p className="m-5 mt-2 rounded-sm bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted sm:mx-6">
+              <p className="m-5 mt-2 rounded-sm bg-cream px-3.5 py-2.5 text-sm leading-relaxed text-muted sm:mx-6">
                 {t(p.docsNote)}
               </p>
             )}
@@ -360,8 +412,9 @@ function AdmDocsCtaView(p: DocsCtaProps) {
                 className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-dark via-dark/85 to-dark/25" />
-            <div className="absolute inset-0 bg-gradient-to-br from-purple/45 via-transparent to-transparent" />
+            {/* Lighter at the top so the school's photo reads; dark where the text sits. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-dark from-15% via-dark/75 via-50% to-dark/10" />
+            <div className="absolute inset-0 bg-gradient-to-br from-purple/30 via-transparent to-transparent" />
             <div className="relative p-6 text-white sm:p-8">
               {p.badge && (
                 <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/85">
@@ -373,7 +426,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
                 {t(p.title)}
               </h3>
               {p.text && (
-                <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85">
+                <p className="mt-2 max-w-md text-base leading-relaxed text-white/85">
                   {t(p.text)}
                 </p>
               )}
@@ -384,7 +437,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
                   </CmsAnchor>
                   <CmsAnchor
                     link={{ ...secondary, label: t(secondary.label) }}
-                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-sm border-2 border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                    className="btn-ghost flex-1 justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                   />
                 </div>
               )}
@@ -424,10 +477,10 @@ const FAQS: FaqItem[] = [
  * exam), so no step links to it.
  */
 const STEPS: StepItem[] = [
-  { icon: 'WhatsApp', step: '01', key: 'informes', title: 'Informes', text: 'Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.', color: 'var(--green)', link: { label: '', href: '' } },
-  { icon: 'CalendarDays', step: '02', key: 'visita_guiada', title: 'Visita guiada', text: 'Conozca las instalaciones y al equipo docente en un recorrido personalizado.', color: 'var(--purple)', link: { label: 'Agendar visita', href: '/agendar-visita' } },
-  { icon: 'FileText', step: '03', key: 'examen', title: 'Examen de valoración', text: 'Después de la visita agendamos el examen de valoración de su hijo/a. Consulte los documentos que se piden.', color: 'var(--pink)', link: { label: 'Ver documentación', href: '/admisiones/documentacion' } },
-  { icon: 'ClipboardList', step: '04', key: 'inscripcion', title: 'Inscripción', text: 'Si su hijo/a es admitido, le enviamos por correo o WhatsApp su ficha de inscripción personal para llenarla en línea y asegurar su lugar.', color: 'var(--green)', link: { label: 'Ver costos', href: '/admisiones/costos' } },
+  { icon: 'WhatsApp', illustration: 'informes', step: '01', key: 'informes', title: 'Informes', text: 'Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.', color: 'var(--green)', link: { label: '', href: '' } },
+  { icon: 'CalendarDays', illustration: 'visita', step: '02', key: 'visita_guiada', title: 'Visita guiada', text: 'Conozca las instalaciones y al equipo docente en un recorrido personalizado.', color: 'var(--purple)', link: { label: 'Agendar visita', href: '/agendar-visita' } },
+  { icon: 'FileText', illustration: 'examen', step: '03', key: 'examen', title: 'Examen de valoración', text: 'Después de la visita agendamos el examen de valoración de su hijo/a. Consulte los documentos que se piden.', color: 'var(--pink)', link: { label: 'Ver documentación', href: '/admisiones/documentacion' } },
+  { icon: 'ClipboardList', illustration: 'inscripcion', step: '04', key: 'inscripcion', title: 'Inscripción', text: 'Si su hijo/a es admitido, le enviamos por correo o WhatsApp su ficha de inscripción personal para llenarla en línea y asegurar su lugar.', color: 'var(--green)', link: { label: 'Ver costos', href: '/admisiones/costos' } },
 ];
 
 export const sections = [
@@ -453,13 +506,13 @@ export const sections = [
     defaults: { eyebrow: 'Comunidad', title: 'Familias que ya son Interlaken', limit: 3 },
   }),
   section({
-    type: 'sep', label: 'Admisiones · Incorporación SEP', description: 'Franja con las claves de incorporación SEP de cada nivel. Las claves se editan en Ajustes.',
+    type: 'sep', label: 'Admisiones · Incorporación SEP', description: 'Franja con una ilustración y las claves de incorporación SEP de cada nivel. Las claves se editan en Ajustes.',
     component: AdmSepView,
-    fields: [f.text('title', 'Título'), f.text('text', 'Texto', { hint: 'Puede usar {{anios}}.' })],
-    defaults: { title: 'Incorporación oficial SEP', text: '{{anios}} años de trayectoria con reconocimiento y validez oficial.' },
+    fields: [f.text('title', 'Título'), f.text('text', 'Texto', { hint: 'Puede usar {{anios}}.' }), artField()],
+    defaults: { title: 'Incorporación oficial SEP', text: '{{anios}} años de trayectoria con reconocimiento y validez oficial.', illustration: 'academico' },
   }),
   section({
-    type: 'steps', label: 'Admisiones · Proceso de admisión', description: 'Pasos numerados con ícono, color y un botón cada uno.',
+    type: 'steps', label: 'Admisiones · Proceso de admisión', description: 'Pasos numerados en tarjetas con ilustración, color y un botón cada uno.',
     component: AdmStepsView,
     fields: [
       ...headingFields(),
@@ -467,7 +520,8 @@ export const sections = [
         f.text('step', 'Número'),
         f.text('title', 'Título', { required: true }),
         f.textarea('text', 'Texto'),
-        f.icon('icon', 'Ícono', { hint: 'WhatsApp = logo de WhatsApp.' }),
+        artField(),
+        f.icon('icon', 'Ícono', { hint: 'Se muestra si el paso no tiene ilustración. WhatsApp = logo de WhatsApp.' }),
         f.color('color'),
         f.link('link', 'Botón', { hint: 'Vacío = botón de WhatsApp (o el enlace de contacto si no hay WhatsApp en Ajustes).' }),
       ]),
@@ -485,6 +539,7 @@ export const sections = [
     fields: [
       f.action('editPrices', 'Editar precios', '/admin/costos', { hint: 'Las cifras del estimador son las de «Costos y precios» (las mismas de la página de Costos).' }),
       ...headingFields({ text: true }),
+      artField(),
       ...estimatorText('Tarjeta', [['cardEyebrow', 'Calculadora: etiqueta'], ['cardTitle', 'Calculadora: título']]),
       f.text('sectionLabel', 'Título de los niveles', { group: 'Selectores' }),
       f.items('sections', 'Niveles', [f.text('label', 'Nivel', { required: true })], { group: 'Selectores', hint: 'Cada botón muestra las filas de precios cuyo nombre contiene ese texto (Primaria = «Primaria»).' }),
@@ -501,7 +556,7 @@ export const sections = [
       ...estimatorText('Si no cargan los precios', [['errorTitle', 'Si no cargan los precios: título'], ['errorText', 'Si no cargan los precios: texto']]),
     ],
     defaults: {
-      eyebrow: 'Costos {{ciclo}}', title: 'Estime su inversión',
+      eyebrow: 'Costos {{ciclo}}', title: 'Estime su inversión', illustration: 'costos',
       text: 'Elija la sección y la modalidad para ver las cuotas del ciclo. Las cifras son publicadas por la administración del colegio y el desglose completo está en la página de Costos.',
       ...ESTIMATOR_COPY,
     },
@@ -517,6 +572,7 @@ export const sections = [
         f.textarea('docsNote', 'Documentos: nota al pie'),
         f.link('docsLink', 'Documentos: enlace a la lista por nivel'),
         f.text('docsError', 'Documentos: si no carga la lista'),
+        artField('docsIllustration', 'Documentos: ilustración'),
         f.action('editList', 'Editar la lista de documentos', '/admin/admisiones/documentos', { hint: 'Los documentos y sus niveles se editan en «Documentos requeridos».' }),
       ]),
       ...grouped('Llamado a agendar visita', [
@@ -533,7 +589,7 @@ export const sections = [
       docsTitle: 'Documentos requeridos', docsSummary: '{total} documentos · {online} con trámite oficial en línea',
       docsNote: 'Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE) para obtener o consultar cada documento en línea.',
       docsOnlyLabel: 'Solo', docsLink: { label: 'Ver los documentos por nivel', href: '/admisiones/documentacion' },
-      docsError: 'No se pudo cargar la lista de documentos.',
+      docsError: 'No se pudo cargar la lista de documentos.', docsIllustration: 'documentos',
       image: '/assets/classroom.webp', imageAlt: 'Salón de clases del Colegio Interlaken',
       badge: 'Inscripciones abiertas · Ciclo {{ciclo}}', title: '¿Listo para comenzar?',
       text: 'El primer paso es conocernos: agende una visita guiada o escríbanos para recibir informes. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción.',
@@ -546,6 +602,7 @@ export const sections = [
     component: lazySection(faqChunk, 'AdmFaqView', '60vh'),
     fields: [
       ...headingFields(),
+      artField('illustration', 'Ilustración junto al filtro'),
       f.items('items', 'Preguntas', [f.text('cat', 'Tema', { hint: 'Las preguntas con el mismo tema se agrupan en el filtro.' }), f.text('q', 'Pregunta', { required: true }), f.textarea('a', 'Respuesta')]),
       ...grouped('Buscador y filtro', [
         f.text('search', 'Buscador'), f.text('searchLabel', 'Buscador (lectores de pantalla)'),
@@ -555,7 +612,7 @@ export const sections = [
       ]),
     ],
     defaults: {
-      eyebrow: 'Preguntas frecuentes', title: 'Resolvemos sus dudas', items: FAQS,
+      eyebrow: 'Preguntas frecuentes', title: 'Resolvemos sus dudas', illustration: 'ideas', items: FAQS,
       search: 'Buscar…', searchLabel: 'Buscar en preguntas frecuentes', filterTitle: 'Filtrar por tema', all: 'Todas',
       count: '{n} de {total} preguntas', empty: 'No encontramos preguntas para su búsqueda.',
       emptyLink: { label: 'Contáctenos', href: '/contacto' }, emptyAfter: 'y con gusto le ayudamos.',

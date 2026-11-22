@@ -3,6 +3,9 @@
  * (docs/CMS-COMPLETION-PLAN.md). The legal text comes from legalApi, versioned
  * for consent, and is never edited here: the notice renderer is a locked
  * section. Only the hero and the frame copy around the notice are props.
+ *
+ * Media round (owner 2026-11-22), light touch for a legal page: one quiet
+ * illustration beside the introduction on computers; the text is unchanged.
  */
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
@@ -18,6 +21,8 @@ import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PhotoHero } from '@/components/public/PhotoHero';
+import { Illustration } from '@/components/ui/Illustration';
+import { isIllustration } from '@/lib/illustrations';
 import { iconResolver } from '../iconRuntime';
 import { useTokens } from '../runtime';
 import { asList, defineModule, f, sectionsOf } from './kit';
@@ -101,7 +106,7 @@ export function AvisoHero({ data, ...p }: HeroProps & { data?: PrivacyNotice }) 
 
 /* ── Texto oficial (bloqueado) ──────────────────────────────────────────── */
 interface CardItem { icon?: string; label?: string; value?: string }
-interface NoticeProps { cards?: CardItem[]; note?: string; integralLabel?: string; errorTitle?: string; errorText?: string }
+interface NoticeProps { cards?: CardItem[]; note?: string; integralLabel?: string; errorTitle?: string; errorText?: string; illustration?: string }
 /** Drops the empty parts of a «a · b» line (e.g. a phone or email not set in Ajustes). */
 const joinParts = (v: string) => v.split(' · ').filter((s) => s.trim()).join(' · ');
 
@@ -120,6 +125,8 @@ export function AvisoNoticeBody({ data, isLoading = false, isError = false, ...p
 
   const parsed = data?.body ? parseNotice(data.body) : null;
   const structured = (parsed?.sections.length ?? 0) >= 3;
+  // «none» hides it; content saved before the field existed shows the padlock.
+  const art = p.illustration === 'none' ? undefined : isIllustration(p.illustration) ? p.illustration : 'acceso';
 
   return (
     <Section bg="white" container={false}>
@@ -161,11 +168,22 @@ export function AvisoNoticeBody({ data, isLoading = false, isError = false, ...p
 
           {structured && parsed ? (
             <>
-              {parsed.intro.map((para) => (
-                <p key={para.slice(0, 40)} className="mb-4 whitespace-pre-line text-[15px] leading-relaxed text-ink/90">
-                  {para}
-                </p>
-              ))}
+              <div className="lg:grid lg:grid-cols-12 lg:items-center lg:gap-10">
+                <div className="lg:col-span-8">
+                  {parsed.intro.map((para) => (
+                    <p key={para.slice(0, 40)} className="mb-4 whitespace-pre-line text-[15px] leading-relaxed text-ink/90">
+                      {para}
+                    </p>
+                  ))}
+                </div>
+                {art && (
+                  <div className="hidden justify-center lg:col-span-4 lg:flex print:hidden">
+                    <div className="flex h-52 w-52 items-center justify-center rounded-full bg-cream-2">
+                      <Illustration name={art} size={150} />
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="mt-6 space-y-3">
                 {parsed.sections.map((s, i) => {
                   const Icon = sectionIcon(s.title);
@@ -257,6 +275,7 @@ export const sections = [
       f.text('integralLabel', 'Botón del aviso integral'),
       f.text('errorTitle', 'Título si el aviso no carga'),
       f.textarea('errorText', 'Texto si el aviso no carga'),
+      f.illustration('illustration', 'Ilustración', { hint: 'Junto a la introducción, solo en computadora. Sin elegir, el candado con llave.' }),
     ],
     defaults: {
       cards: [
@@ -268,6 +287,7 @@ export const sections = [
       integralLabel: 'Consultar el aviso integral',
       errorTitle: 'Aviso no disponible',
       errorText: '',
+      illustration: 'acceso',
     },
   }),
 ];

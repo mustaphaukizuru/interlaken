@@ -127,6 +127,9 @@ function HomeStatsView({ items }: { items?: StatItem[] }) {
 
 const levelItem = [f.text('name', 'Nombre', { required: true }), f.image('image', 'Foto'), f.color('color'), f.textarea('text', 'Descripción'), f.href('href', 'Enlace'), f.text('linkLabel', 'Texto del enlace', { hint: 'Vacío = «Conocer <nombre>».' })];
 
+// The editor fills the illustration list (f.illustration), so the home chunk does not ship it.
+const artField = f.illustration('illustration', 'Ilustración', { hint: 'Sin elegir, se toma la que corresponde al ícono.' });
+
 export const sections = [
   section({
     type: 'hero', label: 'Inicio · Portada', description: 'Portada con video o foto, logo, título y dos botones.',
@@ -169,7 +172,7 @@ export const sections = [
       eyebrow: 'Nuestra Comunidad', title: '{{anios}} años formando familias en Tlalnepantla',
       text: 'En Colegio Interlaken combinamos rigor académico, educación bilingüe y un ambiente cálido y seguro. Nuestros egresados destacan por su liderazgo, sus valores y su compromiso con la comunidad.',
       cta: { label: 'Conózcanos', href: '/nosotros' },
-      image1: '/assets/classroom.webp', image2: '/assets/campus-mural.webp', image3: '/assets/hopscotch.webp',
+      image1: '/assets/classroom.webp', image2: '/assets/campus-mural.webp', image3: '/assets/interlaken-image (1).webp',
       badgeValue: '+2,500', badgeLabel: 'Egresados',
     },
   }),
@@ -191,8 +194,8 @@ export const sections = [
       eyebrow: 'Niveles Educativos', title: 'Un camino de excelencia',
       text: 'De preescolar a secundaria, un mismo campus y un mismo compromiso con cada etapa.',
       items: [
-        { name: 'Preescolar', href: '/niveles/preescolar', image: '/assets/court-primaria.webp', color: 'var(--nivel-preescolar)', text: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.', linkLabel: '' },
-        { name: 'Primaria', href: '/niveles/primaria', image: '/assets/facade.webp', color: 'var(--nivel-primaria)', text: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.', linkLabel: '' },
+        { name: 'Preescolar', href: '/niveles/preescolar', image: '/assets/hopscotch.webp', color: 'var(--nivel-preescolar)', text: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.', linkLabel: '' },
+        { name: 'Primaria', href: '/niveles/primaria', image: '/assets/court-primaria.webp', color: 'var(--nivel-primaria)', text: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.', linkLabel: '' },
         { name: 'Secundaria', href: '/niveles/secundaria', image: '/assets/secundaria.webp', color: 'var(--nivel-secundaria)', text: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.', linkLabel: '' },
       ],
       cta: { label: 'Conozca el modelo educativo', href: '/modelo-educativo' },
@@ -205,33 +208,33 @@ export const sections = [
     defaults: {
       eyebrow: 'Nuestros Programas', title: 'Más allá del aula',
       items: [
-        { name: 'Inglés', image: '/assets/classroom.webp', color: 'var(--purple)', icon: 'Languages' },
-        { name: 'Deportes', image: '/assets/court-wide.webp', color: 'var(--green)', icon: 'Trophy' },
-        { name: 'Arte y Música', image: '/assets/campus-mural.webp', color: 'var(--pink)', icon: 'Palette' },
-        { name: 'Ciencia y Robótica', image: '/assets/secundaria.webp', color: 'var(--green)', icon: 'FlaskConical' },
+        { name: 'Inglés', image: '/assets/foto-bilingue.webp', color: 'var(--purple)', icon: 'Languages' },
+        { name: 'Deportes', image: '/assets/foto-deportes.webp', color: 'var(--green)', icon: 'Trophy' },
+        { name: 'Arte y Música', image: '/assets/foto-arte.webp', color: 'var(--pink)', icon: 'Palette' },
+        { name: 'Ciencia y Robótica', image: '/assets/foto-ciencia.webp', color: 'var(--green)', icon: 'FlaskConical' },
       ],
       footnote: 'Programas que complementan la formación académica todos los días.',
     },
   }),
   section({
-    type: 'promos', label: 'Inicio · Tarjetas destacadas', description: 'Par de tarjetas de color con ícono, texto y enlace.',
+    type: 'promos', label: 'Inicio · Tarjetas destacadas', description: 'Par de tarjetas de color con ilustración, texto y enlace.',
     component: lazySection(below, 'HomePromos'),
-    fields: [f.items('items', 'Tarjetas', [f.text('label', 'Etiqueta'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto'), f.link('link', 'Enlace'), f.icon('icon'), f.color('color', 'Color inicial'), f.color('color2', 'Color final')])],
+    fields: [f.items('items', 'Tarjetas', [f.text('label', 'Etiqueta'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto'), f.link('link', 'Enlace'), artField, f.icon('icon', 'Ícono (sin ilustración)'), f.color('color', 'Color inicial'), f.color('color2', 'Color final')])],
     defaults: { items: [
-      { label: 'Modelo Bilingüe', title: 'Inglés desde preescolar, todos los días', text: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.', link: { label: 'Conozca el modelo', href: '/modelo-educativo' }, color: 'var(--purple)', color2: 'var(--purple-mid)', icon: 'Languages' },
-      { label: 'Comunidad y Valores', title: 'Formamos personas íntegras y felices', text: 'Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.', link: { label: 'Nuestra comunidad', href: '/nosotros' }, color: 'var(--pink)', color2: 'var(--pink-hot)', icon: 'Heart' },
+      { label: 'Modelo Bilingüe', title: 'Inglés desde preescolar, todos los días', text: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.', link: { label: 'Conozca el modelo', href: '/modelo-educativo' }, color: 'var(--purple)', color2: 'var(--purple-mid)', icon: 'Languages', illustration: 'bilingue' },
+      { label: 'Comunidad y Valores', title: 'Formamos personas íntegras y felices', text: 'Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.', link: { label: 'Nuestra comunidad', href: '/nosotros' }, color: 'var(--pink)', color2: 'var(--pink-hot)', icon: 'Heart', illustration: 'comunidad' },
     ] },
   }),
   section({
-    type: 'strengths', label: 'Inicio · Por qué Interlaken', description: 'Tarjetas de respaldo con ícono.',
+    type: 'strengths', label: 'Inicio · Por qué Interlaken', description: 'Tarjetas de respaldo con ilustración.',
     component: lazySection(below, 'HomeStrengths'),
-    fields: [...headingFields(), f.items('items', 'Tarjetas', [f.icon('icon'), f.color('color'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto')])],
+    fields: [...headingFields(), f.items('items', 'Tarjetas', [artField, f.icon('icon', 'Ícono (sin ilustración)'), f.color('color'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto')])],
     defaults: {
       eyebrow: 'Por qué Interlaken', title: 'Respaldo que da certeza a su familia',
       items: [
-        { icon: 'Award', color: 'var(--purple)', title: 'Incorporación oficial SEP', text: 'Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública.' },
-        { icon: 'Languages', color: 'var(--green)', title: 'Certificaciones internacionales', text: 'Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente.' },
-        { icon: 'Heart', color: 'var(--pink)', title: '{{anios}} años de trayectoria', text: '{{anios}} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.' },
+        { icon: 'Award', illustration: 'academico', color: 'var(--purple)', title: 'Incorporación oficial SEP', text: 'Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública.' },
+        { icon: 'Languages', illustration: 'mundo', color: 'var(--green)', title: 'Certificaciones internacionales', text: 'Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente.' },
+        { icon: 'Heart', illustration: 'logro', color: 'var(--pink)', title: '{{anios}} años de trayectoria', text: '{{anios}} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.' },
       ],
     },
   }),

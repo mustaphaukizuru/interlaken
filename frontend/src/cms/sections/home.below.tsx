@@ -15,7 +15,10 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
+import { Illustration, wash } from '@/components/ui/Illustration';
 import { CARD_SIZES } from '@/lib/images';
+import { isIllustration, type IllustrationName } from '@/lib/illustrations';
+import { resolveIllustration } from '@/lib/illustrationTopics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, fill } from './kit';
@@ -52,6 +55,23 @@ function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
 
 type Img = { image?: number | string };
 
+/**
+ * A card's illustration (media round, owner 2026-11-22): the one chosen in the
+ * editor; «none» shows the icon instead; content saved before the field existed
+ * takes the one that matches its icon, then its title.
+ */
+const ART_BY_ICON: Record<string, IllustrationName> = {
+  Award: 'academico', Languages: 'mundo', Globe2: 'mundo', Heart: 'logro', Users: 'comunidad',
+  Star: 'logro', ShieldCheck: 'academico', GraduationCap: 'academico', Sparkles: 'ideas',
+};
+function cardArt(chosen: unknown, icon: unknown, title: string, byIcon: Record<string, IllustrationName> = ART_BY_ICON): IllustrationName | undefined {
+  if (chosen === 'none') return undefined;
+  if (isIllustration(chosen)) return chosen;
+  return (typeof icon === 'string' ? byIcon[icon] : undefined) ?? resolveIllustration(undefined, title);
+}
+/** The promo pair reads «bilingual» and «community» where the respaldo cards read «world» and «achievement». */
+const PROMO_ART: Record<string, IllustrationName> = { ...ART_BY_ICON, Languages: 'bilingue', Globe2: 'bilingue', Heart: 'comunidad' };
+
 /* ── Nuestra comunidad ──────────────────────────────────────────────────── */
 interface AboutProps { eyebrow?: string; title?: string; text?: string; cta?: CmsLink; image1?: number | string; image2?: number | string; image3?: number | string; badgeValue?: string; badgeLabel?: string }
 function HomeAboutView(p: AboutProps) {
@@ -70,9 +90,9 @@ function HomeAboutView(p: AboutProps) {
         </m.div>
         <m.div variants={fadeLeft} className="relative">
           <div className="grid grid-cols-2 gap-3.5">
-            {imgs[0] && <img src={imageSrc(imgs[0], 'md')} srcSet={imageSrcSet(imgs[0])} sizes={CARD_SIZES} alt={altOf(imgs[0])} loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full max-w-full rounded-md object-cover" onError={hideOnError} />}
-            {imgs[1] && <img src={imageSrc(imgs[1], 'md')} srcSet={imageSrcSet(imgs[1])} sizes={CARD_SIZES} alt={altOf(imgs[1])} loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
-            {imgs[2] && <img src={imageSrc(imgs[2], 'md')} srcSet={imageSrcSet(imgs[2])} sizes={CARD_SIZES} alt={altOf(imgs[2])} loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
+            {imgs[0] && <img src={imageSrc(imgs[0], 'md')} srcSet={imageSrcSet(imgs[0])} sizes={CARD_SIZES} alt={altOf(imgs[0])} loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full w-full max-w-full rounded-md object-cover shadow-card" onError={hideOnError} />}
+            {imgs[1] && <img src={imageSrc(imgs[1], 'md')} srcSet={imageSrcSet(imgs[1])} sizes={CARD_SIZES} alt={altOf(imgs[1])} loading="lazy" decoding="async" width={400} height={186} className="h-[136px] w-full max-w-full rounded-md object-cover shadow-card sm:h-[180px]" onError={hideOnError} />}
+            {imgs[2] && <img src={imageSrc(imgs[2], 'md')} srcSet={imageSrcSet(imgs[2])} sizes={CARD_SIZES} alt={altOf(imgs[2])} loading="lazy" decoding="async" width={400} height={186} className="h-[136px] w-full max-w-full rounded-md object-cover shadow-card sm:h-[180px]" onError={hideOnError} />}
           </div>
           {p.badgeValue && (
             <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-md bg-white px-4 py-3.5 shadow-purple sm:-right-2">
@@ -122,6 +142,16 @@ function HomeVideoView(p: VideoProps) {
 /* ── Niveles ────────────────────────────────────────────────────────────── */
 interface LevelItem extends Img { name?: string; text?: string; color?: string; href?: string; linkLabel?: string }
 interface LevelsProps { eyebrow?: string; title?: string; text?: string; items?: LevelItem[]; cta?: CmsLink }
+
+/**
+ * The first defaults gave Preescolar the photo of the primaria court, with its
+ * big «PRIMARIA» sign (fixed 2026-11-22). A page saved with that pairing shows
+ * the preescolar playground instead; any other photo the school picked stays.
+ */
+function levelPhoto(name: string, image: Img['image']): Img['image'] {
+  return image === '/assets/court-primaria.webp' && /preescolar/i.test(name) ? '/assets/hopscotch.webp' : image;
+}
+
 function HomeLevelsView(p: LevelsProps) {
   const t = useTokens();
   const altOf = useMediaAlt();
@@ -131,22 +161,28 @@ function HomeLevelsView(p: LevelsProps) {
       <m.div variants={sectionReveal} initial="hidden" whileInView="show" viewport={VIEWPORT} className="mb-10 text-center">
         {p.eyebrow && <span className="section-label-green inline-flex">{t(p.eyebrow)}</span>}
         <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">{t(p.title)}</h2>
-        {p.text && <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-muted">{t(p.text)}</p>}
+        {p.text && <p className="mx-auto mt-3 max-w-lg text-base leading-relaxed text-muted">{t(p.text)}</p>}
       </m.div>
       <m.div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" variants={staggerGroup} initial="hidden" whileInView="show" viewport={VIEWPORT}>
         {asList<LevelItem>(p.items).map((l, i) => {
           const accent = cmsColor(l.color);
+          const name = t(l.name);
+          const image = levelPhoto(name, l.image);
           return (
-            <m.div key={i} variants={sectionReveal}>
-              <div className="card hover-lift overflow-hidden !p-0">
-                <div className="relative h-[180px]">
-                  {l.image && <img src={imageSrc(l.image, 'md')} srcSet={imageSrcSet(l.image)} sizes={CARD_SIZES} alt={altOf(l.image, l.name)} loading="lazy" decoding="async" width={400} height={180} className="h-full w-full max-w-full object-cover" onError={hideOnError} />}
-                  <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, color-mix(in srgb, ${accent} 87%, transparent) 100%)` }} />
-                  <h3 className="absolute bottom-3.5 left-[18px] font-head text-[22px] font-extrabold text-white">{t(l.name)}</h3>
+            <m.div key={i} variants={sectionReveal} className="h-full">
+              <div className="hover-lift flex h-full flex-col overflow-hidden rounded-md bg-white shadow-card">
+                <div className="relative aspect-[16/10] overflow-hidden bg-cream-2">
+                  {image && <img src={imageSrc(image, 'md')} srcSet={imageSrcSet(image)} sizes={CARD_SIZES} alt={altOf(image, name)} loading="lazy" decoding="async" width={400} height={250} className="absolute inset-0 h-full w-full max-w-full object-cover" onError={hideOnError} />}
+                  {/* A dark veil keeps the white name legible on every photo (the yellow of secundaria included); the level colour is the rule above it and the edge below. */}
+                  <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-dark/75 via-dark/10 to-transparent" />
+                  <div className="absolute inset-x-5 bottom-4">
+                    <span aria-hidden="true" className="mb-2 block h-1 w-10 rounded-full" style={{ background: accent }} />
+                    <h3 className="font-head text-[24px] font-extrabold leading-none text-white">{name}</h3>
+                  </div>
                 </div>
-                <div className="px-5 py-[18px]">
-                  {l.text && <p className="text-sm leading-relaxed text-muted">{t(l.text)}</p>}
-                  <CmsAnchor link={{ href: l.href }} className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm">{t(l.linkLabel) || `Conocer ${t(l.name)}`} <ArrowRight size={14} style={{ color: accent }} /></CmsAnchor>
+                <div className="flex flex-1 flex-col px-5 pb-5 pt-4" style={{ borderTop: `4px solid ${accent}` }}>
+                  {l.text && <p className="flex-1 text-base leading-relaxed text-muted">{t(l.text)}</p>}
+                  <CmsAnchor link={{ href: l.href }} className="mt-4 inline-flex items-center gap-1.5 self-start rounded-sm text-[15px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2">{t(l.linkLabel) || `Conocer ${name}`} <ArrowRight size={16} style={{ color: accent }} /></CmsAnchor>
                 </div>
               </div>
             </m.div>
@@ -180,10 +216,10 @@ function HomeProgramsView(p: ProgramsProps) {
           const Icon = cmsIcon(it.icon);
           return (
             <m.div key={i} variants={sectionReveal} className="text-center">
-              <div className="relative mx-auto aspect-square w-full max-w-[150px]">
+              <div className="relative mx-auto aspect-square w-full max-w-[176px]">
                 <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${accent} 8%, transparent)` }} />
                 <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${accent} 53%, transparent)` }}>
-                  {it.image && <img src={imageSrc(it.image, 'md')} srcSet={imageSrcSet(it.image)} sizes={CARD_SIZES} alt={altOf(it.image, it.name)} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />}
+                  {it.image && <img src={imageSrc(it.image, 'md')} srcSet={imageSrcSet(it.image)} sizes="(min-width: 1024px) 176px, 45vw" alt={altOf(it.image, it.name)} loading="lazy" decoding="async" width={176} height={176} className="h-full w-full max-w-full object-cover" onError={hideOnError} />}
                 </div>
                 <div className="absolute bottom-0.5 right-0.5 flex h-10 w-10 items-center justify-center rounded-sm shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]" style={{ background: accent }}>
                   <Icon size={19} color="white" />
@@ -196,7 +232,7 @@ function HomeProgramsView(p: ProgramsProps) {
       </m.div>
       {p.footnote && (
         <m.div variants={sectionReveal} initial="hidden" whileInView="show" viewport={VIEWPORT} className="mt-10 text-center">
-          <p className="text-[15px] text-muted">{t(p.footnote)}</p>
+          <p className="text-base text-muted">{t(p.footnote)}</p>
         </m.div>
       )}
     </Section>
@@ -204,7 +240,7 @@ function HomeProgramsView(p: ProgramsProps) {
 }
 
 /* ── Promociones (par de tarjetas de color) ─────────────────────────────── */
-interface PromoItem { label?: string; title?: string; text?: string; link?: CmsLink; color?: string; color2?: string; icon?: string }
+interface PromoItem { label?: string; title?: string; text?: string; link?: CmsLink; color?: string; color2?: string; icon?: string; illustration?: string }
 function HomePromosView({ items }: { items?: PromoItem[] }) {
   const t = useTokens();
   return (
@@ -213,16 +249,25 @@ function HomePromosView({ items }: { items?: PromoItem[] }) {
         {asList<PromoItem>(items).map((it, i) => {
           const Icon = cmsIcon(it.icon);
           const link = asLink(it.link);
+          const title = t(it.title);
+          const art = cardArt(it.illustration, it.icon, title, PROMO_ART);
           return (
-            <m.div key={i} variants={i % 2 === 0 ? fadeRight : fadeLeft}>
-              <div className="hover-lift relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-md px-8 py-10 text-white shadow-[0_24px_48px_-20px_rgba(16,12,40,0.4)] sm:px-9" style={{ background: `linear-gradient(135deg, ${cmsColor(it.color)} 0%, ${cmsColor(it.color2, cmsColor(it.color))} 100%)` }}>
-                <div className="pointer-events-none absolute -top-12 -right-12 h-[200px] w-[200px] rounded-full bg-white/[0.08]" />
-                <Icon size={40} color="rgba(255,255,255,0.9)" className="relative" />
-                <div className="relative mt-5">
+            <m.div key={i} variants={i % 2 === 0 ? fadeRight : fadeLeft} className="h-full">
+              <div className="hover-lift relative grid h-full min-h-[260px] content-start items-start gap-5 overflow-hidden rounded-md px-7 py-9 text-white shadow-[0_24px_48px_-20px_rgba(16,12,40,0.4)] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-6 sm:px-9 sm:py-10" style={{ background: `linear-gradient(135deg, ${cmsColor(it.color)} 0%, ${cmsColor(it.color2, cmsColor(it.color))} 100%)` }}>
+                {art ? (
+                  // The art sits on a soft white disc so it reads on any card colour; first on phones, beside the text from sm.
+                  <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-white/[0.14] sm:order-2 sm:h-36 sm:w-36 sm:self-center xl:h-40 xl:w-40">
+                    <Illustration name={art} size={150} fluid className="w-[90%]" />
+                  </div>
+                ) : (
+                  <div className="pointer-events-none absolute -top-12 -right-12 h-[200px] w-[200px] rounded-full bg-white/[0.08]" />
+                )}
+                <div className="relative sm:order-1">
+                  {!art && <Icon size={40} color="rgba(255,255,255,0.9)" className="mb-5" />}
                   {it.label && <span className="text-xs font-bold uppercase tracking-[1.5px] opacity-85">{t(it.label)}</span>}
-                  <h3 className="mt-2 font-head text-[26px] font-extrabold leading-tight tracking-[-0.02em]">{t(it.title)}</h3>
-                  {it.text && <p className="mt-3 max-w-[420px] text-[14.5px] leading-relaxed opacity-90">{t(it.text)}</p>}
-                  <CmsAnchor link={link} className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-white underline decoration-2 decoration-white/50 underline-offset-4 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 rounded-sm">{link.label} <ArrowRight size={16} aria-hidden="true" /></CmsAnchor>
+                  <h3 className="mt-2 font-head text-[26px] font-extrabold leading-tight tracking-[-0.02em]">{title}</h3>
+                  {it.text && <p className="mt-3 max-w-[420px] text-base leading-relaxed opacity-90">{t(it.text)}</p>}
+                  <CmsAnchor link={link} className="mt-5 inline-flex items-center gap-1.5 rounded-sm text-[15px] font-bold text-white underline decoration-2 decoration-white/50 underline-offset-4 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2">{link.label} <ArrowRight size={16} aria-hidden="true" /></CmsAnchor>
                 </div>
               </div>
             </m.div>
@@ -233,8 +278,8 @@ function HomePromosView({ items }: { items?: PromoItem[] }) {
   );
 }
 
-/* ── Por qué Interlaken ─────────────────────────────────────────────────── */
-interface StrengthItem { icon?: string; color?: string; title?: string; text?: string }
+/* ── Por qué Interlaken: illustrated cards (the level pages' program cards) ── */
+interface StrengthItem { icon?: string; color?: string; title?: string; text?: string; illustration?: string }
 function HomeStrengthsView(p: { eyebrow?: string; title?: string; items?: StrengthItem[] }) {
   const t = useTokens();
   return (
@@ -247,14 +292,27 @@ function HomeStrengthsView(p: { eyebrow?: string; title?: string; items?: Streng
         {asList<StrengthItem>(p.items).map((s, i) => {
           const color = cmsColor(s.color);
           const Icon = cmsIcon(s.icon);
+          const title = t(s.title);
+          const art = cardArt(s.illustration, s.icon, title);
           return (
             <m.div key={i} variants={sectionReveal} className="h-full">
-              <div className="card hover-lift flex h-full flex-col gap-[18px]">
-                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
-                  <Icon size={26} color={color} />
+              {/* Phones: the art in a tile beside the text; from sm a header band above it. */}
+              <div className="flex h-full items-start gap-4 rounded-md bg-white p-5 shadow-card sm:flex-col sm:items-stretch sm:gap-0 sm:overflow-hidden sm:p-0">
+                {art ? (
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md sm:h-auto sm:w-auto sm:rounded-none sm:py-6" style={{ background: wash(color, 12) }}>
+                    <Illustration name={art} size={136} fluid className="w-[84%] sm:w-[136px]" />
+                  </div>
+                ) : (
+                  <div className="sm:px-6 sm:pt-6">
+                    <div className="flex h-[52px] w-[52px] items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
+                      <Icon size={26} color={color} />
+                    </div>
+                  </div>
+                )}
+                <div className="flex-1 sm:p-6">
+                  <h3 className="font-head text-[19px] font-bold text-ink">{title}</h3>
+                  {s.text && <p className="mt-2 text-base leading-relaxed text-muted">{t(s.text)}</p>}
                 </div>
-                <h3 className="font-head text-[19px] font-bold text-ink">{t(s.title)}</h3>
-                {s.text && <p className="flex-1 text-[15px] leading-relaxed text-muted">{t(s.text)}</p>}
               </div>
             </m.div>
           );

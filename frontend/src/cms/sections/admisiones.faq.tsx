@@ -8,6 +8,8 @@ import { Seo } from '@/components/seo/Seo';
 import { Search, Plus } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
+import { Illustration, wash } from '@/components/ui/Illustration';
+import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import { useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, fill } from './kit';
 
@@ -24,7 +26,7 @@ interface FaqItem { cat?: string; q?: string; a?: string }
 const ALL_TOPICS = '\u0000all';
 
 /** `c(prop)`: the explorer's own words, edited in Contenido ({n} and {total} are filled in). */
-function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (prop: string) => string; emptyLink: CmsLink }) {
+function FaqExplorer({ faqs, c, emptyLink, art }: { faqs: Required<FaqItem>[]; c: (prop: string) => string; emptyLink: CmsLink; art?: IllustrationName }) {
   const [query, setQuery] = useState('');
   const [topic, setTopic] = useState(ALL_TOPICS);
   const topics = useMemo(() => [ALL_TOPICS, ...Array.from(new Set(faqs.map((f) => f.cat)))], [faqs]);
@@ -42,60 +44,68 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
       {/* Barra lateral */}
       <aside className="self-start lg:sticky lg:top-24">
-        <div className="rounded-md bg-white p-4 shadow-card sm:p-5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={c('search')}
-              aria-label={c('searchLabel')}
-              className="input-field min-h-[44px] pl-9 text-base"
-            />
-          </div>
+        <div className="overflow-hidden rounded-md bg-white shadow-card">
+          {/* Desktop: the illustration heads the filter column (phones go straight to the questions). */}
+          {art && (
+            <div className="hidden items-center justify-center py-4 lg:flex" style={{ background: wash('var(--green)', 10) }}>
+              <Illustration name={art} size={104} />
+            </div>
+          )}
+          <div className="p-4 sm:p-5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={c('search')}
+                aria-label={c('searchLabel')}
+                className="input-field min-h-[44px] pl-9 text-base"
+              />
+            </div>
 
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">
-            {c('filterTitle')}
-          </p>
-          <div className="mt-2 flex flex-col gap-1">
-            {topics.map((t) => {
-              const count = t === ALL_TOPICS ? faqs.length : faqs.filter((f) => f.cat === t).length;
-              const active = topic === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setTopic(t)}
-                  className={`flex min-h-[42px] items-center justify-between gap-2 rounded-sm px-3 text-sm font-semibold transition-colors ${
-                    active
-                      ? 'bg-purple text-white shadow-purple'
-                      : 'text-ink/80 hover:bg-purple/[0.07] hover:text-purple'
-                  }`}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-purple/40'}`}
-                      aria-hidden="true"
-                    />
-                    {t === ALL_TOPICS ? c('all') : t}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      active ? 'bg-white/20 text-white' : 'bg-purple/10 text-purple'
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">
+              {c('filterTitle')}
+            </p>
+            <div className="mt-2 flex flex-col gap-1">
+              {topics.map((t) => {
+                const count = t === ALL_TOPICS ? faqs.length : faqs.filter((f) => f.cat === t).length;
+                const active = topic === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setTopic(t)}
+                    className={`flex min-h-[42px] items-center justify-between gap-2 rounded-sm px-3 text-sm font-semibold transition-colors ${
+                      active
+                        ? 'bg-purple text-white shadow-purple'
+                        : 'text-ink/80 hover:bg-purple/[0.07] hover:text-purple'
                     }`}
                   >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    <span className="flex items-center gap-2.5">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-purple/40'}`}
+                        aria-hidden="true"
+                      />
+                      {t === ALL_TOPICS ? c('all') : t}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        active ? 'bg-white/20 text-white' : 'bg-purple/10 text-purple'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-          <p className="mt-5 border-t border-ink/5 pt-3 text-xs uppercase tracking-wide text-subtle">
-            {fill(c('count'), { n: visible.length, total: faqs.length })}
-          </p>
+            <p className="mt-5 border-t border-ink/5 pt-3 text-xs uppercase tracking-wide text-subtle">
+              {fill(c('count'), { n: visible.length, total: faqs.length })}
+            </p>
+          </div>
         </div>
       </aside>
 
@@ -103,7 +113,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
       <div className="min-w-0">
         {visible.length === 0 ? (
           <div className="rounded-md bg-white p-8 text-center shadow-card">
-            <p className="text-sm text-muted">
+            <p className="text-base text-muted">
               {c('empty')}{' '}
               <CmsAnchor link={emptyLink} className="font-semibold text-green-dark underline" />{' '}
               {c('emptyAfter')}
@@ -118,7 +128,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
                     <span className="block text-[11px] font-semibold uppercase tracking-wide text-purple">
                       {f.cat}
                     </span>
-                    <span className="mt-0.5 block font-head text-[15.5px] font-bold leading-snug text-ink">
+                    <span className="mt-0.5 block font-head text-base font-bold leading-snug text-ink sm:text-[17px]">
                       {f.q}
                     </span>
                   </span>
@@ -126,7 +136,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
                     <Plus className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </summary>
-                <p className="px-5 pb-4 text-sm leading-relaxed text-muted sm:px-6">{f.a}</p>
+                <p className="max-w-[68ch] px-5 pb-5 text-base leading-relaxed text-muted sm:px-6">{f.a}</p>
               </details>
             ))}
           </div>
@@ -136,8 +146,10 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
   );
 }
 
-export function AdmFaqView(p: { eyebrow?: string; title?: string; items?: FaqItem[]; emptyLink?: CmsLink; [copy: string]: unknown }) {
+export function AdmFaqView(p: { eyebrow?: string; title?: string; items?: FaqItem[]; emptyLink?: CmsLink; illustration?: unknown; [copy: string]: unknown }) {
   const t = useTokens();
+  // The one chosen in the editor; «none» hides it; nothing chosen (saved before the field existed) keeps the lamp.
+  const art = p.illustration === 'none' ? undefined : isIllustration(p.illustration) ? p.illustration : 'ideas';
   const emptyLink = asLink(p.emptyLink);
   const raw = asList<FaqItem>(p.items);
   const faqs = useMemo(
@@ -163,7 +175,7 @@ export function AdmFaqView(p: { eyebrow?: string; title?: string; items?: FaqIte
           <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">{t(p.title)}</h2>
         </Reveal>
       )}
-      <FaqExplorer faqs={faqs} c={(k) => t(p[k])} emptyLink={{ ...emptyLink, label: t(emptyLink.label) }} />
+      <FaqExplorer faqs={faqs} c={(k) => t(p[k])} emptyLink={{ ...emptyLink, label: t(emptyLink.label) }} art={art} />
     </Section>
   );
 }
