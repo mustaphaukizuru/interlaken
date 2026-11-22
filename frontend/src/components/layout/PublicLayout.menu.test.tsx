@@ -1,8 +1,8 @@
 /**
  * The public menu as a visitor meets it. «Opción 3» (2026-11-20): «Familias»
- * replaces «Pagos». School request 2026-11-22: three header buttons
- * (Cafetería / Colegiaturas / Agendar visita) and a single tuition entry in
- * «Familias» («Colegiaturas y cafetería», whose page links to the tuition site).
+ * replaces «Pagos». 2026-11-22: two header buttons (Portal Cafetería /
+ * Agendar visita; the owner removed «Colegiaturas») and a single tuition entry
+ * in «Familias» («Colegiaturas y cafetería», whose page links to the tuition site).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
@@ -18,11 +18,14 @@ vi.mock('@/services/api', () => ({
 import { PublicLayout } from './PublicLayout';
 
 describe('PublicLayout menu', () => {
-  it('shows «Cafetería», «Colegiaturas» and «Agendar visita», and no «Pagos» button', () => {
+  it('shows «Portal Cafetería» and «Agendar visita», and no «Colegiaturas» or «Pagos» button', () => {
     renderWithProviders(<PublicLayout />);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('link', { name: 'Cafetería' })).toHaveAttribute('href', '/login');
-    expect(within(header).getByRole('link', { name: 'Colegiaturas' })).toHaveAttribute('href', '/pagos');
+    const cafe = within(header).getAllByRole('link', { name: 'Portal Cafetería' });
+    expect(cafe[0]).toHaveAttribute('href', '/login');
+    // Two buttons fit with their names at every desktop width (no icon-only mode).
+    expect(cafe[0].querySelector('.sr-only')).toBeNull();
+    expect(within(header).queryByRole('link', { name: /^Colegiaturas$/ })).not.toBeInTheDocument();
     expect(within(header).getByRole('link', { name: 'Agendar visita' })).toHaveAttribute('href', '/agendar-visita');
     expect(within(header).queryByRole('link', { name: /^Pagos$/ })).not.toBeInTheDocument();
     expect(within(header).queryByRole('button', { name: 'Pagos' })).not.toBeInTheDocument();
