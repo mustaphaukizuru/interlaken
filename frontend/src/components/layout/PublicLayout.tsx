@@ -105,10 +105,11 @@ function MenuLink({ to, className, onClick, children }: { to: string; className:
 }
 
 /** A header/footer button from SiteSettings.chrome: external URLs open in a new tab; `icon` draws before the text.
- *  `compact` (desktop header): from 1024 to 1149 px the menu and three buttons
- *  only fit if the outlined buttons with an icon show just the icon (2026-11-22,
- *  Cafetería / Colegiaturas / Agendar visita). The name stays for screen
- *  readers and as a tooltip; from 1150 px (iPad landscape is 1180) it shows. */
+ *  `compact` (desktop header with three or more buttons): from 1024 to 1149 px
+ *  the menu and three buttons only fit if the outlined buttons with an icon
+ *  show just the icon. The name stays for screen readers and as a tooltip;
+ *  from 1150 px (iPad landscape is 1180) it shows. Two buttons (the default
+ *  since 2026-11-22: Portal Cafetería / Agendar visita) always show names. */
 function ChromeLink({ button, className, onClick, compact = false }: { button: ChromeButton; className: string; onClick?: () => void; compact?: boolean }) {
   const Icon = button.icon ? ICONS[button.icon] : undefined;
   const iconOnly = compact && !!Icon && !button.primary;
@@ -327,7 +328,13 @@ export function PublicLayout() {
 
       {/* Main nav */}
       <div className="accent-bar print:hidden" />
-      <header className="bg-white border-b border-line sticky top-0 z-header shadow-sm print:hidden">
+      {/* Sticky and solid (owner, 2026-11-22: it looked see-through over white
+          cards and lagged below the top while scrolling the busy home page).
+          transform-gpu (translate3d) gives it its own compositor layer, so it moves in the
+          same frame as the scroll; the stronger shadow keeps its edge visible
+          over white sections. Nothing inside is position: fixed, so the
+          transform changes no containing block. */}
+      <header className="sticky top-0 z-header border-b border-line bg-white shadow-md transform-gpu print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
@@ -354,7 +361,7 @@ export function PublicLayout() {
           {/* CTA */}
           <div className="hidden lg:flex items-center gap-2">
             {chrome.header_buttons.map((b) => (
-              <ChromeLink key={b.label + b.href} button={b} compact className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-3.5 py-2`} />
+              <ChromeLink key={b.label + b.href} button={b} compact={chrome.header_buttons.length > 2} className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-3.5 py-2`} />
             ))}
           </div>
 

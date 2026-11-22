@@ -214,6 +214,21 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
   passes by one byte, so the next public change needs the structural fix
   (lazy admin route table) or the owner's call on the budget.
 
+### Header: «Portal Cafetería», no «Colegiaturas», solid sticky bar (owner, 22 Nov 2026)
+- **Buttons.** Back to two, as before #292: «Portal Cafetería» (/login) and
+  «Agendar visita». The home hero's second button reads «Portal Cafetería» and
+  its optional third button is empty by default. «Familias → Colegiaturas y
+  cafetería» stays in the menu. The icon-only squeeze (1024-1149 px) now runs
+  only when Navegación has three or more buttons.
+- **Sticky bar.** The owner saw the bar sit below the top with content above
+  it while scrolling the home page, and read it as see-through over white
+  cards. The header now has its own compositor layer (`transform-gpu`) and a
+  stronger shadow (`shadow-md`). Nothing inside it is `position: fixed`.
+- **Live data.** #292 noted that production had no saved header buttons, so
+  the defaults apply on deploy. If anyone saved buttons in Navegación since,
+  those win and must be edited there; the same holds for a home page saved in
+  Contenido with three hero buttons.
+
 ### Deploy notes (when approved)
 Standard `deploy.sh`; no migrations, no env vars, no crontab change. After
 deploy: hard-refresh once (new CSS), check `/`, `/portal` and `/admin` on a
