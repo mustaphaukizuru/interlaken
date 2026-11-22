@@ -768,7 +768,7 @@ export const paymentsApi = {
     api.get<{ data: Partial<Record<string, string>>; states: { code: string; name: string }[] }>('/payments/billing-profile/'),
   getAvailability: () =>
     api.get<{
-      online: boolean; test_mode: boolean; certification?: boolean; min_amount?: string;
+      online: boolean; test_mode: boolean; certification?: boolean; min_amount?: string; max_amount?: string;
       topup_policy?: import('@/types').TopUpPolicy;
     }>('/payments/availability/'),
 

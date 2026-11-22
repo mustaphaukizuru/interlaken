@@ -137,13 +137,16 @@ def _pending_topup_counts() -> dict:
     paid_total = paid.aggregate(s=Sum('amount'))['s'] or 0
     # «Recargas pendientes de verificar» (2026-11-18): paid by card, approval
     # not matched in MultiCobros; nothing applies them until staff verify.
-    from django.db.models import Min
+    from django.db.models import Min, Q
 
     from apps.payments.multicobros import paid_topups_awaiting_verification
 
     to_verify = TopUpRequest.objects.filter(
         pk__in=paid_topups_awaiting_verification().values('pk')).aggregate(
-        n=Count('pk'), s=Sum('amount'), oldest=Min('processed_at'))
+        n=Count('pk'), s=Sum('amount'), oldest=Min('processed_at'),
+        # Already in the wallet and Loyverse (instant auto-load): only the
+        # MultiCobros confirmation is missing, and the card says so.
+        loaded=Count('pk', filter=Q(status=TopUpRequest.Status.COMPLETED)))
     return {
         'pending_topups': office + online,
         'pending_topups_office': office,
@@ -152,6 +155,7 @@ def _pending_topup_counts() -> dict:
         'paid_topups_to_apply_total': f'{paid_total:.2f}',
         'topups_to_verify': to_verify['n'] or 0,
         'topups_to_verify_total': f'{to_verify["s"] or 0:.2f}',
+        'topups_to_verify_loaded': to_verify['loaded'] or 0,
         # When the oldest one was paid: how long it has been waiting.
         'topups_to_verify_oldest': to_verify['oldest'],
     }

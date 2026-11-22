@@ -19,13 +19,27 @@ function waitedFor(iso: string | null | undefined, now: Date = new Date()): stri
   return unit(Math.floor(hours / 24), 'día', 'días');
 }
 
+/** What the card says depends on whether the money already reached the wallet:
+ *  with the instant auto-load (2026-11-21) most are already in the balance and
+ *  in Loyverse, and only the MultiCobros confirmation is missing. */
+function verifyNote(count: number, loaded = 0): string {
+  const done = Math.min(Math.max(loaded, 0), count);
+  if (done === count) {
+    return 'Pagadas con tarjeta. Ya están en el saldo y en Loyverse: solo falta confirmarlas en MultiCobros (suba el reporte del día).';
+  }
+  if (done === 0) return 'Pagadas con tarjeta. No llegan al saldo hasta verificarlas en MultiCobros.';
+  const waiting = count - done;
+  return `Pagadas con tarjeta. ${done} ya ${done === 1 ? 'está' : 'están'} en el saldo y en Loyverse; `
+    + `${waiting} ${waiting === 1 ? 'llega' : 'llegan'} al saldo al verificarla${waiting === 1 ? '' : 's'} en MultiCobros.`;
+}
+
 /**
  * «Recargas pendientes de verificar» on the admin dashboard: card top-ups the
- * family already paid that cannot reach the wallet until someone matches them
- * in MultiCobros (2026-11-18: two waited a whole morning in Loyverse). Not
- * rendered at all when there are none.
+ * family already paid whose approval staff have not matched in MultiCobros
+ * (2026-11-18: two waited a whole morning in Loyverse). `loaded` of them are
+ * already in the wallet (instant auto-load). Not rendered when there are none.
  */
-export function TopUpsToVerifyCard({ count, total, oldest }: { count?: number; total?: string; oldest?: string | null }) {
+export function TopUpsToVerifyCard({ count, total, oldest, loaded }: { count?: number; total?: string; oldest?: string | null; loaded?: number }) {
   if (!count) return null;
   const waited = waitedFor(oldest);
   return (
@@ -41,9 +55,7 @@ export function TopUpsToVerifyCard({ count, total, oldest }: { count?: number; t
           <h2 id="topups-to-verify-title" className="font-head text-[15px] font-bold text-ink">
             Recargas pendientes de verificar
           </h2>
-          <p className="mt-0.5 text-sm text-muted">
-            Pagadas con tarjeta. No llegan al saldo hasta verificarlas en MultiCobros.
-          </p>
+          <p className="mt-0.5 text-sm text-muted">{verifyNote(count, loaded)}</p>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-ink">
             <span><strong className="font-head text-xl">{count}</strong> recarga{count === 1 ? '' : 's'}</span>
             <span>Total <strong>{formatMXN(total ?? 0)}</strong></span>

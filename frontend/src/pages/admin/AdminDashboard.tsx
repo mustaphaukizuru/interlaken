@@ -42,6 +42,7 @@ export default function AdminDashboard() {
             count={data?.topups_to_verify}
             total={data?.topups_to_verify_total}
             oldest={data?.topups_to_verify_oldest}
+            loaded={data?.topups_to_verify_loaded}
           />
           {/* "Who paid yesterday?" (owner, 2026-10-20): straight to the 07:30 list. */}
           {!!data?.paid_topups_to_apply && (

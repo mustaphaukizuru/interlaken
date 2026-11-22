@@ -477,7 +477,7 @@ class TestApplyTopUp:
             data={"student": student.id, "amount": Decimal("20.00"), "method": "office"})
         assert s.is_valid(), s.errors
         s = TopUpRequestSerializer(
-            data={"student": student.id, "amount": Decimal("2000.00"), "method": "office"})
+            data={"student": student.id, "amount": Decimal("1000.00"), "method": "office"})
         assert s.is_valid(), s.errors
 
 

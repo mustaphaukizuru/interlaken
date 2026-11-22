@@ -644,3 +644,105 @@ class TestVerifyAfterTheFact:
         settings.PAYMENTS_LIVE = True
         paid_topup("200.00", checkout="PRD", balance=100)  # PAID: «Por aplicar», not here
         assert admin_client.get(reverse("admin-topups"), {"needs_verify": 1}).data["results"] == []
+
+
+# ── 2026-11-22: $1,000 per top-up, and every one of them automatic ──────────
+class TestThousandAndAutomatic:
+    def test_the_form_is_told_the_maximum(self, api_client, settings):
+        from django.urls import reverse
+
+        from apps.accounts.factories import ParentFactory
+
+        api_client.force_authenticate(user=ParentFactory())
+        data = api_client.get(reverse("payment-availability")).data
+        assert data["max_amount"] == "1000.00" and data["min_amount"] == "20.00"
+        settings.CAFETERIA_TOPUP_MAX = "750"
+        assert api_client.get(reverse("payment-availability")).data["max_amount"] == "750.00"
+
+    def test_the_server_enforces_the_setting(self, settings):
+        from apps.accounts.factories import StudentProfileFactory
+        from apps.cafeteria.serializers import TopUpRequestSerializer
+
+        student = StudentProfileFactory()
+
+        def ok(amount):
+            return TopUpRequestSerializer(
+                data={"student": student.id, "amount": amount, "method": "office"}
+            ).is_valid()
+
+        assert ok("1000.00") and not ok("1000.01")
+        settings.CAFETERIA_TOPUP_MAX = "750"
+        assert ok("750.00") and not ok("800.00")
+
+    def test_the_automatic_limit_covers_every_allowed_top_up(self, settings):
+        from apps.cafeteria.serializers import topup_max_amount
+
+        assert loyverse_push.unverified_max() == topup_max_amount() == Decimal("1000.00")
+
+    def test_a_thousand_unverified_loads_at_once(
+        self, push, loyverse, django_capture_on_commit_callbacks
+    ):
+        push.CAFETERIA_TOPUP_LOYVERSE_PUSH = "instant"
+        # Unset: the automatic limit follows the $1,000 top-up maximum.
+        push.CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX = ""
+        with django_capture_on_commit_callbacks(execute=True):
+            student, topup, payment = paid_topup("1000.00", checkout="PRD", balance=100)
+        topup.refresh_from_db()
+        assert topup.applied_via == TopUpRequest.AppliedVia.AUTO_POS
+        assert loyverse.points == Decimal("1100") and wallet(student) == Decimal("1100")
+        assert payment.needs_bank_verification()  # confirmed later in MultiCobros
+
+    def test_the_dashboard_counts_the_ones_already_loaded(
+        self, push, loyverse, django_capture_on_commit_callbacks
+    ):
+        from apps.accounts.factories import ParentFactory, StudentProfileFactory
+        from apps.portal.views import _pending_topup_counts
+
+        push.CAFETERIA_TOPUP_LOYVERSE_PUSH = "instant"
+        with django_capture_on_commit_callbacks(execute=True):
+            paid_topup("200.00", checkout="PRD", balance=100)  # loaded at once
+        loyverse.set(999)  # the next one waits: Loyverse and the wallet disagree
+        kid = StudentProfileFactory(parents=[ParentFactory()], loyverse_id="lv-1b")
+        with patch(GET, side_effect=lambda cid: {**loyverse.customer, "id": cid}):
+            with django_capture_on_commit_callbacks(execute=True):
+                paid_topup("50.00", student=kid, checkout="PRD", balance=10)
+        counts = _pending_topup_counts()
+        assert counts["topups_to_verify"] == 2 and counts["topups_to_verify_loaded"] == 1
+
+
+class TestLeftoverLabel:
+    def test_applying_another_way_closes_the_waiting_label(self, push, loyverse):
+        from apps.cafeteria.services import apply_paid_topup
+
+        _, topup, payment = ready(balance=100)
+        loyverse.set(130)  # a sale in flight: the app waits
+        assert loyverse_push.push_topup(payment)["state"] == "waiting"
+        loyverse.set(300)  # staff typed it into the POS by hand, then «Aplicar»
+        apply_paid_topup(TopUpRequest.objects.get(pk=topup.pk))
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.COMPLETED
+        assert topup.loyverse_push_state == S.NONE
+        assert "otra vía" in topup.loyverse_push_note
+
+    def test_the_migration_closes_old_ones(self, push, loyverse):
+        import importlib
+
+        from django.apps import apps as registry
+
+        from apps.accounts.factories import ParentFactory, StudentProfileFactory
+
+        migration = importlib.import_module(
+            "apps.cafeteria.migrations.0024_close_stale_push_waiting"
+        )
+        _, done, _ = ready(balance=100)
+        other = StudentProfileFactory(parents=[ParentFactory()], loyverse_id="lv-2b")
+        _, still_paid, _ = paid_topup("200.00", student=other, checkout="PRD", balance=100)
+        TopUpRequest.objects.filter(pk=done.pk).update(
+            status=TopUpRequest.Status.COMPLETED, loyverse_push_state=S.WAITING
+        )
+        TopUpRequest.objects.filter(pk=still_paid.pk).update(loyverse_push_state=S.WAITING)
+        migration.close_stale_waiting(registry, None)
+        done.refresh_from_db()
+        still_paid.refresh_from_db()
+        assert done.loyverse_push_state == S.NONE
+        assert still_paid.loyverse_push_state == S.WAITING  # still the app's to load

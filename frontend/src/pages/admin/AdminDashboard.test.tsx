@@ -107,6 +107,20 @@ describe('AdminDashboard', () => {
     expect(within(card).getByRole('link', { name: /Verificar ahora/ })).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
   });
 
+  it.each([
+    [0, /No llegan al saldo hasta verificarlas en MultiCobros/],
+    [2, /Ya están en el saldo y en Loyverse: solo falta confirmarlas en MultiCobros/],
+    [1, /1 ya está en el saldo y en Loyverse; 1 llega al saldo al verificarla en MultiCobros/],
+  ])('says whether the money is already in the balance (%i of 2 auto-loaded)', async (loaded, text) => {
+    getDashboard.mockResolvedValue({ data: {
+      ...DASHBOARD, topups_to_verify: 2, topups_to_verify_total: '444.00', topups_to_verify_oldest: null,
+      topups_to_verify_loaded: loaded,
+    } } as never);
+    renderWithProviders(<AdminDashboard />);
+    const card = await screen.findByRole('region', { name: 'Recargas pendientes de verificar' });
+    expect(card).toHaveTextContent(text);
+  });
+
   it('hides the verification card when nothing waits', async () => {
     getDashboard.mockResolvedValue({ data: {
       ...DASHBOARD, topups_to_verify: 0, topups_to_verify_total: '0.00', topups_to_verify_oldest: null,
