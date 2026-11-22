@@ -53,6 +53,8 @@ const FacturacionPage = cmsRoute('facturacion', () => import('./pages/public/Fac
 const LoginPage       = cmsRoute('iniciar-sesion', () => import('./pages/auth/LoginPage'));
 const ConfirmNotifyEmailPage = cmsRoute('confirmar-correo', () => import('./pages/public/ConfirmNotifyEmailPage'));
 const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
+// Design-system reference, DEV only: the conditional keeps the chunk out of production builds.
+const DesignSystemPage = import.meta.env.DEV ? lazy(() => import('./pages/dev/DesignSystemPage')) : () => null;
 
 // Parent portal
 const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
@@ -196,6 +198,7 @@ export default function App() {
             {import.meta.env.DEV && (
               <Route path="/pago/simulado" element={<SandboxCheckout />} />
             )}
+            {import.meta.env.DEV && <Route path="/_design" element={<DesignSystemPage />} />}
 
             {/* ── PARENT PORTAL ───────────────────────────── */}
             <Route path="/portal" element={
