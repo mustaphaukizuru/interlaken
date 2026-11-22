@@ -10,6 +10,7 @@
  * `contentApi` from `./api`.
  */
 import type { AxiosResponse } from 'axios';
+import type { PageCheckSummary } from '@/cms/editor/review/types';
 import { api } from './api';
 import type { BulkRequest, BulkResult, ExportParams, ImportApi, ImportFormat, ImportReport, ImportUploadOptions, ListParams, MediaAsset } from './api';
 import { importFormData } from './dataOps';
@@ -48,7 +49,11 @@ export const announcementsAdminApi = {
     api.get<Blob>(`/portal/admin/announcements/${id}/delivery/export/`, { params: { fmt }, responseType: 'blob' }),
 };
 
-export const pagesAdminApi = entityApi('/content/admin/pages/');
+export const pagesAdminApi = {
+  ...entityApi('/content/admin/pages/'),
+  /** «Revisión antes de publicar» of every page, for the «Contenido» chips. */
+  checksSummary: () => api.get<{ results: PageCheckSummary[] }>('/content/admin/pages/checks-summary/'),
+};
 export const formsAdminApi = entityApi('/content/admin/forms/');
 export const testimonialsAdminApi = entityApi('/content/admin/testimonials/');
 export const redirectsAdminApi = { ...entityApi('/content/admin/redirects/'), import: importApi('/content/admin/redirects/') };

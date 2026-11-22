@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn(), loading: vi.fn(() => 't'), dismiss: vi.fn() } }));
 vi.mock('@/services/AdminContentApi', () => ({
-  pagesAdminApi: { list: vi.fn(), export: vi.fn(), bulk: vi.fn() },
+  pagesAdminApi: { list: vi.fn(), export: vi.fn(), bulk: vi.fn(), checksSummary: vi.fn() },
 }));
 vi.mock('@/services/api', () => ({ contentApi: { adminDeletePage: vi.fn(), adminCreatePage: vi.fn() }, downloadBlob: vi.fn() }));
 
@@ -19,6 +19,11 @@ import { originalBlocks } from '@/cms/editor/helpers';
 import AdminPages from './AdminPages';
 
 const list = vi.mocked(pagesAdminApi.list);
+const checksSummary = vi.mocked(pagesAdminApi.checksSummary);
+const counts = (errors: number, warnings: number, first?: string, firstWarning?: string) => ({
+  errors, warnings, first_error: first ? { code: first, label: first === 'private_link' ? 'enlace privado' : first } : null,
+  first_warning: firstWarning ? { code: firstWarning, label: firstWarning } : null,
+});
 const bulk = vi.mocked(pagesAdminApi.bulk);
 
 const base = { seo: {}, published_at: null, publish_at: null, unpublish_at: null, review_requested_at: null, review_note: '', updated_at: '2026-11-19T10:00:00Z' };
@@ -54,6 +59,7 @@ beforeEach(() => {
   stubViewport(1280);
   setRole('admin');
   list.mockResolvedValue({ data: { count: PAGES.length, next: null, previous: null, results: PAGES } } as never);
+  checksSummary.mockResolvedValue({ data: { results: [] } } as never);
 });
 
 describe('AdminPages: one list of the site', () => {
@@ -82,6 +88,33 @@ describe('AdminPages: one list of the site', () => {
     expect(within(row('Inicio')).getByRole('link', { name: 'Versiones de Inicio' })).toHaveAttribute('href', '/admin/contenido/1?versiones=1');
     // A custom draft is not on the site yet: no «Ver».
     expect(within(row('Becas')).queryByRole('link', { name: /Ver Becas/ })).not.toBeInTheDocument();
+  });
+
+  it('names what «Revisión antes de publicar» found on each page', async () => {
+    const days = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+    checksSummary.mockResolvedValue({ data: { results: [
+      // Inicio: the draft links to a private page, and so does what the site shows.
+      { id: 1, slug: 'inicio', has_unpublished_changes: true, unpublished_since: days(6), draft: counts(1, 2, 'private_link'), live: counts(1, 0, 'private_link') },
+      // Contacto: only warnings in the draft.
+      { id: 9, slug: 'contacto', has_unpublished_changes: true, unpublished_since: days(1), draft: counts(0, 2, undefined, 'token_glued'), live: counts(0, 0) },
+      // Curso de verano: published, nothing pending, fine.
+      { id: 20, slug: 'verano', has_unpublished_changes: false, unpublished_since: null, draft: counts(0, 0), live: counts(0, 0) },
+    ] } } as never);
+    renderList();
+    await screen.findByRole('list', { name: 'Páginas del sitio' }, { timeout: 8000 });
+    await waitFor(() => expect(within(row('Inicio')).getByText('Bloqueado: enlace privado')).toBeInTheDocument());
+    expect(within(row('Inicio')).getByText('En el sitio: enlace privado')).toBeInTheDocument();
+    expect(within(row('Inicio')).getByText(/^Sin publicar desde el/)).toBeInTheDocument();
+    expect(within(row('Contacto')).getByText('Revisar: 2 advertencias')).toBeInTheDocument();
+    expect(within(row('Contacto')).queryByText(/^Sin publicar desde el/)).not.toBeInTheDocument();
+    expect(within(row('Curso de verano')).queryByText(/Bloqueado|Revisar:|En el sitio/)).not.toBeInTheDocument();
+  });
+
+  it('the list does not wait for the review summary', async () => {
+    checksSummary.mockRejectedValue(new Error('offline'));
+    renderList();
+    const site = await screen.findByRole('list', { name: 'Páginas del sitio' }, { timeout: 8000 });
+    expect(within(site).getAllByRole('listitem')).toHaveLength(21);
   });
 
   it('filters by state and searches from the URL', async () => {

@@ -49,6 +49,14 @@ describe('NotificationDetailPage', () => {
     getNotification.mockResolvedValue({ data: notif } as any);
   });
 
+  it('a page-review notice links to the editor of that page', async () => {
+    getNotification.mockResolvedValue({ data: { ...notif, title: 'Página publicada con un problema: Costos',
+      message: ['La página /admisiones/costos que ven las familias tiene un problema:', '', '- La ficha de inscripción es personal.', '',
+        'Corríjalo en el editor y vuelva a publicar: https://sitio.example/admin/contenido/12'].join('\n') } } as any);
+    renderPage();
+    expect(await screen.findByRole('link', { name: /Abrir el editor/ })).toHaveAttribute('href', '/admin/contenido/12');
+  });
+
   it('shows the whole message, not the two-line clamp the list uses', async () => {
     renderPage();
     expect(await screen.findByText('Saldo bajo')).toBeInTheDocument();

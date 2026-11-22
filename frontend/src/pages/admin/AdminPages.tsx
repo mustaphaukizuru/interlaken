@@ -73,6 +73,13 @@ export default function AdminPages() {
   useEffect(() => { let alive = true; void loadAllGroups().then(() => { if (alive) setTemplates(allTemplates()); }); return () => { alive = false; }; }, []);
   // Under the pages entity key: bulk actions, imports and the editor refresh it.
   const { data: pages, isLoading, isError, refetch } = useQuery({ queryKey: adminKeys.summary(PAGES_ENTITY, 'all'), queryFn: fetchAllPages });
+  // «Revisión antes de publicar» of every page (chips); the list never waits for it.
+  const { data: checkRows } = useQuery({
+    queryKey: adminKeys.summary(PAGES_ENTITY, 'checks'),
+    queryFn: async () => (await pagesAdminApi.checksSummary()).data.results,
+    staleTime: 30_000,
+  });
+  const checks = useMemo(() => new Map((checkRows ?? []).map((c) => [c.id, c])), [checkRows]);
   const exportPages = usePagesExport();
   const bulk = usePagesBulk();
   const [now] = useState(() => Date.now());
@@ -157,6 +164,7 @@ export default function AdminPages() {
             customising={customise.isPending ? customise.variables?.slug ?? null : null}
             onDelete={setToDelete}
             now={now}
+            checks={checks}
             empty={<div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><p>Ninguna página del sitio coincide con la búsqueda.</p>{clearFilters}</div>}
           />
           <PageListGroup
@@ -171,6 +179,7 @@ export default function AdminPages() {
             onToggleAll={toggleAll}
             onDelete={setToDelete}
             now={now}
+            checks={checks}
             headerAction={rows.custom.length > 0 ? <Button variant="secondary" size="md" onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" /> Nueva página</Button> : undefined}
             empty={filtering && rows.custom.length > 0
               ? <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><p>Ninguna página propia coincide con la búsqueda.</p>{clearFilters}</div>
