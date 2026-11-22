@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CreditCard, FileText, Users } from 'lucide-react';
+import { CircleDollarSign, FileText, Users } from 'lucide-react';
 import { DEFAULT_MENU, resolveMenu } from './PublicLayout';
 import { DEFAULT_MENU as ADMIN_DEFAULT_MENU } from '@/pages/admin/AdminNavigation';
 import { CHROME_DEFAULTS } from '@/lib/siteChrome';
@@ -22,28 +22,30 @@ describe('resolveMenu', () => {
     expect(links).not.toContain('/calendario');
     expect(links).toContain('/plataformas');
   });
-  it('follows menu «Opción 3» (2026-11-20): «Pagos» is «Familias» with the online payment and Plataformas', () => {
+  it('«Familias» has one tuition entry, «Colegiaturas y cafetería» (school, 2026-11-22)', () => {
     const shape = DEFAULT_MENU.map((g) => [g.label, g.items.map((i) => i.label)]);
     expect(shape).toEqual([
       ['El Colegio', ['Quiénes Somos', 'Modelo Educativo', 'Galería']],
       ['Niveles Educativos', ['Preescolar', 'Primaria', 'Secundaria']],
       // The ficha de inscripción is private (sent after admission): the menu offers the visit.
       ['Admisiones', ['Proceso de Inscripción', 'Documentación', 'Costos', 'Agendar visita']],
-      ['Familias', ['Pagar colegiatura', 'Colegiaturas y cafetería', 'Facturación', 'Plataformas']],
+      ['Familias', ['Colegiaturas y cafetería', 'Facturación', 'Plataformas']],
     ]);
-    expect(DEFAULT_MENU.flatMap((g) => g.items.map((i) => i.to))).not.toContain('/pre-registro');
-    const pay = DEFAULT_MENU[3].items[0];
-    expect(pay.to).toBe('https://interlaken.servoescolar.mx');
-    expect(pay.icon).toBe(CreditCard);
+    const links = DEFAULT_MENU.flatMap((g) => g.items.map((i) => i.to));
+    expect(links).not.toContain('/pre-registro');
+    // The tuition site is reached from /pagos («Colegiaturas y boletas»), not twice from the menu.
+    expect(links).not.toContain('https://interlaken.servoescolar.mx');
+    expect(DEFAULT_MENU[3].items[0]).toMatchObject({ to: '/pagos', icon: CircleDollarSign });
   });
   it('the admin editor offers the same built-in menu as the public site', () => {
     const publicShape = DEFAULT_MENU.map((g) => [g.label, g.items.map((i) => [i.label, i.to])]);
     const adminShape = ADMIN_DEFAULT_MENU.map((g) => [g.label, g.items.map((i) => [i.label, i.to])]);
     expect(adminShape).toEqual(publicShape);
   });
-  it('header buttons are «Portal Cafetería» (with a cup) and «Agendar visita»; «Pagos» moved into the menu', () => {
+  it('header buttons are «Cafetería», «Colegiaturas» and «Agendar visita» (school, 2026-11-22)', () => {
     expect(CHROME_DEFAULTS.header_buttons).toEqual([
-      { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
+      { label: 'Cafetería', href: '/login', icon: 'Coffee' },
+      { label: 'Colegiaturas', href: '/pagos', icon: 'CircleDollarSign' },
       { label: 'Agendar visita', href: '/agendar-visita', primary: true },
     ]);
   });

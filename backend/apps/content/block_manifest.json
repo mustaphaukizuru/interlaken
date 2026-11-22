@@ -2411,6 +2411,7 @@
         "subtitle": "Subtítulo",
         "primary": "Botón principal",
         "secondary": "Botón secundario",
+        "tertiary": "Tercer botón",
         "poster": "Foto de portada",
         "posterAlt": "Descripción de la foto (accesibilidad)",
         "video": "Video de portada (MP4)"
@@ -2422,6 +2423,7 @@
         "subtitle": "textarea",
         "primary": "link",
         "secondary": "link",
+        "tertiary": "link",
         "poster": "image",
         "posterAlt": "text",
         "video": "url"
@@ -2436,8 +2438,12 @@
           "href": "/agendar-visita"
         },
         "secondary": {
-          "label": "Portal Cafetería",
+          "label": "Cafetería",
           "href": "/login"
+        },
+        "tertiary": {
+          "label": "Colegiaturas",
+          "href": "/pagos"
         },
         "poster": "/assets/court-wide.webp",
         "posterAlt": "Campus Colegio Interlaken",
