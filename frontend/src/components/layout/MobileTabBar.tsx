@@ -38,38 +38,46 @@ export default function MobileTabBar({ role }: { role: Role }) {
       aria-label="Navegación principal"
       // data-bottom-bar: the cookie banner lifts itself above this bar (CookieBanner.tsx).
       data-bottom-bar=""
-      className="fixed inset-x-0 bottom-0 z-sticky flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg print:hidden lg:hidden"
+      // Equal columns: every destination gets the same width and tap area (no label decides the layout).
+      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      className="fixed inset-x-0 bottom-0 z-sticky grid border-t border-line bg-white/95 px-0 min-[360px]:px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_-12px_rgba(26,17,48,0.18)] backdrop-blur-lg print:hidden lg:hidden"
     >
-      {items.map(({ icon: Icon, label, to, end, badgeKey }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          className={({ isActive }) =>
-            `flex min-h-[56px] min-w-0 flex-1 flex-col items-center gap-0.5 rounded-sm pb-1.5 pt-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
-              isActive ? 'text-purple' : 'text-subtle'
-            }`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className={`relative flex h-7 w-12 items-center justify-center rounded-sm transition-colors ${
-                  isActive ? 'bg-purple/10' : ''
-                }`}
-              >
-                <Icon size={24} aria-hidden="true" />
-                {badgeKey && (badges[badgeKey] ?? 0) > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-coral px-1 text-[9px] font-bold text-white" aria-label={`${badges[badgeKey]} pendientes`}>
-                    {(badges[badgeKey] ?? 0) > 99 ? '99+' : badges[badgeKey]}
-                  </span>
-                )}
-              </span>
-              <span className="max-w-full truncate px-0.5">{label}</span>
-            </>
-          )}
-        </NavLink>
-      ))}
+      {items.map(({ icon: Icon, label, to, end, badgeKey }) => {
+        const count = badgeKey ? badges[badgeKey] ?? 0 : 0;
+        return (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            aria-label={count > 0 ? `${label}, ${count} pendientes` : undefined}
+            className={({ isActive }) =>
+              `group flex min-h-[64px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
+                isActive ? 'text-purple' : 'text-subtle hover:text-ink'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {/* Active indicator behind the icon (the label stays plain text, never a pill). */}
+                <span
+                  className={`relative flex h-8 w-14 items-center justify-center rounded-md transition-colors duration-200 ${
+                    isActive ? 'bg-purple/10' : 'group-hover:bg-cream-2'
+                  }`}
+                >
+                  <Icon size={22} strokeWidth={isActive ? 2.3 : 1.8} aria-hidden="true" />
+                  {count > 0 && (
+                    <span aria-hidden="true" className="absolute -top-1 right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                      {count > 99 ? '99+' : count}
+                    </span>
+                  )}
+                </span>
+                {/* 11 px from 360 px wide, 10 px on the narrowest phones: «Comunicados» fits whole. */}
+                <span className={`w-full truncate px-px text-center text-[10px] leading-none tracking-[-0.035em] min-[360px]:text-[11px] min-[360px]:tracking-[-0.01em] ${isActive ? 'font-bold' : 'font-semibold'}`}>{label}</span>
+              </>
+            )}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

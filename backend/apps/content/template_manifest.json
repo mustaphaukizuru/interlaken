@@ -400,7 +400,8 @@
             "title": "Preescolar",
             "headline": "Aprender también es jugar, descubrir y disfrutar",
             "text": "Cuando un niño se divierte, se emociona y siente curiosidad, aprender sucede de manera natural.",
-            "image": "/assets/hopscotch.webp",
+            "image": "/assets/hero-preescolar.webp",
+            "video": "/assets/video/hero-preescolar.mp4",
             "accent": "green",
             "color": "var(--nivel-preescolar)",
             "primary": {
@@ -568,7 +569,8 @@
             "title": "Primaria",
             "headline": "Aprender tiene sentido",
             "text": "Queremos que nuestros alumnos no solo sepan más. Queremos que sepan qué hacer con lo que aprenden.",
-            "image": "/assets/court-primaria.webp",
+            "image": "/assets/hero-primaria.webp",
+            "video": "/assets/video/hero-primaria.mp4",
             "accent": "coral",
             "color": "var(--nivel-primaria)",
             "primary": {
@@ -755,7 +757,8 @@
             "title": "Secundaria",
             "headline": "Formación integral para la vida",
             "text": "La Secundaria es una etapa de grandes cambios, descubrimientos y decisiones. Por eso, para nosotros educar va mucho más allá de enseñar contenidos.",
-            "image": "/assets/secundaria.webp",
+            "image": "/assets/hero-secundaria.webp",
+            "video": "/assets/video/hero-secundaria.mp4",
             "accent": "purple",
             "color": "var(--nivel-secundaria)",
             "primary": {

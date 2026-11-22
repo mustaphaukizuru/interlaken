@@ -125,6 +125,34 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
   new copy added; «Así es el colegio» would fit). `PlatformCard.tsx` was
   removed (no longer used).
 
+### Hero videos and phone navigation (22 Nov 2026, owner request)
+
+- **Hero loops.** Home and the three level heroes autoplay a silent 10 s loop
+  of their own photo (Kling 2.5 image-to-video, camera motion only, no people
+  added; forward + reversed so the loop never jumps). H.264 MP4 without audio,
+  0.46–1.0 MB, in `public/assets/video/`; posters are each clip's first frame
+  (`hero-<name>.webp`), so photo and video line up. 2,600 credits.
+  Same loading rules as before: the poster is the LCP; the video mounts only
+  on screen and not on Save-Data, 2g/3g or reduced motion; it pauses off
+  screen and in hidden tabs; a pause button is always there (WCAG 2.2.2).
+  Not precached by the service worker; WhiteNoise serves range requests (iOS).
+- **Code.** `components/public/BackgroundVideo.tsx` (level heroes; its skip
+  rule is a local copy so HeroVideo stays in the home chunk). Level heroes:
+  new optional `video` field, and one gradient veil over photo and video
+  instead of two 35 % layers. Home hero: `videoSound` toggle; the sound button
+  shows only for videos with sound (the Ajustes video keeps it).
+- **Phone navigation.** `Dropdown` keeps every header menu inside the screen
+  (the «+» menu was 17 px off-screen at 375 px, 72 px at 320 px).
+  QuickActions: 44 px rows, icon tiles, «Emergencia» set apart in danger red.
+  MobileTabBar: equal columns, 64 px bar, active indicator behind the icon,
+  labels fit whole from 360 px («Comunicados» still truncates by a few px on
+  320 px phones). Sidebar/drawer: compact horizontal logo (+54 px for the
+  menu on a 667 px phone), edge fades show there is more to scroll, an opened
+  group scrolls into view, a folded group shows its pending count.
+- **Merge note.** PR #292 (header buttons, home hero `tertiary`) touches the
+  home hero too: after merging, keep both sets of hero fields and regenerate
+  the manifests (`UPDATE_CMS_MANIFEST=1`).
+
 ### Deploy notes (when approved)
 Standard `deploy.sh`; no migrations, no env vars, no crontab change. After
 deploy: hard-refresh once (new CSS), check `/`, `/portal` and `/admin` on a

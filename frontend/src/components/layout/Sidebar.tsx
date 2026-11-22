@@ -23,6 +23,8 @@ function readFolded(): Set<string> {
 const COLLAPSE_KEY = 'portal.sidebar.collapsed';
 const ROLE_LABEL: Record<string, string> = { admin: 'Administración', staff: 'Personal', student: 'Familia', parent: 'Familia' };
 
+const panelIdOf = (heading: string) => `nav-group-${heading.replace(/\W+/g, '-').toLowerCase()}`;
+
 function readCollapsed(): boolean {
   try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
 }
@@ -73,13 +75,45 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   // in five groups; an office that lives in Cafetería should not scroll past
   // Contenido del sitio every time.
   const [folded, setFolded] = useState<Set<string>>(readFolded);
-  const toggleGroup = (heading: string) =>
+  // A group opened near the bottom scrolls into view, so its entries never
+  // open below the fold of the menu.
+  const reveal = useRef<string | null>(null);
+  const toggleGroup = (heading: string) => {
+    if (folded.has(heading)) reveal.current = panelIdOf(heading);
     setFolded((prev) => {
       const next = new Set(prev);
       if (next.has(heading)) next.delete(heading); else next.add(heading);
       try { localStorage.setItem(FOLD_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
       return next;
     });
+  };
+  useEffect(() => {
+    const id = reveal.current;
+    reveal.current = null;
+    if (!id) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(id)?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }, [folded]);
+
+  // Scroll cues: the list scrolls inside the sidebar (the header and the user
+  // card stay put), and a soft fade at an edge says there is more that way.
+  const navRef = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => setEdges((prev) => {
+      const top = nav.scrollTop > 4;
+      const bottom = nav.scrollTop + nav.clientHeight < nav.scrollHeight - 4;
+      return prev.top === top && prev.bottom === bottom ? prev : { top, bottom };
+    });
+    measure();
+    nav.addEventListener('scroll', measure, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(nav);
+    if (nav.firstElementChild) ro?.observe(nav.firstElementChild);
+    return () => { nav.removeEventListener('scroll', measure); ro?.disconnect(); };
+  }, [folded, open]);
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -114,14 +148,15 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       onTouchEnd={onTouchEnd}
       aria-label="Navegación del portal"
       data-collapsed={rail || undefined}
-      className={`fixed inset-y-0 left-0 z-drawer flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-4 overflow-hidden border-r border-line bg-white px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-[transform,width] duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] print:hidden lg:static lg:h-auto lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-drawer flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-3 overflow-hidden border-r border-line bg-white px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-[transform,width] duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] print:hidden lg:static lg:h-auto lg:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       } ${rail ? 'lg:w-[76px] lg:px-2.5' : ''}`}
     >
       {/* Logo + collapse toggle */}
       <div className={`flex items-center ${rail ? 'lg:flex-col lg:gap-2' : 'justify-between'}`}>
+        {/* The horizontal lockup: the stacked one took ~150 px of height from the menu on a phone. */}
         <Link to="/" className="flex justify-center px-1" aria-label="Colegio Interlaken — Inicio">
-          <Logo variant={rail ? 'icon' : 'stacked'} size={rail ? 40 : 76} theme="light" eager />
+          <Logo variant={rail ? 'icon' : 'horizontal'} size={rail ? 40 : 38} theme="light" eager />
         </Link>
         <button
           type="button"
@@ -136,8 +171,8 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
 
       {/* Role badge */}
       {!rail && (
-        <div className="flex items-center gap-2.5 rounded-md bg-purple-light px-3.5 py-2.5">
-          <Users size={20} className="text-purple" aria-hidden="true" />
+        <div className="flex items-center gap-2.5 rounded-md bg-purple-light px-3 py-2">
+          <Users size={18} className="text-purple" aria-hidden="true" />
           <div>
             <div className="font-head text-[11px] font-bold uppercase tracking-[1.4px] text-purple">Portal</div>
             <div className="font-head text-[13px] font-bold tracking-[0.5px] text-ink">{staffPortal ? 'Personal' : (ROLE_LABEL[role] ?? role)}</div>
@@ -146,13 +181,16 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       )}
 
       {/* Navigation */}
-      <nav aria-label="Menú del portal" className="scrollbar-none relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <nav ref={navRef} aria-label="Menú del portal" className="scrollbar-none relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain">
         {groups.map((group) => {
           // The group holding the current page is always open: folding it would
           // hide the highlighted "you are here" entry.
           const holdsCurrent = group.items.some((i) => (i.end ? pathname === i.to : pathname.startsWith(i.to)));
           const isFolded = !rail && folded.has(group.heading) && !holdsCurrent;
-          const panelId = `nav-group-${group.heading.replace(/\W+/g, '-').toLowerCase()}`;
+          const panelId = panelIdOf(group.heading);
+          // A folded group still says how much is waiting inside it.
+          const waiting = isFolded ? group.items.reduce((n, i) => n + (i.badgeKey ? badges[i.badgeKey] ?? 0 : 0), 0) : 0;
           return (
           <div key={group.heading}>
             {!rail && (
@@ -160,11 +198,17 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                 type="button"
                 aria-expanded={!isFolded}
                 aria-controls={panelId}
+                aria-label={waiting > 0 ? `${group.heading}, ${waiting} pendientes` : undefined}
                 onClick={() => toggleGroup(group.heading)}
-                className="flex w-full items-center justify-between rounded-sm px-3.5 pb-1 pt-1 text-left font-head text-[11px] font-bold uppercase tracking-[1.6px] text-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="flex min-h-[36px] w-full items-center gap-2 rounded-sm px-3.5 py-1 text-left font-head text-[11px] font-bold uppercase tracking-[1.6px] text-subtle hover:bg-cream-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
-                {group.heading}
-                <ChevronDown size={16} aria-hidden="true" className={`transition-transform ${isFolded ? '-rotate-90' : ''}`} />
+                <span className="flex-1">{group.heading}</span>
+                {waiting > 0 && (
+                  <span aria-hidden="true" className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-coral px-1.5 text-[10px] font-bold normal-case tracking-normal text-white">
+                    {waiting > 99 ? '99+' : waiting}
+                  </span>
+                )}
+                <ChevronDown size={16} aria-hidden="true" className={`shrink-0 transition-transform ${isFolded ? '-rotate-90' : ''}`} />
               </button>
             )}
             {rail && <div className="mx-auto mb-1 h-px w-8 bg-line" aria-hidden="true" />}
@@ -218,6 +262,10 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           );
         })}
       </nav>
+        {/* Scroll cues (decorative): fade where more of the menu is hidden. */}
+        <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-white to-transparent transition-opacity duration-200 ${edges.top ? 'opacity-100' : 'opacity-0'}`} />
+        <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent transition-opacity duration-200 ${edges.bottom ? 'opacity-100' : 'opacity-0'}`} />
+      </div>
 
       {/* User card → account actions (P1-E5) */}
       <div className="relative">

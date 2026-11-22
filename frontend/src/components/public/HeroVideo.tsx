@@ -23,6 +23,8 @@ interface Props {
   posterSrcSet?: string;
   posterAlt: string;
   reducedMotion: boolean;
+  /** The video has an audio track: show the sound toggle. Silent loops pass false. Default true. */
+  sound?: boolean;
   /** Rendered above the media (headline, CTAs). */
   children: React.ReactNode;
   className?: string;
@@ -42,7 +44,7 @@ interface Props {
  *    session. Audio never starts on its own — that is a deliberate, one-tap opt-in.
  * 5. Playback pauses when the hero scrolls away or the tab is hidden (battery).
  */
-export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion, children, className = '' }: Props) {
+export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion, sound = true, children, className = '' }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -145,7 +147,7 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
           >
             {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
           </button>
-          <button
+          {sound && <button
             type="button"
             onClick={toggleSound}
             aria-pressed={!muted}
@@ -154,7 +156,7 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
           >
             {muted ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
             <span className="hidden xs:inline">{muted ? 'Activar sonido' : 'Sonido activado'}</span>
-          </button>
+          </button>}
         </div>
       )}
 

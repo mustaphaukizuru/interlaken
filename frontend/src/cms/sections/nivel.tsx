@@ -12,6 +12,7 @@
 import { Fragment, useId, type ReactNode } from 'react';
 import { ArrowRight, CalendarCheck, CheckCircle2, MessageCircle, ShieldCheck, Users } from 'lucide-react';
 import { Reveal } from '@/components/ui/Reveal';
+import { BackgroundVideo } from '@/components/public/BackgroundVideo';
 import { Illustration, IllustrationPanel, wash } from '@/components/ui/Illustration';
 import type { IllustrationName } from '@/lib/illustrations';
 import { illustrationFor, resolveIllustration } from '@/lib/illustrationTopics';
@@ -49,7 +50,7 @@ const PROGRAM_ICON_OPTIONS = [
 const programArt = (v: unknown): IllustrationName => PROGRAM_ART[typeof v === 'string' && v in PROGRAM_ART ? v : 'reading'];
 
 /* ── Portada ────────────────────────────────────────────────────────────── */
-interface HeroProps { label?: string; title?: string; headline?: string; text?: string; image?: number | string; accent?: string; color?: string; primary?: CmsLink; secondary?: CmsLink }
+interface HeroProps { label?: string; title?: string; headline?: string; text?: string; image?: number | string; video?: string; accent?: string; color?: string; primary?: CmsLink; secondary?: CmsLink }
 function NivelHeroView(p: HeroProps) {
   const t = useTokens();
   const accent = accentOf(p.accent);
@@ -66,9 +67,14 @@ function NivelHeroView(p: HeroProps) {
         width={1600}
         height={900}
         decoding="async"
-        className="absolute inset-0 h-full w-full object-cover opacity-35"
+        className="absolute inset-0 h-full w-full object-cover"
         onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
       />
+      {/* A silent loop of the same photo (media round 2026-11-22); the photo stays as poster and fallback. */}
+      {p.video?.trim() && <BackgroundVideo src={p.video.trim()} poster={image.src} />}
+      {/* One veil over photo and video alike (they used to be dimmed separately, which stacked to a washed-out look):
+          dark where the text sits, lighter to the right; an even veil on phones, where the text spans the width. */}
+      <div aria-hidden="true" className="absolute inset-0 bg-dark/70 sm:bg-transparent sm:bg-gradient-to-r sm:from-dark/90 sm:via-dark/70 sm:to-dark/30" />
       <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         {p.label && <span className={`${accent.label} inline-flex`} style={{ borderLeft: `4px solid ${cmsColor(p.color)}`, paddingLeft: 10 }}>{t(p.label)}</span>}
         <h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]">
@@ -451,8 +457,20 @@ function NivelOthersView(p: { title?: string; items?: OtherItem[] }) {
 /* ── Defaults per level (lib/levels.ts + lib/levelStories.ts) ───────────── */
 const levelColor = (l: LevelData) => `var(--nivel-${l.slug})`;
 
+/**
+ * Hero loops (media round 2026-11-22): each level's own photo animated with a
+ * slow camera move (Freepik Kling 2.5, no people added), played forward then
+ * backward as a 10 s loop. The poster is the clip's first frame, so the photo
+ * and the video line up exactly.
+ */
+const HERO_MEDIA: Record<LevelData['slug'], { poster: string; video: string }> = {
+  preescolar: { poster: '/assets/hero-preescolar.webp', video: '/assets/video/hero-preescolar.mp4' },
+  primaria: { poster: '/assets/hero-primaria.webp', video: '/assets/video/hero-primaria.mp4' },
+  secundaria: { poster: '/assets/hero-secundaria.webp', video: '/assets/video/hero-secundaria.mp4' },
+};
+
 const heroProps = (l: LevelData) => ({
-  label: 'Niveles Educativos', title: l.name, headline: l.headline, text: l.intro, image: l.hero, accent: l.accent, color: levelColor(l),
+  label: 'Niveles Educativos', title: l.name, headline: l.headline, text: l.intro, image: HERO_MEDIA[l.slug].poster, video: HERO_MEDIA[l.slug].video, accent: l.accent, color: levelColor(l),
   primary: VISIT_CTA,
   secondary: INFORMES_CTA,
 });
@@ -534,6 +552,7 @@ export const sections = [
       f.text('headline', 'Frase principal', { hint: 'La línea grande bajo el nombre del nivel.' }),
       f.textarea('text', 'Presentación'),
       f.image('image', 'Foto'),
+      f.url('video', 'Video de portada (MP4)', { hint: 'Opcional. Video corto, sin sonido, en bucle sobre la foto. Vacío = solo la foto.' }),
       f.select('accent', 'Color de la etiqueta', ACCENT_OPTIONS),
       f.color('color', 'Color del nivel'),
       f.link('primary', 'Botón principal'),

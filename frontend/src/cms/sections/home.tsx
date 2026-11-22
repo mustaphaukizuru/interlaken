@@ -41,7 +41,7 @@ const heroItem: Variants = {
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 interface HeroProps {
   showLogo?: boolean; title?: string; titleAccent?: string; subtitle?: string;
-  primary?: CmsLink; secondary?: CmsLink; poster?: number | string; posterAlt?: string; video?: string;
+  primary?: CmsLink; secondary?: CmsLink; poster?: number | string; posterAlt?: string; video?: string; videoSound?: boolean;
 }
 function HomeHeroView(p: HeroProps) {
   const t = useTokens();
@@ -58,6 +58,8 @@ function HomeHeroView(p: HeroProps) {
       posterSrcSet={poster.srcSet}
       posterAlt={poster.alt}
       reducedMotion={reducedMotion}
+      // The hero's own video is a silent loop unless the editor says otherwise; the Ajustes video keeps its sound button.
+      sound={p.video?.trim() ? p.videoSound === true : true}
     >
       <div
         className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
@@ -144,13 +146,15 @@ export const sections = [
       f.image('poster', 'Foto de portada', { hint: 'Se ve mientras carga el video, o siempre si no hay video.' }),
       f.text('posterAlt', 'Descripción de la foto (accesibilidad)'),
       f.url('video', 'Video de portada (MP4)', { hint: 'Vacío = el video de Ajustes.' }),
+      f.toggle('videoSound', 'El video tiene sonido', { hint: 'Muestra el botón «Activar sonido». Déjelo apagado para un video en bucle sin audio.' }),
     ],
     defaults: {
       showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
       subtitle: 'Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.',
       primary: VISIT_CTA,
       secondary: { label: 'Portal Cafetería', href: '/login' },
-      poster: '/assets/court-wide.webp', posterAlt: 'Campus Colegio Interlaken', video: '',
+      // Media round 2026-11-22: the court photo animated (slow glide under the canopies, no people added), 10 s silent loop; the poster is its first frame.
+      poster: '/assets/hero-home.webp', posterAlt: 'Campus Colegio Interlaken', video: '/assets/video/hero-home.mp4', videoSound: false,
     },
   }),
   section({

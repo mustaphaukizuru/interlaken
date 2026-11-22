@@ -2513,7 +2513,8 @@
         "secondary": "Botón secundario",
         "poster": "Foto de portada",
         "posterAlt": "Descripción de la foto (accesibilidad)",
-        "video": "Video de portada (MP4)"
+        "video": "Video de portada (MP4)",
+        "videoSound": "El video tiene sonido"
       },
       "kinds": {
         "showLogo": "toggle",
@@ -2524,7 +2525,8 @@
         "secondary": "link",
         "poster": "image",
         "posterAlt": "text",
-        "video": "url"
+        "video": "url",
+        "videoSound": "toggle"
       },
       "defaults": {
         "showLogo": true,
@@ -2539,9 +2541,10 @@
           "label": "Portal Cafetería",
           "href": "/login"
         },
-        "poster": "/assets/court-wide.webp",
+        "poster": "/assets/hero-home.webp",
         "posterAlt": "Campus Colegio Interlaken",
-        "video": ""
+        "video": "/assets/video/hero-home.mp4",
+        "videoSound": false
       }
     },
     "home.lead": {
@@ -3315,6 +3318,7 @@
         "headline": "Frase principal",
         "text": "Presentación",
         "image": "Foto",
+        "video": "Video de portada (MP4)",
         "accent": "Color de la etiqueta",
         "color": "Color del nivel",
         "primary": "Botón principal",
@@ -3326,6 +3330,7 @@
         "headline": "text",
         "text": "textarea",
         "image": "image",
+        "video": "url",
         "accent": "select",
         "color": "color",
         "primary": "link",
@@ -3336,7 +3341,8 @@
         "title": "Preescolar",
         "headline": "Aprender también es jugar, descubrir y disfrutar",
         "text": "Cuando un niño se divierte, se emociona y siente curiosidad, aprender sucede de manera natural.",
-        "image": "/assets/hopscotch.webp",
+        "image": "/assets/hero-preescolar.webp",
+        "video": "/assets/video/hero-preescolar.mp4",
         "accent": "green",
         "color": "var(--nivel-preescolar)",
         "primary": {
