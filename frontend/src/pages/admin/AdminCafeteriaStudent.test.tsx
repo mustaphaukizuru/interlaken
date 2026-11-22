@@ -161,6 +161,25 @@ describe('AdminCafeteriaStudent money actions', () => {
     });
   });
 
+  it('previews the resulting balance and shows server errors next to the field', async () => {
+    const user = userEvent.setup();
+    adjustBalance.mockRejectedValueOnce({ isAxiosError: true, response: { status: 400, data: { amount: ['El saldo no puede quedar negativo.'] } } });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Luis López' });
+    await user.click(screen.getByRole('button', { name: /Ajustar saldo/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^Descontar$/i }));
+    fireEvent.change(within(dialog).getByLabelText(/Monto/i), { target: { value: '150' } });
+    // Display only: $120.00 − $150.00.
+    expect(within(dialog).getByText(/Saldo:/)).toHaveTextContent('Saldo: $120.00 → -$30.00');
+    fireEvent.change(within(dialog).getByLabelText(/^Motivo$/i), { target: { value: 'Corrección' } });
+    await user.click(within(dialog).getByRole('button', { name: /Descontar \$150/i }));
+    await waitFor(() => expect(adjustBalance).toHaveBeenCalledWith(7, -150, 'Corrección'));
+    expect(await within(dialog).findByText('El saldo no puede quedar negativo.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Monto/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+
   it('keeps refund confirm disabled until DEVOLVER is typed', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -216,7 +235,7 @@ describe('AdminCafeteriaStudent «Consumo registrado» (owner, 2026-11-08)', () 
 
     const consumo = (await screen.findByText('Consumo registrado')).parentElement as HTMLElement;
     expect(within(consumo).getByText('$907.00')).toBeInTheDocument();
-    expect(within(consumo).getByText('Compras desde el 3 de sep 2024')).toBeInTheDocument();
+    expect(within(consumo).getByText('Compras desde el 3 sep 2024')).toBeInTheDocument();
     expect(screen.queryByText('Gasto total')).toBeNull();
     const cash = screen.getByText('Efectivo/tarjeta en caja').parentElement as HTMLElement;
     expect(within(cash).getByText('$0.00')).toBeInTheDocument();

@@ -94,7 +94,7 @@ export default function AdminCalendar() {
   const copyIcs = async () => {
     try {
       await navigator.clipboard.writeText(calendarIcsUrl());
-      toast.success('Liga .ics copiada. Péguela en Google Calendar, Outlook o Apple Calendar para suscribirse.');
+      toast.success('Liga .ics copiada. Péguela en su calendario.');
     } catch {
       toast.error('No se pudo copiar la liga.');
     }

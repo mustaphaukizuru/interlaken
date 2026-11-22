@@ -24,7 +24,7 @@ export function CopyButton({ value, label, className = '' }: { value: string; la
       timer.current = setTimeout(() => setCopied(false), 1500);
       toast.success('Copiado');
     } catch {
-      toast.error('No se pudo copiar. Seleccione el texto y cópielo a mano.');
+      toast.error('No se pudo copiar. Cópielo a mano.');
     }
   };
 

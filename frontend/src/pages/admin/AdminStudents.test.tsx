@@ -324,7 +324,11 @@ describe('AdminStudents on DataTable v2 (Data Ops Phase 3)', () => {
 
       asRole('admin');
       renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
-      expect(await screen.findByRole('link', { name: 'Cafetería de Ana López' })).toBeInTheDocument();
+      await screen.findByText('Ana López');
+      // One inline action per row (Editar); Cafetería lives in the row menu.
+      expect(screen.queryByRole('link', { name: 'Cafetería de Ana López' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Más acciones para Ana López' }));
+      expect(screen.getByRole('menuitem', { name: 'Cafetería de Ana López' })).toBeInTheDocument();
     });
 
     it('on a phone the row actions are plain buttons named after the student', async () => {
@@ -420,7 +424,7 @@ describe('AdminStudents · Vincular como hermanos (bulk)', () => {
     await screen.findByText('Ana López');
     await userEvent.click(screen.getByRole('checkbox', { name: /Ana López/ }));
     await userEvent.click(screen.getByRole('button', { name: /Vincular como hermanos/ }));
-    expect(toast.error).toHaveBeenCalledWith('Elija al menos dos alumnos para vincularlos como hermanos.');
+    expect(toast.error).toHaveBeenCalledWith('Elija al menos dos alumnos.');
   });
 });
 

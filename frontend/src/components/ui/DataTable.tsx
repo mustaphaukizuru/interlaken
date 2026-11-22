@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, SearchX } from 'lucide-react';
 import { SortableTh, type SortState } from '@/components/ui/SortableTh';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { ColumnControls } from '@/components/admin/ColumnControls';
@@ -39,6 +40,9 @@ export interface Column<Row> {
   minWidth?: number;
   /** Cut a text cell to this many px with an ellipsis; the full text shows as a tooltip. */
   truncate?: number;
+  /** `low`: left out of the stacked phone rows (below md); the table shows it.
+   *  Default: shown everywhere. */
+  priority?: 'high' | 'low';
 }
 
 /** What a cell renders when it has nothing to show: one muted dash, everywhere. */
@@ -73,6 +77,10 @@ interface Props<Row> {
   isError?: boolean;
   onRetry?: () => void;
   empty?: { icon: LucideIcon; title: string; description?: string; action?: ReactNode };
+  /** Pass while filters or a search are active: an empty result then reads
+   *  «Sin resultados» with a «Limpiar filtros» action instead of the
+   *  first-use `empty` state (which says there is nothing at all). */
+  noResults?: { onClear?: () => void; title?: string; description?: string };
   /** Row-level className, e.g. to dim cancelled rows. */
   rowClassName?: (row: Row) => string;
   /** Extra classes on the scroll wrapper: `hidden md:block` for a desktop-only
@@ -124,7 +132,7 @@ const MIN_WIDTH = 56;
  */
 export function DataTable<Row>({
   columns, rows, rowKey, sort, onSort, page, count = 0, onPage, pageSize = ADMIN_PAGE_SIZE, itemLabel = 'resultados',
-  isLoading, isError, onRetry, empty, rowClassName, wrapClassName = '',
+  isLoading, isError, onRetry, empty, noResults, rowClassName, wrapClassName = '',
   tableId, selection, toolbar, bulkBar, columnControls = false, pinFirstColumn = false, pinActions = false, resizable = false,
   onRowClick, stickyHeader = true, rowActions, rowLabel, caption,
 }: Props<Row>) {
@@ -134,8 +142,12 @@ export function DataTable<Row>({
   );
   const defaultHidden = useMemo(() => cols.filter((c) => c.defaultHidden).map((c) => c.id), [cols]);
   const prefs = useTablePrefs(tableId, { defaultHidden });
-  const visible = useMemo(() => cols.filter((c) => !c.hideable || !prefs.isHidden(c.id)), [cols, prefs]);
   const isMd = useMediaQuery('(min-width: 768px)');
+  // Low-priority columns stay out of the stacked phone rows (below md).
+  const visible = useMemo(
+    () => cols.filter((c) => (!c.hideable || !prefs.isHidden(c.id)) && (isMd || c.priority !== 'low')),
+    [cols, prefs, isMd],
+  );
   const isLg = useMediaQuery('(min-width: 1024px)');
   const canResize = resizable && isMd;
 
@@ -224,7 +236,18 @@ export function DataTable<Row>({
   let body: ReactNode;
   if (isError) body = <ErrorState onRetry={onRetry} />;
   else if (isLoading && !rows) body = <TableSkeleton />;
-  else if (!rows || rows.length === 0) {
+  else if ((!rows || rows.length === 0) && noResults) {
+    body = (
+      <EmptyState
+        icon={SearchX}
+        title={noResults.title ?? 'Sin resultados'}
+        description={noResults.description ?? 'Nada coincide con la búsqueda o los filtros.'}
+        action={noResults.onClear ? (
+          <Button variant="secondary" size="sm" onClick={noResults.onClear}>Limpiar filtros</Button>
+        ) : undefined}
+      />
+    );
+  } else if (!rows || rows.length === 0) {
     body = empty ? <EmptyState icon={empty.icon} title={empty.title} description={empty.description} action={empty.action} /> : null;
   } else {
     const sortable = sort && onSort;

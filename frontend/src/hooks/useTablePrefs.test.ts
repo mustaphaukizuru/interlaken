@@ -6,7 +6,8 @@ describe('useTablePrefs', () => {
   it('starts from the defaults and persists changes under interlaken:table:<id>', () => {
     const { result } = renderHook(() => useTablePrefs('payments', { defaultHidden: ['reference'] }));
     expect(result.current.hidden).toEqual(['reference']);
-    expect(result.current.density).toBe('normal');
+    // Compact by default for anyone who never chose (UX Phase 7).
+    expect(result.current.density).toBe('dense');
     expect(result.current.dirty).toBe(false);
     expect(result.current.persisted).toBe(true);
 
@@ -15,7 +16,7 @@ describe('useTablePrefs', () => {
     act(() => result.current.setWidth('date', 140.6));
 
     const stored = JSON.parse(localStorage.getItem(prefsKey('payments')) || 'null');
-    expect(stored).toEqual({ hidden: ['reference', 'gateway'], density: 'dense', widths: { date: 141 } });
+    expect(stored).toEqual({ hidden: ['reference', 'gateway'], density: 'normal', widths: { date: 141 } });
     expect(result.current.dirty).toBe(true);
     expect(result.current.isHidden('gateway')).toBe(true);
   });
@@ -24,7 +25,7 @@ describe('useTablePrefs', () => {
     localStorage.setItem(prefsKey('audit'), JSON.stringify({ hidden: ['detail', 3], density: 'weird', widths: { a: 'x', b: 90 } }));
     const { result } = renderHook(() => useTablePrefs('audit'));
     expect(result.current.hidden).toEqual(['detail']);
-    expect(result.current.density).toBe('normal');
+    expect(result.current.density).toBe('dense');
     expect(result.current.widths).toEqual({ b: 90 });
 
     localStorage.setItem(prefsKey('broken'), '{not json');
@@ -34,12 +35,18 @@ describe('useTablePrefs', () => {
   it('reset restores defaults and forgets the stored entry', () => {
     const { result } = renderHook(() => useTablePrefs('t', { defaultHidden: ['x'] }));
     act(() => result.current.toggleColumn('x'));
-    act(() => result.current.setDensity('dense'));
+    act(() => result.current.setDensity('normal'));
     expect(localStorage.getItem(prefsKey('t'))).not.toBeNull();
     act(() => result.current.reset());
     expect(result.current.hidden).toEqual(['x']);
-    expect(result.current.density).toBe('normal');
+    expect(result.current.density).toBe('dense');
     expect(localStorage.getItem(prefsKey('t'))).toBeNull();
+  });
+
+  it('a stored density choice survives the new compact default', () => {
+    localStorage.setItem(prefsKey('kept'), JSON.stringify({ hidden: [], density: 'normal', widths: {} }));
+    const { result } = renderHook(() => useTablePrefs('kept'));
+    expect(result.current.density).toBe('normal');
   });
 
   it('works in memory without a tableId', () => {

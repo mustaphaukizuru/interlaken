@@ -156,12 +156,12 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
       let copied: boolean | undefined;
       if (channel === 'email') {
         if (res.sent) toast.success(`Enviado por correo a ${res.sent_to}.`);
-        else toast.error('El correo no salió. Envíe el mensaje por WhatsApp.');
+        else toast.error('El correo no salió. Use WhatsApp.');
       } else if (channel === 'whatsapp') {
         if (res.whatsapp_url) sendTo(win, res.whatsapp_url);
         else {
           win?.close();
-          toast.error('El expediente no tiene un celular de 10 dígitos. Copie el mensaje.');
+          toast.error('Sin celular de 10 dígitos. Copie el mensaje.');
         }
       } else {
         copied = await copyText(copy.hasLink && res.link ? res.link : res.whatsapp_text);

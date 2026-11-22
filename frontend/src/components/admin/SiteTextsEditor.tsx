@@ -156,7 +156,7 @@ export function SiteTextsEditor() {
   const save = useMutation({
     mutationFn: (patch: Record<string, unknown>) => contentApi.adminUpdateSettings({ chrome: mergeChrome(stored, SITE_TEXT_KEYS, patch) }),
     onSuccess: (res) => {
-      toast.success('Textos del sitio guardados. El sitio los muestra en unos minutos.');
+      toast.success('Textos del sitio guardados.');
       setError(''); setTexts(null); setLinks(null); setFieldError({});
       const chrome = (res?.data as { chrome?: Record<string, unknown> } | undefined)?.chrome;
       if (chrome) qc.setQueryData<{ chrome?: Record<string, unknown> }>(['admin-site-settings'], (prev) => (prev ? { ...prev, chrome } : prev));

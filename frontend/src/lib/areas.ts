@@ -63,6 +63,11 @@ export function canOpen(user: Who, path: string): boolean {
   return section[1].some((a) => held.has(a));
 }
 
+/** The areas that open a console path (empty = admin-only or not a section). */
+export function areasFor(path: string): AreaKey[] {
+  return sectionOf(path)?.[1] ?? [];
+}
+
 /** Where `user` lands in the console (null = no console). */
 export function consoleHome(user: Who): string | null {
   if (isAdmin(user)) return '/admin';

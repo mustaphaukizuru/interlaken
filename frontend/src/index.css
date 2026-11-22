@@ -297,6 +297,8 @@
      mobile these tables are replaced by card stacks, so internal scroll is
      desktop-only by design. */
   .admin-table-wrap { @apply w-full overflow-auto rounded-md bg-white shadow-card; max-height: 68vh; }
+  /* Inside a card the table is part of that surface: no second shadow (no card-in-card). */
+  .card .admin-table-wrap { box-shadow: none; border-radius: 0; }
   .admin-table--dense tbody td { @apply py-1.5 text-[13px]; }
   .admin-table { @apply w-full border-collapse text-sm; }
   .admin-table thead th {

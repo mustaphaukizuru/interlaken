@@ -417,7 +417,7 @@ export default function AdminPricing() {
           setSource('import');
           const first = TABLES.find((t) => tables[t.key]);
           if (first) setTab(first.key);
-          toast.success('Cambios cargados en el editor. Revise la vista previa y pulse «Guardar cambios».');
+          toast.success('Cambios cargados. Revise y pulse «Guardar cambios».');
         }}
       />
     </div>

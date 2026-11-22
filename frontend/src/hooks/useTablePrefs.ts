@@ -163,7 +163,7 @@ export function useTablePrefs(tableId: string | undefined, options: UseTablePref
   // defaults object is referentially stable across renders.
   const hiddenKey = (defaultHidden ?? []).join('\u0000');
   const defaults = useMemo<TablePrefs>(
-    () => ({ hidden: hiddenKey ? hiddenKey.split('\u0000') : [], density: defaultDensity ?? 'normal', widths: {} }),
+    () => ({ hidden: hiddenKey ? hiddenKey.split('\u0000') : [], density: defaultDensity ?? 'dense', widths: {} }), // compact unless the person chose otherwise (UX Phase 7)
     [hiddenKey, defaultDensity],
   );
 

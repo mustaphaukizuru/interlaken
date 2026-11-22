@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatMXN } from '@/lib/format';
 import { Link2, AlertTriangle, CheckCircle2, UserMinus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
@@ -110,7 +111,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
     try {
       const { data } = await portalApi.bulkStudents({ ids: [...selected], action: 'status', value: 'withdrawn' });
       const notDone = (data.failed?.length ?? 0) + (data.skipped?.length ?? 0);
-      if (notDone > 0) toast.error(`${data.updated} dado(s) de baja; ${notDone} no se pudieron aplicar.`);
+      if (notDone > 0) toast.error(`${data.updated} dado(s) de baja; ${notDone} sin aplicar.`);
       else toast.success(`${data.updated} alumno(s) dados de baja.`);
       setConfirmBaja(false);
       setSelected(new Set());
@@ -147,7 +148,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
         </div>
       ) : phase === 'error' ? (
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-md border border-coral/30 bg-coral-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-sm bg-danger-bg px-4 py-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-coral-dark" />
             <p className="text-sm text-ink">{error}</p>
           </div>
@@ -223,7 +224,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
               `Se marcarán ${selected.size} alumno(s) como baja definitiva: dejan de contar como activos, `
               + 'su cuenta de alumno ya no puede iniciar sesión y quedan en Auditoría. '
               + (selectedBalance > 0
-                ? `Entre ellos queda un saldo de $${selectedBalance.toFixed(2)} en cafetería; la baja no lo toca — decida su devolución por separado.`
+                ? `Entre ellos queda un saldo de ${formatMXN(selectedBalance)} en cafetería; la baja no lo toca — decida su devolución por separado.`
                 : 'Ninguno de los seleccionados tiene saldo pendiente en cafetería.')
             }
           />
@@ -293,7 +294,7 @@ function LeaverGroup({ rows, selected, onToggle, onToggleAll, selectAllLabel, ti
               </span>
             </span>
             <span className={`whitespace-nowrap text-xs ${parseFloat(u.balance) > 0 ? 'font-semibold text-amber' : 'text-subtle'}`}>
-              ${parseFloat(u.balance || '0').toFixed(2)}
+              {formatMXN(u.balance || '0')}
             </span>
           </li>
         ))}

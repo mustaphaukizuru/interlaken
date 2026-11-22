@@ -242,4 +242,37 @@ describe('DataTable · a new default-hidden column reaches saved prefs', () => {
     expect(screen.queryByRole('columnheader', { name: 'Notas' })).not.toBeInTheDocument();
     expect(screen.getByRole('table')).toHaveClass('admin-table--dense');
   });
+
+  it('tells «no results» (with «Limpiar filtros») apart from a first-use empty table', async () => {
+    const onClear = vi.fn();
+    const empty = { icon: Inbox, title: 'Aún no hay pagos' };
+    const { rerender } = render(<DataTable<Row> columns={COLUMNS} rows={[]} rowKey={(r) => r.id} empty={empty} />);
+    expect(screen.getByText('Aún no hay pagos')).toBeInTheDocument();
+    rerender(<DataTable<Row> columns={COLUMNS} rows={[]} rowKey={(r) => r.id} empty={empty} noResults={{ onClear }} />);
+    expect(screen.queryByText('Aún no hay pagos')).not.toBeInTheDocument();
+    expect(screen.getByText('Sin resultados')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves low-priority columns out of the stacked phone rows only', () => {
+    const cols: Column<Row>[] = [
+      { id: 'name', header: 'Nombre', cell: (r) => r.name },
+      { id: 'amount', header: 'Monto', priority: 'low', cell: (r) => r.amount },
+    ];
+    stubViewport(390);
+    const { unmount } = render(<DataTable<Row> columns={cols} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(screen.getByText('Ana')).toBeInTheDocument();
+    expect(screen.queryByText('20')).not.toBeInTheDocument();
+    unmount();
+    stubViewport(1280);
+    render(<DataTable<Row> columns={cols} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(screen.getByText('20')).toBeInTheDocument();
+  });
+
+  it('counts pages with es-MX grouping', () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `N${i}`, amount: i }));
+    render(<DataTable<Row> columns={COLUMNS} rows={many} rowKey={(r) => r.id} page={2} count={1234} onPage={() => {}} itemLabel="pagos" />);
+    expect(screen.getByRole('navigation', { name: 'Paginación' })).toHaveTextContent('21–40 de 1,234 pagos');
+  });
 });

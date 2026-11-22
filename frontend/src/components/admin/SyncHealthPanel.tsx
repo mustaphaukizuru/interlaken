@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatMXN } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { STUDENTS_ENTITY, STUDENTS_RELATED } from '@/hooks/queries/studentKeys';
@@ -200,7 +201,7 @@ export function buildChecks(h: SyncHealth): Check[] {
         : drifting === 0
           ? `${audit.compared} alumno(s) comparados ${ago(audit.at)}`
             + (audit.deferred > 0 ? `; ${audit.deferred} en espera por movimientos recientes.` : '.')
-          : `Diferencia total $${driftTotal.toFixed(2)} (${ago(audit.at)}). Si persiste después del `
+          : `Diferencia total ${formatMXN(driftTotal)} (${ago(audit.at)}). Si persiste después del `
             + 'repaso nocturno, revise la pestaña Reconciliación.',
     },
     {

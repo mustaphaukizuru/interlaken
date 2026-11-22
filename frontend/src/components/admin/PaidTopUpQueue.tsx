@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { formatMXN } from '@/lib/format';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -20,7 +21,7 @@ import { MulticobrosUploadButton } from '@/components/admin/MulticobrosUploadBut
 import { FilterBar } from '@/components/admin/FilterBar';
 import { PersonalTag } from '@/components/admin/PersonalTag';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
-import { useUrlFilters } from '@/hooks/useUrlFilters';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { PERSON_STATUS_OPTIONS, PERSON_TIPO_OPTIONS, personStatusParam } from '@/lib/people';
 import { idsParam, type BulkResult, type ExportFormat } from '@/services/dataOps';
 import { cafeteriaAdminApi, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
@@ -33,7 +34,8 @@ import { LIVE } from '@/lib/live';
 import { schoolToday } from '@/lib/topupApply';
 import type { TopUpLogEntry } from '@/types';
 
-const mxn = (v: string | number | null | undefined) => `$${parseFloat(String(v ?? 0)).toFixed(2)}`;
+/** One money format everywhere (es-MX grouping): display only. */
+const mxn = formatMXN;
 const when = (d?: string | null) => (d ? format(new Date(d), "d MMM, HH:mm", { locale: es }) : '—');
 
 /** Loyverse (last sync) minus the wallet: what staff typed in and the app has not applied yet. */
@@ -62,7 +64,8 @@ function useInvalidateMoney() {
  * the app applies it on its own within minutes (or press «Aplicar»).
  */
 export function PaidTopUpQueue() {
-  const [page, setPage] = useState(1);
+  // Its own page key: the POS tab shows several paged queues at once.
+  const [page, setPage] = useUrlPage('apage');
   // A8: active people by default; bajas, archivados and «Personal» on demand.
   const { get, set } = useUrlFilters();
   const studentStatus = personStatusParam(get('estado'));
@@ -210,7 +213,7 @@ export function PaidTopUpQueue() {
         </div>
       </div>
       {hiddenInactive > 0 && (
-        <div role="note" className="mb-3 flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-2.5 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+        <div role="note" className="mb-3 flex flex-col gap-2 rounded-sm bg-warning-bg px-4 py-2.5 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
           <span>
             <strong>{hiddenInactive} recarga{hiddenInactive === 1 ? '' : 's'} pagada{hiddenInactive === 1 ? '' : 's'}</strong> de
             personas que ya no están activas no se muestra{hiddenInactive === 1 ? '' : 'n'} con el filtro «Activos».
@@ -312,7 +315,7 @@ export function PaidTopUpQueue() {
  * recarga of the same amount, and the family's card payment is still owed.
  */
 export function AppliedTodayList() {
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useUrlPage('hpage');
   const filters = { applied_on: schoolToday(), ordering: '-applied_at' };
   const { data, isLoading, isError, refetch } = useTopUpsList({ page, ...filters }, LIVE);
   const count = data?.count ?? 0;

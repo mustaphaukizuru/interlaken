@@ -347,7 +347,7 @@ export default function AdminPageEditor() {
       setServerErrors([]);
       setServerWarnings([]);
       setEditedHere(false);
-      toast.success('Cambios descartados: el borrador es igual a lo que muestra el sitio.');
+      toast.success('Cambios descartados: el borrador es el publicado.');
     },
     onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : apiFieldErrors(e).detail || 'No se pudieron descartar los cambios.'),
   });
@@ -355,7 +355,7 @@ export default function AdminPageEditor() {
   /** A quick fix of the review: the field takes the backend's value (undo and autosave as any edit), then a new review. */
   const fixIssue = (issue: ReviewIssue) => {
     const res = applyFix(draft.current.blocks, draft.current.meta.seo, issue);
-    if (!res) { toast.error('Esta corrección ya no aplica: la sección cambió. Use «Ir al campo».', dialogToast); return; }
+    if (!res) { toast.error('La sección cambió. Use «Ir al campo».', dialogToast); return; }
     if (res.blocks) update(res.blocks);
     if (res.seo) updateMeta({ seo: res.seo });
     toast.success(`Corregido: ${issue.fix?.label ?? ''}.`, dialogToast);
@@ -399,7 +399,7 @@ export default function AdminPageEditor() {
       await flushOrThrow();
       const { data } = await contentApi.adminPreviewToken(pageId);
       const url = previewUrl(meta.slug || page?.slug || '', data.token);
-      if (win) { win.opener = null; win.location.href = url; } else toast.error('El navegador bloqueó la pestaña nueva. Use «Más» y «Enlace de vista previa».');
+      if (win) { win.opener = null; win.location.href = url; } else toast.error('Pestaña bloqueada. Use «Enlace de vista previa».');
     } catch (e) {
       win?.close();
       toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo abrir la vista previa.');
@@ -449,7 +449,7 @@ export default function AdminPageEditor() {
   const copyBlock = (b: Block) => {
     try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(b)); } catch { /* private mode: the copy lives only in this tab */ }
     setClip(b);
-    toast.success('Sección copiada. Puede pegarla en esta u otra página con «Pegar».');
+    toast.success('Sección copiada. Péguela con «Pegar».');
   };
   const insertAfterAnchor = (b: Block) => {
     const anchor = selected ?? lastSelected;
@@ -544,7 +544,7 @@ export default function AdminPageEditor() {
     if (res.data) {
       initFrom(res.data);
       setSelected(null);
-      toast.success('Se cargó la versión más reciente. Su copia quedó guardada en este navegador.');
+      toast.success('Versión reciente cargada; su copia quedó guardada.');
     }
   };
   const overwriteMine = async () => {
@@ -850,7 +850,7 @@ export default function AdminPageEditor() {
         pageTitle={pageTitle}
         canLoad={!!original}
         publishing={publish.isPending}
-        onLoadDesign={() => { loadDesign(); setDialog(null); toast.success('Diseño actual cargado. Revise sus cambios y publique cuando esté lista.'); }}
+        onLoadDesign={() => { loadDesign(); setDialog(null); toast.success('Diseño actual cargado. Revise y publique.'); }}
         onPublishAnyway={dialog === 'legacy' ? () => publish.mutate({ action: 'publish', confirmLegacy: true }) : undefined}
       />
       <Modal open={dialog === 'reject'} onClose={() => setDialog(null)} title="Pedir cambios al editor" maxWidth={480}>

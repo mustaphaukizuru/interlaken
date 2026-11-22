@@ -190,7 +190,7 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
       toast.success(`${existing.name} volvió a la lista como «Baja definitiva».`);
       onClose();
     } catch {
-      toast.error('No se pudo restaurar. Inténtelo desde la pestaña Archivados.');
+      toast.error('No se pudo restaurar. Use la pestaña Archivados.');
     } finally {
       setRestoring(false);
     }

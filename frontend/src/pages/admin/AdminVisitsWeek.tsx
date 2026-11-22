@@ -130,9 +130,11 @@ export default function AdminVisitsWeek() {
           {exams.isError && <li className="text-coral-700" role="status">No se pudieron cargar los exámenes.</li>}
         </ul>
       )}
+      {/* The week wraps instead of scrolling sideways (768–1535 px): seven
+          columns only where seven fit, two or four per row before that. */}
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
-        <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
-          <div className="grid grid-cols-1 gap-2 md:min-w-[980px] md:grid-cols-7" role="list" aria-label="Días de la semana">
+        <div className="pb-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7" role="list" aria-label="Días de la semana">
             {data.days.map((d, i) => {
               const isToday = d.date === today;
               return (

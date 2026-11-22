@@ -79,7 +79,7 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
   };
 
   const unwaive = () => patch.mutate({ documents_waived: false }, {
-    onSuccess: () => toast.success('Se quitó la dispensa: los documentos vuelven a contar.'),
+    onSuccess: () => toast.success('Dispensa quitada: los documentos vuelven a contar.'),
     onError: (e) => toast.error(errorsFrom(e).detail ?? 'No se pudo quitar la dispensa.'),
   });
 

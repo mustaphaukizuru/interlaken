@@ -188,7 +188,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     const confirm = await screen.findByRole('dialog', { name: '¿Descartar los cambios sin publicar?' });
     await userEvent.click(within(confirm).getByRole('button', { name: 'Descartar cambios' }));
     await waitFor(() => expect(reviewApi.discard).toHaveBeenCalledWith(7, 4));
-    expect(toast.success).toHaveBeenCalledWith('Cambios descartados: el borrador es igual a lo que muestra el sitio.');
+    expect(toast.success).toHaveBeenCalledWith('Cambios descartados: el borrador es el publicado.');
     expect(screen.queryByRole('dialog', { name: 'Revisión antes de publicar' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Este borrador tiene cambios sin publicar/)).not.toBeInTheDocument();
   });

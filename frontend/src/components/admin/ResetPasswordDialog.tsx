@@ -90,7 +90,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
       setCopied(true);
       toast.success('Contraseña copiada al portapapeles.');
     } catch {
-      toast.error('No se pudo copiar. Seleccione el texto y cópielo a mano.');
+      toast.error('No se pudo copiar. Cópielo a mano.');
     }
   };
 

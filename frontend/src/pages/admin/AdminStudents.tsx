@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type MouseEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, House, Briefcase, type LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
@@ -116,6 +116,7 @@ export default function AdminStudents() {
   const canDelete = isAdmin(me);
   // Secretaría without the cafetería area was bounced from that link silently.
   const canCafeteria = canOpen(me, '/admin/cafeteria');
+  const navigate = useNavigate();
   // «Alumnos» / «Personal» (2026-11-18): staff cafetería accounts are never
   // in the pupils' list; their own tab lists them with their puesto.
   const personal = get('tipo') === 'personal';
@@ -245,7 +246,12 @@ export default function AdminStudents() {
         return (
           <div className="flex flex-wrap gap-1">
             <Badge variant={meta?.variant ?? 'neutral'}>{meta?.label ?? s.status}</Badge>
-            {s.is_active !== false && s.loyverse_missing_since && <Badge variant="warning">Sin cliente en Loyverse</Badge>}
+            {/* One badge per row: the second fact reads as a quiet warning line. */}
+            {s.is_active !== false && s.loyverse_missing_since && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
+                <AlertTriangle size={16} aria-hidden="true" /> Sin cliente en Loyverse
+              </span>
+            )}
           </div>
         );
       },
@@ -289,9 +295,9 @@ export default function AdminStudents() {
 
   const startBulk = (action: BulkActionDef) => {
     if (action.name === 'family') {
-      if (selection.allMatching) { toast.error('Elija a los hermanos uno por uno, no «todos los que coinciden».'); return; }
+      if (selection.allMatching) { toast.error('Elija a los hermanos uno por uno.'); return; }
       const ids = selection.ids.map(Number);
-      if (ids.length < 2) { toast.error('Elija al menos dos alumnos para vincularlos como hermanos.'); return; }
+      if (ids.length < 2) { toast.error('Elija al menos dos alumnos.'); return; }
       if (ids.length > 10) { toast.error('Una familia admite hasta 10 alumnos.'); return; }
       const byId = new Map((students ?? []).map((s) => [s.id, s]));
       setLinkFamily(ids.map((id) => {
@@ -526,13 +532,24 @@ export default function AdminStudents() {
                 <button type="button" onClick={() => setEditing(s)} className={ROW_ACTION} title="Editar" aria-label={`Editar a ${s.user.full_name}`}>
                   <RowActionLabel icon={Pencil} label="Editar" />
                 </button>
-                {canCafeteria && (
+                {/* From lg one inline action (Editar) plus the menu; below lg the
+                    table folds everything into its «Acciones» popover anyway. */}
+                {canCafeteria && !isLg && (
                   <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} title="Cafetería" aria-label={`Cafetería de ${s.user.full_name}`}>
                     <RowActionLabel icon={Wallet} label="Cafetería" />
                   </Link>
                 )}
                 {isLg ? (
-                  <RowActionsMenu label={`Más acciones para ${s.user.full_name}`} items={lifecycleItems(s)} />
+                  <RowActionsMenu
+                    label={`Más acciones para ${s.user.full_name}`}
+                    items={[
+                      ...(canCafeteria ? [{
+                        key: 'cafeteria', label: 'Cafetería', icon: Wallet, ariaLabel: `Cafetería de ${s.user.full_name}`,
+                        onSelect: () => navigate(`/admin/cafeteria/${s.id}`),
+                      }] : []),
+                      ...lifecycleItems(s),
+                    ]}
+                  />
                 ) : lifecycleItems(s).map((it) => {
                   const Icon = it.icon!;
                   return (

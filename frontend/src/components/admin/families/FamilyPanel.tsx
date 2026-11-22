@@ -117,7 +117,7 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
   const confirmDissolve = () => {
     dissolve.mutate(family.id, {
       onSuccess: () => {
-        toast.success(`${family.name} disuelta. Los expedientes y las cuentas no cambian.`);
+        toast.success(`${family.name} disuelta. Los expedientes no cambian.`);
         setDissolving(false);
         onGone?.();
       },

@@ -87,7 +87,7 @@ function ChromeEditor() {
     mutationFn: (chrome: Partial<SiteChrome>) => contentApi.adminUpdateSettings({ chrome: mergeChrome(data?.chrome, CHROME_KEYS, chrome) }),
     onSuccess: (_res, own) => {
       const chrome = mergeChrome(data?.chrome, CHROME_KEYS, own);
-      toast.success('Encabezado y pie de página guardados. El sitio los muestra en unos minutos.');
+      toast.success('Encabezado y pie de página guardados.');
       setError(''); setDraft(null);
       qc.setQueryData<{ chrome?: Partial<SiteChrome> }>(['admin-site-settings'], (prev) => (prev ? { ...prev, chrome } : prev));
       qc.invalidateQueries({ queryKey: ['admin-site-settings'] }); qc.invalidateQueries({ queryKey: ['site-settings'] });

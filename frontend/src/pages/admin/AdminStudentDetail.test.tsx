@@ -167,11 +167,15 @@ describe('AdminStudentDetail: archiving, removing and history', () => {
     }));
   });
 
-  it('does not offer the delete to staff', async () => {
+  it('shows staff the delete disabled, with the reason', async () => {
     useAuthStore.setState({ user: { id: 2, email: 's@x.mx', role: 'staff', staff_areas: ['alumnos'] } as never });
     openFile();
     expect(await screen.findByRole('button', { name: 'Archivar' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Eliminar' })).toBeNull();
+    const del = screen.getByRole('button', { name: 'Eliminar' });
+    expect(del).toHaveAttribute('aria-disabled', 'true');
+    expect(del).toHaveAccessibleDescription('Solo administradores');
+    await userEvent.click(del);
+    expect(screen.queryByRole('dialog', { name: /Eliminar/ })).toBeNull();
   });
 
   it('Historial lists who changed what', async () => {

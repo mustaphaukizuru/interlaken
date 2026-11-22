@@ -119,7 +119,7 @@ function AccessForm({ user, onClose, onSaved }: { user: StaffUser; onClose: () =
   });
   const save = useMutation({
     mutationFn: () => portalApi.updateStaff(user.id, value),
-    onSuccess: () => { toast.success('Acceso actualizado. Aplica desde la siguiente acción de la persona.'); onSaved(); onClose(); },
+    onSuccess: () => { toast.success('Acceso actualizado.'); onSaved(); onClose(); },
     onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo guardar el acceso.')),
   });
   return (

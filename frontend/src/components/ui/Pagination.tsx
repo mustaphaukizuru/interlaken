@@ -18,6 +18,9 @@ interface PaginationProps {
  * page holds every row. Controls are ≥44px touch targets with visible focus and
  * token-driven colors; disabled at the range edges.
  */
+/** es-MX digit grouping: «1,234». */
+const n = (v: number) => v.toLocaleString('es-MX');
+
 export function Pagination({ page, pageSize, count, onChange, itemLabel = 'resultados' }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
   if (count <= pageSize) return null;
@@ -34,7 +37,7 @@ export function Pagination({ page, pageSize, count, onChange, itemLabel = 'resul
       className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4"
     >
       <p className="text-sm text-muted" aria-live="polite">
-        {from}–{to} de <span className="font-semibold text-ink">{count}</span> {itemLabel}
+        {n(from)}–{n(to)} de <span className="font-semibold text-ink">{n(count)}</span> {itemLabel}
       </p>
       <div className="flex items-center gap-2">
         <button
@@ -47,7 +50,7 @@ export function Pagination({ page, pageSize, count, onChange, itemLabel = 'resul
           <ChevronLeft className="h-4 w-4" /> Anterior
         </button>
         <span className="px-1 text-sm text-muted whitespace-nowrap">
-          Página <span className="font-semibold text-ink">{page}</span> de {totalPages}
+          Página <span className="font-semibold text-ink">{n(page)}</span> de {n(totalPages)}
         </span>
         <button
           type="button"

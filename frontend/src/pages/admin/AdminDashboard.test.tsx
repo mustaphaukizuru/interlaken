@@ -8,6 +8,9 @@ vi.mock('@/services/api', () => ({
     getDashboard: vi.fn(),
     getStaffAnalytics: vi.fn(),
   },
+  coreApi: {
+    getBadges: vi.fn(),
+  },
 }));
 
 vi.mock('@/components/ui/Reveal', () => ({
@@ -19,11 +22,14 @@ vi.mock('@/components/staff/ChartsSection', () => ({
 }));
 
 import AdminDashboard from './AdminDashboard';
-import { portalApi } from '@/services/api';
+import { coreApi, portalApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { useAuthStore } from '@/store/authStore';
+import type { User } from '@/types';
 
 const getDashboard = vi.mocked(portalApi.getDashboard);
 const getStaffAnalytics = vi.mocked(portalApi.getStaffAnalytics);
+const getBadges = vi.mocked(coreApi.getBadges);
 
 const DASHBOARD = {
   total_students: 120,
@@ -45,10 +51,14 @@ const DASHBOARD = {
   }>,
 };
 
+const pendientes = () => screen.findByRole('region', { name: 'Pendientes' });
+
 describe('AdminDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuthStore.setState({ user: null });
     getStaffAnalytics.mockResolvedValue({ data: null } as never);
+    getBadges.mockResolvedValue({ data: {} } as never);
   });
 
   it('shows the pupils and the staff wallet totals apart', async () => {
@@ -62,91 +72,113 @@ describe('AdminDashboard', () => {
     await waitFor(() => expect(screen.getByText('$3,200.50')).toBeInTheDocument());
   });
 
-  it('shows KPI counts including pending registrations', async () => {
+  it('KPI tiles are real links to the list behind the figure', async () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
-
     renderWithProviders(<AdminDashboard />, { route: '/admin' });
-
-    // KPIs re-cut for the cafetería-only money path (BACKLOG P1-H5)
-    expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
-    // Pupils and staff wallets apart (2026-11-18).
-    expect(screen.getByText('Saldo alumnos')).toBeInTheDocument();
-    expect(screen.getByText('Admisiones en cola')).toBeInTheDocument();
-    expect(screen.getByText('Cobrado este mes')).toBeInTheDocument();
-    expect(screen.getByText('Visitas hoy')).toBeInTheDocument();
-    expect(screen.getByText('4 pre-registros · 2 inscripciones')).toBeInTheDocument();
-
-    await waitFor(
-      () => {
-        expect(screen.getByText('120')).toBeInTheDocument();
-        expect(screen.getByText('6')).toBeInTheDocument();
-        expect(screen.getByText('5')).toBeInTheDocument();
-      },
-      { timeout: 2000 },
-    );
+    expect(await screen.findByRole('link', { name: /Alumnos activos/ })).toHaveAttribute('href', '/admin/alumnos');
+    expect(screen.getByRole('link', { name: /Saldo alumnos/ })).toHaveAttribute('href', '/admin/cafeteria');
+    expect(screen.getByRole('link', { name: /Cobrado este mes/ }).getAttribute('href')).toMatch(/^\/admin\/pagos\?estado=success&desde=\d{4}-\d{2}-01$/);
+    // Queues are no longer tiles: they live in «Pendientes».
+    expect(screen.queryByText('Admisiones en cola')).toBeNull();
+    expect(screen.queryByText('Por atender')).toBeNull();
+    await waitFor(() => expect(screen.getByText('120')).toBeInTheDocument(), { timeout: 2000 });
   });
 
-  it('links the paid card top-ups straight to the 07:30 list', async () => {
-    getDashboard.mockResolvedValue({ data: { ...DASHBOARD, paid_topups_to_apply: 3, paid_topups_to_apply_total: '450.00' } } as never);
-    renderWithProviders(<AdminDashboard />);
-    const link = await screen.findByRole('link', { name: /3 recargas con tarjeta por aplicar/ });
-    expect(link).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
-    expect(link).toHaveTextContent('$450.00');
-  });
-
-  it('«Recargas pendientes de verificar»: count, total, oldest wait and the way to the queue', async () => {
-    const dayAgo = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
-    getDashboard.mockResolvedValue({ data: {
-      ...DASHBOARD, topups_to_verify: 2, topups_to_verify_total: '444.00', topups_to_verify_oldest: dayAgo,
+  it('«Pendientes» lists only the non-zero queues, most urgent first, each a link to its list', async () => {
+    getDashboard.mockResolvedValue({ data: { ...DASHBOARD, topups_to_verify_total: '444.00' } } as never);
+    getBadges.mockResolvedValue({ data: {
+      cafeteria_verificar: 2, cafeteria_verificar_edad: 26 * 60, preregistros: 4, documentos: 0,
+      pagos_fallidos: 1, mensajes: 1, mensajes_edad: 30, arco: 2, arco_vencidas: 1,
     } } as never);
-    renderWithProviders(<AdminDashboard />);
-    const card = await screen.findByRole('region', { name: 'Recargas pendientes de verificar' });
-    expect(card).toHaveTextContent('2 recargas');
-    expect(card).toHaveTextContent('$444.00');
-    expect(card).toHaveTextContent('La más antigua: hace 1 día');
-    expect(within(card).getByRole('link', { name: /Verificar ahora/ })).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    const list = await pendientes();
+    const links = await within(list).findAllByRole('link');
+    expect(links.map((l) => l.textContent?.replace(/\s+/g, ' ').trim().split(' · ')[0])).toEqual([
+      expect.stringMatching(/^2 recargas por verificar/),
+      expect.stringMatching(/^1 pago con tarjeta fallido/),
+      expect.stringMatching(/^2 solicitudes ARCO abiertas/),
+      expect.stringMatching(/^4 pre-registros nuevos/),
+      expect.stringMatching(/^1 mensaje sin atender/),
+    ]);
+    expect(links[0]).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
+    expect(links[0]).toHaveTextContent('$444.00');
+    expect(links[0]).toHaveTextContent('Desde hace 1 día');
+    expect(links[1].getAttribute('href')).toMatch(/^\/admin\/pagos\?estado=failed&desde=/);
+    // ARCO past its legal deadline opens the overdue filter.
+    expect(links[2]).toHaveAttribute('href', '/admin/arco?vencidas=1');
+    expect(links[2]).toHaveTextContent('1 fuera de plazo legal');
+    expect(links[3]).toHaveAttribute('href', '/admin/admisiones?etapa=informes');
+    expect(links[4]).toHaveTextContent('Desde hace 30 minutos');
+    expect(within(list).queryByText(/documento/)).toBeNull();
   });
 
-  it('hides the verification card when nothing waits', async () => {
+  it('says «Todo al día» when nothing waits', async () => {
+    getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
+    getBadges.mockResolvedValue({ data: { notificaciones: 3, cafeteria: 0, preregistros: 0 } } as never);
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    expect(await within(await pendientes()).findByText('Todo al día')).toBeInTheDocument();
+  });
+
+  it('a staff account sees only the pending items of its areas, with no admin figures', async () => {
+    useAuthStore.setState({ user: { id: 7, email: 'caja@demo.test', role: 'staff', staff_areas: ['cafeteria'] } as unknown as User });
+    getBadges.mockResolvedValue({ data: { cafeteria_aplicar: 3, saldo_bajo: 5 } } as never);
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    const list = await pendientes();
+    expect(await within(list).findByText(/recargas con tarjeta por aplicar/)).toBeInTheDocument();
+    expect(screen.getByText(/De sus áreas: Cafetería y pagos/)).toBeInTheDocument();
+    expect(getDashboard).not.toHaveBeenCalled();
+    expect(getStaffAnalytics).not.toHaveBeenCalled();
+    expect(screen.queryByText('Alumnos activos')).toBeNull();
+    // Shortcuts only to sections the account may open.
+    const nav = screen.getByRole('navigation', { name: 'Accesos rápidos' });
+    expect(within(nav).getByRole('link', { name: 'Cafetería' })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Alumnos' })).toBeNull();
+  });
+
+  it('activity and audiences read in Spanish, never as raw codes', async () => {
     getDashboard.mockResolvedValue({ data: {
-      ...DASHBOARD, topups_to_verify: 0, topups_to_verify_total: '0.00', topups_to_verify_oldest: null,
+      ...DASHBOARD,
+      recent_activity: [
+        { id: 1, when: '2026-11-20T10:00:00Z', actor: 'Ana López', action: 'update', object_type: 'accounts.studentprofile', object_id: '12', context: '' },
+        { id: 2, when: '2026-11-20T09:00:00Z', actor: '', action: 'create', object_type: 'cafeteria.topuprequest', object_id: '3', context: '' },
+      ],
+      announcements: [{ id: 9, title: 'Junta de padres', audience: 'parents', created_at: '2026-11-19T12:00:00Z' }],
     } } as never);
-    renderWithProviders(<AdminDashboard />);
-    expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
-    expect(screen.queryByText('Recargas pendientes de verificar')).toBeNull();
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    expect(await screen.findByText(/modificó un alumno/)).toBeInTheDocument();
+    expect(screen.getByText(/creó una recarga/)).toBeInTheDocument();
+    expect(screen.getByText('Sistema')).toBeInTheDocument();
+    expect(screen.queryByText(/studentprofile/)).toBeNull();
+    expect(screen.getAllByText('Padres').length).toBeGreaterThan(0);
+    expect(screen.queryByText('parents')).toBeNull();
   });
 
   it('shows announcements empty state when there are none', async () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
-
     renderWithProviders(<AdminDashboard />, { route: '/admin' });
-
-    expect(await screen.findByText('Sin actividad reciente')).toBeInTheDocument();
-    expect(screen.getByText('Avisos Recientes')).toBeInTheDocument();
+    expect(await screen.findByText('Sin avisos recientes')).toBeInTheDocument();
+    expect(screen.getByText('Avisos recientes')).toBeInTheDocument();
   });
 
   it('shows ErrorState with retry when the dashboard fails to load', async () => {
     getDashboard.mockRejectedValue(new Error('network'));
-
     renderWithProviders(<AdminDashboard />, { route: '/admin' });
-
     expect(await screen.findByText(/No se pudo cargar la información/i)).toBeInTheDocument();
-    expect(screen.queryByText('Avisos Recientes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Avisos recientes')).not.toBeInTheDocument();
 
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
     await userEvent.click(screen.getByRole('button', { name: /Reintentar/i }));
-
     expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
   });
 
-  it('quick actions say what they do, and a failed analytics load shows an error with retry', async () => {
+  it('shortcuts are quiet links, and a failed analytics load shows an error with retry', async () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
     getStaffAnalytics.mockRejectedValue(new Error('500'));
     renderWithProviders(<AdminDashboard />, { route: '/admin' });
     expect(await screen.findByText('No se pudieron cargar los indicadores')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Cafetería y sincronización/ })).toHaveAttribute('href', '/admin/cafeteria');
-    expect(screen.getByRole('link', { name: /Ver admisiones/ })).toHaveAttribute('href', '/admin/admisiones');
-    expect(screen.queryByText('Sincronizar Loyverse')).not.toBeInTheDocument();
-    expect(screen.queryByText('Nueva Admisión')).not.toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Accesos rápidos' });
+    expect(within(nav).getByRole('link', { name: 'Cafetería' })).toHaveAttribute('href', '/admin/cafeteria');
+    expect(within(nav).getByRole('link', { name: 'Admisiones' })).toHaveAttribute('href', '/admin/admisiones');
+    expect(nav.querySelector('.btn-green, .btn-pink, .btn-outline')).toBeNull();
   });
 });

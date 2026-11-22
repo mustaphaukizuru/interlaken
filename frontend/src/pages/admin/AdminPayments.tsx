@@ -12,7 +12,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 import { formatMXN } from '@/lib/format';
 import { shortDateTime } from '@/lib/tableFormat';
-import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useActiveFilters, useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { usePaymentsExport, usePaymentsList, usePaymentsSummary, type PaymentsListParams } from '@/hooks/queries/payments';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
@@ -90,6 +90,7 @@ export default function AdminPayments() {
     from: from || undefined, to: to || undefined, ordering: serializeSort(sort) || undefined,
   };
 
+  const filtered = useActiveFilters(['q', 'estado', 'pasarela', 'alumno', 'desde', 'hasta']);
   const summary = usePaymentsSummary(30);
   const { data, isLoading, isError, refetch } = usePaymentsList({ page, ...filters });
   const exportPayments = usePaymentsExport();
@@ -201,7 +202,8 @@ export default function AdminPayments() {
               exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="pagos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
             />
           )}
-          empty={{ icon: CreditCard, title: 'Sin pagos', description: 'No hay pagos con esos filtros.' }}
+          empty={{ icon: CreditCard, title: 'Aún no hay pagos', description: 'Los pagos con tarjeta aparecerán aquí.' }}
+          noResults={filtered.active ? { onClear: filtered.clear } : undefined}
         />
       </Card>
     </>

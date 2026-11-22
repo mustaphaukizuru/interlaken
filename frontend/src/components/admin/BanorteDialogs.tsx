@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { formatMXN } from '@/lib/format';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,7 +31,8 @@ export interface ReconcilePrefill {
   amount: string;
 }
 
-const mxn = (v: string | number | null | undefined) => `$${parseFloat(String(v ?? 0)).toFixed(2)}`;
+/** One money format everywhere (es-MX grouping): display only. */
+const mxn = formatMXN;
 const when = (d?: string | null) => (d ? format(new Date(d), "d MMM yyyy, HH:mm", { locale: es }) : '-');
 
 /** Where staff look an operation up (same words as docs/BANORTE-INTEGRATION.md). */

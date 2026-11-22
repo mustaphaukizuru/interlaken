@@ -138,11 +138,18 @@ describe('ConsoleAreaGuard (staff with console areas)', () => {
     expect(screen.getByText('CAFETERIA')).toBeInTheDocument();
   });
 
-  it('sends a section outside its areas to its own first section', () => {
+  it('says which area a section outside its areas needs, with a way back', () => {
     useAuthStore.setState({ user: staff(['cafeteria']), accessToken: 't', isAuthenticated: true });
     renderConsole('/admin/usuarios');
-    expect(screen.getByText('CAFETERIA')).toBeInTheDocument();
     expect(screen.queryByText('USUARIOS')).not.toBeInTheDocument();
+    expect(screen.getByText('Sin acceso a esta sección')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ir a mi consola' })).toHaveAttribute('href', '/admin/cafeteria');
+  });
+
+  it('sends the console landing (/admin) to the account’s first section', () => {
+    useAuthStore.setState({ user: staff(['cafeteria']), accessToken: 't', isAuthenticated: true });
+    renderConsole('/admin');
+    expect(screen.getByText('CAFETERIA')).toBeInTheDocument();
   });
 
   it('sends staff without areas to the staff dashboard', () => {

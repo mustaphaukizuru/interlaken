@@ -64,7 +64,7 @@ function EnrollForm({ detail, isAdmin, onCancel, onDone }: {
       ...(override ? { override_documents: true, override_reason: reason.trim() } : {}),
     }, {
       onSuccess: (r) => {
-        if (r.unlinked?.length) toast.success('Alumno inscrito. Revise los tutores que no se vincularon.');
+        if (r.unlinked?.length) toast.success('Inscrito. Revise los tutores sin vincular.');
         else toast.success('Alumno inscrito y cuentas creadas.');
         onDone(r);
       },

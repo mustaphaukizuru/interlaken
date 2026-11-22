@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
+import { RestrictedAction } from '@/components/admin/RestrictedAction';
 import { StudentFamily } from '@/components/admin/families/StudentFamily';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
@@ -183,10 +184,14 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
                 <ArchiveIcon size={16} aria-hidden="true" /> {ARCHIVE_ACTION.label}
               </button>
             )}
-            {canDelete && (
+            {canDelete ? (
               <button type="button" className={DANGER_OUTLINE} onClick={() => setConfirming(DELETE_ACTION)}>
                 <DeleteIcon size={16} aria-hidden="true" /> Eliminar
               </button>
+            ) : (
+              <RestrictedAction reason="Solo administradores" className={DANGER_OUTLINE}>
+                <DeleteIcon size={16} aria-hidden="true" /> Eliminar
+              </RestrictedAction>
             )}
           </>
         )}

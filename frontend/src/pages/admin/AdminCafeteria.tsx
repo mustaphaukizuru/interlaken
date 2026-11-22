@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatMXN } from '@/lib/format';
+import { shortDateTime } from '@/lib/tableFormat';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -6,8 +8,6 @@ import {
   Users, Receipt, ArrowLeftRight, RotateCcw, FileUp, Wallet, ShieldCheck, FileSearch,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
@@ -39,7 +39,7 @@ import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
 import { cafeteriaApi, downloadBlob, type LoyverseCustomer } from '@/services/api';
 import { adjustmentImportApi, type AdminTransaction, type ReconcileRowV2, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
 import { exportFilename, idsParam, type BulkActionDef, type BulkRequest, type BulkResult, type ExportFormat, type ImportRow, type ListParams } from '@/services/dataOps';
-import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useActiveFilters, useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection, type RowKey } from '@/hooks/useRowSelection';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import {
@@ -72,11 +72,13 @@ const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
 ];
 
 /** Every per-tab URL param; switching tabs drops them all. */
-const TAB_PARAMS = ['q', 'estado', 'tipo', 'persona', 'page', 'orden', 'grado', 'grupo', 'desde', 'hasta', 'metodo', 'saldo', 'vinculo', 'alumno', 'solo', 'revisar'];
+// The POS tab's queues each keep their own page in the URL (apage, vpage, hpage, cpage, qpage).
+const TAB_PARAMS = ['q', 'estado', 'tipo', 'persona', 'page', 'orden', 'grado', 'grupo', 'desde', 'hasta', 'metodo', 'saldo', 'vinculo', 'alumno', 'solo', 'revisar', 'apage', 'vpage', 'hpage', 'cpage', 'qpage'];
 
-const fmtDate = (d: string | null | undefined) =>
-  d ? format(new Date(d), 'd MMM yyyy, HH:mm', { locale: es }) : '—';
-const mxn = (v: string | number | null | undefined) => `$${parseFloat(String(v ?? 0)).toFixed(2)}`;
+// One date format for the console tables (lib/tableFormat).
+const fmtDate = (d: string | null | undefined) => shortDateTime(d) || '—';
+/** One money format everywhere (es-MX grouping): display only. */
+const mxn = formatMXN;
 
 /** Drop empty values so the API (and the query key) only carries real filters. */
 function clean(params: Record<string, string | number | undefined | null>): ListParams {
@@ -288,6 +290,7 @@ function balanceColumns(name: string): Column<CafeteriaBalance>[] {
 function RosterTab() {
   const queryClient = useQueryClient();
   const { get } = useUrlFilters();
+  const filtered = useActiveFilters(['q', 'estado', 'persona', 'grado', 'grupo', 'saldo', 'vinculo']);
   const [page, setPage] = useUrlPage();
   const [sort, onSort] = useUrlSort();
   const saldo = get('saldo');
@@ -332,7 +335,7 @@ function RosterTab() {
       const deferred = d?.pos_topups_deferred ?? 0;
       toast.success(
         `Sincronización: ${receipts} recibo(s), ${created} compra(s) nueva(s)`
-        + (posTopups ? `, ${posTopups} recarga(s) en caja por $${parseFloat(d?.pos_topups_total ?? '0').toFixed(2)}` : '')
+        + (posTopups ? `, ${posTopups} recarga(s) en caja por ${mxn(d?.pos_topups_total ?? '0')}` : '')
         + (deferred ? `, ${deferred} recarga(s) en espera (monedero con movimientos recientes)` : '')
         + (skipped ? `, ${skipped} sin movimiento de monedero` : '')
         + (unmatched ? `, ${unmatched} sin alumno vinculado` : '')
@@ -480,7 +483,8 @@ function RosterTab() {
             {admin && <RowActionsMenu label={`Más acciones para ${b.student.user.full_name}`} items={lifecycleItems(b)} />}
           </>
         )}
-        empty={{ icon: Coffee, title: filters.q ? 'Sin resultados' : 'Sin saldos registrados', description: 'Ajuste la búsqueda o los filtros.' }}
+        empty={{ icon: Coffee, title: 'Sin saldos registrados', description: 'Los saldos aparecen al vincular alumnos con Loyverse.' }}
+        noResults={filtered.active ? { onClear: filtered.clear } : undefined}
       />
 
       <Modal open={askThreshold} onClose={() => setAskThreshold(false)} title="Umbral de saldo bajo" maxWidth={420}>
@@ -559,6 +563,7 @@ const TX_COLUMNS: Column<AdminTransaction>[] = [
 function MovementsTab() {
   const queryClient = useQueryClient();
   const { get, set } = useUrlFilters();
+  const filtered = useActiveFilters(['q', 'tipo', 'alumno', 'desde', 'hasta', 'estado', 'persona']);
   const [page, setPage] = useUrlPage();
   const [sort, onSort] = useUrlSort();
   const student = get('alumno');
@@ -640,7 +645,8 @@ function MovementsTab() {
             <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Devolver
           </Button>
         ) : null}
-        empty={{ icon: ArrowLeftRight, title: 'Sin movimientos', description: 'No hay movimientos con esos filtros.' }}
+        empty={{ icon: ArrowLeftRight, title: 'Sin movimientos', description: 'Las compras y recargas aparecerán aquí.' }}
+        noResults={filtered.active ? { onClear: filtered.clear } : undefined}
       />
       <ConfirmDialog
         open={!!refundTx}
@@ -740,6 +746,7 @@ const applyTotal = (plan: BulkResult) => {
 
 function DepositsTab() {
   const { get } = useUrlFilters();
+  const filtered = useActiveFilters(['q', 'estado', 'metodo', 'desde', 'hasta', 'revisar']);
   const [page, setPage] = useUrlPage();
   const [sort, onSort] = useUrlSort();
   const filters = clean({
@@ -819,7 +826,8 @@ function DepositsTab() {
             <FileSearch className="w-3.5 h-3.5" aria-hidden="true" /> Conciliar con MultiCobros
           </Button>
         ) : null}
-        empty={{ icon: ScrollText, title: 'Sin depósitos registrados', description: 'No hay depósitos con esos filtros.' }}
+        empty={{ icon: ScrollText, title: 'Sin depósitos registrados', description: 'Las recargas en caja y en línea aparecerán aquí.' }}
+        noResults={filtered.active ? { onClear: filtered.clear } : undefined}
       />
       <BulkConfirmDialog
         open={!!pending}
@@ -869,7 +877,7 @@ function PosLoadTab() {
  *  auto-load), still to match in MultiCobros: the rest of «Por verificar».
  *  Hidden when there are none (always, with the auto-load off). */
 function AutoLoadedToVerify() {
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useUrlPage('vpage');
   const { data, isLoading, isError, refetch } = useTopUpsList({ page, needs_verify: 1 });
   const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
   const count = data?.count ?? 0;
@@ -921,7 +929,7 @@ function AutoLoadedToVerify() {
 
 function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' | 'unload'; title: string; intro: string; emptyTitle: string; emptyText: string }) {
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useUrlPage(kind === 'load' ? 'cpage' : 'qpage');
   const filters = kind === 'load' ? { needs_pos: 1 } : { needs_unload: 1 };
   const { data, isLoading, isError, refetch } = useTopUpsList({ page, ...filters });
   const count = data?.count ?? 0;

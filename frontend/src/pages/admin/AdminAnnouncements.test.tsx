@@ -115,6 +115,26 @@ describe('AdminAnnouncements', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Comunicado publicado y enviado.');
   });
 
+  it('shows the server validation next to its field, not in a toast', async () => {
+    const user = userEvent.setup();
+    create.mockRejectedValueOnce({ isAxiosError: true, response: { status: 400, data: { site_link: ['Use una ruta del sitio o https://.'] } } });
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Borrador' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Texto.' } });
+    await user.click(within(dialog).getByLabelText(/^Publicado/i));
+    await user.click(within(dialog).getByLabelText(/Publicar en el sitio público/i));
+    fireEvent.change(within(dialog).getByLabelText(/Enlace «Ver más»/i), { target: { value: 'ftp://x' } });
+    await user.click(within(dialog).getByRole('button', { name: /^Guardar borrador$/i }));
+    expect(await within(dialog).findByText('Use una ruta del sitio o https://.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Enlace «Ver más»/i)).toHaveAttribute('aria-invalid', 'true');
+    // Typing again clears the message.
+    fireEvent.change(within(dialog).getByLabelText(/Enlace «Ver más»/i), { target: { value: '/admisiones' } });
+    expect(within(dialog).queryByText('Use una ruta del sitio o https://.')).toBeNull();
+  });
+
   it('shows the push toggle ON by default and posts it OFF when unchecked', async () => {
     const user = userEvent.setup();
     renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
@@ -267,7 +287,7 @@ describe('AdminAnnouncements', () => {
     await user.click(within(dialog).getByLabelText(/También WhatsApp/i));
     await user.click(within(dialog).getByLabelText(/Confirmo que este aviso es urgente/i));
     await user.click(within(dialog).getByRole('button', { name: /Enviar aviso urgente/i }));
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith('WhatsApp no está configurado: el aviso no se envió por WhatsApp.'));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('WhatsApp no configurado: no se envió por WhatsApp.'));
     expect(delivery).not.toHaveBeenCalled();
   });
 
@@ -378,7 +398,11 @@ describe('AdminAnnouncements', () => {
     useAuthStore.setState({ user: { ...ADMIN, role: 'staff', staff_areas: ['comunicados'] }, accessToken: 't', isAuthenticated: true });
     renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados?emergencia=1' });
     expect(await screen.findByRole('button', { name: /Nuevo comunicado/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Aviso urgente/i })).not.toBeInTheDocument();
+    // Shown, disabled, with the reason (UX Phase 7); clicking opens nothing.
+    const restricted = screen.getByRole('button', { name: /Aviso urgente/i });
+    expect(restricted).toHaveAttribute('aria-disabled', 'true');
+    expect(restricted).toHaveAccessibleDescription('Solo administradores');
+    fireEvent.click(restricted);
     expect(screen.queryByRole('dialog', { name: /Aviso urgente/ })).not.toBeInTheDocument();
   });
 });

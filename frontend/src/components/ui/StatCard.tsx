@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 
@@ -59,21 +60,23 @@ interface StatCardProps {
   color: Color;
   trend?: { value: string; up: boolean };
   subtitle?: string;
+  /** Where the tile leads. With it the tile is a real link (and lifts on
+   *  hover); without it a plain figure that does not pretend to be a button. */
+  to?: string;
 }
 
-export function StatCard({ title, value, suffix, icon: Icon, color, trend, subtitle }: StatCardProps) {
+const SURFACE = 'relative block overflow-hidden rounded-md bg-white p-4 shadow-card sm:p-[22px]';
+
+export function StatCard({ title, value, suffix, icon: Icon, color, trend, subtitle, to }: StatCardProps) {
   const t = theme[color];
-  return (
-    // Sizing is responsive, not fixed: at 390px these tiles sit two-per-row, so
-    // padding, the icon chip and the figure all step down instead of forcing a
-    // one-per-screen scroll through the KPIs.
-    <div className="hover-lift relative overflow-hidden rounded-md bg-white p-4 shadow-card sm:p-[22px]">
+  const body = (
+    <>
       <div className="mb-3 flex items-center justify-between sm:mb-[18px]">
         <div
           className="flex h-10 w-10 items-center justify-center rounded-md sm:h-11 sm:w-11"
           style={{ background: t.bg }}
         >
-          <Icon size={20} color={t.color} className="sm:h-[22px] sm:w-[22px]" />
+          <Icon size={20} color={t.color} aria-hidden="true" />
         </div>
         {trend && (
           <span
@@ -95,7 +98,20 @@ export function StatCard({ title, value, suffix, icon: Icon, color, trend, subti
         </span>
         {suffix && <span className="text-[17px] font-semibold text-light">{suffix}</span>}
       </div>
-    </div>
+    </>
+  );
+  // Sizing is responsive, not fixed: at 390px these tiles sit two-per-row, so
+  // padding, the icon chip and the figure all step down instead of forcing a
+  // one-per-screen scroll through the KPIs.
+  return to ? (
+    <Link
+      to={to}
+      className={`${SURFACE} hover-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40`}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className={SURFACE}>{body}</div>
   );
 }
 

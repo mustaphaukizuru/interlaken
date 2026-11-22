@@ -22,7 +22,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
 import { RowActionsMenu } from '@/components/admin/RowActionsMenu';
-import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useActiveFilters, useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection, type RowKey } from '@/hooks/useRowSelection';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
@@ -514,6 +514,7 @@ function RowMoves({ moves, isLg, busy, busyAct, menuLabel }: {
 function BookingsView() {
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
+  const filtered = useActiveFilters(['q', 'estado', 'tipo', 'origen', 'desde', 'hasta']);
   const sort = parseSort(get('orden'));
   const filters: Omit<AdminBookingsParams, 'page'> = {
     q: get('q') || undefined,
@@ -616,7 +617,8 @@ function BookingsView() {
             exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="visitas" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
           />
         )}
-        empty={{ icon: CalendarClock, title: 'Sin reservas', description: 'Ninguna reserva coincide con los filtros. Las visitas agendadas aparecerán aquí.' }}
+        empty={{ icon: CalendarClock, title: 'Sin reservas', description: 'Las visitas agendadas aparecerán aquí.' }}
+        noResults={filtered.active ? { onClear: filtered.clear } : undefined}
       />
 
       <BulkConfirmDialog

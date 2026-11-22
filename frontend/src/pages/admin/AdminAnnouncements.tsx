@@ -25,7 +25,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi, type AnnouncementAttachment, type BulkActionDef } from '@/services/api';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
-import { apiErrorMessage } from '@/lib/apiErrors';
+import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
+import { RestrictedAction } from '@/components/admin/RestrictedAction';
 import { formatDateTime } from '@/lib/format';
 import { AUDIENCES as AUDIENCE, announcementStatus, audienceMeta, type AdminAnnouncement as Announcement } from '@/lib/status/AdminAnnouncementStatus';
 
@@ -70,6 +71,13 @@ export default function AdminAnnouncements() {
   // «Publicar» that sends right away asks once more (portal, email and push to
   // the whole audience cannot be taken back).
   const [confirmSend, setConfirmSend] = useState(false);
+  // Server validation next to its field (title, body, site_link, publish_at…),
+  // not a toast that disappears (UX Phase 7). `form` = a message for no field.
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
+  const setField = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setFormErrors((e) => (e[k as string] || e.form ? { ...e, [k as string]: undefined, form: undefined } : e));
+  };
   // Focus lands on «Volver»: a stray Enter never sends to the whole audience.
   const backFromSendRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (confirmSend) backFromSendRef.current?.focus(); }, [confirmSend]);
@@ -112,7 +120,14 @@ export default function AdminAnnouncements() {
       setConfirmSend(false);
       setOpen(false);
     },
-    onError: () => { setConfirmSend(false); toast.error('No se pudo guardar el comunicado.'); },
+    onError: (e: unknown) => {
+      setConfirmSend(false);
+      const fields = fieldErrorsOrNull(e);
+      const { detail, non_field_errors: nonField, ...byField } = fields ?? {};
+      setFormErrors(Object.keys(byField).length || detail || nonField
+        ? { ...byField, form: detail ?? nonField }
+        : { form: 'No se pudo guardar el comunicado.' });
+    },
   });
   const sendsNow = sendsOnSave(editing, form);
   const recipients = useQuery({
@@ -157,7 +172,7 @@ export default function AdminAnnouncements() {
           (d.whatsapp_queued ? ` Enviando WhatsApp a ${d.whatsapp_queued} contacto${d.whatsapp_queued === 1 ? '' : 's'}…` : ''),
       );
       if (sent.whatsapp && !d.whatsapp_configured) {
-        toast.error('WhatsApp no está configurado: el aviso no se envió por WhatsApp.');
+        toast.error('WhatsApp no configurado: no se envió por WhatsApp.');
       } else if (sent.whatsapp && !d.whatsapp_queued) {
         toast('Ningún destinatario tiene WhatsApp registrado.');
       }
@@ -166,7 +181,7 @@ export default function AdminAnnouncements() {
     onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo enviar el aviso urgente.')),
   });
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setConfirmSend(false); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY); setFormErrors({}); setConfirmSend(false); setOpen(true); };
 
   // Command-palette deep link: /admin/comunicados?nuevo=1 opens the composer
   // (same modal, same validations) and consumes the param.
@@ -201,6 +216,7 @@ export default function AdminAnnouncements() {
       show_on_site: a.show_on_site ?? false, site_until: a.site_until ?? null, site_link: a.site_link ?? '',
       publish_at: a.publish_at ?? null, requires_ack: a.requires_ack ?? false, attachments: a.attachments ?? [],
     });
+    setFormErrors({});
     setConfirmSend(false);
     setOpen(true);
   };
@@ -239,10 +255,14 @@ export default function AdminAnnouncements() {
         actions={(
           <div className="flex flex-wrap gap-2">
             <ExportMenu formats={['csv', 'xlsx']} filenamePrefix="comunicados" selectedCount={selection.count} fetch={fetchExport} />
-            {canBroadcast && (
+            {canBroadcast ? (
               <Button variant="danger" onClick={openAlert}>
                 <Siren className="h-4 w-4" aria-hidden="true" /> Aviso urgente
               </Button>
+            ) : (
+              <RestrictedAction reason="Solo administradores">
+                <Siren size={16} aria-hidden="true" /> Aviso urgente
+              </RestrictedAction>
             )}
             <Button onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>
           </div>
@@ -337,11 +357,13 @@ export default function AdminAnnouncements() {
       {/* Composer */}
       <Modal open={open} onClose={() => { setOpen(false); setConfirmSend(false); }} title={editing ? 'Editar comunicado' : 'Nuevo comunicado'} maxWidth={520}>
         <div className="space-y-4">
-          <Input label="Título" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Ej. Suspensión de clases" />
+          <Input label="Título" value={form.title} onChange={(e) => setField('title', e.target.value)} placeholder="Ej. Suspensión de clases" error={formErrors.title} />
           <div>
             <label htmlFor="ann-body" className="label">Mensaje</label>
-            <textarea id="ann-body" className="input-field min-h-[110px] resize-none" value={form.body} aria-describedby="ann-body-hint"
-              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="Escribe el comunicado…" />
+            <textarea id="ann-body" className={`input-field min-h-[110px] resize-none ${formErrors.body ? 'border-coral-400' : ''}`} value={form.body}
+              aria-describedby={formErrors.body ? 'ann-body-error ann-body-hint' : 'ann-body-hint'} aria-invalid={formErrors.body ? true : undefined}
+              onChange={(e) => setField('body', e.target.value)} placeholder="Escribe el comunicado…" />
+            {formErrors.body && <p id="ann-body-error" className="mt-1.5 text-xs text-danger">{formErrors.body}</p>}
             <p id="ann-body-hint" className={`mt-1 text-xs ${form.body.length > DELIVERED_CHARS ? 'text-coral-600' : 'text-subtle'}`}>
               {form.body.length}/{DELIVERED_CHARS} caracteres.
               {form.body.length > DELIVERED_CHARS && ` Las familias solo reciben los primeros ${DELIVERED_CHARS} en la notificación y el correo; resuma o agregue un enlace.`}
@@ -350,9 +372,11 @@ export default function AdminAnnouncements() {
           <div>
             <label htmlFor="ann-audience" className="label">Dirigido a</label>
             <select id="ann-audience" className="input-field" value={form.audience}
-              onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))}>
+              aria-invalid={formErrors.audience ? true : undefined} aria-describedby={formErrors.audience ? 'ann-audience-error' : undefined}
+              onChange={(e) => setField('audience', e.target.value)}>
               {AUDIENCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
+            {formErrors.audience && <p id="ann-audience-error" className="mt-1.5 text-xs text-danger">{formErrors.audience}</p>}
             <RecipientCountHint audience={form.audience} />
           </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
@@ -376,16 +400,19 @@ export default function AdminAnnouncements() {
           </label>
           {form.show_on_site && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Mostrar hasta (opcional)" type="date" value={form.site_until ?? ''} onChange={(e) => setForm((f) => ({ ...f, site_until: e.target.value || null }))} />
-              <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setForm((f) => ({ ...f, site_link: e.target.value }))} placeholder="/admisiones" />
+              <Input label="Mostrar hasta (opcional)" type="date" value={form.site_until ?? ''} onChange={(e) => setField('site_until', e.target.value || null)} error={formErrors.site_until} />
+              <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setField('site_link', e.target.value)} placeholder="/admisiones" error={formErrors.site_link} />
             </div>
           )}
           {/* «Pedir Enterado» and attachments are not offered: no family channel
               delivers them since the portal comunicados page was retired. */}
-          <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setForm((f) => ({ ...f, publish_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} hint="Vacío = se envía al publicar." />
+          <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setField('publish_at', e.target.value ? new Date(e.target.value).toISOString() : null)} hint="Vacío = se envía al publicar." error={formErrors.publish_at} />
+          {formErrors.form && (
+            <p role="alert" className="rounded-sm bg-danger-bg px-3 py-2 text-sm text-danger">{formErrors.form}</p>
+          )}
           {confirmSend && sendsNow ? (
             <div role="alertdialog" aria-labelledby="ann-send-title" aria-describedby="ann-send-desc"
-              className="space-y-3 rounded-md border border-amber/40 bg-amber/10 p-3">
+              className="space-y-3 rounded-sm bg-warning-bg p-3">
               <p id="ann-send-title" className="text-sm font-semibold text-ink">¿Enviar ahora?</p>
               <p id="ann-send-desc" className="text-sm text-muted">
                 «{form.title.trim()}» se enviará ahora a: {audienceMeta(form.audience).label.toLowerCase()}
@@ -419,7 +446,7 @@ export default function AdminAnnouncements() {
         maxWidth={520}
       >
         <div className="space-y-4">
-          <p className="rounded-md border border-coral/30 bg-coral/5 px-3 py-2 text-sm text-ink">
+          <p className="rounded-sm bg-danger-bg px-3 py-2 text-sm text-ink">
             Se creará un comunicado y se notificará de inmediato (app + primer lote de correo/push).
             El resto lo completa el cron. Use solo para contingencias reales.
           </p>

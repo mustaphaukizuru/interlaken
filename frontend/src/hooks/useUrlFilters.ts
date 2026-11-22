@@ -38,16 +38,35 @@ export function useUrlFilters() {
   return { params, get, set };
 }
 
-/** 1-based page number synced to `?page=` (omitted when 1). */
-export function useUrlPage(): [number, (page: number) => void] {
+/**
+ * 1-based page number synced to `?page=` (omitted when 1). Pass `key` for a
+ * second paged list on the same screen (`?vpage=`, `?apage=`), so each keeps
+ * its own place.
+ */
+export function useUrlPage(key = 'page'): [number, (page: number) => void] {
   const { get, set } = useUrlFilters();
-  const raw = parseInt(get('page'), 10);
+  const raw = parseInt(get(key), 10);
   const page = Number.isFinite(raw) && raw > 1 ? raw : 1;
   const setPage = useCallback(
-    (next: number) => set({ page: next > 1 ? String(next) : null }),
-    [set],
+    (next: number) => set({ [key]: next > 1 ? String(next) : null }),
+    [set, key],
   );
   return [page, setPage];
+}
+
+/**
+ * Whether any of `keys` is set in the URL, and a way to clear them all (and
+ * the page): what a table's «Sin resultados · Limpiar filtros» state needs.
+ */
+export function useActiveFilters(keys: readonly string[]) {
+  const { params, set } = useUrlFilters();
+  const active = keys.some((k) => (params.get(k) ?? '') !== '');
+  const joined = keys.join(',');
+  const clear = useCallback(
+    () => set(Object.fromEntries([...joined.split(','), 'page'].map((k) => [k, null]))),
+    [set, joined],
+  );
+  return { active, clear };
 }
 
 /**

@@ -239,7 +239,7 @@ export default function AdminSettings() {
     },
     onError: (err: unknown) => {
       if (err instanceof Error && err.message === 'settings-not-loaded') {
-        toast.error('Espere a que carguen los ajustes antes de guardar.');
+        toast.error('Espere a que carguen los ajustes.');
         return;
       }
       const next = settingsFieldErrors(err);
