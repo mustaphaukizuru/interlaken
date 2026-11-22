@@ -15,8 +15,9 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
+import { parseVideoUrl } from '@/lib/videoEmbed';
 import { Illustration, wash } from '@/components/ui/Illustration';
-import { CARD_SIZES } from '@/lib/images';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import { resolveIllustration } from '@/lib/illustrationTopics';
 import { iconResolver } from '../iconRuntime';
@@ -110,7 +111,7 @@ function HomeAboutView(p: AboutProps) {
 }
 
 /* ── Video institucional ────────────────────────────────────────────────── */
-interface VideoProps { eyebrow?: string; title?: string; text?: string; video?: string; primary?: CmsLink; secondary?: CmsLink }
+interface VideoProps { eyebrow?: string; title?: string; text?: string; video?: string; poster?: number | string; clickToPlay?: boolean; primary?: CmsLink; secondary?: CmsLink }
 function HomeVideoView(p: VideoProps) {
   const t = useTokens();
   const settings = useSiteSettings();
@@ -119,11 +120,35 @@ function HomeVideoView(p: VideoProps) {
   if (!url) return null;
   const primary = asLink(p.primary);
   const secondary = asLink(p.secondary);
+  // Ambient glow behind the card: the cover's colours, blurred (a small file is
+  // plenty); without a cover, the YouTube thumbnail's.
+  const parsed = parseVideoUrl(url);
+  const glow = p.poster
+    ? (typeof p.poster === 'string' && assetSrcSet(p.poster) ? p.poster.replace(/\.webp$/, '-480.webp') : imageSrc(p.poster, 'thumb'))
+    : parsed?.provider === 'youtube' ? `https://i.ytimg.com/vi/${parsed.id}/mqdefault.jpg` : null;
   return (
     <Section bg="dark">
       <m.div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12" variants={staggerGroup} initial="hidden" whileInView="show" viewport={VIEWPORT}>
-        <m.div variants={fadeRight} className="order-2 lg:order-1">
-          <VideoEmbed url={url} />
+        <m.div variants={fadeRight} className="relative isolate order-2 lg:order-1">
+          {glow && (
+            <img
+              src={glow}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="pointer-events-none absolute -inset-8 z-0 h-[calc(100%+4rem)] w-[calc(100%+4rem)] object-cover opacity-45 blur-3xl saturate-150"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
+          {/* Silent preview unless the editor chose «Esperar un clic» (older saved pages: preview). */}
+          <div className="relative z-10">
+            <VideoEmbed
+              url={url}
+              autoplay={p.clickToPlay !== true}
+              poster={p.poster ? { src: imageSrc(p.poster, 'md'), srcSet: imageSrcSet(p.poster) } : undefined}
+            />
+          </div>
         </m.div>
         <m.div variants={fadeLeft} className="order-1 text-center lg:order-2 lg:text-left">
           {p.eyebrow && <span className="section-label-pink inline-flex">{t(p.eyebrow)}</span>}

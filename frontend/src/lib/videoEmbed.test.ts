@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseVideoUrl } from './videoEmbed';
+import { parseVideoUrl, playerCommand } from './videoEmbed';
 
 describe('parseVideoUrl (video institucional)', () => {
   it('parses youtube watch?v= URLs into a nocookie embed + thumbnail', () => {
@@ -36,5 +36,22 @@ describe('parseVideoUrl (video institucional)', () => {
     expect(parseVideoUrl('https://example.com/video.mp4')).toBeNull();
     expect(parseVideoUrl('https://www.youtube.com/@colegiointerlaken')).toBeNull();
     expect(parseVideoUrl('ftp://youtu.be/dQw4w9WgXcQ')).toBeNull();
+  });
+
+  it('builds a silent looping preview the page can pause', () => {
+    const yt = parseVideoUrl('https://youtu.be/z271WfIaPSE')!;
+    const q = new URL(yt.previewUrl).searchParams;
+    expect(yt.previewUrl.startsWith('https://www.youtube-nocookie.com/embed/z271WfIaPSE?')).toBe(true);
+    expect(Object.fromEntries(q)).toMatchObject({ autoplay: '1', mute: '1', playsinline: '1', loop: '1', playlist: 'z271WfIaPSE', controls: '0', enablejsapi: '1', rel: '0' });
+    expect(yt.origin).toBe('https://www.youtube-nocookie.com');
+    const vm = parseVideoUrl('https://vimeo.com/76979871')!;
+    expect(vm.previewUrl).toBe('https://player.vimeo.com/video/76979871?background=1&dnt=1');
+    expect(vm.origin).toBe('https://player.vimeo.com');
+  });
+
+  it('speaks each player play/pause message', () => {
+    expect(JSON.parse(playerCommand('youtube', 'pause'))).toEqual({ event: 'command', func: 'pauseVideo', args: [] });
+    expect(JSON.parse(playerCommand('youtube', 'play'))).toEqual({ event: 'command', func: 'playVideo', args: [] });
+    expect(JSON.parse(playerCommand('vimeo', 'pause'))).toEqual({ method: 'pause' });
   });
 });
