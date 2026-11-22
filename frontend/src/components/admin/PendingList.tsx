@@ -23,6 +23,8 @@ const TONE: Record<Tone, string> = {
 /** Money figures only the admin dashboard payload carries (staff get counts). */
 export interface PendingTotals {
   verificar?: string;
+  /** How many of the top-ups to verify the app already loaded (instant auto-load). */
+  verificarCargadas?: number;
   aplicar?: string;
 }
 
@@ -59,6 +61,26 @@ export function waitedFor(minutes: number | undefined): string {
 }
 
 /**
+ * «Recargas por verificar» says whether the money already reached the wallet
+ * (school, 2026-11-22): with the instant auto-load most are in the balance and
+ * in Loyverse, and only the MultiCobros confirmation is missing. Without the
+ * loaded count (staff payload) it only asks for the check.
+ */
+export function verifyHint(count: number, loaded: number | undefined, total?: string): string {
+  const paid = `Pagadas con tarjeta${total ? ` (${formatMXN(total)})` : ''}.`;
+  if (loaded === undefined || count <= 0) return `${paid} Verifíquelas en MultiCobros.`;
+  const done = Math.min(Math.max(loaded, 0), count);
+  const one = count === 1;
+  if (done === count) {
+    return `${paid} Ya ${one ? 'está' : 'están'} en el saldo y en Loyverse: solo falta confirmarla${one ? '' : 's'} en MultiCobros.`;
+  }
+  if (done === 0) return `${paid} No ${one ? 'llega' : 'llegan'} al saldo hasta verificarla${one ? '' : 's'} en MultiCobros.`;
+  const waiting = count - done;
+  return `${paid} ${done} ya ${done === 1 ? 'está' : 'están'} en el saldo y en Loyverse; `
+    + `${waiting} ${waiting === 1 ? 'llega' : 'llegan'} al saldo al verificarla${waiting === 1 ? '' : 's'} en MultiCobros.`;
+}
+
+/**
  * The queues, most urgent first: money that has not reached a wallet, then
  * legal deadlines, then admissions and the office's inboxes. Each opens its
  * filtered list. Keys are those of GET /core/badges/ (backend core/badges.py).
@@ -66,7 +88,7 @@ export function waitedFor(minutes: number | undefined): string {
 const ITEMS: Item[] = [
   { key: 'cafeteria_verificar', area: 'cafeteria', icon: ShieldAlert, tone: 'warning',
     one: 'recarga por verificar', many: 'recargas por verificar', to: '/admin/cafeteria?tab=pos',
-    hint: (_c, t) => `Pagadas con tarjeta: verifíquelas en MultiCobros${t.verificar ? ` (${formatMXN(t.verificar)})` : ''}.` },
+    hint: (c, t) => verifyHint(c.cafeteria_verificar ?? 0, t.verificarCargadas, t.verificar) },
   { key: 'cafeteria_aplicar', area: 'cafeteria', icon: Coffee, tone: 'warning',
     one: 'recarga con tarjeta por aplicar', many: 'recargas con tarjeta por aplicar', to: '/admin/cafeteria?tab=pos',
     hint: (_c, t) => `Cárguelas en Loyverse a las 7:30${t.aplicar ? ` (${formatMXN(t.aplicar)})` : ''}.` },

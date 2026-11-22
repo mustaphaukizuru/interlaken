@@ -679,8 +679,9 @@ class TestOnlineAvailability:
         assert not Payment.objects.exists()
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data | {"min_amount": None, "topup_policy": None} == {
+        assert avail.data | {"min_amount": None, "max_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "max_amount": None,
             "topup_policy": None,
             "online": False,
             "test_mode": True,
@@ -695,8 +696,9 @@ class TestOnlineAvailability:
         assert resp.status_code == 201, resp.data
         assert resp.data["checkout"]["kind"] == "lightbox"
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data | {"min_amount": None, "topup_policy": None} == {
+        assert avail.data | {"min_amount": None, "max_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "max_amount": None,
             "topup_policy": None,
             "online": True,
             "test_mode": True,
@@ -723,8 +725,9 @@ class TestOnlineAvailability:
         resp = _start(api_client, family, family_child)
         assert resp.status_code == 400
         assert resp.data["code"] == "online_unavailable"
-        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None, "topup_policy": None} == {
+        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None, "max_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "max_amount": None,
             "topup_policy": None,
             "online": False,
             "test_mode": False,
@@ -737,8 +740,9 @@ class TestOnlineAvailability:
         resp = _start(api_client, tester, child)
         assert resp.status_code == 201, resp.data
         assert BanorteCheckout.objects.get(payment_id=resp.data["payment_id"]).mode == "PRD"
-        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None, "topup_policy": None} == {
+        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None, "max_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "max_amount": None,
             "topup_policy": None,
             "online": True,
             "test_mode": False,
@@ -751,8 +755,9 @@ class TestOnlineAvailability:
         parent, _ = _family()
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data | {"min_amount": None, "topup_policy": None} == {
+        assert avail.data | {"min_amount": None, "max_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "max_amount": None,
             "topup_policy": None,
             "online": True,
             "test_mode": False,

@@ -47,7 +47,7 @@ export const DEFAULT_MENU: MenuGroup[] = [
   { label: 'El Colegio', items: [{ label: 'Quiénes Somos', to: '/nosotros', icon: 'Users' }, { label: 'Modelo Educativo', to: '/modelo-educativo', icon: 'BookOpen' }, { label: 'Galería', to: '/galeria', icon: 'Camera' }] },
   { label: 'Niveles Educativos', items: [{ label: 'Preescolar', to: '/niveles/preescolar', icon: 'Blocks' }, { label: 'Primaria', to: '/niveles/primaria', icon: 'Pencil' }, { label: 'Secundaria', to: '/niveles/secundaria', icon: 'GraduationCap' }] },
   { label: 'Admisiones', items: [{ label: 'Proceso de Inscripción', to: '/admisiones', icon: 'ClipboardList' }, { label: 'Documentación', to: '/admisiones/documentacion', icon: 'FileText' }, { label: 'Costos', to: '/admisiones/costos', icon: 'CircleDollarSign' }, { label: 'Agendar visita', to: '/agendar-visita', icon: 'CalendarDays' }] },
-  { label: 'Familias', items: [{ label: 'Pagar colegiatura', to: 'https://interlaken.servoescolar.mx', icon: 'CreditCard' }, { label: 'Colegiaturas y cafetería', to: '/pagos', icon: 'CircleDollarSign' }, { label: 'Facturación', to: '/comunidad/facturacion', icon: 'Receipt' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
+  { label: 'Familias', items: [{ label: 'Colegiaturas y cafetería', to: '/pagos', icon: 'CircleDollarSign' }, { label: 'Facturación', to: '/comunidad/facturacion', icon: 'Receipt' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
 ];
 
 function moveAt<T>(list: T[], i: number, d: -1 | 1): T[] {

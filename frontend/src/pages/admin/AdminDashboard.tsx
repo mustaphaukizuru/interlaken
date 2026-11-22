@@ -102,7 +102,7 @@ function AdminHome() {
       <PageHeader title="Panel de administración" subtitle={`Ciclo escolar ${CURRENT_CYCLE}`} />
 
       {/* Exceptions first (UX Phase 7): what is waiting, each a link to its list. */}
-      <PendingList totals={{ verificar: data?.topups_to_verify_total, aplicar: data?.paid_topups_to_apply_total }} />
+      <PendingList totals={{ verificar: data?.topups_to_verify_total, verificarCargadas: data?.topups_to_verify_loaded, aplicar: data?.paid_topups_to_apply_total }} />
 
       {/* Figures, not queues: each tile opens the list behind its number. */}
       {isError ? (

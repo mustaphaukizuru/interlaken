@@ -342,9 +342,9 @@ class TestSandboxComplete:
 
 
 class TestTopUpLimits:
-    """Parent UI copy: mínimo $20 · máximo $2,000."""
+    """Parent UI copy: mínimo $20 · máximo $1,000 (CAFETERIA_TOPUP_MAX, school 2026-11-22)."""
 
-    @pytest.mark.parametrize("amount, ok", [("20.00", True), ("19.99", False), ("2000.00", True), ("2000.01", False)])
+    @pytest.mark.parametrize("amount, ok", [("20.00", True), ("19.99", False), ("1000.00", True), ("1000.01", False), ("2000.00", False)])
     def test_amount_limits(self, api_client, amount, ok):
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])

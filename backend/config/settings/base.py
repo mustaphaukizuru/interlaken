@@ -433,7 +433,12 @@ CAFETERIA_TOPUP_WHATSAPP = env('CAFETERIA_TOPUP_WHATSAPP', default='5553791188')
 # Only with PAYMENTS_LIVE=true, never for a Payworks simulation.
 CAFETERIA_TOPUP_LOYVERSE_PUSH = env('CAFETERIA_TOPUP_LOYVERSE_PUSH', default='off')
 # ``instant`` mode: the largest approval written before it is verified (MXN).
-CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX = env('CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX', default='500')
+# Equal to the top-up maximum (school, 2026-11-22): every card top-up loads at once.
+CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX = env('CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX', default='1000')
+# The largest single cafetería top-up a family or staff member may pay (MXN).
+# School, 2026-11-22: $1,000 (was $2,000). The form reads it from
+# /payments/availability/ (``max_amount``) and the top-up endpoint enforces it.
+CAFETERIA_TOPUP_MAX = env('CAFETERIA_TOPUP_MAX', default='1000')
 
 # ── PAYMENTS ──────────────────────────────────────────────
 # Banorte "Ventana de Comercio Electrónico Cifrada" is the only gateway

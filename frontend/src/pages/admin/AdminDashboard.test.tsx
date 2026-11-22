@@ -112,6 +112,16 @@ describe('AdminDashboard', () => {
     expect(within(list).queryByText(/documento/)).toBeNull();
   });
 
+  it('«Recargas por verificar» says the auto-loaded ones are already in the balance', async () => {
+    getDashboard.mockResolvedValue({ data: { ...DASHBOARD, topups_to_verify_total: '70.00', topups_to_verify_loaded: 2 } } as never);
+    getBadges.mockResolvedValue({ data: { cafeteria_verificar: 2, preregistros: 0 } } as never);
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    const list = await pendientes();
+    const link = await within(list).findByRole('link', { name: /2 recargas por verificar/ });
+    await waitFor(() => expect(link).toHaveTextContent('Ya están en el saldo y en Loyverse: solo falta confirmarlas en MultiCobros'));
+    expect(link).toHaveTextContent('$70.00');
+  });
+
   it('says «Todo al día» when nothing waits', async () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
     getBadges.mockResolvedValue({ data: { notificaciones: 3, cafeteria: 0, preregistros: 0 } } as never);

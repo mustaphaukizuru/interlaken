@@ -120,8 +120,8 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       'Contacte al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa.',
   },
-  // Menu «Familias» (2026-11-20): Pagar colegiatura (Servo Escolar), Colegiaturas
-  // y cafetería, Facturación, Plataformas. Labels and titles follow the menu.
+  // Menu «Familias» (2026-11-22): Colegiaturas y cafetería, Facturación,
+  // Plataformas. Labels and titles follow the menu.
   '/pagos': {
     title: 'Colegiaturas y cafetería: pagos en línea',
     crumb: 'Colegiaturas y cafetería',

@@ -31,8 +31,9 @@ const HIDE_STICKY_CTA = [
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
  *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra.
- *  «Opción 3» (2026-11-20): «Pagos» se llama «Familias» y recibe el pago en
- *  línea («Pagar colegiatura», antes un botón) y «Plataformas» (antes en «El Colegio»). */
+ *  «Opción 3» (2026-11-20): «Pagos» se llama «Familias» y recibe «Plataformas»
+ *  (antes en «El Colegio»). 2026-11-22: sin «Pagar colegiatura», que repetía
+ *  «Colegiaturas y cafetería» (esa página enlaza al pago de colegiaturas). */
 type MenuEntry = { label: string; to: string; icon: LucideIcon };
 type MenuGroupEntry = { label: string; items: MenuEntry[] };
 
@@ -78,7 +79,6 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
   {
     label: 'Familias',
     items: [
-      { label: 'Pagar colegiatura', to: 'https://interlaken.servoescolar.mx', icon: CreditCard },
       { label: 'Colegiaturas y cafetería', to: '/pagos', icon: CircleDollarSign },
       { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
       { label: 'Plataformas', to: '/plataformas', icon: MonitorSmartphone },
@@ -104,14 +104,21 @@ function MenuLink({ to, className, onClick, children }: { to: string; className:
   return <Link to={to} onClick={onClick} className={className}>{children}</Link>;
 }
 
-/** A header/footer button from SiteSettings.chrome: external URLs open in a new tab; `icon` draws before the text. */
-function ChromeLink({ button, className, onClick }: { button: ChromeButton; className: string; onClick?: () => void }) {
+/** A header/footer button from SiteSettings.chrome: external URLs open in a new tab; `icon` draws before the text.
+ *  `compact` (desktop header): from 1024 to 1149 px the menu and three buttons
+ *  only fit if the outlined buttons with an icon show just the icon (2026-11-22,
+ *  Cafetería / Colegiaturas / Agendar visita). The name stays for screen
+ *  readers and as a tooltip; from 1150 px (iPad landscape is 1180) it shows. */
+function ChromeLink({ button, className, onClick, compact = false }: { button: ChromeButton; className: string; onClick?: () => void; compact?: boolean }) {
   const Icon = button.icon ? ICONS[button.icon] : undefined;
-  const content = <>{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}{button.label}</>;
+  const iconOnly = compact && !!Icon && !button.primary;
+  const label = iconOnly ? <span className="sr-only min-[1150px]:not-sr-only">{button.label}</span> : button.label;
+  const content = <>{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}{label}</>;
+  const title = iconOnly ? button.label : undefined;
   if (isExternalHref(button.href)) {
-    return <a href={button.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{content}</a>;
+    return <a href={button.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className} title={title}>{content}</a>;
   }
-  return <Link to={button.href} onClick={onClick} className={className}>{content}</Link>;
+  return <Link to={button.href} onClick={onClick} className={className} title={title}>{content}</Link>;
 }
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
@@ -328,7 +335,7 @@ export function PublicLayout() {
           </Link>
 
           {/* Desktop nav — menú confirmado por el cliente */}
-          <nav className="hidden lg:flex items-center gap-5">
+          <nav className="hidden lg:flex items-center gap-4">
             {MENU.map((group) => (
               <NavDropdown key={group.label} label={group.label} items={group.items} />
             ))}
@@ -345,9 +352,9 @@ export function PublicLayout() {
           </nav>
 
           {/* CTA */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2">
             {chrome.header_buttons.map((b) => (
-              <ChromeLink key={b.label + b.href} button={b} className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-4 py-2`} />
+              <ChromeLink key={b.label + b.href} button={b} compact className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-3.5 py-2`} />
             ))}
           </div>
 

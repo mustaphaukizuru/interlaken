@@ -280,7 +280,7 @@ a live test that day proved the API accepts it). With `verified`, it does so
 the moment staff press **Verificar en MultiCobros** (top-ups verified with the
 report upload are written by the next 5-minute pass). With `instant`, it does
 so right after the approval for amounts up to
-`CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX` (MXN 500 by default) and staff verify
+`CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX` (by default the top-up maximum, `CAFETERIA_TOPUP_MAX`, MXN 1,000 since 2026-11-22, so every top-up loads at once) and staff verify
 them afterwards (they still count in «Por verificar»); larger ones wait for
 the verification. Either way the app reads the card, writes the full customer
 record back with the new balance, reads it again and credits the wallet only

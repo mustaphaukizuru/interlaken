@@ -17,10 +17,12 @@ export interface SiteChrome {
 }
 
 export const CHROME_DEFAULTS: SiteChrome = {
-  // Menu «Opción 3» (confirmed 2026-11-20): the old «Pagos» button lives in the
-  // «Familias» menu as «Pagar colegiatura»; «Cafetería» reads «Portal Cafetería».
+  // School, 2026-11-22 (René, option 1): three buttons, «Cafetería»,
+  // «Colegiaturas» (the families page with the tuition and cafetería links)
+  // and «Agendar visita». Up to 4 fit (navigation.validate_chrome).
   header_buttons: [
-    { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
+    { label: 'Cafetería', href: '/login', icon: 'Coffee' },
+    { label: 'Colegiaturas', href: '/pagos', icon: 'CircleDollarSign' },
     { label: 'Agendar visita', href: '/agendar-visita', primary: true },
   ],
   footer_tagline: 'Educación bilingüe de excelencia para el desarrollo integral de sus hijos. Tlalnepantla, Estado de México.',
