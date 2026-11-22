@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardPaste, Copy, ExternalLink, Eye, EyeOff,
+  AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardPaste, Copy, ExternalLink, Eye, EyeOff,
   HelpCircle, History, Link2, Plus, RotateCcw, Search, Send, Upload, XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,11 +16,10 @@ import { blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { PageErrorSummary } from '@/cms/editor/PageErrorSummary';
 import { requestFieldFocus } from '@/cms/editor/fieldFocus';
-import { fieldErrorsFromIssues } from '@/cms/editor/validation';
 import { templateFor } from '@/cms/sections';
 import { ROUTE_META } from '@/lib/routeMeta';
 import { loadAllGroups } from '@/cms/sections/loaders';
-import { contentApi, type CmsPageAdmin, type PageIssue } from '@/services/api';
+import { contentApi, type CmsPageAdmin } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cmsBase, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps } from '@/cms/editor/helpers';
@@ -46,6 +45,12 @@ import { pageState } from '@/cms/editor/shell/status';
 import { useDraftSaver } from '@/cms/editor/shell/useDraftSaver';
 import { useLeaveGuard, type LeaveState } from '@/cms/editor/shell/useLeaveGuard';
 import { VersionsModal } from '@/cms/editor/shell/VersionsModal';
+import { applyFix, isSeoField } from '@/cms/editor/review/applyFix';
+import { DraftAgeBanner } from '@/cms/editor/review/DraftAgeBanner';
+import { daysSince, STALE_DRAFT_DAYS } from '@/cms/editor/review/format';
+import { ReviewDialog } from '@/cms/editor/review/ReviewDialog';
+import { publishRefusalFrom, reviewApi } from '@/cms/editor/review/reviewApi';
+import type { ReviewIssue, ReviewReport } from '@/cms/editor/review/types';
 
 /**
  * What a page shows when the school leaves its SEO fields empty: the route's
@@ -104,6 +109,10 @@ export default function AdminPageEditor() {
   const isAdmin = role === 'admin';
   const base = cmsBase(role);
   const desktop = useMediaQuery('(min-width: 1024px)');
+  // On phones the toaster sits at the bottom (ToastHost), right over the review dialog's
+  // «Entiendo las advertencias» and «Publicar»: notices raised while it is open go on top.
+  const phone = !useMediaQuery('(min-width: 768px)');
+  const dialogToast = phone ? { position: 'top-center' as const } : undefined;
   const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
   const [blocks, setBlocksState] = useState<Block[]>([]);
@@ -120,9 +129,20 @@ export default function AdminPageEditor() {
   // «Versiones» from the page list opens the dialog right away (?versiones=1).
   const [dialog, setDialog] = useState<null | 'add' | 'versions' | 'seo' | 'schedule' | 'unpublish' | 'reset' | 'reject' | 'legacy' | 'legacy-review'>(() => (isAdmin && params.get('versiones') ? 'versions' : null));
   const [rejectNote, setRejectNote] = useState('');
-  const [issues, setIssues] = useState<PageIssue[] | null>(null);
+  // «Revisión antes de publicar»: the dialog and the last review of the draft on screen.
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [report, setReport] = useState<ReviewReport | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const reviewSeq = useRef(0);
+  // «Publicar de todos modos» an old seed, then its warnings: the next publish keeps the confirmation.
+  const legacyConfirmed = useRef(false);
+  // An edit made in this visit (leaving with it unpublished asks first).
+  const [editedHere, setEditedHere] = useState(false);
   // C3: structured errors of the last save, publish or «Revisar», next to each field and in the summary.
   const [serverErrors, setServerErrors] = useState<BlockFieldError[]>([]);
+  // Review warnings, amber under their fields.
+  const [serverWarnings, setServerWarnings] = useState<BlockFieldError[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [legacyResolved, setLegacyResolved] = useState(false);
   const [localCopy, setLocalCopy] = useState<LocalCopy | null>(null);
@@ -243,50 +263,123 @@ export default function AdminPageEditor() {
   const flushOrThrow = async () => { if (!(await saver.flush())) throw new SaveBlocked(); };
   const blockedMessage = () => (saver.conflict ? 'Primero resuelva el aviso: otra persona guardó cambios en esta página.' : 'El borrador no se pudo guardar. Revise el aviso y vuelva a intentarlo.');
 
+  /** A review shown next to the fields: errors in red, warnings in amber. */
+  const showReport = (r: ReviewReport) => {
+    const located = (list: ReviewIssue[]): BlockFieldError[] => list.filter((i) => i.block_id && i.field).map((i) => ({
+      block_index: i.block_index ?? undefined, block_id: i.block_id, block_label: i.block_label, field: i.field, field_label: i.field_label, message: i.field_message || i.message,
+    }));
+    setReport(r);
+    setServerErrors(located(r.errors));
+    setServerWarnings(located([...r.warnings, ...r.suggestions]));
+  };
+
+  /** «Revisión antes de publicar» of the draft as it is on screen (saved or not). */
+  const runReview = async () => {
+    const seq = ++reviewSeq.current;
+    setReviewing(true);
+    setReviewError(null);
+    try {
+      const { data } = await reviewApi.check(pageId, { draft_blocks: draft.current.blocks, seo: draft.current.meta.seo });
+      if (seq === reviewSeq.current) showReport(data);
+    } catch (e) {
+      if (seq !== reviewSeq.current) return;
+      const errs = blockErrorsFrom(e);
+      if (errs.length) setServerErrors(errs);
+      setReviewError(apiFieldErrors(e).detail || 'No se pudo revisar la página. Inténtelo de nuevo.');
+    } finally {
+      if (seq === reviewSeq.current) setReviewing(false);
+    }
+  };
+  // Older notices (a token's «Deshacer», «Guardado») would cover the dialog's footer on phones.
+  const openReview = () => { toast.dismiss(); setReviewOpen(true); void runReview(); };
+
   const publish = useMutation({
-    mutationFn: async ({ action, confirmLegacy }: { action: 'publish' | 'unpublish'; confirmLegacy?: boolean }) => {
+    mutationFn: async ({ action, confirmLegacy, acknowledged }: { action: 'publish' | 'unpublish'; confirmLegacy?: boolean; acknowledged?: string[] }) => {
       await flushOrThrow();
-      return publishPage(pageId, action, !!confirmLegacy);
+      return publishPage(pageId, action, !!confirmLegacy, acknowledged);
     },
     onSuccess: (res, { action }) => {
       toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');
       setDialog(null);
+      setReviewOpen(false);
+      setReport(null);
+      legacyConfirmed.current = false;
+      setEditedHere(false);
       setServerErrors([]);
+      setServerWarnings([]);
       qc.setQueryData(['admin-page', pageId], res.data);
       qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
       qc.invalidateQueries({ queryKey: ['cms-page'] });
     },
-    onError: (e) => {
+    onError: (e, vars) => {
       if (e instanceof SaveBlocked) { toast.error(blockedMessage()); return; }
       // Contract C1: the backend refuses an old generic seed without confirmation.
-      if (isLegacySeedRefusal(e)) { setDialog('legacy'); return; }
+      if (isLegacySeedRefusal(e)) { setReviewOpen(false); setDialog('legacy'); return; }
+      // «Revisión antes de publicar»: what stopped it opens (or refreshes) the review.
+      const refusal = publishRefusalFrom(e);
+      if (refusal) {
+        if (vars.confirmLegacy) legacyConfirmed.current = true;
+        setDialog(null);
+        showReport(refusal);
+        setReviewOpen(true);
+        if (refusal.code === 'publish_warnings' && vars.acknowledged?.length) toast.error('Apareció una advertencia nueva: revísela antes de publicar.', dialogToast);
+        return;
+      }
       const f = apiFieldErrors(e);
-      const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data;
-      if (data?.issues) setIssues(data.issues);
       toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise las secciones.');
       setFieldErrors(f);
       showBlockErrors(blockErrorsFrom(e), 'focus');
     },
   });
 
+  const discard = useMutation({
+    mutationFn: async () => {
+      await flushOrThrow();
+      return reviewApi.discard(pageId, saver.revision.current);
+    },
+    onSuccess: ({ data }) => {
+      qc.setQueryData(['admin-page', pageId], data);
+      qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
+      initFrom(data);
+      setSelected(null);
+      setReviewOpen(false);
+      setReport(null);
+      setServerErrors([]);
+      setServerWarnings([]);
+      setEditedHere(false);
+      toast.success('Cambios descartados: el borrador es igual a lo que muestra el sitio.');
+    },
+    onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : apiFieldErrors(e).detail || 'No se pudieron descartar los cambios.'),
+  });
+
+  /** A quick fix of the review: the field takes the backend's value (undo and autosave as any edit), then a new review. */
+  const fixIssue = (issue: ReviewIssue) => {
+    const res = applyFix(draft.current.blocks, draft.current.meta.seo, issue);
+    if (!res) { toast.error('Esta corrección ya no aplica: la sección cambió. Use «Ir al campo».', dialogToast); return; }
+    if (res.blocks) update(res.blocks);
+    if (res.seo) updateMeta({ seo: res.seo });
+    toast.success(`Corregido: ${issue.fix?.label ?? ''}.`, dialogToast);
+    void runReview();
+  };
+  const jumpToIssue = (issue: ReviewIssue) => {
+    setReviewOpen(false);
+    if (isSeoField(issue.field)) { setDialog('seo'); return; }
+    if (issue.block_id) jumpToField(issue.block_id, issue.field);
+  };
+
   const review = useMutation({
     mutationFn: async (args: { action: 'request' | 'reject'; note?: string }) => { await flushOrThrow(); return contentApi.adminReviewPage(pageId, args.action, args.note); },
     onSuccess: (res, args) => {
       toast.success(args.action === 'request' ? 'Solicitud enviada a Dirección.' : 'Cambios solicitados al editor.');
       setDialog(null); setRejectNote('');
+      if (args.action === 'request') { setReviewOpen(false); setEditedHere(false); }
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
     },
     onError: (e) => {
       // Contract C1: an old generic seed draft can't go to Dirección for approval either.
-      if (isLegacySeedRefusal(e)) { setDialog('legacy-review'); return; }
+      if (isLegacySeedRefusal(e)) { setReviewOpen(false); setDialog('legacy-review'); return; }
       toast.error(e instanceof SaveBlocked ? blockedMessage() : apiFieldErrors(e).detail || 'No se pudo enviar.');
     },
-  });
-
-  const checks = useMutation({
-    mutationFn: async () => { await flushOrThrow(); return contentApi.adminPageChecks(pageId); },
-    onSuccess: ({ data }) => { setIssues(data.issues); setServerErrors(fieldErrorsFromIssues(data.issues)); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
-    onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo revisar la página.'),
   });
 
   const previewLink = useMutation({
@@ -316,8 +409,11 @@ export default function AdminPageEditor() {
   const update = (next: Block[], key = '') => {
     const sameField = key !== '' && key === lastEdit.current;
     lastEdit.current = key;
-    setHistory((h) => (sameField ? { past: h.past, future: [] } : { past: [...h.past.slice(-49), blocks], future: [] }));
+    // The history keeps the draft as it was, read from the ref: a quick fix runs from a dialog's handler.
+    const before = draft.current.blocks;
+    setHistory((h) => (sameField ? { past: h.past, future: [] } : { past: [...h.past.slice(-49), before], future: [] }));
     setBlocks(next);
+    setEditedHere(true);
     saver.touch();
   };
   const undo = () => {
@@ -336,7 +432,7 @@ export default function AdminPageEditor() {
   };
   const historyActions = useRef({ undo, redo });
   useEffect(() => { historyActions.current = { undo, redo }; });
-  const updateMeta = (patch: Partial<Meta>) => { setMeta({ ...draft.current.meta, ...patch }); saver.touch(); };
+  const updateMeta = (patch: Partial<Meta>) => { setMeta({ ...draft.current.meta, ...patch }); setEditedHere(true); saver.touch(); };
 
   const select = (blockId: string | null, source: 'list' | 'preview' = 'list') => {
     selectSource.current = source;
@@ -430,9 +526,14 @@ export default function AdminPageEditor() {
     return () => { window.removeEventListener('focus', refresh); window.removeEventListener('storage', refresh); };
   }, []);
 
+  // Edits made here that the site does not show yet (asked about on the way out). A review already
+  // requested from Dirección is the expected way out for staff, so it does not ask.
+  const unpublishedHere = editedHere && !!page && (page.has_unpublished_changes || saver.dirty)
+    && !(role !== 'admin' && page.review_requested_at);
   const leaveState: LeaveState = saver.status === 'error' || saver.status === 'conflict' ? 'unsaved'
-    : saver.dirty || saver.status === 'saving' || saver.status === 'pending' ? 'pending' : 'clean';
-  const guard = useLeaveGuard({ state: leaveState, flush: saver.flush, beforeLeave: () => { if (saver.dirty) keepLocalCopy(); } });
+    : saver.dirty || saver.status === 'saving' || saver.status === 'pending' ? 'pending'
+      : unpublishedHere ? 'unpublished' : 'clean';
+  const guard = useLeaveGuard({ state: leaveState, flush: saver.flush, unpublished: unpublishedHere, beforeLeave: () => { if (saver.dirty) keepLocalCopy(); } });
 
   /** C2 «Ver sus cambios (recargar)»: local edits go to a copy in this browser first. */
   const reloadTheirs = async () => {
@@ -505,14 +606,19 @@ export default function AdminPageEditor() {
   const onPublishClick = () => {
     // Without the backend flag (C1 not deployed yet) the client still stops an old seed.
     if (legacy) { setDialog('legacy'); return; }
-    publish.mutate({ action: 'publish' });
+    // «Revisión antes de publicar»: «Publicar» opens the review; its own «Publicar» sends the page.
+    openReview();
   };
+  // Fresh unpublished edits that sat for days get a reminder (not the untouched design, not drafts in review).
+  const staleSince = page.unpublished_since && (state.key === 'changes' || state.key === 'draft' || state.key === 'scheduled')
+    && daysSince(page.unpublished_since) >= STALE_DRAFT_DAYS ? page.unpublished_since : null;
+  const reviewCounts = report ? { errors: report.errors.length, warnings: report.warnings.length } : null;
 
   // Same actions in the top bar (desktop) and the bottom bar (phones, tablets: «Vista previa» is a tab there).
   const btn = desktop ? 'whitespace-nowrap' : 'whitespace-nowrap !px-3';
   const primary = (
     <>
-      <Button variant="secondary" size="md" onClick={() => checks.mutate()} loading={checks.isPending} className={btn}>
+      <Button variant="secondary" size="md" onClick={openReview} loading={reviewing && !reviewOpen} className={btn}>
         <ClipboardCheck size={17} aria-hidden="true" /> Revisar
       </Button>
       {desktop && (
@@ -526,7 +632,7 @@ export default function AdminPageEditor() {
           <Upload size={17} aria-hidden="true" /> Publicar
         </Button>
       ) : (
-        <Button variant="cta" size="md" onClick={() => review.mutate({ action: 'request' })} loading={review.isPending} disabled={!!page.review_requested_at || busy} className={desktop ? btn : `${btn} flex-1`}>
+        <Button variant="cta" size="md" onClick={openReview} loading={review.isPending} disabled={!!page.review_requested_at || busy} className={desktop ? btn : `${btn} flex-1`}>
           <Send size={17} aria-hidden="true" /> {page.review_requested_at ? 'Esperando aprobación' : desktop ? 'Solicitar aprobación' : 'Pedir aprobación'}
         </Button>
       )}
@@ -588,7 +694,7 @@ export default function AdminPageEditor() {
         </div>
         {selectedBlock.hidden && <p className="mb-3 flex items-center gap-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink"><EyeOff size={14} aria-hidden="true" /> Esta sección está oculta: se conserva aquí pero no aparece en el sitio.</p>}
         {(fieldErrors.blocks || fieldErrors.draft_blocks) && <p className="mb-2 text-sm text-coral-700" role="alert">{fieldErrors.blocks || fieldErrors.draft_blocks}</p>}
-        <BlockForm block={selectedBlock} serverErrors={serverErrors.filter((x) => x.block_id === selectedBlock.id)} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
+        <BlockForm block={selectedBlock} serverErrors={serverErrors.filter((x) => x.block_id === selectedBlock.id)} serverWarnings={serverWarnings.filter((x) => x.block_id === selectedBlock.id)} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
       </div>
   );
 
@@ -642,21 +748,15 @@ export default function AdminPageEditor() {
         {page.review_note && !page.review_requested_at && (
           <p className="rounded-xl border border-coral-600/20 bg-coral-50 px-3 py-2 text-sm text-coral-700" role="status">Dirección pidió cambios: {page.review_note}</p>
         )}
+        {staleSince && <DraftAgeBanner since={staleSince} canPublish={isAdmin} onReview={openReview} />}
         <PageErrorSummary blocks={blocks} serverErrors={serverErrors} onJump={jumpToField} />
-        {issues && issues.length > 0 && (
-          <div className="rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-ink">Revisión: {issues.filter((i) => i.level === 'error').length} por corregir · {issues.filter((i) => i.level === 'warning').length} sugerencias</h2>
-              <Button variant="ghost" size="sm" onClick={() => setIssues(null)}>Ocultar</Button>
-            </div>
-            <ul className="space-y-1 text-sm">
-              {issues.map((i, k) => (
-                <li key={k} className="flex items-start gap-2">
-                  {i.level === 'error' ? <AlertTriangle size={16} className="mt-0.5 shrink-0 text-coral-600" aria-label="Por corregir" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber" aria-label="Sugerencia" />}
-                  {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => jumpToField(i.block_id as string, i.field)}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
-                </li>
-              ))}
-            </ul>
+        {reviewCounts && !reviewOpen && (reviewCounts.errors > 0 || reviewCounts.warnings > 0) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm" role="status">
+            <p className="flex items-center gap-2 text-ink">
+              <AlertTriangle size={16} className={`shrink-0 ${reviewCounts.errors ? 'text-coral-600' : 'text-amber'}`} aria-hidden="true" />
+              <span><strong>Revisión:</strong> {reviewCounts.errors} por corregir · {reviewCounts.warnings} {reviewCounts.warnings === 1 ? 'advertencia' : 'advertencias'}</span>
+            </p>
+            <Button variant="ghost" size="sm" onClick={openReview}>Ver la revisión</Button>
           </div>
         )}
       </div>
@@ -764,11 +864,37 @@ export default function AdminPageEditor() {
       <ConfirmDialog open={dialog === 'unpublish'} title="¿Retirar la página del sitio?"
         message={original ? 'El sitio vuelve a mostrar el diseño original de esta página. El borrador y las versiones se conservan.' : 'Las visitas verán «Página no encontrada» hasta volver a publicarla. El borrador se conserva.'}
         confirmLabel="Retirar página" loading={publish.isPending} onConfirm={() => publish.mutate({ action: 'unpublish' })} onClose={() => setDialog(null)} />
-      <ConfirmDialog open={!!guard.blockedHref} title="¿Salir sin guardar?"
+      <ConfirmDialog open={guard.blocked?.reason === 'unsaved'} title="¿Salir sin guardar?"
         message={saver.conflict
           ? 'Otra persona guardó cambios en esta página y los suyos no se han guardado. Si sale, quedará una copia solo en este navegador.'
           : 'El último cambio no se pudo guardar. Si sale, quedará una copia solo en este navegador y podrá recuperarla al volver.'}
         confirmLabel="Salir sin guardar" onConfirm={guard.leave} onClose={guard.stay} />
+      <ConfirmDialog open={guard.blocked?.reason === 'unpublished'} title="¿Salir sin publicar?"
+        message={isAdmin
+          ? 'Sus cambios están guardados como borrador, pero el sitio no los muestra hasta que los publique. Puede volver y publicarlos cuando quiera.'
+          : 'Sus cambios están guardados como borrador. Para que aparezcan en el sitio, pida la aprobación de Dirección con «Solicitar aprobación».'}
+        confirmLabel="Salir sin publicar" onConfirm={guard.leave} onClose={guard.stay} />
+      <ReviewDialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        pageTitle={pageTitle}
+        report={report}
+        loading={reviewing}
+        error={reviewError}
+        onRetry={() => void runReview()}
+        onFix={fixIssue}
+        onJump={jumpToIssue}
+        canPublish={isAdmin}
+        onPublish={(acknowledged) => publish.mutate({ action: 'publish', confirmLegacy: legacyConfirmed.current, acknowledged })}
+        publishing={publish.isPending && publish.variables?.action === 'publish'}
+        onRequest={() => review.mutate({ action: 'request' })}
+        requesting={review.isPending}
+        nothingToDo={isAdmin
+          ? (nothingToPublish ? 'No hay cambios por publicar: el sitio ya muestra este borrador.' : null)
+          : (page.review_requested_at ? 'Ya se pidió la aprobación de Dirección.' : null)}
+        discard={published && page.published_version_number && (page.has_unpublished_changes || saver.dirty)
+          ? { onConfirm: () => discard.mutate(), busy: discard.isPending, version: page.published_version_number } : null}
+      />
     </div>
   );
 }

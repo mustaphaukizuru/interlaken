@@ -71,10 +71,12 @@ def test_publish_errors_name_section_and_field(admin_client, settings, tmp_path)
         {'id': 'd', 'type': 'nivel.others', 'props': {'title': 'x', 'items': [{'name': 'Otro', 'href': '/tampoco'}]}},
     ])
     r = admin_client.post(reverse('admin-page-publish', args=[page.pk]), {'action': 'publish'}, format='json')
-    assert r.status_code == 400 and r.data['detail'].startswith('Corrija antes de publicar:')
+    assert r.status_code == 409 and r.data['code'] == 'publish_blocked'
+    assert r.data['detail'].startswith('Corrija antes de publicar:')
     assert not RAW_KEY.search(r.data['detail'])
     by_block = {e['block_id']: e for e in r.data['errors']}
-    assert all(set(e) == ERROR_KEYS for e in r.data['errors'])
+    # Publish errors are whole review issues (publish_checks): the C3 keys plus code, fix…
+    assert all(ERROR_KEYS <= set(e) for e in r.data['errors'])
     assert (by_block['a']['field'], by_block['a']['field_label'], by_block['a']['block_index']) == ('title', 'Título', 0)
     assert (by_block['b']['field'], by_block['b']['field_label']) == ('cta', 'Botón')
     assert 'Enlace roto' in by_block['b']['message']

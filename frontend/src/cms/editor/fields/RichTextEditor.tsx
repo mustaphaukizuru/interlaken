@@ -11,7 +11,7 @@ import { describedBy, FieldLabel, FieldNotes, type FieldBaseProps } from './Fiel
 import { LinkPickerDialog } from './LinkField';
 import { describeHref } from './links';
 import { normalizeRichHtml } from './richHtml';
-import { TokenChips } from './TokenChips';
+import { TokenChips, useTokenUndo } from './TokenChips';
 
 export interface RichTextEditorProps extends FieldBaseProps {
   value: string;
@@ -33,6 +33,7 @@ export function RichTextEditor({ id, label, required, hint, error, warning, onBl
   const [active, setActive] = useState<Record<string, boolean>>({});
   const [linking, setLinking] = useState<{ href: string } | null>(null);
   const labelId = `${id}-label`;
+  const tokenUndo = useTokenUndo(value, onChange);
 
   // External value (load, undo, reset) replaces the content; our own edits do not (the caret stays put).
   useEffect(() => {
@@ -159,7 +160,7 @@ export function RichTextEditor({ id, label, required, hint, error, warning, onBl
           }}
         />
       </div>
-      {focused && <TokenChips onInsert={(t) => { restoreRange(); exec('insertText', t); emit(); }} />}
+      {focused && <TokenChips onInsert={(t) => { const before = value; restoreRange(); exec('insertText', t); emit(); tokenUndo(t, before, emitted.current ?? before); }} />}
       <FieldNotes id={id} hint={hint} error={error} warning={warning} />
       <LinkPickerDialog open={!!linking} value={linking?.href ?? ''} onClose={() => { setLinking(null); restoreRange(); }} onPick={applyLink} />
     </div>

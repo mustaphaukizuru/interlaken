@@ -36,14 +36,18 @@ type Props = {
   onChange: (props: Record<string, unknown>, field: string) => void;
   /** Structured errors of this block from the server (save, publish, checks): shown at their field until it is edited. */
   serverErrors?: CmsFieldError[];
+  /** Warnings of «Revisión antes de publicar» (amber, under their field until it is edited). */
+  serverWarnings?: CmsFieldError[];
 };
 
-export function BlockForm({ block, onChange, serverErrors }: Props) {
+export function BlockForm({ block, onChange, serverErrors, serverWarnings }: Props) {
   const spec = blockSpec(block.type);
   if (!spec) return <p className="text-sm text-coral-600">Tipo de bloque desconocido.</p>;
   if (spec.fields.length === 0) return <p className="text-sm text-muted">Este bloque se llena automáticamente con los datos del colegio.</p>;
-  return <SpecForm key={block.id} block={block} spec={spec} onChange={onChange} serverErrors={serverErrors ?? []} />;
+  return <SpecForm key={block.id} block={block} spec={spec} onChange={onChange} serverErrors={serverErrors ?? []} serverWarnings={serverWarnings ?? NO_WARNINGS} />;
 }
+
+const NO_WARNINGS: CmsFieldError[] = [];
 
 /* ── Group open/closed memory (per section type, this browser only) ── */
 const GROUPS_KEY = 'cms-field-groups';
@@ -103,13 +107,13 @@ interface FormCtx {
   blockId: string;
   type: string;
   props: Record<string, unknown>;
-  errorFor: (path: string) => { error?: string; altError?: string };
+  errorFor: (path: string) => { error?: string; altError?: string; warning?: string };
   touch: (path: string) => void;
   edited: (path: string) => void;
   issuesUnder: (prefix: string) => number;
 }
 
-function SpecForm({ block, spec, onChange, serverErrors }: { block: Block; spec: BlockSpec; onChange: Props['onChange']; serverErrors: CmsFieldError[] }) {
+function SpecForm({ block, spec, onChange, serverErrors, serverWarnings }: { block: Block; spec: BlockSpec; onChange: Props['onChange']; serverErrors: CmsFieldError[]; serverWarnings: CmsFieldError[] }) {
   // Show what the site shows: a prop added in a later release still displays its default.
   const props = withDefaults(spec, block.props);
   const media = useMediaLookup(imageIdsIn(spec.fields, props));
@@ -127,11 +131,24 @@ function SpecForm({ block, spec, onChange, serverErrors }: { block: Block; spec:
   const serverKey = JSON.stringify(serverErrors.map((e) => [e.field, e.message]));
   const [editedFor, setEditedFor] = useState<{ key: string; paths: Set<string> }>({ key: serverKey, paths: new Set() });
   const editedPaths = editedFor.key === serverKey ? editedFor.paths : new Set<string>();
-  const edited = (path: string) => setEditedFor((s) => ({ key: serverKey, paths: new Set(s.key === serverKey ? s.paths : []).add(path) }));
+  const edited = (path: string) => {
+    setEditedFor((s) => ({ key: serverKey, paths: new Set(s.key === serverKey ? s.paths : []).add(path) }));
+    setWarnEdited((s) => ({ key: warnKey, paths: new Set(s.key === warnKey ? s.paths : []).add(path) }));
+  };
   const server = new Map<string, string>();
+  const stale = (field: string) => !field || editedPaths.has(field) || [...editedPaths].some((p) => field.startsWith(`${p}.`));
   for (const e of serverErrors) {
-    if (!e.field || editedPaths.has(e.field) || [...editedPaths].some((p) => e.field.startsWith(`${p}.`))) continue;
+    if (stale(e.field)) continue;
     if (!server.has(e.field)) server.set(e.field, e.message);
+  }
+  // Review warnings («Revisión antes de publicar»): amber under the field until it is edited.
+  const warnKey = JSON.stringify(serverWarnings.map((e) => [e.field, e.message]));
+  const [warnEdited, setWarnEdited] = useState<{ key: string; paths: Set<string> }>({ key: warnKey, paths: new Set() });
+  const warnEditedPaths = warnEdited.key === warnKey ? warnEdited.paths : new Set<string>();
+  const warnings = new Map<string, string>();
+  for (const w of serverWarnings) {
+    if (!w.field || warnEditedPaths.has(w.field) || [...warnEditedPaths].some((p) => w.field.startsWith(`${p}.`))) continue;
+    if (!warnings.has(w.field)) warnings.set(w.field, w.message);
   }
   const reveal = serverErrors.length > 0;
 
@@ -139,8 +156,10 @@ function SpecForm({ block, spec, onChange, serverErrors }: { block: Block; spec:
     const issue = byPath.get(path);
     const shown = touched.has(path) || reveal ? issue : undefined;
     const fromServer = server.get(path);
-    if (shown?.code === 'alt') return { altError: shown.message, error: fromServer && fromServer !== shown.message ? fromServer : undefined };
-    return { error: shown?.message ?? fromServer };
+    const warning = warnings.get(path);
+    if (shown?.code === 'alt') return { altError: shown.message, error: fromServer && fromServer !== shown.message ? fromServer : undefined, warning };
+    const error = shown?.message ?? fromServer;
+    return { error, warning: error ? undefined : warning };
   };
   const issuesUnder = (prefix: string) => {
     const match = (p: string) => p === prefix || p.startsWith(prefix.endsWith('.') ? prefix : `${prefix}.`);
@@ -259,9 +278,9 @@ interface FieldProps {
 
 function Field({ spec, value, onChange, path, helpPath, ctx }: FieldProps) {
   const id = fieldDomId(ctx.blockId, path);
-  const { error, altError } = ctx.errorFor(path);
+  const { error, altError, warning } = ctx.errorFor(path);
   const hint = helpFor(ctx.type, helpPath, spec);
-  const base = { id, label: spec.label, required: spec.required, hint, error, onBlur: () => ctx.touch(path) };
+  const base = { id, label: spec.label, required: spec.required, hint, error, warning, onBlur: () => ctx.touch(path) };
   const str = typeof value === 'string' ? value : value == null ? '' : String(value);
   let control: ReactNode;
   switch (spec.kind) {

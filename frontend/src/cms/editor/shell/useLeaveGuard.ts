@@ -2,32 +2,40 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * - `clean`: nothing to save, leave freely;
- * - `pending`: an autosave is queued or running: save first, then leave;
- * - `unsaved`: the last save failed or is paused by a conflict: ask.
+ * - `clean`: nothing to save or publish, leave freely;
+ * - `pending`: an autosave is queued or running: save first, then leave
+ *   (or ask, when `unpublished` says the saved edits are not on the site);
+ * - `unsaved`: the last save failed or is paused by a conflict: ask;
+ * - `unpublished`: saved, but the site does not show the edits yet: ask
+ *   in the app (no browser prompt: nothing would be lost).
  */
-export type LeaveState = 'clean' | 'pending' | 'unsaved';
+export type LeaveState = 'clean' | 'pending' | 'unsaved' | 'unpublished';
+
+export type LeaveReason = 'unsaved' | 'unpublished';
 
 interface Options {
   state: LeaveState;
   flush: () => Promise<boolean>;
+  /** Edits made in this visit are saved but not published (asked about after the last save). */
+  unpublished?: boolean;
   /** Runs before leaving with unsaved edits (keeps a copy in this browser). */
   beforeLeave?: () => void;
 }
 
 /**
- * Warns before leaving the editor with edits that did not reach the server:
- * the browser prompt on reload/close, and an in-app dialog for console links
- * (the app uses <BrowserRouter>, which has no navigation blocker).
+ * Warns before leaving the editor with edits that did not reach the server
+ * (the browser prompt on reload/close, an in-app dialog for console links;
+ * the app uses <BrowserRouter>, which has no navigation blocker), and before
+ * leaving edits that reached the server but not the public site.
  */
-export function useLeaveGuard({ state, flush, beforeLeave }: Options) {
+export function useLeaveGuard({ state, flush, unpublished = false, beforeLeave }: Options) {
   const navigate = useNavigate();
-  const [blockedHref, setBlockedHref] = useState<string | null>(null);
-  const latest = useRef({ state, flush, beforeLeave });
-  useEffect(() => { latest.current = { state, flush, beforeLeave }; });
+  const [blocked, setBlocked] = useState<{ to: string; reason: LeaveReason } | null>(null);
+  const latest = useRef({ state, flush, beforeLeave, unpublished });
+  useEffect(() => { latest.current = { state, flush, beforeLeave, unpublished }; });
 
   useEffect(() => {
-    if (state === 'clean') return;
+    if (state !== 'pending' && state !== 'unsaved') return;
     const onUnload = (e: BeforeUnloadEvent) => {
       latest.current.beforeLeave?.();
       void latest.current.flush();
@@ -54,8 +62,14 @@ export function useLeaveGuard({ state, flush, beforeLeave }: Options) {
       e.stopPropagation();
       const to = url.pathname + url.search + url.hash;
       void (async () => {
-        if (latest.current.state === 'pending' && (await latest.current.flush())) navigate(to);
-        else setBlockedHref(to);
+        const now = latest.current.state;
+        if (now === 'pending') {
+          if (!(await latest.current.flush())) setBlocked({ to, reason: 'unsaved' });
+          else if (latest.current.unpublished) setBlocked({ to, reason: 'unpublished' });
+          else navigate(to);
+        } else if (now === 'unpublished') setBlocked({ to, reason: 'unpublished' });
+        else if (now === 'unsaved') setBlocked({ to, reason: 'unsaved' });
+        else navigate(to);
       })();
     };
     document.addEventListener('click', onClick, true);
@@ -63,12 +77,14 @@ export function useLeaveGuard({ state, flush, beforeLeave }: Options) {
   }, [state, navigate]);
 
   return {
-    blockedHref,
-    stay: () => setBlockedHref(null),
+    blocked,
+    /** The destination held back (kept for callers that only need it). */
+    blockedHref: blocked?.to ?? null,
+    stay: () => setBlocked(null),
     leave: () => {
-      const to = blockedHref;
-      latest.current.beforeLeave?.();
-      setBlockedHref(null);
+      const to = blocked?.to;
+      if (blocked?.reason === 'unsaved') latest.current.beforeLeave?.();
+      setBlocked(null);
       if (to) navigate(to);
     },
   };

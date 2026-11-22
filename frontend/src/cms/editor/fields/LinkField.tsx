@@ -269,12 +269,12 @@ export interface LinkFieldProps extends Omit<FieldBaseProps, 'id'> {
 }
 
 /** A button or link prop `{ label, href }`: its text (with data chips) and its destination. */
-export function LinkField({ id, label, required, hint, error, onBlur, value, onChange, textLabel = 'Texto del botón' }: LinkFieldProps) {
+export function LinkField({ id, label, required, hint, error, warning, onBlur, value, onChange, textLabel = 'Texto del botón' }: LinkFieldProps) {
   const v = value ?? {};
   return (
     <fieldset className="min-w-0 space-y-3 rounded-xl border border-line p-3" aria-describedby={hint ? `${id}-hint` : undefined}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{label}{required && <span aria-hidden="true" className="text-coral-600"> *</span>}</legend>
-      <TextField id={`${id}-label`} label={textLabel} value={v.label ?? ''} onChange={(t) => onChange({ ...v, label: t })} onBlur={onBlur} />
+      <TextField id={`${id}-label`} label={textLabel} value={v.label ?? ''} onChange={(t) => onChange({ ...v, label: t })} onBlur={onBlur} warning={warning} />
       <HrefInput id={id} label="Destino" value={v.href ?? ''} onChange={(href) => onChange({ ...v, href })} error={error} onBlur={onBlur} required={required} />
       {hint && <p id={`${id}-hint`} className="text-xs text-muted">{hint}</p>}
     </fieldset>

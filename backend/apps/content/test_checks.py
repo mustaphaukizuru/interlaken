@@ -46,7 +46,8 @@ def test_publish_blocked_by_errors_and_checks_endpoint(admin_client):
     r = admin_client.get(reverse('admin-page-checks', args=[p.pk]))
     assert r.status_code == 200 and r.data['ok'] is False
     r = admin_client.post(reverse('admin-page-publish', args=[p.pk]), {'action': 'publish'}, format='json')
-    assert r.status_code == 400 and 'Enlace roto' in r.data['detail'] and r.data['issues']
+    assert r.status_code == 409 and r.data['code'] == 'publish_blocked'
+    assert 'Enlace roto' in r.data['detail'] and r.data['issues']
     p.draft_blocks[0]['props']['cta']['href'] = '/admisiones'
     p.save()
     assert admin_client.get(reverse('admin-page-checks', args=[p.pk])).data['ok'] is True

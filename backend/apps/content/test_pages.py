@@ -47,7 +47,8 @@ def test_publish_versions_rollback_and_public_cache(admin_client, api_client):
     api_client.force_authenticate(user=None)
     assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 2
     api_client.force_authenticate(user=AdminFactory())
-    assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').data['version'] == 2
+    # Taking a section out is a «large change»: published once acknowledged.
+    assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {'acknowledge_warnings': True}, format='json').data['version'] == 2
     api_client.force_authenticate(user=None)
     assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 1
     # restoring v1 copies it into the DRAFT only: nothing is published yet
@@ -61,7 +62,8 @@ def test_publish_versions_rollback_and_public_cache(admin_client, api_client):
     assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 1
     # publishing the restored draft (through the checked publish flow) creates v3
     api_client.force_authenticate(user=AdminFactory())
-    assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').data['version'] == 3
+    # (these test blocks carry no ids, so each save names them anew: «Qué cambia» sees a section swapped)
+    assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {'acknowledge_warnings': True}, format='json').data['version'] == 3
     api_client.force_authenticate(user=None)
     assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 2
 
@@ -102,6 +104,6 @@ def test_publish_blocks_images_without_alt(admin_client, settings, tmp_path):
     asset = admin_client.post(reverse('admin-media'), {'file': SimpleUploadedFile('a.png', buf.getvalue(), content_type='image/png')}, format='multipart').data
     page = Page.objects.create(slug='fotos', title='G', draft_blocks=[{'type': 'image', 'props': {'image': asset['id']}}])
     resp = admin_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json')
-    assert resp.status_code == 400 and 'texto alternativo' in resp.data['detail']
+    assert resp.status_code == 409 and 'texto alternativo' in resp.data['detail']
     admin_client.patch(reverse('admin-media-detail', args=[asset['id']]), {'alt': 'Campus'}, format='json')
     assert admin_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').status_code == 200

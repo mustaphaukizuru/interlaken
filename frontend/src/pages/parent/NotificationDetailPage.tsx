@@ -14,9 +14,12 @@ import { NOTIF_META } from '@/lib/notifications';
 import { portalApi } from '@/services/api';
 
 /** Where the notification's subject lives, when it lives somewhere. */
-function related(n: { notif_type: string; announcement: number | null }): { to: string; label: string } | null {
+function related(n: { notif_type: string; announcement: number | null; message?: string }): { to: string; label: string } | null {
   if (n.notif_type === 'payment') return { to: '/portal/cafeteria', label: 'Ver mi cafetería' };
   if (n.notif_type === 'cafeteria') return { to: '/portal/cafeteria', label: 'Ver la cafetería' };
+  // «Revisión antes de publicar» notices (a blocked scheduled publication, a live page with a problem).
+  const page = /\/admin\/contenido\/(\d+)/.exec(n.message ?? '');
+  if (page) return { to: `/admin/contenido/${page[1]}`, label: 'Abrir el editor' };
   return null;
 }
 

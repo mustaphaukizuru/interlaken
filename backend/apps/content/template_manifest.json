@@ -7,7 +7,30 @@
       "seo": {
         "title": "Admisiones {{ciclo}}",
         "description": "Admisiones {{ciclo}} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a su hijo en preescolar, primaria o secundaria."
-      }
+      },
+      "sections": [
+        {
+          "type": "admisiones.hero"
+        },
+        {
+          "type": "admisiones.testimonials"
+        },
+        {
+          "type": "admisiones.sep"
+        },
+        {
+          "type": "admisiones.steps"
+        },
+        {
+          "type": "admisiones.estimator"
+        },
+        {
+          "type": "admisiones.docs_cta"
+        },
+        {
+          "type": "admisiones.faq"
+        }
+      ]
     },
     "agendar-visita": {
       "path": "/agendar-visita",
@@ -15,7 +38,18 @@
       "seo": {
         "title": "Agende una visita al colegio",
         "description": "Reserve en línea un recorrido por las instalaciones del Colegio Interlaken en Residencial El Dorado, Tlalnepantla. Conozca salones, maestros y patios."
-      }
+      },
+      "sections": [
+        {
+          "type": "visita.hero"
+        },
+        {
+          "type": "visita.steps"
+        },
+        {
+          "type": "visita.booking"
+        }
+      ]
     },
     "aviso-de-privacidad": {
       "path": "/aviso-de-privacidad",
@@ -23,7 +57,15 @@
       "seo": {
         "title": "Aviso de privacidad",
         "description": "Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer sus derechos ARCO."
-      }
+      },
+      "sections": [
+        {
+          "type": "aviso.hero"
+        },
+        {
+          "type": "aviso.notice"
+        }
+      ]
     },
     "confirmar-correo": {
       "path": "/confirmar-correo",
@@ -31,7 +73,12 @@
       "seo": {
         "title": "Confirmar correo para avisos",
         "description": "Confirme el correo en el que recibirá los avisos del Colegio Interlaken."
-      }
+      },
+      "sections": [
+        {
+          "type": "correo.confirm"
+        }
+      ]
     },
     "contacto": {
       "path": "/contacto",
@@ -39,7 +86,21 @@
       "seo": {
         "title": "Contacto y ubicación",
         "description": "Contacte al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa."
-      }
+      },
+      "sections": [
+        {
+          "type": "contacto.hero"
+        },
+        {
+          "type": "contacto.main"
+        },
+        {
+          "type": "contacto.directory"
+        },
+        {
+          "type": "contacto.map"
+        }
+      ]
     },
     "costos": {
       "path": "/admisiones/costos",
@@ -47,7 +108,15 @@
       "seo": {
         "title": "Costos y colegiaturas {{ciclo}}",
         "description": "Costos del Colegio Interlaken para el ciclo {{ciclo}}: inscripción, colegiaturas, seguros, extraescolares y estancia de preescolar, primaria y secundaria."
-      }
+      },
+      "sections": [
+        {
+          "type": "costos.hero"
+        },
+        {
+          "type": "costos.prices"
+        }
+      ]
     },
     "documentacion": {
       "path": "/admisiones/documentacion",
@@ -55,7 +124,15 @@
       "seo": {
         "title": "Documentos para la inscripción",
         "description": "Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo {{ciclo}}), con enlaces a los trámites oficiales en gob.mx."
-      }
+      },
+      "sections": [
+        {
+          "type": "documentacion.hero"
+        },
+        {
+          "type": "documentacion.list"
+        }
+      ]
     },
     "facturacion": {
       "path": "/comunidad/facturacion",
@@ -63,7 +140,21 @@
       "seo": {
         "title": "Facturación (CFDI)",
         "description": "Solicite sus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos, plazos y avisos importantes."
-      }
+      },
+      "sections": [
+        {
+          "type": "facturacion.hero"
+        },
+        {
+          "type": "facturacion.notices"
+        },
+        {
+          "type": "facturacion.request"
+        },
+        {
+          "type": "facturacion.download"
+        }
+      ]
     },
     "galeria": {
       "path": "/galeria",
@@ -71,7 +162,15 @@
       "seo": {
         "title": "Galería: campus e instalaciones",
         "description": "La vida en el Colegio Interlaken: campus, salones, deportes y actividades de preescolar, primaria y secundaria en Tlalnepantla."
-      }
+      },
+      "sections": [
+        {
+          "type": "galeria.hero"
+        },
+        {
+          "type": "galeria.grid"
+        }
+      ]
     },
     "iniciar-sesion": {
       "path": "/login",
@@ -79,7 +178,12 @@
       "seo": {
         "title": "Iniciar sesión",
         "description": "Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea."
-      }
+      },
+      "sections": [
+        {
+          "type": "acceso.screen"
+        }
+      ]
     },
     "inicio": {
       "path": "/",
@@ -87,7 +191,45 @@
       "seo": {
         "title": "Colegio Interlaken | Escuela bilingüe en Tlalnepantla",
         "description": "Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con {{anios}} años de trayectoria. Agende su visita."
-      }
+      },
+      "sections": [
+        {
+          "type": "home.hero"
+        },
+        {
+          "type": "home.stats"
+        },
+        {
+          "type": "home.about"
+        },
+        {
+          "type": "home.video"
+        },
+        {
+          "type": "home.levels"
+        },
+        {
+          "type": "home.programs"
+        },
+        {
+          "type": "home.promos"
+        },
+        {
+          "type": "home.strengths"
+        },
+        {
+          "type": "home.testimonials"
+        },
+        {
+          "type": "home.gallery"
+        },
+        {
+          "type": "home.lead"
+        },
+        {
+          "type": "home.cta"
+        }
+      ]
     },
     "inscripcion-documentos": {
       "path": "/inscripcion/documentos",
@@ -95,7 +237,12 @@
       "seo": {
         "title": "Documentos de inscripción",
         "description": "Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken."
-      }
+      },
+      "sections": [
+        {
+          "type": "documentos.main"
+        }
+      ]
     },
     "modelo-educativo": {
       "path": "/modelo-educativo",
@@ -103,7 +250,15 @@
       "seo": {
         "title": "Modelo educativo bilingüe",
         "description": "El modelo del Colegio Interlaken: educación bilingüe, alto nivel académico, valores, tecnología en el aula y cultura ecológica, de preescolar a secundaria."
-      }
+      },
+      "sections": [
+        {
+          "type": "modelo.hero"
+        },
+        {
+          "type": "modelo.pillars"
+        }
+      ]
     },
     "no-encontrada": {
       "path": "/no-encontrada",
@@ -111,7 +266,12 @@
       "seo": {
         "title": "Página no encontrada",
         "description": "La página que busca no existe o fue movida."
-      }
+      },
+      "sections": [
+        {
+          "type": "notfound.message"
+        }
+      ]
     },
     "nosotros": {
       "path": "/nosotros",
@@ -119,7 +279,38 @@
       "seo": {
         "title": "Nosotros: {{anios}} años educando en Tlalnepantla",
         "description": "Conozca al Colegio Interlaken: {{anios}} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores."
-      }
+      },
+      "sections": [
+        {
+          "type": "page.hero",
+          "props": {
+            "label": "Nuestra Historia",
+            "labelClass": "section-label-pink",
+            "image": "/assets/facade-sign.webp",
+            "focus": "center 40%",
+            "title": "{{anios}} años formando\nlíderes en Tlalnepantla",
+            "subtitle": "Colegio Interlaken es una institución educativa privada con más de cuatro décadas de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta secundaria."
+          }
+        },
+        {
+          "type": "about.mission"
+        },
+        {
+          "type": "about.timeline"
+        },
+        {
+          "type": "about.values"
+        },
+        {
+          "type": "about.levels"
+        },
+        {
+          "type": "about.credentials"
+        },
+        {
+          "type": "about.cta"
+        }
+      ]
     },
     "pagos": {
       "path": "/pagos",
@@ -127,7 +318,15 @@
       "seo": {
         "title": "Colegiaturas y cafetería: pagos en línea",
         "description": "Familias del Colegio Interlaken: pague colegiaturas y consulte boletas en línea, y revise el saldo y las recargas de la cafetería escolar."
-      }
+      },
+      "sections": [
+        {
+          "type": "pagos.hero"
+        },
+        {
+          "type": "pagos.platforms"
+        }
+      ]
     },
     "plataformas": {
       "path": "/plataformas",
@@ -135,7 +334,36 @@
       "seo": {
         "title": "Plataformas para familias",
         "description": "Plataformas del Colegio Interlaken: Google Classroom, Gmail institucional, registro de iPad (Mosyle) y Educar es Padre."
-      }
+      },
+      "sections": [
+        {
+          "type": "plataformas.hero"
+        },
+        {
+          "type": "plataformas.platforms"
+        },
+        {
+          "type": "plataformas.platforms",
+          "props": {
+            "bg": "cream",
+            "labelClass": "section-label-green",
+            "eyebrow": "Familias",
+            "title": "Para padres",
+            "text": "Acompañamiento para la crianza y la vida familiar.",
+            "columns": "3",
+            "items": [
+              {
+                "name": "Educar es Padre",
+                "text": "Cursos y contenidos diseñados para fortalecer la dinámica familiar y acompañar la crianza.",
+                "href": "https://educarespadre.com/",
+                "icon": "HeartHandshake",
+                "cta": "Ir a Educar es Padre"
+              }
+            ],
+            "note": "¿Necesita recuperar un acceso o una contraseña? Escríbanos por WhatsApp o al correo de su nivel; vea [Contacto](/contacto). Los pagos de colegiaturas y cafetería están en [Colegiaturas y cafetería](/pagos)."
+          }
+        }
+      ]
     },
     "pre-registro": {
       "path": "/pre-registro",
@@ -143,7 +371,18 @@
       "seo": {
         "title": "Ficha de inscripción",
         "description": "La ficha de inscripción del Colegio Interlaken es personal: el colegio envía el enlace a cada familia admitida después del examen de valoración."
-      }
+      },
+      "sections": [
+        {
+          "type": "preregistro.hero"
+        },
+        {
+          "type": "preregistro.trust"
+        },
+        {
+          "type": "preregistro.form"
+        }
+      ]
     },
     "preescolar": {
       "path": "/niveles/preescolar",
@@ -151,7 +390,150 @@
       "seo": {
         "title": "Kínder bilingüe en Tlalnepantla",
         "description": "Kínder bilingüe en Tlalnepantla, de maternal a KIII: aprender jugando, proyectos en inglés y español, computación, música, deportes y yoga."
-      }
+      },
+      "sections": [
+        {
+          "type": "nivel.hero",
+          "props": {
+            "label": "Niveles Educativos",
+            "title": "Preescolar",
+            "headline": "Aprender también es jugar, descubrir y disfrutar",
+            "text": "Cuando un niño se divierte, se emociona y siente curiosidad, aprender sucede de manera natural.",
+            "image": "/assets/hopscotch.webp",
+            "accent": "green",
+            "color": "var(--nivel-preescolar)",
+            "primary": {
+              "label": "Agendar visita",
+              "href": "/agendar-visita"
+            },
+            "secondary": {
+              "label": "Solicitar informes",
+              "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+            }
+          }
+        },
+        {
+          "type": "nivel.content",
+          "props": {
+            "accent": "green",
+            "color": "var(--nivel-preescolar)",
+            "story": [
+              {
+                "title": "",
+                "text": "En nuestro Kínder queremos que los niños disfruten esta etapa mientras descubren todo lo que son capaces de hacer. Por eso buscamos que cada experiencia tenga un propósito: jugar, explorar, preguntar, crear, experimentar, convivir y, casi sin darse cuenta, **desarrollen habilidades que serán la base de sus futuros aprendizajes**.\n\nPorque en estos primeros años no se trata de acumular conceptos, **se trata de aprender con sentido.**",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Menos memorizar. Más experimentar.",
+                "text": "Los niños aprenden haciendo; por eso trabajamos a través de experiencias y **proyectos tanto en inglés como en español**, que despiertan su curiosidad y les permiten relacionar lo que aprenden con el mundo que los rodea.\n\nQueremos que pregunten, prueben, se equivoquen, vuelvan a intentarlo y encuentren respuestas.\n\nAsí construimos **aprendizajes significativos** que van mucho más allá de memorizar información.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Bilingües desde pequeños",
+                "text": "En esta etapa, los niños tienen una enorme capacidad para acercarse a un segundo idioma de manera natural.\n\nNuestra propuesta es **bilingüe desde maternal hasta KIII** y el inglés forma parte de su experiencia cotidiana.\n\nLos niños escuchan, comprenden, hablan y participan en actividades y proyectos en ambos idiomas. Además, durante su paso por Kínder desarrollan progresivamente las habilidades necesarias para **aprender a leer y escribir tanto en español como en inglés**.\n\nNo buscamos únicamente que conozcan palabras en otro idioma, **queremos que aprendan a comunicarse en él.**",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Aprender también es moverse, crear y encontrar la calma",
+                "text": "Un niño necesita mucho más que lápices y cuadernos para desarrollarse, por eso nuestra propuesta incluye **computación, música, deportes y yoga**.\n\nCada una de estas experiencias aporta algo diferente: creatividad, coordinación, expresión, movimiento, concentración, conciencia corporal y herramientas para reconocer y regular sus emociones. Aprender a detenerse, respirar y reconocer cómo se sienten también es parte muy importante del crecimiento.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "“¡Yo puedo hacerlo!”",
+                "text": "Una de las cosas más importantes que un niño puede descubrir durante estos años es que puede hacer cada vez más cosas por sí mismo.\n\nAcompañamos a nuestros alumnos para que desarrollen **autonomía e independencia** de acuerdo con su edad: tomar pequeñas decisiones, asumir responsabilidades, resolver situaciones cotidianas y pedir ayuda cuando la necesitan.\n\nNo hacemos todo por ellos, **los acompañamos para que descubran que pueden hacerlo,** mientras les enseñamos y los animamos en el proceso.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Saber convivir también se aprende",
+                "text": "Compartir, esperar un turno, expresar lo que sienten, escuchar a los demás, resolver un desacuerdo o aprender que no todos pensamos igual son aprendizajes fundamentales.\n\nPor eso damos especial importancia a la **socialización y al desarrollo emocional**.\n\nQueremos que nuestros niños aprendan a reconocer y expresar sus emociones, construir relaciones positivas y convivir con otros dentro de un ambiente donde prevalezcan **el respeto, la tolerancia, la diversión y el amor**; sabiendo que el sentirse seguro y querido abre la puerta al aprendizaje.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Cada niño tiene su propio ritmo",
+                "text": "No todos los niños aprenden de la misma manera ni al mismo tiempo. Y eso importa.\n\nNuestro equipo docente acompaña de manera cercana el desarrollo de cada alumno, observa sus avances, reconoce sus fortalezas e identifica las áreas en las que necesita mayor apoyo.\n\nEse acompañamiento también incluye a las familias. Promovemos una comunicación **cercana, constante y abierta entre familia y escuela**, porque cuando los adultos que acompañan a un niño trabajan juntos, podemos comprender mejor sus necesidades y ayudarlo a crecer.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Niños felices que descubren todo lo que pueden lograr",
+                "text": "Queremos que nuestros alumnos terminen el Kínder sabiendo muchas cosas, por supuesto. Pero queremos algo más: que sean **curiosos, autónomos, seguros, creativos y capaces de convivir con los demás**. Que sepan expresar lo que sienten, que disfruten aprender y que lleguen a Primaria con las herramientas necesarias para enfrentar con confianza una nueva etapa.\n\nPorque durante los primeros años se construyen mucho más que conocimientos; **se construye la confianza para aprender, la seguridad para intentarlo y el gusto por descubrir.** Y la mejor manera de comenzar la vida estudiantil es muy sencilla: **aprendiendo jugando y siendo feliz.**",
+                "programs": [],
+                "quote": ""
+              }
+            ],
+            "photo": "/assets/campus-mural.webp",
+            "photoAlt": "Patio del colegio con toldos rojos y muros pintados de colores",
+            "photoAfter": 4,
+            "groupsTitle": "Cuatro grupos en este nivel",
+            "groups": [
+              {
+                "name": "Maternal",
+                "detail": "Ingreso a los dos años. Salones de 10 a 15 alumnos, atendidos por una educadora y una auxiliar."
+              },
+              {
+                "name": "1º a 3er grado",
+                "detail": "Ingreso a 1º con tres años cumplidos. Grupos de 15 a 20 alumnos con maestra de Español, maestra de Inglés y una niñera."
+              }
+            ],
+            "extras": [
+              {
+                "text": "Estudios con reconocimiento oficial de la Secretaría de Educación Pública (SEP)."
+              },
+              {
+                "text": "Al concluir el tercer grado, los alumnos reciben su Certificado de Educación Preescolar."
+              }
+            ],
+            "sepLevel": "Preescolar",
+            "sepTitle": "Incorporación oficial SEP",
+            "sepNote": "Estudios con reconocimiento de validez oficial.",
+            "sideTitle": "Información útil",
+            "links": [
+              {
+                "label": "Proceso de inscripción",
+                "href": "/admisiones"
+              },
+              {
+                "label": "Documentación",
+                "href": "/admisiones/documentacion"
+              },
+              {
+                "label": "Costos y colegiaturas",
+                "href": "/admisiones/costos"
+              },
+              {
+                "label": "Agendar visita",
+                "href": "/agendar-visita"
+              },
+              {
+                "label": "Contacto por nivel",
+                "href": "/contacto"
+              }
+            ]
+          }
+        },
+        {
+          "type": "nivel.others",
+          "props": {
+            "title": "Conozca también",
+            "items": [
+              {
+                "name": "Primaria",
+                "href": "/niveles/primaria"
+              },
+              {
+                "name": "Secundaria",
+                "href": "/niveles/secundaria"
+              }
+            ]
+          }
+        }
+      ]
     },
     "primaria": {
       "path": "/niveles/primaria",
@@ -159,7 +541,168 @@
       "seo": {
         "title": "Primaria bilingüe en Tlalnepantla",
         "description": "Primaria bilingüe en Tlalnepantla: proyectos, tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos."
-      }
+      },
+      "sections": [
+        {
+          "type": "nivel.hero",
+          "props": {
+            "label": "Niveles Educativos",
+            "title": "Primaria",
+            "headline": "Aprender tiene sentido",
+            "text": "Queremos que nuestros alumnos no solo sepan más. Queremos que sepan qué hacer con lo que aprenden.",
+            "image": "/assets/court-primaria.webp",
+            "accent": "coral",
+            "color": "var(--nivel-primaria)",
+            "primary": {
+              "label": "Agendar visita",
+              "href": "/agendar-visita"
+            },
+            "secondary": {
+              "label": "Solicitar informes",
+              "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+            }
+          }
+        },
+        {
+          "type": "nivel.content",
+          "props": {
+            "accent": "coral",
+            "color": "var(--nivel-primaria)",
+            "story": [
+              {
+                "title": "",
+                "text": "En Primaria acompañamos una etapa increíble: los niños descubren de qué son capaces, empiezan a construir su propia forma de pensar y desarrollan herramientas que utilizarán durante toda su vida.\n\nPor eso nuestra propuesta es **bilingüe e integral**. Buscamos el equilibrio entre una sólida preparación académica, el desarrollo de habilidades y competencias, la creatividad, el arte, la autonomía y la formación personal.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Menos memorizar. Más comprender, pensar y hacer.",
+                "text": "Aprender no debería significar únicamente recordar información para un examen.\n\nNuestros alumnos investigan, preguntan, experimentan, colaboran, resuelven problemas y llevan lo aprendido a situaciones concretas. A través del **trabajo por proyectos**, conectamos distintas áreas del conocimiento y acercamos el aprendizaje a la vida real.\n\nPorque cuando un niño entiende para qué sirve lo que aprende, **el conocimiento cobra sentido**.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Tareas que suman, no tareas por cumplir",
+                "text": "Creemos que una buena educación no se mide por la cantidad de tarea que un niño lleva a casa.\n\nPor eso buscamos que las **tareas sean pocas, relevantes y con un propósito claro**: reforzar aprendizajes importantes y favorecer la autonomía, sin convertir las tardes familiares en una extensión de la jornada escolar.",
+                "programs": [],
+                "quote": "Más tarea no siempre significa más aprendizaje."
+              },
+              {
+                "title": "Herramientas para aprender mejor",
+                "text": "Contamos con programas específicos que fortalecen habilidades fundamentales para el desarrollo académico y personal.",
+                "programs": [
+                  {
+                    "name": "Lee y Produce",
+                    "icon": "reading",
+                    "text": "**Lee y Produce** impulsa la comprensión lectora y la capacidad de organizar y expresar ideas por escrito."
+                  },
+                  {
+                    "name": "Habilidades Orales",
+                    "icon": "speaking",
+                    "text": "**Habilidades Orales** ayuda a nuestros alumnos a comunicar lo que piensan, argumentar, escuchar y expresarse con claridad y seguridad."
+                  },
+                  {
+                    "name": "Método Singapur",
+                    "icon": "math",
+                    "text": "Con el **Método Singapur**, las matemáticas se trabajan desde la comprensión, el razonamiento y la resolución de problemas, para que los niños no solo aprendan procedimientos, sino que entiendan cómo y cuándo utilizarlos."
+                  }
+                ],
+                "quote": ""
+              },
+              {
+                "title": "Bilingües para comunicarse con el mundo",
+                "text": "El inglés forma parte de la experiencia cotidiana de nuestros alumnos.\n\nNuestra propuesta bilingüe busca que desarrollen las herramientas necesarias para **comprender, comunicarse y desenvolverse en inglés con confianza**.\n\nAdemás, nuestros alumnos tienen la oportunidad de presentar **certificaciones de Cambridge**, que permiten respaldar y reconocer su avance en el dominio del idioma a lo largo de su formación, mismas que les son de utilidad en su vida académica, así como en su futuro laboral.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Aprender también es prepararse para la vida",
+                "text": "Hay conocimientos que difícilmente caben en un libro.\n\nA través de **Emprendimiento y Finanzas**, acercamos a los niños desde edades tempranas a conceptos y experiencias que les ayudan a comprender mejor el mundo que los rodea.\n\nBuscamos desarrollar iniciativa, creatividad, toma de decisiones, responsabilidad y una relación cada vez más consciente con el dinero y los recursos.\n\nNo se trata solamente de aprender conceptos. Se trata de comenzar a desarrollar **habilidades prácticas para la vida**.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "También se aprende creando",
+                "text": "El desarrollo de un niño no sucede solamente frente a un cuaderno.\n\nEl **teatro y la música** forman parte de nuestra propuesta porque ofrecen otras maneras de aprender, expresarse y descubrir talentos.\n\nA través de estas experiencias fortalecemos la creatividad, la sensibilidad, la comunicación, la seguridad personal y el trabajo en equipo.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Hay aprendizajes que necesitan salir del salón",
+                "text": "Creemos que algunas de las experiencias que más ayudan a crecer a un niño suceden cuando tiene la oportunidad de enfrentarse a nuevos retos.\n\nPor eso los **campamentos** también forman parte de nuestra propuesta educativa.\n\nSalir de su entorno cotidiano, convivir con sus compañeros y asumir pequeñas responsabilidades les permite poner en práctica algo fundamental: **aprender a hacer las cosas por sí mismos**.\n\nEstas experiencias favorecen la autonomía, la independencia, la socialización, la capacidad de adaptación y la confianza en sí mismos.\n\nPorque crecer también significa descubrir:",
+                "programs": [],
+                "quote": "“Yo puedo hacerlo.”"
+              },
+              {
+                "title": "Educación para la escuela. Formación para la vida.",
+                "text": "Queremos niños curiosos, seguros, capaces de expresar sus ideas, trabajar con otros, resolver problemas, tomar decisiones y seguir aprendiendo.\n\nNiños que poco a poco desarrollen la autonomía necesaria para enfrentar nuevos retos y la sensibilidad para convivir y construir con los demás.\n\nPor eso entendemos la educación de manera integral: **mente, emociones, creatividad, valores, habilidades y conocimiento trabajando juntos.**\n\nPorque la Primaria no es solamente una etapa para aprender contenidos.",
+                "programs": [],
+                "quote": "Es el momento de aprender a pensar, a crear, a convivir, a ser más independientes y a descubrir todo lo que son capaces de hacer."
+              }
+            ],
+            "photo": "/assets/classroom.webp",
+            "photoAlt": "Pasillo de salones de Primaria con puertas rojas y barandal de colores",
+            "photoAfter": 3,
+            "groupsTitle": "Seis grupos en este nivel",
+            "groups": [
+              {
+                "name": "1º a 6º grado",
+                "detail": "Salones con capacidad de 20 a 25 alumnos, atendidos por maestra de Español, maestra de Inglés y maestros especialistas de Educación Física, Artística y Tecnológica."
+              }
+            ],
+            "extras": [
+              {
+                "text": "Actividades complementarias y extraescolares: visitas, campañas, concursos, exposiciones, festivales y servicio a la comunidad."
+              },
+              {
+                "text": "Acompañamiento del Departamento de Psicopedagogía."
+              }
+            ],
+            "sepLevel": "Primaria",
+            "sepTitle": "Incorporación oficial SEP",
+            "sepNote": "Estudios con reconocimiento de validez oficial.",
+            "sideTitle": "Información útil",
+            "links": [
+              {
+                "label": "Proceso de inscripción",
+                "href": "/admisiones"
+              },
+              {
+                "label": "Documentación",
+                "href": "/admisiones/documentacion"
+              },
+              {
+                "label": "Costos y colegiaturas",
+                "href": "/admisiones/costos"
+              },
+              {
+                "label": "Agendar visita",
+                "href": "/agendar-visita"
+              },
+              {
+                "label": "Contacto por nivel",
+                "href": "/contacto"
+              }
+            ]
+          }
+        },
+        {
+          "type": "nivel.others",
+          "props": {
+            "title": "Conozca también",
+            "items": [
+              {
+                "name": "Preescolar",
+                "href": "/niveles/preescolar"
+              },
+              {
+                "name": "Secundaria",
+                "href": "/niveles/secundaria"
+              }
+            ]
+          }
+        }
+      ]
     },
     "secundaria": {
       "path": "/niveles/secundaria",
@@ -167,7 +710,158 @@
       "seo": {
         "title": "Secundaria bilingüe en Tlalnepantla",
         "description": "Secundaria bilingüe en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, arte y viajes opcionales al extranjero."
-      }
+      },
+      "sections": [
+        {
+          "type": "nivel.hero",
+          "props": {
+            "label": "Niveles Educativos",
+            "title": "Secundaria",
+            "headline": "Formación integral para la vida",
+            "text": "La Secundaria es una etapa de grandes cambios, descubrimientos y decisiones. Por eso, para nosotros educar va mucho más allá de enseñar contenidos.",
+            "image": "/assets/secundaria.webp",
+            "accent": "purple",
+            "color": "var(--nivel-secundaria)",
+            "primary": {
+              "label": "Agendar visita",
+              "href": "/agendar-visita"
+            },
+            "secondary": {
+              "label": "Solicitar informes",
+              "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+            }
+          }
+        },
+        {
+          "type": "nivel.content",
+          "props": {
+            "accent": "purple",
+            "color": "var(--nivel-secundaria)",
+            "story": [
+              {
+                "title": "",
+                "text": "Acompañamos a nuestros alumnos para que descubran de lo que son capaces, fortalezcan su identidad y desarrollen las herramientas académicas, personales y sociales que necesitarán dentro y fuera de la escuela.",
+                "programs": [],
+                "quote": "Queremos jóvenes preparados para el futuro, pero también seguros de quiénes son."
+              },
+              {
+                "title": "Aprender haciendo, preguntando y descubriendo",
+                "text": "Creemos que se aprende mejor cuando lo que sucede en el salón tiene sentido.\n\nPor eso nuestras clases son dinámicas y trabajamos por proyectos que conectan los contenidos con situaciones de la vida real. Los alumnos investigan, hacen preguntas, trabajan en equipo, buscan soluciones, toman decisiones y aprenden a llevar lo que saben a la práctica.",
+                "programs": [],
+                "quote": "Porque aprender no es memorizar. Es entender, cuestionar, crear y saber qué hacer con lo que aprendemos."
+              },
+              {
+                "title": "Pocas tareas, pero con propósito",
+                "text": "No creemos en llenar las tardes de tareas sólo por cumplir. Buscamos que sean **pocas, significativas y con un objetivo claro**.\n\nLas actividades en casa están pensadas para reforzar lo aprendido, pero también para despertar la curiosidad, promover la investigación y dar espacio a la creatividad.",
+                "programs": [],
+                "quote": "Menos tareas por hacer. Más razones para aprender."
+              },
+              {
+                "title": "Tecnología sí. Habilidades fundamentales, también.",
+                "text": "Nuestros alumnos crecen rodeados de tecnología y queremos que sepan aprovecharla. Pero también sabemos que su uso cotidiano puede hacer que algunas habilidades fundamentales reciban menos atención.\n\nPor eso hacemos especial hincapié en fortalecer capacidades como la **comprensión lectora**, la atención, el análisis, la expresión de ideas y el pensamiento crítico.\n\nLa tecnología es una gran herramienta cuando los alumnos también saben **leer, comprender, pensar, cuestionar y crear**.",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Preparados para un mundo global",
+                "text": "El inglés y la tecnología forman parte natural de su preparación. Nuestros alumnos pueden acceder a certificaciones de **Cambridge** y **Microsoft**, que les permiten avanzar con herramientas útiles para las siguientes etapas de su vida académica.\n\nAdemás, a través de **LEGO® Education**, aprenden construyendo, experimentando y resolviendo retos mientras desarrollan creatividad, pensamiento lógico y trabajo en equipo.",
+                "programs": [],
+                "quote": "El futuro no sólo se estudia. Se construye."
+              },
+              {
+                "title": "Money Adventure: aprender para la vida",
+                "text": "Hablar de dinero también es hablar de decisiones, responsabilidad y autonomía.\n\nEn **Money Adventure**, una clase impartida en inglés, nuestros alumnos comienzan a desarrollar habilidades financieras de una manera práctica y cercana a su realidad. Aprenden, por ejemplo, a elaborar presupuestos, calcular costos, vender productos y tomar decisiones sobre el uso del dinero.\n\nAsí, mientras practican inglés, adquieren herramientas que podrán utilizar durante toda su vida.",
+                "programs": [],
+                "quote": "Porque aprender a manejar el dinero también es aprender a tomar mejores decisiones."
+              },
+              {
+                "title": "Aprender a desenvolverse en el mundo",
+                "text": "Crecer también significa aprender a hacer las cosas por uno mismo; por eso ofrecemos viajes opcionales al extranjero en los que nuestros alumnos viven una experiencia que va mucho más allá de conocer otro país. Viajan acompañados por personal de la escuela, pero son ellos quienes, de acuerdo con su edad, comienzan a hacerse responsables de aspectos importantes del viaje: administrar sus gastos, cuidar su equipaje, manejar sus documentos de viaje, organizar sus pertenencias y tomar decisiones durante el camino.\n\nEstas experiencias les permiten poner en práctica su autonomía, capacidad de planeación, comunicación, responsabilidad y solución de problemas en situaciones reales, siempre dentro de un entorno acompañado y seguro.\n\nTambién aprenden a adaptarse, convivir, llegar a acuerdos y enfrentar pequeños retos lejos de su rutina habitual.",
+                "programs": [],
+                "quote": "Porque hay aprendizajes que sólo ocurren cuando se atreven a salir, descubrir y hacer las cosas por sí mismos."
+              },
+              {
+                "title": "El arte también forma",
+                "text": "Teatro, artes visuales y música son parte importante de nuestra propuesta.\n\nA través del arte, los alumnos encuentran nuevas maneras de expresarse, descubren talentos, desarrollan su creatividad y ganan confianza para compartir sus ideas y mostrarse como son.",
+                "programs": [],
+                "quote": "Educar también es darles espacio para descubrir aquello que los hace únicos."
+              },
+              {
+                "title": "Una escuela donde cada alumno importa",
+                "text": "La cercanía es una de nuestras mayores fortalezas.\n\nNuestros maestros conocen a sus alumnos, saben qué necesitan y acompañan de cerca tanto su desarrollo académico como personal. Además, reciben capacitación constante porque sabemos que enseñar bien también significa seguir aprendiendo.\n\nY este acompañamiento no termina en el salón de clases. Mantenemos una comunicación cercana con las familias porque creemos que **cuando escuela y familia trabajan juntas, los alumnos tienen mejores oportunidades para crecer.**",
+                "programs": [],
+                "quote": ""
+              },
+              {
+                "title": "Excelencia académica con calidad humana",
+                "text": "Promovemos que nuestros alumnos terminen la Secundaria con una excelente preparación académica y listos para enfrentar con seguridad la siguiente etapa. Pero queremos algo más: queremos jóvenes curiosos, responsables, creativos y seguros de sí mismos; capaces de pensar, expresar lo que sienten y sus ideas, convivir con los demás y tomar buenas decisiones.",
+                "programs": [],
+                "quote": "Porque una buena escuela prepara para el siguiente nivel. Una gran educación prepara para la vida."
+              }
+            ],
+            "photo": "/assets/facade.webp",
+            "photoAlt": "Fachada del Colegio Interlaken",
+            "photoAfter": 5,
+            "groupsTitle": "Seis grupos en este nivel",
+            "groups": [
+              {
+                "name": "1º a 3er grado — dos grupos por grado",
+                "detail": "Salones con capacidad de 20 a 25 alumnos, con profesores altamente capacitados en actualización continua."
+              }
+            ],
+            "extras": [
+              {
+                "text": "Actividades complementarias: visitas, exposiciones, concursos, conferencias, festivales, ceremonias y servicio a la comunidad."
+              },
+              {
+                "text": "Actividades extraescolares deportivas y culturales."
+              }
+            ],
+            "sepLevel": "Secundaria",
+            "sepTitle": "Incorporación oficial SEP",
+            "sepNote": "Estudios con reconocimiento de validez oficial.",
+            "sideTitle": "Información útil",
+            "links": [
+              {
+                "label": "Proceso de inscripción",
+                "href": "/admisiones"
+              },
+              {
+                "label": "Documentación",
+                "href": "/admisiones/documentacion"
+              },
+              {
+                "label": "Costos y colegiaturas",
+                "href": "/admisiones/costos"
+              },
+              {
+                "label": "Agendar visita",
+                "href": "/agendar-visita"
+              },
+              {
+                "label": "Contacto por nivel",
+                "href": "/contacto"
+              }
+            ]
+          }
+        },
+        {
+          "type": "nivel.others",
+          "props": {
+            "title": "Conozca también",
+            "items": [
+              {
+                "name": "Preescolar",
+                "href": "/niveles/preescolar"
+              },
+              {
+                "name": "Primaria",
+                "href": "/niveles/primaria"
+              }
+            ]
+          }
+        }
+      ]
     }
   }
 }

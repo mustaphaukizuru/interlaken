@@ -140,11 +140,14 @@ export function fromLocalInput(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-/** Today as YYYY-MM-DD in local time (max of a payment date). */
-export function todayLocal(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/**
+ * Today as YYYY-MM-DD in the school's time zone (default and max of a payment date).
+ * The server checks «no puede ser futura» against America/Mexico_City
+ * (timezone.localdate()), so the device clock must not decide: after 18:00 a
+ * device on UTC is already on tomorrow and its payment was refused.
+ */
+export function todayLocal(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
 /** «$9,500.00». */

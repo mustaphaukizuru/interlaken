@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ExternalLink, History, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { PageRow } from './pageList';
+import { CheckChips } from '../review/CheckChips';
+import type { PageCheckSummary } from '../review/types';
 import { ReviewChip, StatusChip } from './StatusChip';
 import { timeAgo } from './status';
 
@@ -24,6 +26,8 @@ interface Props {
   headerAction?: ReactNode;
   empty: ReactNode;
   now: number;
+  /** «Revisión antes de publicar» per page id (chips next to the state). */
+  checks?: Map<number, PageCheckSummary>;
 }
 
 /** «Editar» and «Personalizar» share one size so the column lines up. */
@@ -35,7 +39,7 @@ const iconLink = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rou
  * layout from 768 px and cards on phones, with the state in words and icon,
  * who edited last and when, and the page's actions.
  */
-export function PageListGroup({ title, listLabel, rows, total, base, isAdmin, selected, onToggle, onToggleAll, onCustomise, customising, onDelete, headerAction, empty, now }: Props) {
+export function PageListGroup({ title, listLabel, rows, total, base, isAdmin, selected, onToggle, onToggleAll, onCustomise, customising, onDelete, headerAction, empty, now, checks }: Props) {
   const selectable = rows.filter((r) => r.page).map((r) => r.page!.id);
   const allOn = !!selected && selectable.length > 0 && selectable.every((id) => selected.has(id));
   const headingId = `group-${listLabel.replace(/\s+/g, '-').toLowerCase()}`;
@@ -81,6 +85,7 @@ export function PageListGroup({ title, listLabel, rows, total, base, isAdmin, se
                     <div className="flex flex-wrap items-center gap-1.5">
                       <StatusChip state={r.state} />
                       {r.state.review && <ReviewChip />}
+                      {p && <CheckChips summary={checks?.get(p.id)} now={now} />}
                     </div>
                     {r.state.detail && <p className="mt-0.5 text-xs text-subtle">{r.state.detail}</p>}
                   </div>

@@ -1301,6 +1301,8 @@ export interface CmsPageAdmin {
   draft_revision?: number;
   draft_updated_by?: string | null;
   draft_updated_at?: string | null;
+  /** «Revisión antes de publicar»: since when the draft differs from the published version (null when equal). */
+  unpublished_since?: string | null;
 }
 
 /** Contract C2: body of the HTTP 409 a draft save gets when someone else saved first. */

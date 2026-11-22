@@ -15,6 +15,39 @@
         "items[].color": "Color",
         "items[].title": "Título",
         "items[].text": "Texto"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "items[].title": "text",
+        "items[].text": "textarea"
+      },
+      "defaults": {
+        "eyebrow": "Nuestro respaldo",
+        "title": "Certificaciones y trayectoria que dan certeza",
+        "items": [
+          {
+            "icon": "Award",
+            "color": "var(--purple)",
+            "title": "Incorporación oficial SEP",
+            "text": "Estudios con reconocimiento y validez oficial ante la Secretaría de Educación Pública."
+          },
+          {
+            "icon": "Globe2",
+            "color": "var(--green)",
+            "title": "Certificaciones de inglés",
+            "text": "Preparamos a los alumnos para exámenes de certificación internacional de inglés."
+          },
+          {
+            "icon": "Users",
+            "color": "var(--pink)",
+            "title": "Más de 2,500 egresados",
+            "text": "Cuatro décadas de comunidad que respaldan nuestra trayectoria en Tlalnepantla."
+          }
+        ]
       }
     },
     "about.cta": {
@@ -28,6 +61,24 @@
         "text": "Texto",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "textarea",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "title": "¿Desea conocernos de cerca?",
+        "text": "Agende una visita para conocer el colegio o escríbanos para recibir informes. Le acompañamos en cada paso de la admisión.",
+        "primary": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "secondary": {
+          "label": "Solicitar informes",
+          "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+        }
       }
     },
     "about.levels": {
@@ -44,6 +95,39 @@
         "items[].grades": "Grados",
         "items[].age": "Edades",
         "items[].tone": "Color"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].name": "text",
+        "items[].grades": "text",
+        "items[].age": "text",
+        "items[].tone": "select"
+      },
+      "defaults": {
+        "eyebrow": "Oferta educativa",
+        "title": "Niveles educativos",
+        "items": [
+          {
+            "name": "Preescolar",
+            "grades": "1°–3°",
+            "age": "3–6 años",
+            "tone": "green"
+          },
+          {
+            "name": "Primaria",
+            "grades": "1°–6°",
+            "age": "6–12 años",
+            "tone": "brand"
+          },
+          {
+            "name": "Secundaria",
+            "grades": "1°–3°",
+            "age": "12–15 años",
+            "tone": "coral"
+          }
+        ]
       }
     },
     "about.mission": {
@@ -71,6 +155,47 @@
         "alt3": "Descripción de la foto inferior",
         "badgeValue": "Insignia: cifra",
         "badgeLabel": "Insignia: texto"
+      },
+      "kinds": {
+        "title": "text",
+        "items": "items",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "items[].title": "text",
+        "items[].text": "textarea",
+        "image1": "image",
+        "alt1": "text",
+        "image2": "image",
+        "alt2": "text",
+        "image3": "image",
+        "alt3": "text",
+        "badgeValue": "text",
+        "badgeLabel": "text"
+      },
+      "defaults": {
+        "title": "Nuestra misión y visión",
+        "items": [
+          {
+            "icon": "Target",
+            "color": "var(--purple)",
+            "title": "Misión",
+            "text": "Formar personas íntegras, críticas y comprometidas con su entorno, capaces de afrontar los retos del siglo XXI con confianza y habilidades globales."
+          },
+          {
+            "icon": "Eye",
+            "color": "var(--green)",
+            "title": "Visión",
+            "text": "Ser la comunidad educativa de referencia en la zona, reconocida por la excelencia académica, el bilingüismo y la formación humana de sus egresados."
+          }
+        ],
+        "image1": "/assets/facade.webp",
+        "alt1": "Fachada del Colegio Interlaken",
+        "image2": "/assets/classroom.webp",
+        "alt2": "Aula del colegio",
+        "image3": "/assets/campus-mural.webp",
+        "alt3": "Mural del campus",
+        "badgeValue": "+2,500",
+        "badgeLabel": "Egresados"
       }
     },
     "about.timeline": {
@@ -86,6 +211,45 @@
         "items[].year": "Año",
         "items[].title": "Título",
         "items[].text": "Texto"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].year": "text",
+        "items[].title": "text",
+        "items[].text": "textarea"
+      },
+      "defaults": {
+        "eyebrow": "Trayectoria",
+        "title": "{{anios}} años formando líderes",
+        "items": [
+          {
+            "year": "{{fundacion}}",
+            "title": "Fundación",
+            "text": "Nace Colegio Interlaken en Tlalnepantla con preescolar y primaria, y una vocación bilingüe desde el primer día."
+          },
+          {
+            "year": "1990",
+            "title": "Secundaria",
+            "text": "Se abre la secundaria incorporada a la SEP, completando la formación básica en un solo campus."
+          },
+          {
+            "year": "2006",
+            "title": "Campus y deportes",
+            "text": "Ampliación de instalaciones deportivas y talleres: canchas, laboratorio y espacios de arte."
+          },
+          {
+            "year": "2019",
+            "title": "Tecnología en el aula",
+            "text": "iPad de 4° a 6° de primaria, Google Classroom y plataformas para familias."
+          },
+          {
+            "year": "{{anio}}",
+            "title": "{{anios}} años",
+            "text": "Portal de Familias con cafetería digital, comunicados y admisiones en línea. La misma comunidad, nuevas herramientas."
+          }
+        ]
       }
     },
     "about.values": {
@@ -102,6 +266,57 @@
         "items[].color": "Color",
         "items[].title": "Título",
         "items[].text": "Texto"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "items[].title": "text",
+        "items[].text": "textarea"
+      },
+      "defaults": {
+        "eyebrow": "Lo que nos define",
+        "title": "Nuestros valores",
+        "items": [
+          {
+            "icon": "Award",
+            "color": "var(--purple)",
+            "title": "Excelencia académica",
+            "text": "Formación rigurosa con enfoque humanista y pensamiento crítico."
+          },
+          {
+            "icon": "Globe2",
+            "color": "var(--green)",
+            "title": "Bilingüismo real",
+            "text": "Inglés intensivo desde el nivel inicial con certificaciones internacionales."
+          },
+          {
+            "icon": "Heart",
+            "color": "var(--pink)",
+            "title": "Formación en valores",
+            "text": "Ciudadanía, empatía y responsabilidad como parte de la vida diaria."
+          },
+          {
+            "icon": "Sparkles",
+            "color": "var(--green)",
+            "title": "Innovación educativa",
+            "text": "Tecnología, ciencia y creatividad integradas al aula."
+          },
+          {
+            "icon": "Users",
+            "color": "var(--purple-mid)",
+            "title": "Comunidad integrada",
+            "text": "Un ambiente cálido e inclusivo donde cada familia pertenece."
+          },
+          {
+            "icon": "Target",
+            "color": "var(--amber)",
+            "title": "Acompañamiento",
+            "text": "Apoyo psicopedagógico personalizado para cada alumno."
+          }
+        ]
       }
     },
     "acceso.screen": {
@@ -163,6 +378,127 @@
         "errEmailUnverified": "Correo de Google sin verificar",
         "errBackendUnreachable": "Servidor no disponible",
         "errOther": "Otro error"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "titleAccent": "text",
+        "text": "textarea",
+        "image": "image",
+        "stats": "items",
+        "stats[].value": "text",
+        "stats[].label": "text",
+        "heading": "text",
+        "subheading": "text",
+        "googleButton": "text",
+        "googleBusy": "text",
+        "divider": "text",
+        "emailLabel": "text",
+        "emailPlaceholder": "text",
+        "passwordLabel": "text",
+        "passwordPlaceholder": "text",
+        "showPassword": "text",
+        "hidePassword": "text",
+        "totpLabel": "text",
+        "submitLabel": "text",
+        "submittingLabel": "text",
+        "completingLabel": "text",
+        "pwBefore": "text",
+        "pwWhatsapp": "text",
+        "pwOr": "text",
+        "pwEmail": "text",
+        "pwAfter": "text",
+        "problemsText": "text",
+        "problemsLink": "link",
+        "signupText": "text",
+        "signupLink": "link",
+        "errCredentials": "text",
+        "errOffline": "text",
+        "errTooMany": "text",
+        "errUnavailable": "text",
+        "errTotp": "text",
+        "errOauthToast": "text",
+        "errNoCode": "text",
+        "errStateMismatch": "text",
+        "errNoEmail": "text",
+        "errTokenExchange": "text",
+        "errUserinfo": "text",
+        "errGoogleUnreachable": "text",
+        "errGoogleUnavailable": "text",
+        "errNotInvited": "text",
+        "errInactive": "text",
+        "errEmailUnverified": "text",
+        "errBackendUnreachable": "text",
+        "errOther": "text"
+      },
+      "defaults": {
+        "label": "Portal Escolar",
+        "title": "Formando Líderes",
+        "titleAccent": "con Excelencia",
+        "text": "Acceda al portal de Colegio Interlaken para consultar cafetería y pagos en línea.",
+        "image": "/assets/facade.webp",
+        "stats": [
+          {
+            "value": "{{anios}}",
+            "label": "Años"
+          },
+          {
+            "value": "1,200+",
+            "label": "Alumnos"
+          },
+          {
+            "value": "95%",
+            "label": "Aprovechamiento"
+          }
+        ],
+        "heading": "Iniciar Sesión",
+        "subheading": "Acceso para familias y personal del colegio",
+        "googleButton": "Continuar con Google",
+        "googleBusy": "Completando acceso con Google…",
+        "divider": "O CON CORREO",
+        "emailLabel": "Correo electrónico",
+        "emailPlaceholder": "correo@interlaken.com.mx",
+        "passwordLabel": "Contraseña",
+        "passwordPlaceholder": "••••••••",
+        "showPassword": "Mostrar contraseña",
+        "hidePassword": "Ocultar contraseña",
+        "totpLabel": "Código de verificación (app de autenticación)",
+        "submitLabel": "Ingresar",
+        "submittingLabel": "Ingresando…",
+        "completingLabel": "Completando…",
+        "pwBefore": "¿Olvidó su contraseña? Solicítela al colegio por",
+        "pwWhatsapp": "WhatsApp",
+        "pwOr": "o",
+        "pwEmail": "correo",
+        "pwAfter": "Un administrador le enviará una nueva.",
+        "problemsText": "¿Problemas?",
+        "problemsLink": {
+          "label": "Contacte al colegio",
+          "href": "/contacto"
+        },
+        "signupText": "¿No tiene cuenta? Su cuenta se crea al inscribirse.",
+        "signupLink": {
+          "label": "Conozca el proceso de admisión",
+          "href": "/admisiones"
+        },
+        "errCredentials": "Credenciales incorrectas o cuenta sin contraseña. Use Google si su cuenta es institucional.",
+        "errOffline": "No hay conexión con el servidor. Revise su internet e intente de nuevo.",
+        "errTooMany": "Demasiados intentos. Espere unos minutos e intente de nuevo.",
+        "errUnavailable": "El servicio no está disponible en este momento. Intente más tarde.",
+        "errTotp": "Código incorrecto.",
+        "errOauthToast": "Error al iniciar sesión. Intente nuevamente.",
+        "errNoCode": "No se recibió autorización de Google.",
+        "errStateMismatch": "La sesión de Google caducó o no coincide. Intente de nuevo.",
+        "errNoEmail": "No fue posible obtener su correo de Google.",
+        "errTokenExchange": "Error al comunicarse con Google. Intente de nuevo.",
+        "errUserinfo": "No fue posible obtener su perfil de Google. Intente de nuevo.",
+        "errGoogleUnreachable": "No fue posible comunicarse con Google. Intente de nuevo.",
+        "errGoogleUnavailable": "El acceso con Google no está disponible ahora. Use su correo y contraseña.",
+        "errNotInvited": "No hay una cuenta registrada con este correo. Pida al colegio que lo invite o vincule como tutor.",
+        "errInactive": "Esta cuenta está desactivada. Si cree que es un error, contacte al colegio.",
+        "errEmailUnverified": "Su correo de Google no está verificado. Verifíquelo e intente de nuevo.",
+        "errBackendUnreachable": "El servicio no está disponible en este momento. Intente más tarde.",
+        "errOther": "Ocurrió un error. Intente de nuevo."
       }
     },
     "admisiones.docs_cta": {
@@ -188,6 +524,46 @@
         "text": "Texto del llamado",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
+      },
+      "kinds": {
+        "docsTitle": "text",
+        "docsSummary": "text",
+        "docsOnlyLabel": "text",
+        "docsNote": "textarea",
+        "docsLink": "link",
+        "docsError": "text",
+        "editList": "action",
+        "image": "image",
+        "imageAlt": "text",
+        "badge": "text",
+        "title": "text",
+        "text": "textarea",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "docsTitle": "Documentos requeridos",
+        "docsSummary": "{total} documentos · {online} con trámite oficial en línea",
+        "docsNote": "Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE) para obtener o consultar cada documento en línea.",
+        "docsOnlyLabel": "Solo",
+        "docsLink": {
+          "label": "Ver los documentos por nivel",
+          "href": "/admisiones/documentacion"
+        },
+        "docsError": "No se pudo cargar la lista de documentos.",
+        "image": "/assets/classroom.webp",
+        "imageAlt": "Salón de clases del Colegio Interlaken",
+        "badge": "Inscripciones abiertas · Ciclo {{ciclo}}",
+        "title": "¿Listo para comenzar?",
+        "text": "El primer paso es conocernos: agende una visita guiada o escríbanos para recibir informes. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción.",
+        "primary": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "secondary": {
+          "label": "Solicitar informes",
+          "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+        }
       }
     },
     "admisiones.estimator": {
@@ -229,6 +605,96 @@
         "allHref": "Enlace a Costos: destino",
         "errorTitle": "Si no cargan los precios: título",
         "errorText": "Si no cargan los precios: texto"
+      },
+      "kinds": {
+        "editPrices": "action",
+        "eyebrow": "text",
+        "title": "text",
+        "text": "textarea",
+        "cardEyebrow": "text",
+        "cardTitle": "text",
+        "sectionLabel": "text",
+        "sections": "items",
+        "sections[].label": "text",
+        "startSection": "text",
+        "modalityLabel": "text",
+        "newTag": "text",
+        "returningTag": "text",
+        "adminLabel": "text",
+        "adminSub": "text",
+        "newFeeLabel": "text",
+        "returningFeeLabel": "text",
+        "feeSub": "text",
+        "tuitionLabel": "text",
+        "tuitionMissing": "text",
+        "perMonth": "text",
+        "insuranceLabel": "text",
+        "insuranceSub": "text",
+        "noCost": "text",
+        "notes": "items",
+        "notes[].text": "textarea",
+        "notes[].tone": "select",
+        "waLabel": "text",
+        "allLabel": "text",
+        "allHref": "href",
+        "errorTitle": "text",
+        "errorText": "text"
+      },
+      "defaults": {
+        "eyebrow": "Costos {{ciclo}}",
+        "title": "Estime su inversión",
+        "text": "Elija la sección y la modalidad para ver las cuotas del ciclo. Las cifras son publicadas por la administración del colegio y el desglose completo está en la página de Costos.",
+        "cardEyebrow": "Estimador",
+        "cardTitle": "¿Cuánto cuesta por sección?",
+        "sectionLabel": "Sección",
+        "sections": [
+          {
+            "label": "Maternal"
+          },
+          {
+            "label": "Preescolar"
+          },
+          {
+            "label": "Primaria"
+          },
+          {
+            "label": "Secundaria"
+          }
+        ],
+        "startSection": "Preescolar",
+        "modalityLabel": "Modalidad",
+        "newTag": "Nuevo ingreso",
+        "returningTag": "Reinscripción",
+        "adminLabel": "Gastos administrativos",
+        "adminSub": "Sin devolución",
+        "newFeeLabel": "Cuota de inscripción",
+        "returningFeeLabel": "Cuota de reinscripción",
+        "feeSub": "Pago único por ciclo",
+        "tuitionLabel": "Colegiatura mensual",
+        "tuitionMissing": "Por confirmar",
+        "perMonth": "/ mes",
+        "insuranceLabel": "Seguros y credenciales",
+        "insuranceSub": "Anual · obligatorios",
+        "noCost": "SIN COSTO",
+        "notes": [
+          {
+            "text": "Inscripción y colegiatura con precios 2027; seguros y credenciales con precios 2026 (los de 2027 están pendientes).",
+            "tone": "purple"
+          },
+          {
+            "text": "La cuota de inscripción y reinscripción se divide en 4 parcialidades de enero a abril.",
+            "tone": "purple"
+          },
+          {
+            "text": "Las colegiaturas tienen un recargo del 5% mensual a partir del día 17.",
+            "tone": "amber"
+          }
+        ],
+        "waLabel": "Solicitar información",
+        "allLabel": "Ver todos los costos",
+        "allHref": "/admisiones/costos",
+        "errorTitle": "No fue posible cargar el estimador",
+        "errorText": "Intente de nuevo o consulte los costos completos más tarde."
       }
     },
     "admisiones.faq": {
@@ -252,6 +718,84 @@
         "empty": "Sin resultados",
         "emptyLink": "Sin resultados: enlace",
         "emptyAfter": "Sin resultados: final"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].cat": "text",
+        "items[].q": "text",
+        "items[].a": "textarea",
+        "search": "text",
+        "searchLabel": "text",
+        "filterTitle": "text",
+        "all": "text",
+        "count": "text",
+        "empty": "text",
+        "emptyLink": "link",
+        "emptyAfter": "text"
+      },
+      "defaults": {
+        "eyebrow": "Preguntas frecuentes",
+        "title": "Resolvemos sus dudas",
+        "items": [
+          {
+            "cat": "Niveles",
+            "q": "¿Qué niveles educativos ofrece Colegio Interlaken?",
+            "a": "Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe (español–inglés) en cada nivel."
+          },
+          {
+            "cat": "Niveles",
+            "q": "¿En qué consiste el modelo bilingüe?",
+            "a": "Inglés intensivo desde el nivel inicial, con preparación para certificaciones internacionales de la Universidad de Cambridge en secundaria."
+          },
+          {
+            "cat": "Inscripción",
+            "q": "¿Cuándo se llena la ficha de inscripción?",
+            "a": "Cuando su hijo/a es admitido después del examen de valoración, el colegio le envía por correo o WhatsApp un enlace personal a su ficha de inscripción. Se llena en línea en unos 15 minutos y puede guardarla y continuar después."
+          },
+          {
+            "cat": "Inscripción",
+            "q": "¿Cómo es el proceso de admisión?",
+            "a": "Informes, visita guiada y examen de valoración. Si su hijo/a es admitido, le enviamos su ficha de inscripción, entrega los documentos y confirma su lugar. Un asesor le guía en cada paso."
+          },
+          {
+            "cat": "Documentos",
+            "q": "¿Qué documentos necesito para inscribir a mi hijo?",
+            "a": "Acta de nacimiento, CURP del alumno y de los tutores, INE del tutor, comprobante de domicilio, boletas del ciclo anterior, entre otros. Consulte la lista completa con enlaces oficiales en la sección de Documentación."
+          },
+          {
+            "cat": "Costos",
+            "q": "¿Cómo están estructurados los costos?",
+            "a": "Las colegiaturas se pagan en 11 mensualidades, de agosto a junio. Consulte el desglose por sección en la página de Costos."
+          },
+          {
+            "cat": "Costos",
+            "q": "¿Ofrecen becas o descuentos?",
+            "a": "Contamos con apoyos para hermanos y casos especiales. Escríbanos desde la sección de Contacto para conocer las opciones vigentes."
+          },
+          {
+            "cat": "Oficial",
+            "q": "¿El colegio cuenta con incorporación oficial ante la SEP?",
+            "a": "Sí. Nuestros planes de estudio tienen reconocimiento y validez oficial ante la Secretaría de Educación Pública."
+          },
+          {
+            "cat": "Privacidad",
+            "q": "¿Cómo protege el colegio los datos de mi familia?",
+            "a": "Tratamos sus datos personales conforme a la LFPDPPP. Consulte nuestro Aviso de Privacidad para conocer y ejercer sus derechos ARCO."
+          }
+        ],
+        "search": "Buscar…",
+        "searchLabel": "Buscar en preguntas frecuentes",
+        "filterTitle": "Filtrar por tema",
+        "all": "Todas",
+        "count": "{n} de {total} preguntas",
+        "empty": "No encontramos preguntas para su búsqueda.",
+        "emptyLink": {
+          "label": "Contáctenos",
+          "href": "/contacto"
+        },
+        "emptyAfter": "y con gusto le ayudamos."
       }
     },
     "admisiones.hero": {
@@ -269,6 +813,18 @@
         "title": "Título",
         "subtitle": "Texto",
         "image": "Foto"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Ciclo Escolar {{ciclo}} · Inscripciones Abiertas",
+        "title": "Admisiones",
+        "subtitle": "Un proceso simple, transparente y completamente en línea. Le acompañamos en cada paso.",
+        "image": "/assets/primaria-gate.webp"
       }
     },
     "admisiones.sep": {
@@ -280,6 +836,14 @@
       "labels": {
         "title": "Título",
         "text": "Texto"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "text"
+      },
+      "defaults": {
+        "title": "Incorporación oficial SEP",
+        "text": "{{anios}} años de trayectoria con reconocimiento y validez oficial."
       }
     },
     "admisiones.steps": {
@@ -300,6 +864,78 @@
         "items[].link": "Botón",
         "waLabel": "Texto del botón de WhatsApp",
         "contact": "Enlace de contacto (si no hay WhatsApp)"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].step": "text",
+        "items[].title": "text",
+        "items[].text": "textarea",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "items[].link": "link",
+        "waLabel": "text",
+        "contact": "link"
+      },
+      "defaults": {
+        "eyebrow": "Cómo funciona",
+        "title": "Proceso de admisión",
+        "items": [
+          {
+            "icon": "WhatsApp",
+            "step": "01",
+            "key": "informes",
+            "title": "Informes",
+            "text": "Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.",
+            "color": "var(--green)",
+            "link": {
+              "label": "",
+              "href": ""
+            }
+          },
+          {
+            "icon": "CalendarDays",
+            "step": "02",
+            "key": "visita_guiada",
+            "title": "Visita guiada",
+            "text": "Conozca las instalaciones y al equipo docente en un recorrido personalizado.",
+            "color": "var(--purple)",
+            "link": {
+              "label": "Agendar visita",
+              "href": "/agendar-visita"
+            }
+          },
+          {
+            "icon": "FileText",
+            "step": "03",
+            "key": "examen",
+            "title": "Examen de valoración",
+            "text": "Después de la visita agendamos el examen de valoración de su hijo/a. Consulte los documentos que se piden.",
+            "color": "var(--pink)",
+            "link": {
+              "label": "Ver documentación",
+              "href": "/admisiones/documentacion"
+            }
+          },
+          {
+            "icon": "ClipboardList",
+            "step": "04",
+            "key": "inscripcion",
+            "title": "Inscripción",
+            "text": "Si su hijo/a es admitido, le enviamos por correo o WhatsApp su ficha de inscripción personal para llenarla en línea y asegurar su lugar.",
+            "color": "var(--green)",
+            "link": {
+              "label": "Ver costos",
+              "href": "/admisiones/costos"
+            }
+          }
+        ],
+        "waLabel": "WhatsApp",
+        "contact": {
+          "label": "Contáctenos",
+          "href": "/contacto"
+        }
       }
     },
     "admisiones.testimonials": {
@@ -312,6 +948,16 @@
         "eyebrow": "Etiqueta superior",
         "title": "Título",
         "limit": "Cuántos testimonios mostrar"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "limit": "number"
+      },
+      "defaults": {
+        "eyebrow": "Comunidad",
+        "title": "Familias que ya son Interlaken",
+        "limit": 3
       }
     },
     "aviso.hero": {
@@ -330,6 +976,24 @@
         "opacity": "Visibilidad de la foto (0 a 1)",
         "dateLabel": "Texto antes de la fecha",
         "versionLabel": "Texto antes de la versión"
+      },
+      "kinds": {
+        "label": "text",
+        "labelClass": "select",
+        "title": "text",
+        "image": "image",
+        "opacity": "number",
+        "dateLabel": "text",
+        "versionLabel": "text"
+      },
+      "defaults": {
+        "label": "Legal",
+        "labelClass": "section-label-pink",
+        "title": "Aviso de Privacidad",
+        "image": "/assets/facade.webp",
+        "opacity": 0.25,
+        "dateLabel": "Vigente desde el",
+        "versionLabel": "Versión"
       }
     },
     "aviso.notice": {
@@ -347,6 +1011,39 @@
         "integralLabel": "Botón del aviso integral",
         "errorTitle": "Título si el aviso no carga",
         "errorText": "Texto si el aviso no carga"
+      },
+      "kinds": {
+        "cards": "items",
+        "cards[].icon": "icon",
+        "cards[].label": "text",
+        "cards[].value": "text",
+        "note": "text",
+        "integralLabel": "text",
+        "errorTitle": "text",
+        "errorText": "textarea"
+      },
+      "defaults": {
+        "cards": [
+          {
+            "icon": "Building2",
+            "label": "Responsable",
+            "value": "ADCE EDUCACIÓN, A.C. (Colegio Interlaken)"
+          },
+          {
+            "icon": "ShieldCheck",
+            "label": "Sus derechos",
+            "value": "Acceso · Rectificación · Cancelación · Oposición (ARCO)"
+          },
+          {
+            "icon": "Phone",
+            "label": "Ejercerlos",
+            "value": "{{telefono}} · {{correo}}"
+          }
+        ],
+        "note": "Resumen informativo — el texto oficial completo es el siguiente.",
+        "integralLabel": "Consultar el aviso integral",
+        "errorTitle": "Aviso no disponible",
+        "errorText": ""
       }
     },
     "calendar": {
@@ -355,7 +1052,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "contacto.directory": {
       "label": "Contacto · Directorio por nivel",
@@ -371,6 +1069,37 @@
         "items[].ext": "Extensión",
         "items[].email": "Correo",
         "extLabel": "Palabra antes de la extensión"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].level": "text",
+        "items[].ext": "text",
+        "items[].email": "text",
+        "extLabel": "text"
+      },
+      "defaults": {
+        "extLabel": "Ext",
+        "eyebrow": "Directorio",
+        "title": "Atención por nivel educativo",
+        "items": [
+          {
+            "level": "Preescolar",
+            "ext": "1",
+            "email": "preescolar@interlaken.com.mx"
+          },
+          {
+            "level": "Primaria",
+            "ext": "2",
+            "email": "primaria@interlaken.com.mx"
+          },
+          {
+            "level": "Secundaria",
+            "ext": "3",
+            "email": "secundaria@interlaken.com.mx"
+          }
+        ]
       }
     },
     "contacto.hero": {
@@ -388,6 +1117,18 @@
         "title": "Título",
         "text": "Texto",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "textarea",
+        "text": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Estamos para ayudarle",
+        "title": "Contacto",
+        "text": "Resolvemos sus dudas sobre admisiones, costos y nuestro modelo educativo. Escríbanos y le contactaremos pronto.",
+        "image": "/assets/facade-sign.webp"
       }
     },
     "contacto.main": {
@@ -424,6 +1165,60 @@
         "errEmail": "Correo no válido",
         "errSubject": "Falta el asunto",
         "errMessage": "Mensaje demasiado corto"
+      },
+      "kinds": {
+        "infoTitle": "text",
+        "phoneLabel": "text",
+        "hoursLabel": "text",
+        "image": "image",
+        "imageAlt": "text",
+        "directionsLabel": "text",
+        "whatsappLabel": "text",
+        "whatsappMessage": "text",
+        "formTitle": "text",
+        "nameLabel": "text",
+        "namePlaceholder": "text",
+        "emailLabel": "text",
+        "emailPlaceholder": "text",
+        "subjectLabel": "text",
+        "subjectPlaceholder": "text",
+        "messageLabel": "text",
+        "messagePlaceholder": "text",
+        "submitLabel": "text",
+        "sending": "text",
+        "success": "text",
+        "error": "text",
+        "errName": "text",
+        "errEmail": "text",
+        "errSubject": "text",
+        "errMessage": "text"
+      },
+      "defaults": {
+        "infoTitle": "Información de contacto",
+        "phoneLabel": "Teléfono o WhatsApp",
+        "hoursLabel": "Horario de oficina",
+        "image": "/assets/facade.webp",
+        "imageAlt": "Fachada del Colegio Interlaken en Tlalnepantla",
+        "directionsLabel": "Cómo llegar",
+        "whatsappLabel": "Escribir por WhatsApp",
+        "whatsappMessage": "Hola, me gustaría obtener más información",
+        "formTitle": "Envíenos un mensaje",
+        "submitLabel": "Enviar mensaje",
+        "success": "Mensaje enviado. Le responderemos pronto.",
+        "error": "No se pudo enviar el mensaje. Intente nuevamente.",
+        "nameLabel": "Nombre",
+        "namePlaceholder": "Su nombre completo",
+        "emailLabel": "Correo electrónico",
+        "emailPlaceholder": "correo@ejemplo.com",
+        "subjectLabel": "Asunto",
+        "subjectPlaceholder": "¿En qué le podemos ayudar?",
+        "messageLabel": "Mensaje",
+        "messagePlaceholder": "Describa su consulta…",
+        "sending": "Enviando…",
+        "errName": "Nombre requerido",
+        "errEmail": "Correo electrónico inválido",
+        "errSubject": "Asunto requerido",
+        "errMessage": "El mensaje es demasiado corto"
       }
     },
     "contacto.map": {
@@ -437,6 +1232,18 @@
         "mapsLabel": "Texto del enlace a Google Maps",
         "embed": "Dirección del mapa incrustado",
         "mapTitle": "Descripción del mapa (accesibilidad)"
+      },
+      "kinds": {
+        "title": "text",
+        "mapsLabel": "text",
+        "embed": "url",
+        "mapTitle": "text"
+      },
+      "defaults": {
+        "title": "Cómo llegar",
+        "mapsLabel": "Abrir en Google Maps",
+        "embed": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3759.6587772437156!2d-99.20946797478247!3d19.556257781749714!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d21d6c27c972e1%3A0x3c76d65bc761079b!2sCollege%20Interlaken%20%2F%20ADCE%20Education!5e0!3m2!1sen!2smx!4v1783605176683!5m2!1sen!2smx",
+        "mapTitle": "Mapa — Colegio Interlaken, Av. de los Reyes 67, Tlalnepantla"
       }
     },
     "correo.confirm": {
@@ -475,6 +1282,71 @@
         "retryLabel": "Botón para reintentar",
         "helpText": "Ayuda al pie",
         "helpEmail": "Correo de ayuda"
+      },
+      "kinds": {
+        "readyTitle": "text",
+        "readyText": "textarea",
+        "whoseAccount": "text",
+        "whoseStudent": "text",
+        "factStudent": "text",
+        "factAccount": "text",
+        "factEmail": "text",
+        "factReceives": "text",
+        "factReceivesValue": "text",
+        "factExpires": "text",
+        "separateAccount": "textarea",
+        "confirmLabel": "text",
+        "confirming": "text",
+        "confirmError": "text",
+        "readyFootnote": "textarea",
+        "doneTitle": "text",
+        "doneText": "textarea",
+        "doneClose": "text",
+        "expiredTitle": "text",
+        "supersededTitle": "text",
+        "invalidTitle": "text",
+        "invalidText": "text",
+        "portalLink": "link",
+        "checking": "text",
+        "loadErrorTitle": "text",
+        "loadErrorText": "text",
+        "retryLabel": "text",
+        "helpText": "text",
+        "helpEmail": "text"
+      },
+      "defaults": {
+        "readyTitle": "Confirme su correo para avisos",
+        "readyText": "Los avisos {quien} llegarán también a {correo}.",
+        "whoseAccount": "de su cuenta",
+        "whoseStudent": "de {nombre}",
+        "factStudent": "Alumno",
+        "factAccount": "Cuenta",
+        "factEmail": "Correo",
+        "factReceives": "Recibirá",
+        "factReceivesValue": "Compras y recargas de cafetería, saldo bajo y comunicados del colegio",
+        "factExpires": "El enlace vence",
+        "separateAccount": "Este correo también tiene su propia cuenta en el portal. Son cuentas separadas: confirmar aquí no las une.",
+        "confirmLabel": "Confirmar correo",
+        "confirming": "Confirmando…",
+        "confirmError": "No se pudo confirmar. Inténtelo de nuevo.",
+        "readyFootnote": "No necesita iniciar sesión. Esto solo agrega una copia de los avisos: no crea una cuenta ni da acceso al portal. ¿No lo pidió? Cierre esta página; sin su confirmación no recibirá ningún aviso.",
+        "doneTitle": "Listo, correo confirmado",
+        "doneText": "Desde ahora, los avisos {quien} llegarán también a {correo}.",
+        "doneClose": "Ya puede cerrar esta página.",
+        "expiredTitle": "El enlace venció",
+        "supersededTitle": "Este enlace ya no se usa",
+        "invalidTitle": "El enlace no es válido",
+        "invalidText": "Ábralo completo desde el correo que recibió.",
+        "portalLink": {
+          "label": "Ir al Portal de Familias",
+          "href": "/portal/perfil?tab=avisos"
+        },
+        "checking": "Revisando el enlace…",
+        "loadErrorTitle": "No pudimos revisar el enlace",
+        "loadErrorText": "Revise su conexión e inténtelo de nuevo.",
+        "retryLabel": "Reintentar",
+        "helpText": "¿Dudas? Escríbanos a",
+        "helpEmail": "{{correo}}"
       }
     },
     "costos.hero": {
@@ -492,6 +1364,18 @@
         "title": "Título",
         "badge": "Insignia",
         "image": "Foto"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "badge": "text",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Admisiones",
+        "title": "Costos",
+        "badge": "Ciclo Escolar {{ciclo}}",
+        "image": "/assets/facade.webp"
       }
     },
     "costos.prices": {
@@ -556,6 +1440,145 @@
         "emptySecondary": "Sin precios publicados: botón secundario",
         "errorTitle": "Si no cargan los precios: título",
         "errorText": "Si no cargan los precios: texto"
+      },
+      "kinds": {
+        "editPrices": "action",
+        "structureTitle": "text",
+        "structure": "items",
+        "structure[].title": "text",
+        "structure[].text": "text",
+        "feesLabel": "text",
+        "feesTitle": "text",
+        "feesYear": "text",
+        "feesPending": "text",
+        "feesSubtitle": "text",
+        "newTag": "text",
+        "returningTag": "text",
+        "colLevel": "text",
+        "colAdmin": "text",
+        "colNew": "text",
+        "colReturning": "text",
+        "tuitionLabel": "text",
+        "tuitionTitle": "text",
+        "tuitionYear": "text",
+        "tuitionPending": "text",
+        "tuitionSubtitle": "text",
+        "perMonth": "text",
+        "insuranceLabel": "text",
+        "insuranceTitle": "text",
+        "insuranceYear": "text",
+        "insurancePending": "text",
+        "insuranceSubtitle": "text",
+        "extrasLabel": "text",
+        "extrasTitle": "text",
+        "extrasYear": "text",
+        "extrasPending": "text",
+        "extrasSubtitle": "text",
+        "perYear": "text",
+        "daycareLabel": "text",
+        "daycareTitle": "text",
+        "daycareYear": "text",
+        "daycarePending": "text",
+        "daycareSubtitle": "text",
+        "daycareMonthly": "text",
+        "policiesTitle": "text",
+        "policyHighlight": "text",
+        "noteText": "textarea",
+        "noteStrong": "textarea",
+        "noteLinkLead": "text",
+        "noteLink": "link",
+        "ctaTitle": "text",
+        "ctaText": "textarea",
+        "ctaPrimary": "link",
+        "ctaSecondary": "link",
+        "emptyTitle": "text",
+        "emptyText": "textarea",
+        "emptyPrimary": "link",
+        "emptySecondary": "link",
+        "errorTitle": "text",
+        "errorText": "textarea"
+      },
+      "defaults": {
+        "emptyTitle": "Costos próximamente",
+        "emptyText": "El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo {{ciclo}}. Mientras tanto, nuestro equipo de admisiones puede orientarle.",
+        "emptyPrimary": {
+          "label": "Contactar al colegio",
+          "href": "/contacto"
+        },
+        "emptySecondary": {
+          "label": "Ver admisiones",
+          "href": "/admisiones"
+        },
+        "structureTitle": "¿Cómo se estructura el pago?",
+        "structure": [
+          {
+            "title": "Inscripción",
+            "text": "— pago único al ingresar o reinscribirse."
+          },
+          {
+            "title": "Colegiatura",
+            "text": "— 11 mensualidades, de agosto a junio."
+          },
+          {
+            "title": "Seguros y credencial",
+            "text": "— conceptos anuales obligatorios."
+          }
+        ],
+        "feesLabel": "Pago único",
+        "feesTitle": "Inscripción y reinscripción",
+        "feesSubtitle": "Se divide en 4 parcialidades, de enero a abril",
+        "newTag": "Nuevo ingreso",
+        "returningTag": "Alumnos Interlaken",
+        "colLevel": "Nivel",
+        "colAdmin": "Gastos administrativos",
+        "colNew": "Inscripción",
+        "colReturning": "Reinscripción",
+        "tuitionLabel": "Mensual",
+        "tuitionTitle": "Colegiaturas",
+        "tuitionSubtitle": "11 mensualidades, de agosto a junio",
+        "perMonth": "/ mes",
+        "perYear": "/ año",
+        "daycareMonthly": "/mes",
+        "insuranceLabel": "Anual · obligatorio",
+        "insuranceTitle": "Seguros y credenciales",
+        "insuranceSubtitle": "Contratación obligatoria para todos los alumnos",
+        "extrasLabel": "Anualidad",
+        "extrasTitle": "Extraescolares",
+        "extrasSubtitle": "10 parcialidades de septiembre a junio · se definen en agosto",
+        "daycareLabel": "Horario extendido",
+        "daycareTitle": "Estancia",
+        "daycareSubtitle": "Costo diario, con tarifa mensual opcional",
+        "feesYear": "Precios 2027",
+        "tuitionYear": "Precios 2027",
+        "insuranceYear": "Precios 2026",
+        "extrasYear": "Precios 2026",
+        "daycareYear": "Precios 2026",
+        "feesPending": "",
+        "tuitionPending": "",
+        "insurancePending": "Precios 2027: pendientes",
+        "extrasPending": "Precios 2027: pendientes",
+        "daycarePending": "Precios 2027: pendientes",
+        "policiesTitle": "Políticas de pago",
+        "policyHighlight": "recargo, devolución",
+        "errorTitle": "No fue posible cargar los costos",
+        "errorText": "Intente de nuevo más tarde o contáctenos para recibir la información del ciclo.",
+        "noteText": "Información de referencia: los costos los publica la administración y pueden actualizarse cada ciclo escolar.",
+        "noteStrong": "Inscripciones y colegiaturas se pagan directamente con el colegio, no en este sitio.",
+        "noteLinkLead": "Para becas, hermanos o planes de pago,",
+        "noteLink": {
+          "label": "contacte a admisiones",
+          "href": "/contacto"
+        },
+        "ctaTitle": "Asegure el lugar de su hijo/a",
+        "ctaText": "Agende una visita para el ciclo {{ciclo}} o escríbanos para recibir informes. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción.",
+        "ctaPrimary": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "ctaSecondary": {
+          "label": "Solicitar informes",
+          "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+        }
       }
     },
     "cta_band": {
@@ -571,6 +1594,11 @@
         "title": "Título",
         "text": "Texto",
         "cta": "Botón"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "textarea",
+        "cta": "link"
       }
     },
     "documentacion.hero": {
@@ -588,6 +1616,18 @@
         "title": "Título",
         "subtitle": "Texto",
         "image": "Foto"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Admisiones",
+        "title": "Documentación",
+        "subtitle": "Todo lo que su familia necesita presentar para el Examen de Valoración del ciclo {{ciclo}}, según el nivel, con enlaces directos a los trámites oficiales.",
+        "image": "/assets/primaria-gate.webp"
       }
     },
     "documentacion.list": {
@@ -609,6 +1649,36 @@
         "ctaTitle": "Llamado: título",
         "ctaText": "Llamado: texto",
         "cta": "Llamado: botón"
+      },
+      "kinds": {
+        "editList": "action",
+        "title": "text",
+        "summary": "text",
+        "tabsLabel": "text",
+        "physicalLabel": "text",
+        "emptyText": "text",
+        "errorTitle": "text",
+        "errorText": "text",
+        "retryLabel": "text",
+        "ctaTitle": "text",
+        "ctaText": "textarea",
+        "cta": "link"
+      },
+      "defaults": {
+        "title": "Documentos requeridos",
+        "summary": "{total} documentos para {nivel} · {online} con trámite oficial en línea",
+        "tabsLabel": "Nivel educativo",
+        "physicalLabel": "En físico:",
+        "emptyText": "Por ahora no hay documentos publicados para este nivel. Consulte a admisiones.",
+        "errorTitle": "No se pudo cargar la lista de documentos",
+        "errorText": "Revise su conexión e intente de nuevo, o escríbanos.",
+        "retryLabel": "Reintentar",
+        "ctaTitle": "¿Listo para conocernos?",
+        "ctaText": "Agende una visita guiada. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción y coordinamos con usted la entrega de documentos.",
+        "cta": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        }
       }
     },
     "documentos.main": {
@@ -657,6 +1727,91 @@
         "retryLabel": "Botón «Reintentar»",
         "invalidText": "Enlace usado o caducado",
         "invalidEmail": "Correo para escribir"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "childLabel": "text",
+        "levelLabel": "text",
+        "intro": "textarea",
+        "progressLabel": "text",
+        "completeTitle": "text",
+        "completeText": "textarea",
+        "emptyText": "text",
+        "physicalLabel": "text",
+        "multipleHint": "text",
+        "fichaText": "text",
+        "fichaDone": "text",
+        "fichaPending": "text",
+        "noFile": "text",
+        "reasonLabel": "text",
+        "statusMissing": "text",
+        "statusPending": "text",
+        "statusApproved": "text",
+        "statusRejected": "text",
+        "statusPhysical": "text",
+        "statusNotApplicable": "text",
+        "cameraLabel": "text",
+        "uploadLabel": "text",
+        "addLabel": "text",
+        "replaceLabel": "text",
+        "helpText": "text",
+        "contactLink": "link",
+        "uploading": "text",
+        "uploaded": "text",
+        "uploadError": "text",
+        "dismissLabel": "text",
+        "tooBig": "text",
+        "badType": "text",
+        "tooMany": "text",
+        "loadError": "text",
+        "retryLabel": "text",
+        "invalidText": "textarea",
+        "invalidEmail": "text"
+      },
+      "defaults": {
+        "label": "Admisiones",
+        "title": "Documentos de inscripción",
+        "childLabel": "Alumno:",
+        "levelLabel": "Nivel:",
+        "intro": "Tome una foto clara o suba un PDF de cada documento (máximo {mb} MB por archivo). Admisiones lo revisará y le avisará por correo si algo necesita corrección.",
+        "progressLabel": "{listos} de {total} documentos listos",
+        "completeTitle": "Sus documentos están completos",
+        "completeText": "Gracias. Admisiones le avisará si algo necesita corrección.",
+        "emptyText": "No hay documentos que subir para este nivel.",
+        "physicalLabel": "Entregar en físico:",
+        "multipleHint": "Puede subir varios archivos (por ejemplo, frente y reverso).",
+        "fichaText": "Se llena en línea.",
+        "fichaDone": "Enviada",
+        "fichaPending": "Pendiente de enviar",
+        "noFile": "Aún no ha subido este documento.",
+        "reasonLabel": "Motivo:",
+        "statusMissing": "Falta",
+        "statusPending": "En revisión",
+        "statusApproved": "Aprobado",
+        "statusRejected": "Por corregir",
+        "statusPhysical": "Entregado en físico",
+        "statusNotApplicable": "No aplica",
+        "cameraLabel": "Tomar foto",
+        "uploadLabel": "Elegir archivo",
+        "addLabel": "Agregar otro archivo",
+        "replaceLabel": "Reemplazar",
+        "helpText": "¿Dudas?",
+        "contactLink": {
+          "label": "Contacte a admisiones",
+          "href": "/contacto"
+        },
+        "uploading": "Subiendo {archivo}",
+        "uploaded": "Documento subido.",
+        "dismissLabel": "Quitar aviso",
+        "uploadError": "No se pudo subir el archivo. Use PDF o imagen de máximo 10 MB.",
+        "tooBig": "El archivo {archivo} supera {mb} MB. Tome la foto de nuevo o reduzca el PDF.",
+        "badType": "El archivo {archivo} no es PDF ni imagen (JPG o PNG).",
+        "tooMany": "Este documento admite hasta {max} archivos.",
+        "loadError": "No se pudo cargar la lista de documentos. Revise su conexión e intente de nuevo.",
+        "retryLabel": "Reintentar",
+        "invalidText": "Este enlace ya se usó o caducó. Pida a admisiones un nuevo enlace de documentos, o escriba a",
+        "invalidEmail": "{{correo}}"
       }
     },
     "facturacion.download": {
@@ -670,6 +1825,21 @@
         "text": "Texto",
         "link": "Botón",
         "srHint": "Aviso para lectores de pantalla"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "textarea",
+        "link": "link",
+        "srHint": "text"
+      },
+      "defaults": {
+        "title": "Descargar sus facturas",
+        "text": "Si desea descargar sus facturas, puede consultarlas desde nuestro portal de pagos.",
+        "link": {
+          "label": "Ir al portal de pagos",
+          "href": "https://interlaken.servoescolar.mx/"
+        },
+        "srHint": "(interlaken.servoescolar.mx, se abre en otra pestaña)"
       }
     },
     "facturacion.hero": {
@@ -687,6 +1857,18 @@
         "title": "Título",
         "text": "Texto",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "textarea",
+        "text": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Pagos",
+        "title": "Facturación",
+        "text": "Solicite sus facturas (CFDI) una sola vez: a partir de entonces las recibirá cada mes, después de realizar sus pagos.",
+        "image": "/assets/court-wide.webp"
       }
     },
     "facturacion.notices": {
@@ -699,6 +1881,25 @@
         "title": "Título",
         "items": "Avisos",
         "items[].text": "Aviso"
+      },
+      "kinds": {
+        "title": "text",
+        "items": "items",
+        "items[].text": "textarea"
+      },
+      "defaults": {
+        "title": "Antes de solicitar",
+        "items": [
+          {
+            "text": "Solo se emiten facturas del mes en curso. No es posible cancelar ni cambiar facturas fuera del mes en que se realizó el pago."
+          },
+          {
+            "text": "Una vez que recibamos su solicitud, recibirá sus facturas todos los meses, 24 horas hábiles después de realizar sus pagos."
+          },
+          {
+            "text": "Capture sus datos tal como vienen en su constancia de situación fiscal: un dato erróneo hace que el SAT rechace la factura y no nos permite emitirla."
+          }
+        ]
       }
     },
     "facturacion.request": {
@@ -731,6 +1932,56 @@
         "errGeneral": "Si no se pudo enviar",
         "doneTitle": "Confirmación: título",
         "doneText": "Confirmación: texto"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "text",
+        "email": "text",
+        "requiredNote": "text",
+        "studentLabel": "text",
+        "razonLabel": "text",
+        "razonHint": "text",
+        "rfcLabel": "text",
+        "cpLabel": "text",
+        "regimenLabel": "text",
+        "regimenPlaceholder": "text",
+        "emailLabel": "text",
+        "emailPlaceholder": "text",
+        "phoneLabel": "text",
+        "phonePlaceholder": "text",
+        "submitLabel": "text",
+        "errRequired": "text",
+        "errRfc": "text",
+        "errCp": "text",
+        "errPhone": "text",
+        "errGeneral": "text",
+        "doneTitle": "text",
+        "doneText": "textarea"
+      },
+      "defaults": {
+        "title": "Solicitud de facturación",
+        "text": "",
+        "email": "facturas@interlaken.com.mx",
+        "requiredNote": "Todos los campos son obligatorios.",
+        "studentLabel": "Nombre del alumno",
+        "razonLabel": "Razón social",
+        "razonHint": "Tal como aparece en su constancia de situación fiscal.",
+        "rfcLabel": "RFC",
+        "cpLabel": "Código postal",
+        "regimenLabel": "Régimen fiscal",
+        "regimenPlaceholder": "Seleccione su régimen fiscal",
+        "emailLabel": "Correo para enviar facturas",
+        "emailPlaceholder": "ejemplo@ejemplo.com",
+        "phoneLabel": "Teléfono de contacto",
+        "phonePlaceholder": "(00) 0000-0000",
+        "submitLabel": "Enviar solicitud",
+        "errRequired": "Requerido.",
+        "errRfc": "El RFC debe tener 12 o 13 caracteres.",
+        "errCp": "El código postal debe tener 5 dígitos.",
+        "errPhone": "Escriba el teléfono a 10 dígitos: (00) 0000-0000.",
+        "errGeneral": "No se pudo enviar. Intente de nuevo o escriba a {facturas}.",
+        "doneTitle": "Solicitud enviada",
+        "doneText": "Le enviamos una confirmación a {correo}. Recibirá sus facturas cada mes desde {facturas}, 24 horas hábiles después de realizar sus pagos."
       }
     },
     "faq": {
@@ -745,6 +1996,11 @@
         "items": "Preguntas",
         "items[].q": "Pregunta",
         "items[].a": "Respuesta"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].q": "text",
+        "items[].a": "textarea"
       }
     },
     "feature_grid": {
@@ -760,6 +2016,12 @@
         "items": "Tarjetas",
         "items[].title": "Título",
         "items[].text": "Texto"
+      },
+      "kinds": {
+        "title": "text",
+        "items": "items",
+        "items[].title": "text",
+        "items[].text": "textarea"
       }
     },
     "form": {
@@ -772,6 +2034,9 @@
       "images": [],
       "labels": {
         "form": "Formulario"
+      },
+      "kinds": {
+        "form": "form"
       }
     },
     "galeria.grid": {
@@ -800,6 +2065,123 @@
         "closeLabel": "Botón para cerrar",
         "prevLabel": "Botón anterior",
         "nextLabel": "Botón siguiente"
+      },
+      "kinds": {
+        "photos": "items",
+        "photos[].image": "image",
+        "photos[].caption": "text",
+        "photos[].category": "select",
+        "filters": "items",
+        "filters[].label": "text",
+        "filters[].key": "text",
+        "countOne": "text",
+        "countMany": "text",
+        "zoomLabel": "text",
+        "position": "text",
+        "filterLabel": "text",
+        "zoomAria": "text",
+        "dialogLabel": "text",
+        "closeLabel": "text",
+        "prevLabel": "text",
+        "nextLabel": "text"
+      },
+      "defaults": {
+        "photos": [
+          {
+            "image": "/assets/interlaken-image (1).webp",
+            "category": "instalaciones",
+            "caption": "Entrada principal del campus"
+          },
+          {
+            "image": "/assets/interlaken-image (2).webp",
+            "category": "instalaciones",
+            "caption": "Pasillos y áreas comunes"
+          },
+          {
+            "image": "/assets/secundaria.webp",
+            "category": "instalaciones",
+            "caption": "Edificio de secundaria"
+          },
+          {
+            "image": "/assets/interlaken-image (4).webp",
+            "category": "instalaciones",
+            "caption": "Aulas con luz natural"
+          },
+          {
+            "image": "/assets/primaria-gate.webp",
+            "category": "instalaciones",
+            "caption": "Acceso de primaria"
+          },
+          {
+            "image": "/assets/court-logo.webp",
+            "category": "vida",
+            "caption": "Cancha techada con el escudo del colegio"
+          },
+          {
+            "image": "/assets/facade.webp",
+            "category": "instalaciones",
+            "caption": "Fachada del colegio"
+          },
+          {
+            "image": "/assets/hopscotch.webp",
+            "category": "vida",
+            "caption": "Juegos en el patio de preescolar"
+          },
+          {
+            "image": "/assets/campus-mural.webp",
+            "category": "vida",
+            "caption": "Mural de la comunidad Interlaken"
+          },
+          {
+            "image": "/assets/court-wide.webp",
+            "category": "vida",
+            "caption": "Canchas deportivas"
+          },
+          {
+            "image": "/assets/interlaken-image (15).webp",
+            "category": "vida",
+            "caption": "Actividades deportivas"
+          },
+          {
+            "image": "/assets/court-primaria.webp",
+            "category": "vida",
+            "caption": "Recreo en primaria"
+          },
+          {
+            "image": "/assets/facade-sign.webp",
+            "category": "instalaciones",
+            "caption": "Letrero de la fachada"
+          },
+          {
+            "image": "/assets/classroom.webp",
+            "category": "instalaciones",
+            "caption": "Salón de clases"
+          }
+        ],
+        "filters": [
+          {
+            "key": "todas",
+            "label": "Todas"
+          },
+          {
+            "key": "vida",
+            "label": "Vida escolar"
+          },
+          {
+            "key": "instalaciones",
+            "label": "Instalaciones"
+          }
+        ],
+        "countOne": "fotografía",
+        "countMany": "fotografías",
+        "zoomLabel": "Ampliar",
+        "filterLabel": "Filtrar fotografías",
+        "zoomAria": "Ampliar imagen {n} de {total}",
+        "dialogLabel": "Fotografía {n} de {total}",
+        "closeLabel": "Cerrar galería",
+        "prevLabel": "Fotografía anterior",
+        "nextLabel": "Fotografía siguiente",
+        "position": "{n} / {total}"
       }
     },
     "galeria.hero": {
@@ -817,6 +2199,18 @@
         "title": "Título",
         "subtitle": "Texto",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "textarea",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "El Colegio",
+        "title": "Galería",
+        "image": "/assets/hopscotch.webp",
+        "subtitle": "Así se vive un día en Interlaken: instalaciones, aprendizaje y comunidad."
       }
     },
     "gallery": {
@@ -831,6 +2225,9 @@
       ],
       "labels": {
         "images": "Imágenes"
+      },
+      "kinds": {
+        "images": "images"
       }
     },
     "hero": {
@@ -848,6 +2245,12 @@
         "subtitle": "Subtítulo",
         "image": "Imagen de fondo",
         "cta": "Botón"
+      },
+      "kinds": {
+        "title": "text",
+        "subtitle": "textarea",
+        "image": "image",
+        "cta": "link"
       }
     },
     "home.about": {
@@ -870,6 +2273,31 @@
         "image3": "Foto inferior",
         "badgeValue": "Insignia: cifra",
         "badgeLabel": "Insignia: texto"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "text": "textarea",
+        "cta": "link",
+        "image1": "image",
+        "image2": "image",
+        "image3": "image",
+        "badgeValue": "text",
+        "badgeLabel": "text"
+      },
+      "defaults": {
+        "eyebrow": "Nuestra Comunidad",
+        "title": "{{anios}} años formando familias en Tlalnepantla",
+        "text": "En Colegio Interlaken combinamos rigor académico, educación bilingüe y un ambiente cálido y seguro. Nuestros egresados destacan por su liderazgo, sus valores y su compromiso con la comunidad.",
+        "cta": {
+          "label": "Conózcanos",
+          "href": "/nosotros"
+        },
+        "image1": "/assets/classroom.webp",
+        "image2": "/assets/campus-mural.webp",
+        "image3": "/assets/hopscotch.webp",
+        "badgeValue": "+2,500",
+        "badgeLabel": "Egresados"
       }
     },
     "home.cta": {
@@ -883,6 +2311,24 @@
         "text": "Texto",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "textarea",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "title": "Comience el futuro de su hijo hoy",
+        "text": "Agende una visita para conocer el colegio o escríbanos para recibir informes. Le acompañamos en cada paso de la admisión.",
+        "primary": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "secondary": {
+          "label": "Solicitar informes",
+          "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+        }
       }
     },
     "home.gallery": {
@@ -898,6 +2344,54 @@
         "title": "Título",
         "images": "Fotos",
         "cta": "Botón"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "images": "images",
+        "cta": "link"
+      },
+      "defaults": {
+        "eyebrow": "Galería",
+        "title": "Vida en Interlaken",
+        "images": [
+          {
+            "image": "/assets/interlaken-image (1).webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/interlaken-image (2).webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/interlaken-image (4).webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/facade.webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/classroom.webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/hopscotch.webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/court-wide.webp",
+            "caption": ""
+          },
+          {
+            "image": "/assets/campus-mural.webp",
+            "caption": ""
+          }
+        ],
+        "cta": {
+          "label": "Ver la galería completa",
+          "href": "/galeria"
+        }
       }
     },
     "home.hero": {
@@ -920,6 +2414,34 @@
         "poster": "Foto de portada",
         "posterAlt": "Descripción de la foto (accesibilidad)",
         "video": "Video de portada (MP4)"
+      },
+      "kinds": {
+        "showLogo": "toggle",
+        "title": "text",
+        "titleAccent": "text",
+        "subtitle": "textarea",
+        "primary": "link",
+        "secondary": "link",
+        "poster": "image",
+        "posterAlt": "text",
+        "video": "url"
+      },
+      "defaults": {
+        "showLogo": true,
+        "title": "Formando líderes",
+        "titleAccent": "con excelencia",
+        "subtitle": "Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.",
+        "primary": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "secondary": {
+          "label": "Portal Cafetería",
+          "href": "/login"
+        },
+        "poster": "/assets/court-wide.webp",
+        "posterAlt": "Campus Colegio Interlaken",
+        "video": ""
       }
     },
     "home.lead": {
@@ -942,6 +2464,36 @@
         "privacyLink": "Texto del enlace",
         "subject": "Asunto en Mensajes",
         "message": "Mensaje en Mensajes"
+      },
+      "kinds": {
+        "title": "text",
+        "text": "textarea",
+        "button": "text",
+        "success": "text",
+        "nameLabel": "text",
+        "emailLabel": "text",
+        "sending": "text",
+        "sentToast": "text",
+        "errorToast": "text",
+        "privacyText": "textarea",
+        "privacyLink": "text",
+        "subject": "text",
+        "message": "text"
+      },
+      "defaults": {
+        "title": "Solicite informes",
+        "text": "Déjenos sus datos y un asesor le compartirá costos, fechas y todo lo que necesita saber sobre Interlaken.",
+        "button": "Solicitar",
+        "success": "¡Solicitud recibida! Le contactaremos pronto.",
+        "subject": "Solicitud de informes",
+        "nameLabel": "Nombre completo",
+        "emailLabel": "Correo electrónico",
+        "sending": "Enviando…",
+        "sentToast": "¡Gracias! Te contactaremos muy pronto.",
+        "errorToast": "No fue posible enviar tu solicitud. Intenta de nuevo.",
+        "privacyText": "Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el",
+        "privacyLink": "Aviso de Privacidad",
+        "message": "{nombre} solicita informes desde la página de inicio."
       }
     },
     "home.levels": {
@@ -964,6 +2516,54 @@
         "items[].href": "Enlace",
         "items[].linkLabel": "Texto del enlace",
         "cta": "Botón final"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "text": "textarea",
+        "items": "items",
+        "items[].name": "text",
+        "items[].image": "image",
+        "items[].color": "color",
+        "items[].text": "textarea",
+        "items[].href": "href",
+        "items[].linkLabel": "text",
+        "cta": "link"
+      },
+      "defaults": {
+        "eyebrow": "Niveles Educativos",
+        "title": "Un camino de excelencia",
+        "text": "De preescolar a secundaria, un mismo campus y un mismo compromiso con cada etapa.",
+        "items": [
+          {
+            "name": "Preescolar",
+            "href": "/niveles/preescolar",
+            "image": "/assets/court-primaria.webp",
+            "color": "var(--nivel-preescolar)",
+            "text": "Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.",
+            "linkLabel": ""
+          },
+          {
+            "name": "Primaria",
+            "href": "/niveles/primaria",
+            "image": "/assets/facade.webp",
+            "color": "var(--nivel-primaria)",
+            "text": "Formación bilingüe sólida con énfasis en pensamiento crítico y valores.",
+            "linkLabel": ""
+          },
+          {
+            "name": "Secundaria",
+            "href": "/niveles/secundaria",
+            "image": "/assets/secundaria.webp",
+            "color": "var(--nivel-secundaria)",
+            "text": "Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.",
+            "linkLabel": ""
+          }
+        ],
+        "cta": {
+          "label": "Conozca el modelo educativo",
+          "href": "/modelo-educativo"
+        }
       }
     },
     "home.programs": {
@@ -983,6 +2583,47 @@
         "items[].icon": "Ícono",
         "items[].color": "Color",
         "footnote": "Texto final"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].name": "text",
+        "items[].image": "image",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "footnote": "text"
+      },
+      "defaults": {
+        "eyebrow": "Nuestros Programas",
+        "title": "Más allá del aula",
+        "items": [
+          {
+            "name": "Inglés",
+            "image": "/assets/classroom.webp",
+            "color": "var(--purple)",
+            "icon": "Languages"
+          },
+          {
+            "name": "Deportes",
+            "image": "/assets/court-wide.webp",
+            "color": "var(--green)",
+            "icon": "Trophy"
+          },
+          {
+            "name": "Arte y Música",
+            "image": "/assets/campus-mural.webp",
+            "color": "var(--pink)",
+            "icon": "Palette"
+          },
+          {
+            "name": "Ciencia y Robótica",
+            "image": "/assets/secundaria.webp",
+            "color": "var(--green)",
+            "icon": "FlaskConical"
+          }
+        ],
+        "footnote": "Programas que complementan la formación académica todos los días."
       }
     },
     "home.promos": {
@@ -1000,6 +2641,44 @@
         "items[].icon": "Ícono",
         "items[].color": "Color inicial",
         "items[].color2": "Color final"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].label": "text",
+        "items[].title": "text",
+        "items[].text": "textarea",
+        "items[].link": "link",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "items[].color2": "color"
+      },
+      "defaults": {
+        "items": [
+          {
+            "label": "Modelo Bilingüe",
+            "title": "Inglés desde preescolar, todos los días",
+            "text": "Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.",
+            "link": {
+              "label": "Conozca el modelo",
+              "href": "/modelo-educativo"
+            },
+            "color": "var(--purple)",
+            "color2": "var(--purple-mid)",
+            "icon": "Languages"
+          },
+          {
+            "label": "Comunidad y Valores",
+            "title": "Formamos personas íntegras y felices",
+            "text": "Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.",
+            "link": {
+              "label": "Nuestra comunidad",
+              "href": "/nosotros"
+            },
+            "color": "var(--pink)",
+            "color2": "var(--pink-hot)",
+            "icon": "Heart"
+          }
+        ]
       }
     },
     "home.stats": {
@@ -1014,6 +2693,41 @@
         "items[].label": "Etiqueta",
         "items[].icon": "Ícono",
         "items[].color": "Color"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].value": "text",
+        "items[].label": "text",
+        "items[].icon": "icon",
+        "items[].color": "color"
+      },
+      "defaults": {
+        "items": [
+          {
+            "value": "1,200+",
+            "label": "Alumnos",
+            "color": "var(--pink)",
+            "icon": "Users"
+          },
+          {
+            "value": "80+",
+            "label": "Maestros",
+            "color": "var(--green)",
+            "icon": "GraduationCap"
+          },
+          {
+            "value": "{{anios}}",
+            "label": "Años",
+            "color": "var(--purple-mid)",
+            "icon": "CalendarDays"
+          },
+          {
+            "value": "95%",
+            "label": "Aprovechamiento",
+            "color": "var(--green-mid)",
+            "icon": "TrendingUp"
+          }
+        ]
       }
     },
     "home.strengths": {
@@ -1030,6 +2744,39 @@
         "items[].color": "Color",
         "items[].title": "Título",
         "items[].text": "Texto"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "items": "items",
+        "items[].icon": "icon",
+        "items[].color": "color",
+        "items[].title": "text",
+        "items[].text": "textarea"
+      },
+      "defaults": {
+        "eyebrow": "Por qué Interlaken",
+        "title": "Respaldo que da certeza a su familia",
+        "items": [
+          {
+            "icon": "Award",
+            "color": "var(--purple)",
+            "title": "Incorporación oficial SEP",
+            "text": "Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública."
+          },
+          {
+            "icon": "Languages",
+            "color": "var(--green)",
+            "title": "Certificaciones internacionales",
+            "text": "Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente."
+          },
+          {
+            "icon": "Heart",
+            "color": "var(--pink)",
+            "title": "{{anios}} años de trayectoria",
+            "text": "{{anios}} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad."
+          }
+        ]
       }
     },
     "home.testimonials": {
@@ -1042,6 +2789,16 @@
         "eyebrow": "Etiqueta superior",
         "title": "Título",
         "limit": "Cuántos testimonios mostrar"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "limit": "number"
+      },
+      "defaults": {
+        "eyebrow": "Comunidad",
+        "title": "Lo que dicen las familias",
+        "limit": 3
       }
     },
     "home.video": {
@@ -1057,6 +2814,28 @@
         "video": "Video (YouTube o Vimeo)",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
+      },
+      "kinds": {
+        "eyebrow": "text",
+        "title": "text",
+        "text": "textarea",
+        "video": "url",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "eyebrow": "Conócenos",
+        "title": "Interlaken en video",
+        "video": "",
+        "text": "Nuestro video institucional. Y si quiere conocer el colegio en persona, agende una visita: le mostramos instalaciones, salones y patios.",
+        "primary": {
+          "label": "Agendar una visita",
+          "href": "/agendar-visita"
+        },
+        "secondary": {
+          "label": "Ver la galería",
+          "href": "/galeria"
+        }
       }
     },
     "image": {
@@ -1072,6 +2851,10 @@
       "labels": {
         "image": "Imagen",
         "caption": "Pie de foto"
+      },
+      "kinds": {
+        "image": "image",
+        "caption": "text"
       }
     },
     "levels_cards": {
@@ -1080,7 +2863,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "map_contact": {
       "label": "Mapa y contacto",
@@ -1088,7 +2872,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "modelo.hero": {
       "label": "Modelo educativo · Portada",
@@ -1105,6 +2890,18 @@
         "title": "Título",
         "subtitle": "Texto",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "textarea",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "El Colegio",
+        "title": "Modelo Educativo",
+        "image": "/assets/campus-mural.webp",
+        "subtitle": "Un modelo propio orientado a una formación de calidad: los alumnos adquieren conocimientos y desarrollan habilidades y actitudes que los hacen competentes en la vida diaria y los preparan para su siguiente nivel educativo."
       }
     },
     "modelo.pillars": {
@@ -1122,6 +2919,65 @@
         "links": "Enlaces del recuadro",
         "links[].label": "Texto",
         "links[].href": "Enlace"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].icon": "icon",
+        "items[].title": "text",
+        "items[].text": "textarea",
+        "ctaTitle": "text",
+        "links": "items",
+        "links[].label": "text",
+        "links[].href": "href"
+      },
+      "defaults": {
+        "items": [
+          {
+            "icon": "Globe2",
+            "title": "Educación bilingüe",
+            "text": "Español–Inglés en los tres niveles, con preparación para el First Certificate de la Universidad de Cambridge en Secundaria."
+          },
+          {
+            "icon": "BookOpenCheck",
+            "title": "Alto nivel académico",
+            "text": "Planes y Programas de la SEP enriquecidos con horas clase adicionales, Proyecto de Activación a la Inteligencia y Taller de Lectura y Redacción."
+          },
+          {
+            "icon": "HeartHandshake",
+            "title": "Educación en Valores",
+            "text": "Formamos mejores seres humanos: valores en el quehacer diario, ayuda y servicio a la comunidad, ceremonias y convivencia."
+          },
+          {
+            "icon": "Laptop",
+            "title": "Tecnología en el aula",
+            "text": "iPad integrado al salón de clases (de 4º de Primaria en adelante) y Educación Tecnológica con certificación en Word, Excel y PowerPoint."
+          },
+          {
+            "icon": "Leaf",
+            "title": "Cultura Ecológica",
+            "text": "Conciencia ambiental transversal en actividades, campañas y proyectos escolares."
+          },
+          {
+            "icon": "Trophy",
+            "title": "Actividades que complementan",
+            "text": "Visitas, concursos, exposiciones, festivales, ExpoInterlaken · Maratón de Conocimientos y actividades extraescolares deportivas y culturales."
+          }
+        ],
+        "ctaTitle": "Conózcalo en acción, nivel por nivel",
+        "links": [
+          {
+            "label": "preescolar",
+            "href": "/niveles/preescolar"
+          },
+          {
+            "label": "primaria",
+            "href": "/niveles/primaria"
+          },
+          {
+            "label": "secundaria",
+            "href": "/niveles/secundaria"
+          }
+        ]
       }
     },
     "nivel.content": {
@@ -1159,6 +3015,136 @@
         "links": "Enlaces de la barra lateral",
         "links[].label": "Texto",
         "links[].href": "Enlace"
+      },
+      "kinds": {
+        "story": "items",
+        "story[].title": "text",
+        "story[].text": "textarea",
+        "story[].programs": "items",
+        "story[].programs[].name": "text",
+        "story[].programs[].icon": "select",
+        "story[].programs[].text": "textarea",
+        "story[].quote": "textarea",
+        "photo": "image",
+        "photoAlt": "text",
+        "photoAfter": "number",
+        "accent": "select",
+        "color": "color",
+        "groupsTitle": "text",
+        "groups": "items",
+        "groups[].name": "text",
+        "groups[].detail": "textarea",
+        "extras": "items",
+        "extras[].text": "text",
+        "sepLevel": "select",
+        "sepTitle": "text",
+        "sepNote": "text",
+        "sideTitle": "text",
+        "links": "items",
+        "links[].label": "text",
+        "links[].href": "href"
+      },
+      "defaults": {
+        "accent": "green",
+        "color": "var(--nivel-preescolar)",
+        "story": [
+          {
+            "title": "",
+            "text": "En nuestro Kínder queremos que los niños disfruten esta etapa mientras descubren todo lo que son capaces de hacer. Por eso buscamos que cada experiencia tenga un propósito: jugar, explorar, preguntar, crear, experimentar, convivir y, casi sin darse cuenta, **desarrollen habilidades que serán la base de sus futuros aprendizajes**.\n\nPorque en estos primeros años no se trata de acumular conceptos, **se trata de aprender con sentido.**",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "Menos memorizar. Más experimentar.",
+            "text": "Los niños aprenden haciendo; por eso trabajamos a través de experiencias y **proyectos tanto en inglés como en español**, que despiertan su curiosidad y les permiten relacionar lo que aprenden con el mundo que los rodea.\n\nQueremos que pregunten, prueben, se equivoquen, vuelvan a intentarlo y encuentren respuestas.\n\nAsí construimos **aprendizajes significativos** que van mucho más allá de memorizar información.",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "Bilingües desde pequeños",
+            "text": "En esta etapa, los niños tienen una enorme capacidad para acercarse a un segundo idioma de manera natural.\n\nNuestra propuesta es **bilingüe desde maternal hasta KIII** y el inglés forma parte de su experiencia cotidiana.\n\nLos niños escuchan, comprenden, hablan y participan en actividades y proyectos en ambos idiomas. Además, durante su paso por Kínder desarrollan progresivamente las habilidades necesarias para **aprender a leer y escribir tanto en español como en inglés**.\n\nNo buscamos únicamente que conozcan palabras en otro idioma, **queremos que aprendan a comunicarse en él.**",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "Aprender también es moverse, crear y encontrar la calma",
+            "text": "Un niño necesita mucho más que lápices y cuadernos para desarrollarse, por eso nuestra propuesta incluye **computación, música, deportes y yoga**.\n\nCada una de estas experiencias aporta algo diferente: creatividad, coordinación, expresión, movimiento, concentración, conciencia corporal y herramientas para reconocer y regular sus emociones. Aprender a detenerse, respirar y reconocer cómo se sienten también es parte muy importante del crecimiento.",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "“¡Yo puedo hacerlo!”",
+            "text": "Una de las cosas más importantes que un niño puede descubrir durante estos años es que puede hacer cada vez más cosas por sí mismo.\n\nAcompañamos a nuestros alumnos para que desarrollen **autonomía e independencia** de acuerdo con su edad: tomar pequeñas decisiones, asumir responsabilidades, resolver situaciones cotidianas y pedir ayuda cuando la necesitan.\n\nNo hacemos todo por ellos, **los acompañamos para que descubran que pueden hacerlo,** mientras les enseñamos y los animamos en el proceso.",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "Saber convivir también se aprende",
+            "text": "Compartir, esperar un turno, expresar lo que sienten, escuchar a los demás, resolver un desacuerdo o aprender que no todos pensamos igual son aprendizajes fundamentales.\n\nPor eso damos especial importancia a la **socialización y al desarrollo emocional**.\n\nQueremos que nuestros niños aprendan a reconocer y expresar sus emociones, construir relaciones positivas y convivir con otros dentro de un ambiente donde prevalezcan **el respeto, la tolerancia, la diversión y el amor**; sabiendo que el sentirse seguro y querido abre la puerta al aprendizaje.",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "Cada niño tiene su propio ritmo",
+            "text": "No todos los niños aprenden de la misma manera ni al mismo tiempo. Y eso importa.\n\nNuestro equipo docente acompaña de manera cercana el desarrollo de cada alumno, observa sus avances, reconoce sus fortalezas e identifica las áreas en las que necesita mayor apoyo.\n\nEse acompañamiento también incluye a las familias. Promovemos una comunicación **cercana, constante y abierta entre familia y escuela**, porque cuando los adultos que acompañan a un niño trabajan juntos, podemos comprender mejor sus necesidades y ayudarlo a crecer.",
+            "programs": [],
+            "quote": ""
+          },
+          {
+            "title": "Niños felices que descubren todo lo que pueden lograr",
+            "text": "Queremos que nuestros alumnos terminen el Kínder sabiendo muchas cosas, por supuesto. Pero queremos algo más: que sean **curiosos, autónomos, seguros, creativos y capaces de convivir con los demás**. Que sepan expresar lo que sienten, que disfruten aprender y que lleguen a Primaria con las herramientas necesarias para enfrentar con confianza una nueva etapa.\n\nPorque durante los primeros años se construyen mucho más que conocimientos; **se construye la confianza para aprender, la seguridad para intentarlo y el gusto por descubrir.** Y la mejor manera de comenzar la vida estudiantil es muy sencilla: **aprendiendo jugando y siendo feliz.**",
+            "programs": [],
+            "quote": ""
+          }
+        ],
+        "photo": "/assets/campus-mural.webp",
+        "photoAlt": "Patio del colegio con toldos rojos y muros pintados de colores",
+        "photoAfter": 4,
+        "groupsTitle": "Cuatro grupos en este nivel",
+        "groups": [
+          {
+            "name": "Maternal",
+            "detail": "Ingreso a los dos años. Salones de 10 a 15 alumnos, atendidos por una educadora y una auxiliar."
+          },
+          {
+            "name": "1º a 3er grado",
+            "detail": "Ingreso a 1º con tres años cumplidos. Grupos de 15 a 20 alumnos con maestra de Español, maestra de Inglés y una niñera."
+          }
+        ],
+        "extras": [
+          {
+            "text": "Estudios con reconocimiento oficial de la Secretaría de Educación Pública (SEP)."
+          },
+          {
+            "text": "Al concluir el tercer grado, los alumnos reciben su Certificado de Educación Preescolar."
+          }
+        ],
+        "sepLevel": "Preescolar",
+        "sepTitle": "Incorporación oficial SEP",
+        "sepNote": "Estudios con reconocimiento de validez oficial.",
+        "sideTitle": "Información útil",
+        "links": [
+          {
+            "label": "Proceso de inscripción",
+            "href": "/admisiones"
+          },
+          {
+            "label": "Documentación",
+            "href": "/admisiones/documentacion"
+          },
+          {
+            "label": "Costos y colegiaturas",
+            "href": "/admisiones/costos"
+          },
+          {
+            "label": "Agendar visita",
+            "href": "/agendar-visita"
+          },
+          {
+            "label": "Contacto por nivel",
+            "href": "/contacto"
+          }
+        ]
       }
     },
     "nivel.hero": {
@@ -1181,6 +3167,34 @@
         "color": "Color del nivel",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "headline": "text",
+        "text": "textarea",
+        "image": "image",
+        "accent": "select",
+        "color": "color",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "label": "Niveles Educativos",
+        "title": "Preescolar",
+        "headline": "Aprender también es jugar, descubrir y disfrutar",
+        "text": "Cuando un niño se divierte, se emociona y siente curiosidad, aprender sucede de manera natural.",
+        "image": "/assets/hopscotch.webp",
+        "accent": "green",
+        "color": "var(--nivel-preescolar)",
+        "primary": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "secondary": {
+          "label": "Solicitar informes",
+          "href": "https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken."
+        }
       }
     },
     "nivel.others": {
@@ -1194,6 +3208,25 @@
         "items": "Tarjetas",
         "items[].name": "Nombre",
         "items[].href": "Enlace"
+      },
+      "kinds": {
+        "title": "text",
+        "items": "items",
+        "items[].name": "text",
+        "items[].href": "href"
+      },
+      "defaults": {
+        "title": "Conozca también",
+        "items": [
+          {
+            "name": "Primaria",
+            "href": "/niveles/primaria"
+          },
+          {
+            "name": "Secundaria",
+            "href": "/niveles/secundaria"
+          }
+        ]
       }
     },
     "notfound.message": {
@@ -1210,6 +3243,26 @@
         "text": "Texto",
         "primary": "Botón principal",
         "secondary": "Botón secundario"
+      },
+      "kinds": {
+        "code": "text",
+        "title": "textarea",
+        "text": "textarea",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "code": "404",
+        "title": "Página no encontrada",
+        "text": "La dirección que escribió no existe o fue movida. Verifique el enlace o regrese al inicio.",
+        "primary": {
+          "label": "Ir al inicio",
+          "href": "/"
+        },
+        "secondary": {
+          "label": "Contactar al colegio",
+          "href": "/contacto"
+        }
       }
     },
     "open_school_events": {
@@ -1218,7 +3271,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "page.hero": {
       "label": "Portada con foto",
@@ -1240,6 +3294,34 @@
         "opacity": "Visibilidad de la foto (0 a 1)",
         "primary": "Botón principal (opcional)",
         "secondary": "Botón secundario (opcional)"
+      },
+      "kinds": {
+        "label": "text",
+        "labelClass": "select",
+        "title": "textarea",
+        "subtitle": "textarea",
+        "image": "image",
+        "focus": "text",
+        "opacity": "number",
+        "primary": "link",
+        "secondary": "link"
+      },
+      "defaults": {
+        "label": "",
+        "labelClass": "section-label-purple",
+        "title": "",
+        "subtitle": "",
+        "image": "/assets/facade.webp",
+        "focus": "center",
+        "opacity": 0.35,
+        "primary": {
+          "label": "",
+          "href": ""
+        },
+        "secondary": {
+          "label": "",
+          "href": ""
+        }
       }
     },
     "pagos.hero": {
@@ -1257,6 +3339,18 @@
         "title": "Título",
         "subtitle": "Texto",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "textarea",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Pagos",
+        "title": "Colegiaturas y cafetería",
+        "subtitle": "Los pagos de su familia, en línea y sin filas.",
+        "image": "/assets/campus-mural.webp"
       }
     },
     "pagos.platforms": {
@@ -1279,6 +3373,46 @@
         "items[].href": "Enlace",
         "items[].cta": "Texto del botón",
         "note": "Nota final (opcional)"
+      },
+      "kinds": {
+        "bg": "select",
+        "labelClass": "select",
+        "eyebrow": "text",
+        "title": "text",
+        "text": "textarea",
+        "columns": "select",
+        "items": "items",
+        "items[].name": "text",
+        "items[].text": "textarea",
+        "items[].icon": "icon",
+        "items[].href": "href",
+        "items[].cta": "text",
+        "note": "textarea"
+      },
+      "defaults": {
+        "bg": "cream",
+        "labelClass": "section-label-green",
+        "eyebrow": "Familias",
+        "title": "Para familias",
+        "text": "",
+        "columns": "2",
+        "items": [
+          {
+            "name": "Colegiaturas y boletas",
+            "text": "Pague con tarjeta, sin filas en el banco, y consulte las boletas de calificaciones de sus hijos.",
+            "href": "https://interlaken.servoescolar.mx/",
+            "icon": "CreditCard",
+            "cta": "Ir a colegiaturas y boletas"
+          },
+          {
+            "name": "Cafetería",
+            "text": "Consulte el saldo de cafetería de sus hijos y haga recargas en línea.",
+            "href": "/login",
+            "icon": "Coffee",
+            "cta": "Entrar a Cafetería"
+          }
+        ],
+        "note": "¿Necesita factura de un pago? Solicítela en [Facturación](/comunidad/facturacion)."
       }
     },
     "plataformas.hero": {
@@ -1296,6 +3430,18 @@
         "title": "Título",
         "subtitle": "Texto",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "textarea",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "El Colegio",
+        "title": "Plataformas",
+        "subtitle": "Las herramientas digitales del aula y de acompañamiento a padres, en un solo lugar.",
+        "image": "/assets/campus-mural.webp"
       }
     },
     "plataformas.platforms": {
@@ -1318,6 +3464,53 @@
         "items[].href": "Enlace",
         "items[].cta": "Texto del botón",
         "note": "Nota final (opcional)"
+      },
+      "kinds": {
+        "bg": "select",
+        "labelClass": "select",
+        "eyebrow": "text",
+        "title": "text",
+        "text": "textarea",
+        "columns": "select",
+        "items": "items",
+        "items[].name": "text",
+        "items[].text": "textarea",
+        "items[].icon": "icon",
+        "items[].href": "href",
+        "items[].cta": "text",
+        "note": "textarea"
+      },
+      "defaults": {
+        "bg": "white",
+        "labelClass": "section-label-pink",
+        "eyebrow": "Aula digital",
+        "title": "Para alumnos y docentes",
+        "text": "Classroom, correo institucional y registro de dispositivos.",
+        "columns": "3",
+        "items": [
+          {
+            "name": "Google Classroom",
+            "text": "Aulas virtuales del colegio: tareas, materiales y seguimiento de cada clase.",
+            "href": "https://classroom.google.com/",
+            "icon": "GraduationCap",
+            "cta": "Abrir Classroom"
+          },
+          {
+            "name": "Gmail institucional",
+            "text": "Correo electrónico oficial de alumnos y docentes (@interlaken).",
+            "href": "https://www.gmail.com/",
+            "icon": "Mail",
+            "cta": "Abrir Gmail"
+          },
+          {
+            "name": "Mosyle — registro de iPad",
+            "text": "Inscripción del iPad al sistema del colegio para usarlo en el salón de clases.",
+            "href": "https://enroll.mosyle.com/?account=interlaken",
+            "icon": "Tablet",
+            "cta": "Registrar iPad"
+          }
+        ],
+        "note": ""
       }
     },
     "preregistro.form": {
@@ -1464,6 +3657,329 @@
         "doneVisit": "Botón destacado",
         "donePrimary": "Botón principal",
         "doneSecondary": "Botón secundario"
+      },
+      "kinds": {
+        "stepsLabel": "text",
+        "stepOf": "text",
+        "stepsToggle": "text",
+        "stepsHide": "text",
+        "stateDone": "text",
+        "stateMissing": "text",
+        "statePending": "text",
+        "stateCurrent": "text",
+        "nextLabel": "text",
+        "backLabel": "text",
+        "reviewReturn": "text",
+        "laterLabel": "text",
+        "optionalMark": "text",
+        "selectPlaceholder": "text",
+        "saving": "text",
+        "saved": "text",
+        "saveError": "textarea",
+        "errorSummary": "text",
+        "errRequired": "text",
+        "loadError": "textarea",
+        "retryLabel": "text",
+        "expiredTitle": "text",
+        "sessionExpired": "textarea",
+        "startTitle": "text",
+        "startIntro": "textarea",
+        "checklistTitle": "text",
+        "whoTitle": "text",
+        "childTitle": "text",
+        "moreTitle": "text",
+        "startSubmit": "text",
+        "startError": "textarea",
+        "checklist": "items",
+        "checklist[].text": "text",
+        "resumeToggle": "text",
+        "resumeText": "textarea",
+        "resumeEmail": "text",
+        "resumeSubmit": "text",
+        "resumeDone": "textarea",
+        "resumeError": "textarea",
+        "privateTitle": "text",
+        "privateText": "textarea",
+        "privateStepsTitle": "text",
+        "privateWhatsapp": "text",
+        "privateWaMessage": "textarea",
+        "privateCall": "text",
+        "privateSteps": "items",
+        "privateSteps[].text": "text",
+        "privateVisit": "link",
+        "booting": "text",
+        "invitedTitle": "text",
+        "invitedText": "textarea",
+        "inviteErrorTitle": "text",
+        "inviteErrorText": "textarea",
+        "sentTitle": "text",
+        "sentText": "textarea",
+        "alumnoTitle": "text",
+        "alumnoIntro": "textarea",
+        "alumnoNameTitle": "text",
+        "alumnoNameHint": "text",
+        "alumnoBirthTitle": "text",
+        "alumnoBirthHint": "text",
+        "alumnoSchoolTitle": "text",
+        "alumnoSchoolHint": "text",
+        "curpHint": "textarea",
+        "curpFilled": "text",
+        "levelLabel": "text",
+        "ageHint": "textarea",
+        "countryMexico": "text",
+        "countryOther": "text",
+        "countryOtherLabel": "text",
+        "stateOtherLabel": "text",
+        "curpLink": "link",
+        "domicilioTitle": "text",
+        "domicilioIntro": "textarea",
+        "domicilioAddressTitle": "text",
+        "domicilioAddressHint": "text",
+        "domicilioPhoneTitle": "text",
+        "domicilioPhoneHint": "text",
+        "saludTitle": "text",
+        "saludIntro": "textarea",
+        "saludGeneralTitle": "text",
+        "saludGeneralHint": "text",
+        "saludCareTitle": "text",
+        "saludCareHint": "text",
+        "saludConsentTitle": "text",
+        "saludConsentHint": "text",
+        "padreTitle": "text",
+        "madreTitle": "text",
+        "tutorIntro": "textarea",
+        "tutorPersonalTitle": "text",
+        "tutorPersonalHint": "text",
+        "tutorBirthTitle": "text",
+        "tutorBirthHint": "text",
+        "tutorWorkTitle": "text",
+        "tutorWorkHint": "text",
+        "tutorContactTitle": "text",
+        "tutorContactHint": "text",
+        "prefillFromContact": "textarea",
+        "naConfirmTitle": "text",
+        "naConfirmText": "textarea",
+        "naConfirm": "text",
+        "naCollapsed": "textarea",
+        "emergenciaTitle": "text",
+        "emergenciaIntro": "textarea",
+        "emergenciaBlockTitle": "text",
+        "emergenciaBlockHint": "text",
+        "contactoTitle": "text",
+        "contactoIntro": "textarea",
+        "reviewTitle": "text",
+        "reviewIntro": "textarea",
+        "reviewEdit": "text",
+        "reviewEmpty": "text",
+        "reviewYes": "text",
+        "reviewNo": "text",
+        "reviewNotApplicable": "text",
+        "reviewMissing": "text",
+        "privacyTitle": "text",
+        "privacyText": "textarea",
+        "signTitle": "text",
+        "submitLabel": "text",
+        "submitError": "textarea",
+        "incompleteTitle": "text",
+        "incompleteText": "textarea",
+        "fixLabel": "text",
+        "privacyLink": "link",
+        "laterTitle": "text",
+        "laterText": "textarea",
+        "laterBack": "text",
+        "laterError": "textarea",
+        "doneTitle": "text",
+        "doneText": "textarea",
+        "doneStepsTitle": "text",
+        "doneSteps": "items",
+        "doneSteps[].text": "text",
+        "doneVisit": "link",
+        "donePrimary": "link",
+        "doneSecondary": "link"
+      },
+      "defaults": {
+        "stepsLabel": "Pasos de la ficha",
+        "stepOf": "Paso {n} de {total}",
+        "stepsToggle": "Ver los pasos",
+        "stepsHide": "Ocultar",
+        "stateDone": "Completo",
+        "stateMissing": "Faltan datos",
+        "statePending": "Pendiente",
+        "stateCurrent": "Paso actual",
+        "nextLabel": "Guardar y continuar",
+        "backLabel": "Anterior",
+        "reviewReturn": "Guardar y volver a la revisión",
+        "laterLabel": "Guardar y continuar después",
+        "optionalMark": "opcional",
+        "selectPlaceholder": "Elija una opción",
+        "saving": "Guardando…",
+        "saved": "Guardado",
+        "saveError": "No se pudo guardar. Revise su conexión e intente de nuevo.",
+        "errorSummary": "Revise estos datos para continuar:",
+        "errRequired": "Este dato es obligatorio.",
+        "loadError": "No pudimos abrir la ficha. Revise su conexión e intente de nuevo.",
+        "retryLabel": "Intentar de nuevo",
+        "expiredTitle": "Su sesión terminó",
+        "sessionExpired": "Por seguridad, su sesión venció. Pida un enlace nuevo con su correo para continuar; lo que ya guardó sigue ahí.",
+        "startTitle": "Antes de empezar",
+        "startIntro": "Con estos datos guardamos su ficha y le enviamos a su correo un enlace para continuarla. Toda la ficha toma unos 15 minutos y puede guardarla y continuar después.",
+        "checklistTitle": "Tenga a la mano",
+        "whoTitle": "Sus datos",
+        "childTitle": "Datos del alumno",
+        "moreTitle": "Para conocerle mejor",
+        "startSubmit": "Comenzar la ficha",
+        "startError": "No pudimos guardar sus datos. Revise su conexión e intente de nuevo.",
+        "resumeToggle": "¿Ya recibió su enlace y venció? Reciba uno nuevo",
+        "resumeText": "Escriba el correo al que le enviamos la ficha de inscripción y le mandamos un enlace nuevo para continuarla.",
+        "resumeEmail": "Correo electrónico",
+        "resumeSubmit": "Enviar enlace",
+        "resumeDone": "Si hay una ficha en proceso con ese correo, le enviamos un enlace para continuarla. Revise su bandeja de entrada y la carpeta de correo no deseado.",
+        "resumeError": "No pudimos enviar la solicitud. Intente de nuevo en un momento.",
+        "privateTitle": "La ficha de inscripción es personal",
+        "privateText": "El colegio envía la ficha de inscripción por correo o WhatsApp a cada familia cuando su hijo/a es admitido.",
+        "privateStepsTitle": "Así es el proceso de admisión",
+        "privateWhatsapp": "Escribir por WhatsApp",
+        "privateWaMessage": "Hola, me gustaría recibir informes de admisión del Colegio Interlaken.",
+        "privateCall": "¿Prefiere llamar?",
+        "booting": "Abriendo su ficha…",
+        "invitedTitle": "Su ficha ya tiene los primeros datos.",
+        "invitedText": "Revíselos y complete los pasos que faltan. Cada paso se guarda al continuar.",
+        "inviteErrorTitle": "El enlace ya no es válido",
+        "inviteErrorText": "El enlace ya se usó o venció. Escriba su correo y le enviamos uno nuevo; lo que ya guardó sigue ahí.",
+        "sentTitle": "Esta ficha ya fue enviada",
+        "sentText": "Si necesita corregir algún dato, responda al correo de confirmación o llame a admisiones.",
+        "alumnoTitle": "Información del alumno",
+        "alumnoIntro": "Tenga a la mano el acta de nacimiento y la CURP del alumno.",
+        "alumnoNameTitle": "Nombre",
+        "alumnoNameHint": "Como aparecen en el acta de nacimiento.",
+        "alumnoBirthTitle": "Nacimiento",
+        "alumnoBirthHint": "Con la CURP llenamos la fecha, el sexo y el estado.",
+        "alumnoSchoolTitle": "Escuela",
+        "alumnoSchoolHint": "El grado al que se inscribe y la escuela de la que viene.",
+        "curpHint": "¿No tiene la CURP a la mano?",
+        "curpFilled": "Llenamos la fecha de nacimiento, el sexo y el estado con la CURP. Revíselos.",
+        "levelLabel": "Nivel",
+        "ageHint": "Para {grado} el alumno debe tener {edad} años cumplidos al 31 de diciembre de {anio} (tendrá {tiene}). Revise el grado y la fecha de nacimiento, o llame a admisiones.",
+        "countryMexico": "México",
+        "countryOther": "Otro país",
+        "countryOtherLabel": "Escriba el país",
+        "stateOtherLabel": "Estado, provincia o región",
+        "domicilioTitle": "Domicilio",
+        "domicilioIntro": "El domicilio donde vive el alumno.",
+        "domicilioAddressTitle": "Dirección",
+        "domicilioAddressHint": "Como aparece en un recibo de luz, agua o teléfono.",
+        "domicilioPhoneTitle": "Teléfono",
+        "domicilioPhoneHint": "Si no tiene teléfono fijo, déjelo en blanco.",
+        "saludTitle": "Información de salud",
+        "saludIntro": "Datos sensibles: se guardan cifrados y solo los consulta la dirección del colegio.",
+        "saludGeneralTitle": "Datos generales",
+        "saludGeneralHint": "La estatura y el peso pueden ser aproximados.",
+        "saludCareTitle": "Alergias y padecimientos",
+        "saludCareHint": "Lo que debemos saber para cuidar al alumno.",
+        "saludConsentTitle": "Autorización",
+        "saludConsentHint": "Necesaria para guardar los datos de salud.",
+        "padreTitle": "Información del padre",
+        "madreTitle": "Información de la madre",
+        "tutorIntro": "Escriba los datos como aparecen en su identificación oficial.",
+        "tutorPersonalTitle": "Datos personales",
+        "tutorPersonalHint": "Nombre, apellidos y estado civil.",
+        "tutorBirthTitle": "Nacimiento y CURP",
+        "tutorBirthHint": "Con la CURP llenamos la fecha, el sexo y el estado.",
+        "tutorWorkTitle": "Estudios y ocupación",
+        "tutorWorkHint": "El último grado de estudios y a qué se dedica.",
+        "tutorContactTitle": "Contacto",
+        "tutorContactHint": "Para comunicarnos sobre el alumno.",
+        "prefillFromContact": "Usamos los datos de quien llena la ficha. Revíselos y complete los que faltan.",
+        "naConfirmTitle": "Quitar los datos de este bloque",
+        "naConfirmText": "Al marcar «No aplica» se borran los datos que escribió en este bloque.",
+        "naConfirm": "Sí, no aplica",
+        "naCollapsed": "Marcó que este bloque no aplica. Puede continuar al siguiente paso.",
+        "emergenciaTitle": "Contacto de emergencia",
+        "emergenciaIntro": "Alguien distinto de los padres a quien llamar si no les localizamos.",
+        "emergenciaBlockTitle": "Datos del contacto",
+        "emergenciaBlockHint": "Escriba al menos un teléfono.",
+        "contactoTitle": "Quién llena la ficha",
+        "contactoIntro": "A este correo y a este celular le escribiremos sobre la admisión.",
+        "reviewTitle": "Revisión y firma",
+        "reviewIntro": "Revise sus respuestas. Puede corregir cualquier sección antes de firmar.",
+        "reviewEdit": "Editar",
+        "reviewEmpty": "Sin dato",
+        "reviewYes": "Sí",
+        "reviewNo": "No",
+        "reviewNotApplicable": "No aplica",
+        "reviewMissing": "Faltan datos en esta sección",
+        "privacyTitle": "Aviso de privacidad",
+        "privacyText": "El Colegio Interlaken trata estos datos para el proceso de admisión y, si el alumno se inscribe, para su expediente escolar, conforme a su Aviso de Privacidad. Los datos de salud se guardan cifrados.",
+        "signTitle": "Firma",
+        "submitLabel": "Enviar la ficha de inscripción",
+        "submitError": "No pudimos enviar la ficha. Intente de nuevo.",
+        "incompleteTitle": "Faltan datos en algunas secciones",
+        "incompleteText": "Corrija lo marcado y vuelva a enviar la ficha.",
+        "fixLabel": "Corregir",
+        "laterTitle": "Guardamos su avance",
+        "laterText": "Le enviamos a {correo} un enlace para continuar cuando guste. Si no lo ve en unos minutos, revise la carpeta de correo no deseado.",
+        "laterBack": "Seguir llenando ahora",
+        "laterError": "Guardamos su avance, pero no pudimos enviar el correo. Intente de nuevo en un minuto.",
+        "doneTitle": "Recibimos su ficha de inscripción",
+        "doneText": "Gracias. La ficha de {nombre} ya está con el equipo de Admisiones. Le enviamos la confirmación a su correo.",
+        "doneStepsTitle": "Qué sigue",
+        "curpLink": {
+          "label": "Consultar la CURP en gob.mx",
+          "href": "https://www.gob.mx/curp/"
+        },
+        "privacyLink": {
+          "label": "Leer el Aviso de Privacidad",
+          "href": "/aviso-de-privacidad"
+        },
+        "doneVisit": {
+          "label": "Ver los documentos requeridos",
+          "href": "/admisiones/documentacion"
+        },
+        "privateVisit": {
+          "label": "Agendar visita",
+          "href": "/agendar-visita"
+        },
+        "donePrimary": {
+          "label": "Ver el proceso de admisión",
+          "href": "/admisiones"
+        },
+        "doneSecondary": {
+          "label": "Volver al inicio",
+          "href": "/"
+        },
+        "checklist": [
+          {
+            "text": "La CURP y el acta de nacimiento del alumno"
+          },
+          {
+            "text": "Los datos de la madre y del padre, o de quien tenga la tutela"
+          },
+          {
+            "text": "Un contacto de emergencia distinto de los padres"
+          }
+        ],
+        "doneSteps": [
+          {
+            "text": "Revisamos la ficha en un plazo de 3 a 5 días hábiles."
+          },
+          {
+            "text": "Le pedimos los documentos del alumno con un enlace personal."
+          },
+          {
+            "text": "Con los documentos y el pago de inscripción, su lugar queda asegurado."
+          }
+        ],
+        "privateSteps": [
+          {
+            "text": "Agende una visita o solicite informes."
+          },
+          {
+            "text": "Su hijo/a presenta el examen de valoración."
+          },
+          {
+            "text": "Si su hijo/a es admitido, el colegio le envía su ficha de inscripción por correo o WhatsApp."
+          }
+        ]
       }
     },
     "preregistro.hero": {
@@ -1481,6 +3997,18 @@
         "title": "Título",
         "subtitle": "Subtítulo",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Ciclo Escolar {{ciclo}} · Admisiones",
+        "title": "Ficha de inscripción",
+        "subtitle": "Es el último paso de la admisión: el colegio envía a cada familia admitida su enlace personal para llenarla en línea.",
+        "image": "/assets/hopscotch.webp"
       }
     },
     "preregistro.trust": {
@@ -1494,6 +4022,18 @@
         "firstIcon": "Ícono del dato 1",
         "second": "Dato 2",
         "secondIcon": "Ícono del dato 2"
+      },
+      "kinds": {
+        "first": "text",
+        "firstIcon": "icon",
+        "second": "text",
+        "secondIcon": "icon"
+      },
+      "defaults": {
+        "first": "Unos 15 minutos, puede continuar después",
+        "firstIcon": "Clock",
+        "second": "Ciclo Escolar {{ciclo}} o el siguiente",
+        "secondIcon": "CalendarDays"
       }
     },
     "pricing_table": {
@@ -1502,7 +4042,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "rich_text": {
       "label": "Texto",
@@ -1514,6 +4055,9 @@
       "images": [],
       "labels": {
         "html": "Contenido"
+      },
+      "kinds": {
+        "html": "richtext"
       }
     },
     "sep_incorporation": {
@@ -1522,7 +4066,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "stats": {
       "label": "Cifras",
@@ -1536,6 +4081,11 @@
         "items": "Cifras",
         "items[].value": "Valor",
         "items[].label": "Etiqueta"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].value": "text",
+        "items[].label": "text"
       }
     },
     "table": {
@@ -1558,12 +4108,56 @@
         "subtitle": "Subtítulo de la tarjeta",
         "bg": "Fondo de la sección"
       },
+      "kinds": {
+        "title": "text",
+        "intro": "textarea",
+        "table": "table",
+        "notes": "textarea",
+        "card": "toggle",
+        "tone": "select",
+        "icon": "icon",
+        "label": "text",
+        "subtitle": "text",
+        "bg": "select"
+      },
       "tables": {
         "table": {
           "columns": 8,
           "rows": 60,
           "cell": 300
         }
+      },
+      "defaults": {
+        "title": "Nueva tabla",
+        "intro": "",
+        "table": {
+          "columns": [
+            {
+              "label": "Concepto",
+              "align": "left",
+              "format": "text"
+            },
+            {
+              "label": "Monto",
+              "align": "right",
+              "format": "money"
+            }
+          ],
+          "rows": [
+            [
+              "",
+              ""
+            ]
+          ],
+          "highlight": null
+        },
+        "notes": "",
+        "card": true,
+        "tone": "green",
+        "icon": "CircleDollarSign",
+        "label": "",
+        "subtitle": "",
+        "bg": "cream"
       }
     },
     "testimonials": {
@@ -1572,7 +4166,8 @@
       "locked": false,
       "required": {},
       "images": [],
-      "labels": {}
+      "labels": {},
+      "kinds": {}
     },
     "timeline": {
       "label": "Línea de tiempo",
@@ -1587,6 +4182,12 @@
         "items[].year": "Año",
         "items[].title": "Título",
         "items[].text": "Texto"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].year": "text",
+        "items[].title": "text",
+        "items[].text": "textarea"
       }
     },
     "video": {
@@ -1599,6 +4200,9 @@
       "images": [],
       "labels": {
         "url": "URL del video"
+      },
+      "kinds": {
+        "url": "url"
       }
     },
     "visita.booking": {
@@ -1634,6 +4238,62 @@
         "whatsappLabel": "Botón de WhatsApp",
         "whatsappMessage": "Mensaje inicial de WhatsApp",
         "contactLabel": "Botón de contacto (si no hay WhatsApp)"
+      },
+      "kinds": {
+        "pickTitle": "text",
+        "weekdays": "text",
+        "emptyTitle": "text",
+        "emptyText": "textarea",
+        "errorTitle": "text",
+        "errorText": "textarea",
+        "formTitle": "text",
+        "pickHint": "text",
+        "nameLabel": "text",
+        "emailLabel": "text",
+        "phoneLabel": "text",
+        "childLabel": "text",
+        "gradeLabel": "text",
+        "submitLabel": "text",
+        "errName": "text",
+        "errEmail": "text",
+        "errPhone": "text",
+        "bookingError": "text",
+        "confirmedTitle": "text",
+        "confirmedText": "textarea",
+        "againLabel": "text",
+        "whatsappTitle": "text",
+        "whatsappText": "text",
+        "whatsappLabel": "text",
+        "whatsappMessage": "text",
+        "contactLabel": "text"
+      },
+      "defaults": {
+        "pickTitle": "Elija una fecha y horario",
+        "formTitle": "Sus datos",
+        "pickHint": "Seleccione un horario para continuar",
+        "submitLabel": "Confirmar visita",
+        "confirmedTitle": "¡Visita confirmada!",
+        "confirmedText": "Le enviamos los detalles por correo. ¡Le esperamos!",
+        "againLabel": "Agendar otra visita",
+        "emptyTitle": "Sin horarios disponibles",
+        "emptyText": "No hay citas abiertas por el momento. Escríbanos por WhatsApp y con gusto le agendamos.",
+        "errorTitle": "No fue posible cargar los horarios",
+        "errorText": "Verifique su conexión e intente de nuevo. También puede agendar por WhatsApp.",
+        "whatsappTitle": "¿Prefiere agendar por WhatsApp?",
+        "whatsappText": "Escríbanos y con gusto coordinamos su visita.",
+        "whatsappLabel": "Reservar por WhatsApp",
+        "whatsappMessage": "Hola, me gustaría agendar una visita individual al Colegio Interlaken.",
+        "contactLabel": "Contactar al colegio",
+        "weekdays": "Lun, Mar, Mié, Jue, Vie, Sáb, Dom",
+        "nameLabel": "Nombre completo",
+        "emailLabel": "Correo electrónico",
+        "phoneLabel": "Teléfono / WhatsApp",
+        "childLabel": "Nombre del alumno (opcional)",
+        "gradeLabel": "Grado de interés (opcional)",
+        "errName": "Nombre requerido",
+        "errEmail": "Correo inválido",
+        "errPhone": "Teléfono inválido",
+        "bookingError": "No fue posible completar la reserva. Intente de nuevo."
       }
     },
     "visita.hero": {
@@ -1651,6 +4311,18 @@
         "title": "Título",
         "subtitle": "Subtítulo",
         "image": "Foto de fondo"
+      },
+      "kinds": {
+        "label": "text",
+        "title": "text",
+        "subtitle": "textarea",
+        "image": "image"
+      },
+      "defaults": {
+        "label": "Ciclo Escolar {{ciclo}} · Admisiones",
+        "title": "Agendar Visita",
+        "subtitle": "Un recorrido personalizado para su familia: elija la fecha que le convenga y confirme su cita. Es el primer paso del proceso de admisión.",
+        "image": "/assets/facade.webp"
       }
     },
     "visita.steps": {
@@ -1663,6 +4335,28 @@
         "items": "Pasos",
         "items[].text": "Paso",
         "link": "Enlace bajo los pasos"
+      },
+      "kinds": {
+        "items": "items",
+        "items[].text": "text",
+        "link": "link"
+      },
+      "defaults": {
+        "items": [
+          {
+            "text": "Elija fecha y horario disponibles aquí mismo"
+          },
+          {
+            "text": "Reciba la confirmación de su visita por correo"
+          },
+          {
+            "text": "Después de la visita agendamos el examen de valoración de su hijo/a"
+          }
+        ],
+        "link": {
+          "label": "Conozca el proceso de admisión →",
+          "href": "/admisiones"
+        }
       }
     }
   }

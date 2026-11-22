@@ -23,32 +23,68 @@ C3): block_index, block_label, field (a path such as `items.2.title`, the
 editor field it belongs to), field_label («Tarjetas › elemento 3 › Título»)
 and field_message (the short text shown next to the field). Labels come from
 block_manifest.json (pages.field_label), never from prop keys.
+These are the structural checks. publish_checks.py («Revisión antes de
+publicar») runs them and adds the content rules (links to private pages,
+tokens, retired defaults, large changes) with their quick fixes: whatever
+decides if a page may go live calls publish_checks.review(), not this.
 """
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from .media import MediaAsset
 from .pages import Page, image_ref_paths, located_error, manifest, section_schema, where
 
 HREF_RE = re.compile(r'href=["\']([^"\']+)["\']', re.I)
 ROUTE_PREFIXES = ('/niveles/', '/portal', '/admin', '/staff', '/login', '/p/')
-# The ficha de inscripción is private (2026-11-21): the school sends each
-# admitted family its link. A public page linking to it is flagged.
-PRIVATE_PATHS = ('/pre-registro', '/inscripcion')
-MSG_PRIVATE_LINK = ('La ficha de inscripción es personal: el colegio envía el enlace a cada familia admitida. '
-                    'Use «Agendar visita» (/agendar-visita) o «Admisiones» (/admisiones).')
 SEO_TITLE_MAX = 60
 SEO_DESCRIPTION_MAX = 160
 
 
-def _known_paths() -> set[str]:
+def _known_paths(published_slugs=None) -> set[str]:
     from .navigation import STATIC_ROUTES, Redirect, page_path
     paths = {p for p, _f, _p in STATIC_ROUTES}
-    paths |= {'/pre-registro', '/inscripcion', '/inscripcion/documentos', '/puertas-abiertas', '/agendar-visita', '/whatsapp/'}
-    paths |= {page_path(s) for s in Page.objects.filter(status=Page.Status.PUBLISHED).values_list('slug', flat=True)}
+    # Private routes exist, so a link to them is not «broken»: publish_checks flags them on public pages.
+    paths |= {'/pre-registro', '/inscripcion', '/inscripcion/documentos', '/confirmar-correo', '/puertas-abiertas',
+              '/agendar-visita', '/whatsapp/'}
+    if published_slugs is None:
+        published_slugs = Page.objects.filter(status=Page.Status.PUBLISHED).values_list('slug', flat=True)
+    paths |= {page_path(s) for s in published_slugs}
     paths |= set(Redirect.objects.values_list('from_path', flat=True))
     return paths
+
+
+def media_ids(blocks, seo) -> set[int]:
+    """Media-library ids used by these blocks and SEO image."""
+    ids = {mid for b in blocks or [] if isinstance(b, dict) for _p, mid in image_ref_paths(b)}
+    og = (seo or {}).get('og_image')
+    if isinstance(og, int) and not isinstance(og, bool):
+        ids.add(og)
+    return ids
+
+
+@dataclass
+class CheckContext:
+    """Lookups shared by the checks of many pages (the «Contenido» chips, the audit
+    of live pages): a constant number of queries however many pages are checked.
+
+    ``assets`` holds every media-library image of the checked drafts; an id
+    missing from it is an image that was deleted. ``tokens`` are today's token
+    values (publish_checks.token_values), read once.
+    """
+    known: set[str]
+    assets: dict
+    tokens: dict | None = None
+
+    @classmethod
+    def build(cls, drafts, published_slugs=None) -> CheckContext:
+        """``drafts``: (blocks, seo) of everything that will be checked; ``published_slugs`` saves a query."""
+        ids: set[int] = set()
+        for blocks, seo in drafts:
+            ids |= media_ids(blocks, seo)
+        assets = {a.pk: a for a in MediaAsset.objects.filter(pk__in=ids)} if ids else {}
+        return cls(known=_known_paths(published_slugs), assets=assets)
 
 
 def _hrefs(value, out: list[tuple[str, str]], path: str = '') -> None:
@@ -89,7 +125,8 @@ def issue_error(issue: dict) -> dict:
     }
 
 
-def run_checks(page: Page) -> list[dict]:
+def run_checks(page: Page, ctx: CheckContext | None = None) -> list[dict]:
+    """Structural issues of ``page.draft_blocks`` and ``page.seo`` (``ctx``: shared lookups, else queried here)."""
     from .legacy_seed import seed_seo_fields
     from .page_templates import template_seo
 
@@ -134,7 +171,10 @@ def run_checks(page: Page) -> list[dict]:
         prev, prev_i = b.get('type'), i
 
     refs = [(i, path, mid) for i, b in visible for path, mid in image_ref_paths(b)]
-    assets = {a.pk: a for a in MediaAsset.objects.filter(pk__in=[mid for _i, _p, mid in refs])}
+    if ctx is not None:
+        assets = ctx.assets
+    else:
+        assets = {a.pk: a for a in MediaAsset.objects.filter(pk__in=[mid for _i, _p, mid in refs])} if refs else {}
     for i, path, mid in refs:
         a = assets.get(mid)
         if a is None:
@@ -142,7 +182,7 @@ def run_checks(page: Page) -> list[dict]:
         elif not a.alt:
             at('error', 'missing_alt', i, path, f'La foto «{a.filename}» no tiene descripción (texto alternativo). Escríbala junto a la imagen.')
 
-    known = _known_paths()
+    known = ctx.known if ctx is not None else _known_paths()
     for i, path, href in _links_in(visible):
         h = href.strip()
         t = all_blocks[i].get('type')
@@ -154,9 +194,6 @@ def run_checks(page: Page) -> list[dict]:
             at('error', 'relative_link', i, path, f'El enlace «{h}» debe empezar con / (página del sitio) o con https://.')
             continue
         target = h.split('?')[0].split('#')[0].rstrip('/') or '/'
-        if target in PRIVATE_PATHS:
-            at('warning', 'private_link', i, path, MSG_PRIVATE_LINK)
-            continue
         if target in known or target.startswith(ROUTE_PREFIXES):
             continue
         at('error', 'broken_link', i, path, f'Enlace roto: {h} no lleva a ninguna página ni redirección. Elija otro destino.',
@@ -167,7 +204,8 @@ def run_checks(page: Page) -> list[dict]:
     seo = page.seo or {}
     defaults = template_seo(page.slug)
     og = seo.get('og_image')
-    if isinstance(og, int) and not isinstance(og, bool) and not MediaAsset.objects.filter(pk=og).exists():
+    is_id = isinstance(og, int) and not isinstance(og, bool)
+    if is_id and ((og not in ctx.assets) if ctx is not None else not MediaAsset.objects.filter(pk=og).exists()):
         warn('missing_og_image', 'SEO, campo «Imagen al compartir»: la imagen se borró de la biblioteca; se usará la imagen general del sitio.')
     description = (seo.get('description') or '').strip()
     if not description and not defaults['description']:

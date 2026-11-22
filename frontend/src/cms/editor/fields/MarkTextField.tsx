@@ -10,7 +10,7 @@ import { describedBy, FieldLabel, FieldNotes, invalidClass, type FieldBaseProps 
 import { LinkPickerDialog } from './LinkField';
 import { describeHref } from './links';
 import { leftWrapper } from './TextField';
-import { TokenChips, useResolvedText } from './TokenChips';
+import { TokenChips, useResolvedText, useTokenUndo } from './TokenChips';
 
 export interface MarkTextFieldProps extends FieldBaseProps {
   value: string;
@@ -58,6 +58,7 @@ export function MarkTextField({ id, label, required, hint, error, warning, onBlu
   const [focused, setFocused] = useState(false);
   const [linking, setLinking] = useState(false);
   const resolve = useResolvedText();
+  const tokenUndo = useTokenUndo(value, onChange);
   const paragraphs = resolve(value).split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
   const insertLink = (href: string) => {
     setLinking(false);
@@ -99,7 +100,7 @@ export function MarkTextField({ id, label, required, hint, error, warning, onBlu
           className={`block min-h-[120px] w-full resize-y border-0 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-0 ${invalidClass(error)}`}
         />
       </div>
-      {focused && <TokenChips target={ref} value={value} onChange={onChange} />}
+      {focused && <TokenChips target={ref} value={value} onChange={onChange} onInserted={tokenUndo} />}
       {paragraphs.length > 0 && (
         <div className="mt-2 rounded-lg border border-dashed border-line bg-cream-2/50 px-3 py-2" aria-label={`Vista previa de ${label}`} role="group">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-subtle">Así se verá</p>
