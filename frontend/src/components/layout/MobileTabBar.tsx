@@ -36,7 +36,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_-12px_rgba(64,26,142,0.25)] backdrop-blur-lg lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-sticky flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_-12px_rgba(64,26,142,0.25)] backdrop-blur-lg lg:hidden"
     >
       {items.map(({ icon: Icon, label, to, end, badgeKey }) => (
         <NavLink
@@ -44,7 +44,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
           to={to}
           end={end}
           className={({ isActive }) =>
-            `flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg pb-1.5 pt-2 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
+            `flex min-w-0 flex-1 flex-col items-center gap-1 rounded-sm pb-1.5 pt-2 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
               isActive ? 'text-purple' : 'text-subtle'
             }`
           }
@@ -52,7 +52,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
           {({ isActive }) => (
             <>
               <span
-                className={`relative flex h-7 w-12 items-center justify-center rounded-full transition-colors ${
+                className={`relative flex h-7 w-12 items-center justify-center rounded-sm transition-colors ${
                   isActive ? 'bg-purple/10' : ''
                 }`}
               >

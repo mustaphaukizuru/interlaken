@@ -43,7 +43,7 @@ const IMPORT_HEADERS = [{ key: 'correo', required: true }, { key: 'nombre', requ
 const DEACTIVATE: BulkActionDef = { name: 'deactivate', label: 'Desactivar', danger: true, icon: UserX, planVerb: 'Se desactivarán' };
 const REACTIVATE: BulkActionDef = { name: 'reactivate', label: 'Reactivar', icon: UserCheck, planVerb: 'Se reactivarán' };
 const ROW_ACTION_BASE =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
 const ROW_ACTION = `${ROW_ACTION_BASE} text-purple hover:bg-cream-2`;
 // One color class each: with both, Tailwind's own order (not the class string) picks the winner.
 const ROW_ACTION_DANGER = `${ROW_ACTION_BASE} text-coral-700 hover:bg-coral-50`;
@@ -121,7 +121,7 @@ export default function AdminStaffUsers() {
           <button
             type="button"
             onClick={() => setToView(u)}
-            className="rounded text-left font-medium text-ink hover:text-purple hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="rounded-sm text-left font-medium text-ink hover:text-purple hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
             aria-label={`Ver la cuenta y la actividad de ${u.full_name || u.email}`}
           >
             {u.full_name || u.email}
@@ -399,7 +399,7 @@ function RevealModal({ data, onClose }: { data: { user: StaffUser; password: str
   return (
     <Modal open onClose={onClose} title="Contraseña temporal" maxWidth={460}>
       <p className="text-sm text-muted">Entregue este acceso a <strong>{data.user.email}</strong>. No se volverá a mostrar.</p>
-      <div className="rounded-2xl bg-cream/70 p-4 text-center"><code className="select-all break-all font-mono text-xl font-bold text-ink">{data.password}</code></div>
+      <div className="rounded-md bg-cream/70 p-4 text-center"><code className="select-all break-all font-mono text-xl font-bold text-ink">{data.password}</code></div>
       <Button variant="secondary" className="w-full" onClick={copy}>{copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />} Copiar</Button>
       <Button className="w-full" onClick={onClose}>Listo</Button>
     </Modal>
@@ -465,7 +465,7 @@ function StaffActivityModal({ user, onClose }: { user: StaffUser | null; onClose
   return (
     <Modal open={!!user} onClose={onClose} title={u?.full_name || u?.email || 'Cuenta'} maxWidth={560}>
       {u && (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-cream-2 p-4 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md bg-cream-2 p-4 text-sm">
           <div className="col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Correo</dt><dd className="mt-0.5 break-all text-ink">{u.email}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Rol</dt><dd className="mt-0.5 text-ink">{ROLE[u.role] ?? u.role}{u.staff_title ? ` · ${u.staff_title}` : ''}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Estado</dt><dd className="mt-0.5 text-ink">{u.archived_at ? 'Archivada' : u.is_active ? 'Activa' : 'Inactiva'}</dd></div>

@@ -149,14 +149,14 @@ function NewProspectBody({ onClose }: { onClose: () => void }) {
         />
 
         {duplicates && duplicates.length > 0 && (
-          <div className="space-y-2 rounded-xl border border-amber/40 bg-amber/10 p-3" role="alert">
+          <div className="space-y-2 rounded-md border border-amber/40 bg-amber/10 p-3" role="alert">
             <p className="flex items-start gap-2 text-sm font-semibold text-ink">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
               Ya hay {duplicates.length === 1 ? 'un expediente' : `${duplicates.length} expedientes`} con ese celular o correo.
             </p>
             <ul className="space-y-1.5" aria-label="Expedientes parecidos">
               {duplicates.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
+                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-sm bg-white px-3 py-2 text-sm">
                   <span className="min-w-0">
                     <Link to={`/admin/admisiones/${d.id}`} className="font-semibold text-purple underline" onClick={onClose}>{d.child_name}</Link>
                     <span className="block text-xs text-muted">{d.parent_name} · {d.grade_applying} · {fmtDay(d.created_at)}</span>

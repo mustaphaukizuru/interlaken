@@ -66,7 +66,7 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
       </p>
 
       {data?.email && (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-line bg-cream/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-3 rounded-md bg-cream/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-ink">{data.email}</p>
             {data.verified ? (

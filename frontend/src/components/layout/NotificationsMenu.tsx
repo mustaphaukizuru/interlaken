@@ -58,7 +58,7 @@ export function NotificationsMenu() {
       aria-label={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
       aria-expanded={open}
       aria-haspopup="dialog"
-      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-white text-muted shadow-card transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-white text-muted shadow-card transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
     >
       <Bell size={19} />
       {unread > 0 && (
@@ -82,13 +82,13 @@ export function NotificationsMenu() {
           <button
             type="button"
             onClick={() => markAll.mutate()}
-            className="inline-flex min-h-[32px] items-center gap-1 rounded text-xs font-semibold text-purple transition-colors hover:text-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="inline-flex min-h-[32px] items-center gap-1 rounded-sm text-xs font-semibold text-purple transition-colors hover:text-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             <Check size={13} /> Marcar todas
           </button>
         )}
         {withClose && (
-          <button type="button" onClick={close} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-cream hover:text-ink">
+          <button type="button" onClick={close} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-sm text-muted hover:bg-cream hover:text-ink">
             <X size={18} />
           </button>
         )}
@@ -114,9 +114,9 @@ export function NotificationsMenu() {
         {/* Portalled to <body>: inside the header's stacking context (z-30) the
             sheet sat under the mobile tab bar, which hid «Ver todas». */}
         {sheetOpen && createPortal(
-          <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label="Notificaciones">
+          <div className="fixed inset-0 z-modal md:hidden" role="dialog" aria-modal="true" aria-label="Notificaciones">
             <button type="button" aria-label="Cerrar" onClick={close} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
-            <div className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl bg-white shadow-[0_-12px_40px_-12px_rgba(16,12,40,0.45)] pb-[env(safe-area-inset-bottom)]">
+            <div className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-md bg-white shadow-[0_-12px_40px_-12px_rgba(16,12,40,0.45)] pb-[env(safe-area-inset-bottom)]">
               <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-line" aria-hidden="true" />
               {header(close, true)}
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">

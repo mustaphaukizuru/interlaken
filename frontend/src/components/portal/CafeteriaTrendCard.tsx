@@ -74,7 +74,7 @@ export default function CafeteriaTrendCard({ student: controlled }: { student?: 
               value={student}
               onChange={(e) => setStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               aria-label="Filtrar consumo por alumno"
-              className="min-h-[44px] sm:min-h-0 rounded-lg border border-line bg-white px-2.5 py-1.5 text-base sm:text-[12.5px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
+              className="min-h-[44px] sm:min-h-0 rounded-sm border border-line bg-white px-2.5 py-1.5 text-base sm:text-[12.5px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
             >
               <option value="all">Todos</option>
               {children!.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -94,7 +94,7 @@ export default function CafeteriaTrendCard({ student: controlled }: { student?: 
           <ErrorState onRetry={() => refetch()} />
         </div>
       ) : isLoading ? (
-        <div className="skeleton m-5 h-44 rounded-xl2" aria-hidden="true" />
+        <div className="skeleton m-5 h-44 rounded-md" aria-hidden="true" />
       ) : total === 0 ? (
         <SectionEmpty icon={Coffee}>Sin compras registradas en este periodo.</SectionEmpty>
       ) : (

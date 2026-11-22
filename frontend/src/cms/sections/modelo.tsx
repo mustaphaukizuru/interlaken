@@ -52,7 +52,7 @@ function ModeloPillarsView(p: PillarsProps) {
             const Icon = cmsIcon(it.icon);
             return (
               <Reveal key={i}>
-                <div className="h-full rounded-xl2 border border-ink/10 bg-cream-2 p-6">
+                <div className="h-full rounded-md bg-cream-2 p-6">
                   <Icon size={22} className="text-green-dark" aria-hidden="true" />
                   <h2 className="mt-3 font-head text-lg font-bold text-ink">{t(it.title)}</h2>
                   {it.text && <p className="mt-2 text-sm leading-relaxed text-muted">{t(it.text)}</p>}
@@ -63,7 +63,7 @@ function ModeloPillarsView(p: PillarsProps) {
         </div>
 
         {(p.ctaTitle || links.length > 0) && (
-          <div className="mt-12 rounded-xl2 bg-dark p-8 text-center text-white sm:p-10">
+          <div className="mt-12 rounded-md bg-dark p-8 text-center text-white sm:p-10">
             {p.ctaTitle && (
               <h2 className="font-head text-fluid-xl font-bold">
                 {t(p.ctaTitle)}

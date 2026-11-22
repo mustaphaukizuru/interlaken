@@ -21,7 +21,7 @@ import {
 } from '@/hooks/queries/requiredDocs';
 
 /** 44 px targets: the office reviews on the iPad. */
-const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50';
+const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50';
 
 const FILE_STATUS: Record<FileStatus, { label: string; icon: typeof Clock; cls: string }> = {
   pending: { label: 'En revisión', icon: Clock, cls: 'text-brand-700' },
@@ -114,7 +114,7 @@ export function DocumentChecklist({ registrationId, columns = 1 }: { registratio
 
   return (
     <section aria-labelledby={`checklist-${registrationId}`} className="space-y-4">
-      <div className="space-y-3 rounded-xl2 border border-line bg-cream/40 p-4">
+      <div className="space-y-3 rounded-md bg-cream/40 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 id={`checklist-${registrationId}`} className="font-semibold text-ink">
@@ -183,7 +183,7 @@ export function DocumentChecklist({ registrationId, columns = 1 }: { registratio
       {data.other_files.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">Otros archivos</p>
-          <ul className="space-y-2 rounded-xl border border-line p-3">
+          <ul className="space-y-2 rounded-md border border-line p-3">
             {data.other_files.map((file) => (
               <FileLine key={file.id} file={file} downloading={downloadingId === file.id} busy={review.isPending}
                 onDownload={() => download(file)} onApprove={() => review.mutate({ file, status: 'approved' })}
@@ -256,7 +256,7 @@ export function DocumentChecklist({ registrationId, columns = 1 }: { registratio
           <div className="space-y-3">
             <p className="text-sm text-muted">El mensaje lleva un enlace nuevo para subir documentos (el anterior deja de servir). Revíselo y envíelo desde WhatsApp.</p>
             <div className="relative">
-              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-line bg-cream-2 p-3 pr-10 font-sans text-sm text-ink">{whatsapp.whatsapp_text}</pre>
+              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-cream-2 p-3 pr-10 font-sans text-sm text-ink">{whatsapp.whatsapp_text}</pre>
               <CopyButton value={whatsapp.whatsapp_text ?? ''} label="el mensaje" className="absolute right-2 top-2" />
             </div>
             {whatsapp.whatsapp_phone ? (
@@ -265,7 +265,7 @@ export function DocumentChecklist({ registrationId, columns = 1 }: { registratio
                 <MessageCircle size={16} aria-hidden="true" /> Abrir WhatsApp
               </a>
             ) : (
-              <p className="rounded-xl bg-amber/10 px-3 py-2 text-sm text-amber" role="status">La familia no tiene celular registrado. Copie el mensaje y envíelo por otro medio.</p>
+              <p className="rounded-md bg-amber/10 px-3 py-2 text-sm text-amber" role="status">La familia no tiene celular registrado. Copie el mensaje y envíelo por otro medio.</p>
             )}
           </div>
         )}
@@ -287,7 +287,7 @@ function ChecklistRow({ item, fichaSubmitted, downloadingId, busy, onDownload, o
 }) {
   const ficha = item.kind === 'ficha';
   return (
-    <li className="rounded-xl border border-line bg-white p-3.5">
+    <li className="rounded-md bg-white p-3.5 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-ink">{item.name}</p>
@@ -300,7 +300,7 @@ function ChecklistRow({ item, fichaSubmitted, downloadingId, busy, onDownload, o
       </div>
 
       {item.manual && (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-cream px-3 py-2 text-xs text-muted">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-sm bg-cream px-3 py-2 text-xs text-muted">
           <span>
             «{item.manual.state_label}»{item.manual.updated_by ? ` por ${item.manual.updated_by}` : ''}
             {item.manual.updated_at ? ` · ${fmtDate(item.manual.updated_at)}` : ''}
@@ -344,7 +344,7 @@ function FileLine({ file, downloading, busy, onDownload, onApprove, onReject }: 
   const meta = FILE_STATUS[file.status];
   const Icon = meta.icon;
   return (
-    <li className="rounded-lg border border-line-2 px-3 py-2">
+    <li className="rounded-sm border border-line-2 px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <FileText className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />

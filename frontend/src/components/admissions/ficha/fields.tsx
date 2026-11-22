@@ -210,7 +210,7 @@ function OptionCards({ spec, label, className, after }: SpecProps) {
               key={o.value}
               className={clsx(
                 // relative: the visually hidden radio stays inside its card (no scroll jump on focus).
-                'relative flex min-h-[48px] cursor-pointer items-center rounded-xl border bg-white text-[15px] leading-snug transition-colors',
+                'relative flex min-h-[48px] cursor-pointer items-center rounded-md border bg-white text-[15px] leading-snug transition-colors',
                 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
                 compact ? 'justify-center px-2 py-2 text-center' : 'px-3.5 py-2.5',
                 checked ? 'border-purple bg-purple-light font-semibold text-purple ring-1 ring-purple' : error ? 'border-coral-400 text-ink' : 'border-line text-ink hover:border-purple/40',
@@ -330,7 +330,7 @@ function CountryField({ spec, className }: SpecProps) {
     form.set(spec.name, abroad ? '' : MEXICO);
   };
   const card = (checked: boolean) => clsx(
-    'relative flex min-h-[48px] cursor-pointer items-center justify-center rounded-xl border bg-white px-3 py-2 text-center text-[15px] transition-colors',
+    'relative flex min-h-[48px] cursor-pointer items-center justify-center rounded-md border bg-white px-3 py-2 text-center text-[15px] transition-colors',
     'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
     checked ? 'border-purple bg-purple-light font-semibold text-purple ring-1 ring-purple' : 'border-line text-ink hover:border-purple/40',
   );
@@ -370,7 +370,7 @@ function SwitchRow({ spec, label, className }: SpecProps) {
       <label
         htmlFor={id}
         className={clsx(
-          'relative flex min-h-[56px] cursor-pointer items-center justify-between gap-4 rounded-xl border bg-white px-4 py-3',
+          'relative flex min-h-[56px] cursor-pointer items-center justify-between gap-4 rounded-md border bg-white px-4 py-3',
           'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
           error ? 'border-coral-400' : on ? 'border-purple/50' : 'border-line',
         )}
@@ -411,7 +411,7 @@ function CheckboxCard({ spec, label, className }: SpecProps) {
       <label
         htmlFor={id}
         className={clsx(
-          'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border bg-white px-4 py-3.5',
+          'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-md border bg-white px-4 py-3.5',
           'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple/40 has-[:focus-visible]:ring-offset-1',
           error ? 'border-coral-400' : value === true ? 'border-purple/50 bg-purple-light/40' : 'border-line',
         )}
@@ -419,7 +419,7 @@ function CheckboxCard({ spec, label, className }: SpecProps) {
         <input
           id={id}
           type="checkbox"
-          className="mt-0.5 h-5 w-5 shrink-0 rounded border-line text-purple focus:outline-none"
+          className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-line text-purple focus:outline-none"
           checked={value === true}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
@@ -516,7 +516,7 @@ function CurpField({ spec, label, className, after }: SpecProps) {
 /** A soft note (not an error) under a field: the age hint, the CURP help. */
 export function FieldNote({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'warn' }) {
   return (
-    <p className={clsx('mt-2 flex items-start gap-2 rounded-xl px-3 py-2 text-sm leading-snug',
+    <p className={clsx('mt-2 flex items-start gap-2 rounded-md px-3 py-2 text-sm leading-snug',
       tone === 'warn' ? 'bg-amber-bright/15 text-ink' : 'bg-cream text-muted')} role={tone === 'warn' ? 'status' : undefined}>
       <Info className={clsx('mt-0.5 h-4 w-4 shrink-0', tone === 'warn' ? 'text-amber' : 'text-purple')} aria-hidden="true" />
       <span>{children}</span>

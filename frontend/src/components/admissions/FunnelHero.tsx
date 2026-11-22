@@ -103,7 +103,7 @@ export function FunnelHero({
               <li key={s.n} className="min-w-[7.5rem] flex-1 snap-start sm:min-w-0">
                 <Link
                   to={s.to}
-                  className={`block rounded-xl2 border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                  className={`block rounded-md border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                     current
                       ? 'border-pink/50 bg-white/10'
                       : done

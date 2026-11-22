@@ -118,7 +118,7 @@ export function TableBlock(p: TableBlockProps) {
           <div>
             {title && <h2 className="font-head text-fluid-2xl font-extrabold tracking-tight text-ink">{title}</h2>}
             {intro && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{intro}</p>}
-            <div className={`${title || intro ? 'mt-5' : ''} overflow-hidden rounded-xl2 border border-ink/10 bg-white shadow-card`}>{body}</div>
+            <div className={`${title || intro ? 'mt-5' : ''} overflow-hidden rounded-md border border-ink/10 bg-white shadow-card`}>{body}</div>
             <Notes notes={notes} boxed={false} />
           </div>
         )}

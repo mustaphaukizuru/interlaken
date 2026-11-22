@@ -117,7 +117,7 @@ export default function ParentDashboard() {
               type="button"
               aria-label="Actualizar"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['dashboard'] })}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-muted shadow-card transition hover:border-purple/25 hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+              className="flex h-10 w-10 items-center justify-center rounded-sm border border-line bg-white text-muted shadow-card transition hover:border-purple/25 hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
             >
               <RefreshCw size={16} className={isFetching ? 'animate-spin' : undefined} aria-hidden="true" />
             </button>
@@ -131,14 +131,14 @@ export default function ParentDashboard() {
         /* Per-card skeletons mirroring the final layout: hero + stat, quick actions, section cards. */
         <div aria-busy="true" aria-label="Cargando panel">
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-[18px]">
-            <div className="skeleton h-[200px] rounded-xl2 sm:col-span-2" />
-            <div className="skeleton h-[200px] rounded-xl2" />
+            <div className="skeleton h-[200px] rounded-md sm:col-span-2" />
+            <div className="skeleton h-[200px] rounded-md" />
           </div>
           <div className="mb-6 grid gap-4 sm:grid-cols-2">
-            {[0, 1].map((i) => <div key={i} className="skeleton h-[92px] rounded-xl2" />)}
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[92px] rounded-md" />)}
           </div>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            {[0, 1].map((i) => <div key={i} className="skeleton h-[280px] rounded-xl2" />)}
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[280px] rounded-md" />)}
           </div>
         </div>
       ) : needsFamilyLink ? (
@@ -169,7 +169,7 @@ export default function ParentDashboard() {
       <>
       {/* 1. Low balance alert: one line per child, each with its own top-up */}
       {lowBalances.map((b) => (
-        <div key={b.student ?? b.student_name} className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber/30 bg-amber/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:px-[18px]">
+        <div key={b.student ?? b.student_name} className="mb-5 flex flex-col gap-3 rounded-md border border-amber/30 bg-amber/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:px-[18px]">
           <AlertTriangle size={20} className="shrink-0 text-amber" aria-hidden="true" />
           <div className="flex-1 text-[13.5px] text-ink">
             <strong className="font-semibold text-amber">
@@ -180,7 +180,7 @@ export default function ParentDashboard() {
           <Link
             to={b.student ? `/portal/cafeteria?hijo=${b.student}` : '/portal/cafeteria'}
             aria-label={balances.length > 1 ? `Recargar a ${b.student_name}` : undefined}
-            className="whitespace-nowrap rounded text-[13px] font-bold text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
+            className="whitespace-nowrap rounded-sm text-[13px] font-bold text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
           >
             Recargar →
           </Link>
@@ -191,16 +191,16 @@ export default function ParentDashboard() {
       {balances.length > 1 && (
         <ul className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Saldo por alumno">
           {balances.map((b) => (
-            <li key={b.student ?? b.student_name} className={`flex flex-col rounded-2xl border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
+            <li key={b.student ?? b.student_name} className={`flex flex-col rounded-md border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
               <p className="truncate text-sm font-semibold text-ink">{b.student_name}</p>
               {/* `low` already honours the paid top-ups on their way (backend). */}
               <BalanceWithPending variant="tile" label={null} balance={b.balance} pending={pendingOf(b)} low={b.low} />
               {/* mt-auto: the quick top-ups line up across the row whatever each tile says. */}
               <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
                 {[100, 200].map((amt) => (
-                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}${b.student ? `&hijo=${b.student}` : ''}`} aria-label={`Recargar $${amt} a ${b.student_name}`} className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-purple transition-colors hover:border-purple/40 active:scale-[0.98]">+${amt}</Link>
+                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}${b.student ? `&hijo=${b.student}` : ''}`} aria-label={`Recargar $${amt} a ${b.student_name}`} className="inline-flex min-h-[44px] items-center rounded-sm border border-line bg-white px-4 text-sm font-semibold text-purple transition-colors hover:border-purple/40 active:scale-[0.98]">+${amt}</Link>
                 ))}
-                <Link to={b.student ? `/portal/cafeteria?hijo=${b.student}` : '/portal/cafeteria'} className="inline-flex min-h-[44px] items-center rounded-full px-3 text-sm font-semibold text-muted hover:text-ink">Ver más →</Link>
+                <Link to={b.student ? `/portal/cafeteria?hijo=${b.student}` : '/portal/cafeteria'} className="inline-flex min-h-[44px] items-center rounded-sm px-3 text-sm font-semibold text-muted hover:text-ink">Ver más →</Link>
               </div>
             </li>
           ))}
@@ -218,7 +218,7 @@ export default function ParentDashboard() {
           )}
           {!staffOnly && (
             <Link to="/portal/perfil?tab=hijos"
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-purple hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-purple hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
               <UserPlus className="h-4 w-4" aria-hidden="true" /> Agregar otro hijo
             </Link>
           )}
@@ -293,10 +293,10 @@ export default function ParentDashboard() {
       {hasCafeteria && (
         <Reveal delay={20} className="mb-6">
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
+            <Suspense fallback={<div className="skeleton h-[300px] rounded-md" aria-hidden="true" />}>
               <CafeteriaTrendCard student={selectedChild?.id ?? 'all'} />
             </Suspense>
-            <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
+            <Suspense fallback={<div className="skeleton h-[300px] rounded-md" aria-hidden="true" />}>
               <CafeteriaCategoriesCard student={selectedChild?.id ?? 'all'} />
             </Suspense>
           </div>
@@ -305,7 +305,7 @@ export default function ParentDashboard() {
 
       <Link
         to="/portal/perfil"
-        className="mb-6 flex items-center gap-2 text-[13px] font-medium text-muted transition-colors hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 rounded"
+        className="mb-6 flex items-center gap-2 text-[13px] font-medium text-muted transition-colors hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 rounded-sm"
       >
         <UserCircle size={16} className="text-subtle" aria-hidden="true" />
         Mi información y preferencias
@@ -346,7 +346,7 @@ function CafeteriaSaldoCard({ childId, name, several, balance, pending, low }: {
           caption={several ? <p className="mt-0.5 text-[12px] text-subtle">{name}</p> : undefined}
           expandable
         />
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${low ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-dark'}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${low ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-dark'}`}>
           <Coffee size={22} aria-hidden="true" />
         </span>
       </div>
@@ -358,14 +358,14 @@ function CafeteriaSaldoCard({ childId, name, several, balance, pending, low }: {
               key={amt}
               to={`/portal/cafeteria?recarga=${amt}${hijo ? `&${hijo}` : ''}`}
               aria-label={`Recargar $${amt} a ${name}`}
-              className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-green/40 bg-green-50 px-4 py-1.5 text-sm font-bold text-green-dark transition hover:border-green hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+              className="inline-flex min-h-[40px] items-center gap-1 rounded-sm border border-green/40 bg-green-50 px-4 py-1.5 text-sm font-bold text-green-dark transition hover:border-green hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
             >
               <Plus size={14} aria-hidden="true" /> ${amt}
             </Link>
           ))}
           <Link
             to={page}
-            className="rounded px-1 text-[13px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="rounded-sm px-1 text-[13px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             Otro monto →
           </Link>
@@ -381,9 +381,9 @@ function QuickAction({ to, icon: Icon, title, desc, gradient }: {
   return (
     <Link
       to={to}
-      className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+      className="hover-lift group flex items-center gap-4 rounded-md border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
     >
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white`}>
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gradient-to-br ${gradient} text-white`}>
         <Icon className="h-6 w-6" />
       </span>
       <span className="min-w-0 flex-1">

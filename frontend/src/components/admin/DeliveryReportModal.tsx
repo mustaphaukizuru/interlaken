@@ -52,7 +52,7 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
           <Channel name="Push" counts={data.push} />
           {data.whatsapp && <WhatsAppChannel counts={data.whatsapp} />}
           {data.failed.length > 0 && (
-            <div className="rounded-xl border border-coral/30 bg-coral-50/50 p-3">
+            <div className="rounded-md border border-coral/30 bg-coral-50/50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-coral-dark">{data.failed.length} correo(s) no entregado(s)</p>
                 <Button size="sm" variant="secondary" loading={resend.isPending} onClick={() => resend.mutate()}>
@@ -86,7 +86,7 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-cream-2 p-3">
+    <div className="rounded-md bg-cream-2 p-3">
       <dt className="text-[10.5px] font-bold uppercase tracking-wide text-subtle">{label}</dt>
       <dd className="mt-0.5 font-head text-xl font-extrabold text-ink">{value}</dd>
     </div>

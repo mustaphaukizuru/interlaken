@@ -103,7 +103,7 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
 
   if (done) {
     return (
-      <div className="rounded-xl2 border border-green/30 bg-green/5 p-6 text-center" role="status">
+      <div className="rounded-md border border-green/30 bg-green/5 p-6 text-center" role="status">
         <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-dark" aria-hidden="true" />
         <p className="font-head text-lg font-bold text-ink">{c.doneTitle}</p>
         <p className="mt-1 text-sm text-muted">

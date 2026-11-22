@@ -42,7 +42,7 @@ export function SiteNoticeBanner() {
         {n.link && (isExternal
           ? <a href={n.link} className="shrink-0 whitespace-nowrap font-semibold underline underline-offset-2" target="_blank" rel="noopener noreferrer">Ver más</a>
           : <Link to={n.link} className="shrink-0 whitespace-nowrap font-semibold underline underline-offset-2">Ver más</Link>)}
-        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"><X className="h-4 w-4" aria-hidden="true" /></button>
+        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="grid h-11 w-11 shrink-0 place-items-center rounded-sm hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
     </div>
   );

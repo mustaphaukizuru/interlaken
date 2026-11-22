@@ -62,7 +62,7 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
   return (
     <StageCard stage="inscrito" title="Inscripción" state={state} open={open} onToggle={onToggle} summary={inscripcionSummary(detail)}>
       {enrolled && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-green-50 px-3.5 py-3 text-sm text-green-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-green-50 px-3.5 py-3 text-sm text-green-700">
           <p className="flex items-center gap-2 font-semibold">
             <GraduationCap size={18} aria-hidden="true" /> Inscrito{detail.inscrito.enrolled_at ? ` el ${fmtDay(detail.inscrito.enrolled_at)}` : ''}
             {student ? ` · matrícula ${student.student_id}` : ''}
@@ -82,18 +82,18 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
         </div>
         <p className="text-xs text-muted">Solo registro: la plataforma no cobra la inscripción.</p>
         {detail.inscrito.payments.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin pagos registrados.</p>
+          <p className="rounded-md border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin pagos registrados.</p>
         ) : (
           <ul className="space-y-2" aria-label="Pagos de inscripción">
             {detail.inscrito.payments.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
+              <li key={p.id} className="flex flex-wrap items-start justify-between gap-2 rounded-md bg-white px-3.5 py-3 shadow-card">
                 <div className="min-w-0">
                   <p className="font-semibold text-ink">{p.summary}</p>
                   <p className="text-xs text-muted">{p.recorded_by ? `Registró ${p.recorded_by}` : ''}{p.note ? `${p.recorded_by ? ' · ' : ''}${p.note}` : ''}</p>
                 </div>
                 {!closed && !enrolled && (
                   <button type="button" onClick={() => setVoiding(p)} aria-label={`Anular el pago: ${p.summary}`}
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
                 )}
@@ -104,7 +104,7 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
       </div>
 
       {!enrolled && (
-        <div className="space-y-3 rounded-xl2 border border-line bg-cream-2 p-4">
+        <div className="space-y-3 rounded-md bg-cream-2 p-4">
           <h3 className="font-semibold text-ink">Para marcar como inscrito</h3>
           <GateList items={gates.items} />
           <div className="flex flex-wrap items-center gap-3">

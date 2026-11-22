@@ -256,7 +256,7 @@ export function DataTable<Row>({
                   <input
                     ref={headRef}
                     type="checkbox"
-                    className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                    className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                     aria-label={allOnPage ? 'Quitar la selección de esta página' : 'Seleccionar todas las filas de esta página'}
                     checked={allOnPage}
                     onChange={togglePage}
@@ -328,7 +328,7 @@ export function DataTable<Row>({
                     <td className="admin-table__select" data-label="Seleccionar">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                        className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                         aria-label={`Seleccionar ${labelOf(row)}`}
                         checked={isSelected}
                         onChange={() => toggleRow(key)}
@@ -366,7 +366,7 @@ export function DataTable<Row>({
                               aria-expanded={open}
                               aria-haspopup="true"
                               aria-label={`Acciones de ${labelOf(row)}`}
-                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 md:min-h-[36px] md:min-w-[36px]"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 md:min-h-[36px] md:min-w-[36px]"
                             >
                               <MoreHorizontal size={18} aria-hidden="true" />
                             </button>
@@ -404,7 +404,7 @@ export function DataTable<Row>({
       {/* The bulk bar carries the select-all-matching affordance itself; the
           inline banner is for tables that render selection without a bar. */}
       {selection && !bulkBar && (showSelectAllMatching || selection.allMatching) && (
-        <p className="mb-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700" role="status">
+        <p className="mb-2 rounded-sm bg-brand-50 px-3 py-2 text-sm text-brand-700" role="status">
           {selection.allMatching ? (
             <>
               Las <strong>{matching.toLocaleString('es-MX')}</strong> filas que coinciden con los filtros están seleccionadas.{' '}

@@ -52,7 +52,7 @@ export default function AdminPipeline() {
             const cards = data[i]?.results ?? [];
             const total = counts[stage] ?? cards.length;
             return (
-              <section key={stage} role="listitem" aria-labelledby={`col-${stage}`} className="flex min-w-0 flex-col rounded-xl2 bg-cream-2 p-2">
+              <section key={stage} role="listitem" aria-labelledby={`col-${stage}`} className="flex min-w-0 flex-col rounded-md bg-cream-2 p-2">
                 <div className={clsx('mb-2 h-1 rounded-full', meta.dot)} aria-hidden="true" />
                 <h2 id={`col-${stage}`} className="mb-2 flex items-center justify-between gap-2 px-1 text-sm font-bold text-ink">
                   <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -62,11 +62,11 @@ export default function AdminPipeline() {
                   <span className="rounded-full bg-white px-2 text-xs font-semibold tabular-nums text-muted" aria-label={`${total} expedientes`}>{total}</span>
                 </h2>
                 <ul className="space-y-2">
-                  {cards.length === 0 && <li className="rounded-lg border border-dashed border-line p-3 text-center text-xs text-subtle">Sin expedientes</li>}
+                  {cards.length === 0 && <li className="rounded-sm border border-dashed border-line p-3 text-center text-xs text-subtle">Sin expedientes</li>}
                   {cards.map((c) => <BoardCard key={c.id} card={c} onOpen={() => navigate(`/admin/admisiones/${c.id}`)} />)}
                 </ul>
                 {total > cards.length && (
-                  <Link to={`/admin/admisiones?etapa=${stage}`} className="mt-2 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-lg text-xs font-semibold text-purple hover:bg-white">
+                  <Link to={`/admin/admisiones?etapa=${stage}`} className="mt-2 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-sm text-xs font-semibold text-purple hover:bg-white">
                     Ver los {total} <ArrowRight size={13} aria-hidden="true" />
                   </Link>
                 )}
@@ -87,7 +87,7 @@ function BoardCard({ card: c, onOpen }: { card: CaseRow; onOpen: () => void }) {
         type="button"
         onClick={onOpen}
         aria-label={`Abrir el expediente de ${c.child_name}`}
-        className="block min-h-[44px] w-full rounded-xl border border-line bg-white p-3 text-left text-sm shadow-card transition hover:border-purple/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        className="block min-h-[44px] w-full rounded-sm border border-line bg-white p-3 text-left text-sm shadow-card transition hover:border-purple/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
       >
         <span className="block truncate font-semibold text-ink">{c.child_name}</span>
         <span className="block truncate text-xs text-subtle">{c.grade_applying} · {c.parent_name}</span>

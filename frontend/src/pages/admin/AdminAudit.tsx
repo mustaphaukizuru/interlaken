@@ -244,7 +244,7 @@ function AuditEntryDrawer({ entry, onClose, onHistory }: { entry: AuditLogEntry 
           )}
 
           {details.length > 0 && (
-            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 rounded-lg bg-cream-2 p-3 text-xs" aria-label="Detalles">
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 rounded-sm bg-cream-2 p-3 text-xs" aria-label="Detalles">
               {details.map((d) => (
                 <div key={d.field} className="contents">
                   <dt className="font-mono text-subtle">{d.field}</dt>

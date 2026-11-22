@@ -179,7 +179,7 @@ function VisitBookingView(p: BookingProps) {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {confirmed ? (
         <div className="text-center py-12 sm:py-16" role="status">
-          <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-brand-50 rounded-sm flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-brand-600" />
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-2">{t(p.confirmedTitle) || '¡Visita confirmada!'}</h2>
@@ -208,12 +208,12 @@ function VisitBookingView(p: BookingProps) {
               {p.pickTitle && <h2 className="font-semibold text-fluid-lg text-ink mb-4">{t(p.pickTitle)}</h2>}
               {isLoading ? (
                 <div className="space-y-3" aria-busy="true" aria-label="Cargando horarios">
-                  <div className="skeleton h-10 w-48 rounded-lg" />
-                  <div className="skeleton h-[280px] rounded-xl2" />
+                  <div className="skeleton h-10 w-48 rounded-sm" />
+                  <div className="skeleton h-[280px] rounded-md" />
                   <div className="flex gap-2">
-                    <div className="skeleton h-11 w-20 rounded-xl" />
-                    <div className="skeleton h-11 w-20 rounded-xl" />
-                    <div className="skeleton h-11 w-20 rounded-xl" />
+                    <div className="skeleton h-11 w-20 rounded-md" />
+                    <div className="skeleton h-11 w-20 rounded-md" />
+                    <div className="skeleton h-11 w-20 rounded-md" />
                   </div>
                 </div>
               ) : isError ? (
@@ -255,7 +255,7 @@ function VisitBookingView(p: BookingProps) {
                   />
 
                   {selectedDate && (
-                    <div className="rounded-xl2 border border-line bg-white p-4 shadow-card">
+                    <div className="rounded-md bg-white p-4 shadow-card">
                       <p className="mb-3 flex items-center gap-2 text-sm font-semibold capitalize text-ink">
                         <CalendarDays className="h-4 w-4 text-purple" aria-hidden="true" />
                         {format(parseISO(selectedDate), "EEEE d 'de' MMMM", { locale: es })}
@@ -266,7 +266,7 @@ function VisitBookingView(p: BookingProps) {
                             key={slot.id}
                             type="button"
                             onClick={() => setSelectedSlot(slot)}
-                            className={`flex min-h-[44px] items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
+                            className={`flex min-h-[44px] items-center gap-1.5 rounded-sm border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
                               selectedSlot?.id === slot.id
                                 ? 'border-purple bg-purple text-white shadow-purple'
                                 : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50'
@@ -292,7 +292,7 @@ function VisitBookingView(p: BookingProps) {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4">
-                  <div className="bg-brand-50 rounded-xl p-3 text-sm text-brand-700">
+                  <div className="bg-brand-50 rounded-md p-3 text-sm text-brand-700">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="w-4 h-4 flex-shrink-0" />
                       <strong className="capitalize">
@@ -329,7 +329,7 @@ function VisitBookingView(p: BookingProps) {
 
           {/* WhatsApp fallback */}
           {whatsapp_number && (
-          <div className="mt-8 sm:mt-10 rounded-2xl border border-line bg-cream p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-8 sm:mt-10 rounded-md bg-cream p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-muted text-center sm:text-left">
               {p.whatsappTitle && <p className="font-semibold text-ink">{t(p.whatsappTitle)}</p>}
               {p.whatsappText && <p>{t(p.whatsappText)}</p>}
@@ -338,7 +338,7 @@ function VisitBookingView(p: BookingProps) {
               href={waHref(whatsapp_number, whatsappText)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-sm text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
             >
               <MessageCircle className="w-4 h-4" />
               {whatsappLabel}

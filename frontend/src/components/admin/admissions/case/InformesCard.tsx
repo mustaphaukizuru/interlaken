@@ -144,7 +144,7 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
         </div>
       </form>
 
-      <div className="space-y-3 rounded-xl2 border border-line p-4">
+      <div className="space-y-3 rounded-md border border-line p-4">
         <h3 className="font-semibold text-ink">Resultado de informes</h3>
         {detail.informes.outcome && (
           <p className="text-sm text-muted">Registrado: <strong className="text-ink">{detail.informes.outcome_label}</strong></p>

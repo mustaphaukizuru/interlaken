@@ -139,7 +139,7 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
           hint={!detail.examen.result ? 'Registre primero el resultado' : resultWithFicha ? 'Sin enviar: lleva la liga de la ficha' : 'Sin enviar'} />
       </div>
 
-      <div className="space-y-3 rounded-xl2 border border-line p-4">
+      <div className="space-y-3 rounded-md border border-line p-4">
         <h3 className="font-semibold text-ink">Resultado del examen</h3>
         {detail.examen.result && (
           <p className="text-sm text-muted">Registrado: <strong className="text-ink">{detail.examen.result_label}</strong>
@@ -175,7 +175,7 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
         ) : <ReadOnlyNote stage={detail.stage} />}
       </div>
 
-      <div className="space-y-3 rounded-xl2 border border-line bg-cream-2 p-4">
+      <div className="space-y-3 rounded-md bg-cream-2 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 font-semibold text-ink"><FileSignature size={16} aria-hidden="true" /> Ficha de inscripción</h3>

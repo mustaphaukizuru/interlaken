@@ -134,7 +134,7 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
         {isOpenClass ? (
           // /puertas-abiertas was retired from the public site (BACKLOG P0-8) and
           // /agendar-visita only lists individual slots: nobody can book these online.
-          <p className="mt-1.5 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs text-ink" role="note">
+          <p className="mt-1.5 rounded-sm border border-amber/30 bg-amber/5 px-3 py-2 text-xs text-ink" role="note">
             <strong>Las familias no pueden reservar estos eventos en línea:</strong> la página de Puertas Abiertas se retiró del sitio
             y «Agendar visita» solo muestra visitas individuales. Los eventos quedan en la agenda interna para organizarlos aquí.
             Use una duración igual a la ventana (ej. 09:00 a 11:00 y 120 min) para un solo evento por día.
@@ -176,7 +176,7 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
               key={d.value}
               type="button"
               onClick={() => toggleDay(d.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+              className={`px-3 py-1.5 rounded-sm text-sm border transition-colors ${
                 weekdays.includes(d.value)
                   ? 'border-brand-500 bg-brand-500 text-white'
                   : 'border-line text-muted hover:border-brand-400'
@@ -245,7 +245,7 @@ const hhmm = (t: string) => (t ?? '').slice(0, 5);
 const SOURCE_LABEL = Object.fromEntries(BOOKING_SOURCE_OPTIONS.map((o) => [o.value, o.label]));
 
 const ICON_BTN =
-  'inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 md:h-9 md:w-9';
+  'inline-flex h-11 w-11 items-center justify-center rounded-sm text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 md:h-9 md:w-9';
 
 type View = 'reservas' | 'horarios';
 
@@ -462,7 +462,7 @@ interface RowMove {
 }
 
 const ROW_MOVE_BTN =
-  'inline-flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50';
 
 /** Primary move as an icon + the rest in «⋯» (lg+); every move labelled below lg. */
 function RowMoves({ moves, isLg, busy, busyAct, menuLabel }: {
@@ -912,7 +912,7 @@ export default function AdminBookings() {
         title="Visitas"
         subtitle="Reservas de visitas individuales (/agendar-visita), eventos de Puertas Abiertas (solo agenda interna, sin reserva en línea) y los horarios publicados."
       />
-      <div role="tablist" aria-label="Vista" className="inline-flex rounded-xl2 border border-line bg-white p-1">
+      <div role="tablist" aria-label="Vista" className="inline-flex rounded-md bg-white p-1 shadow-card">
         {VIEWS.map((t) => (
           <button
             key={t.value}
@@ -920,7 +920,7 @@ export default function AdminBookings() {
             role="tab"
             aria-selected={view === t.value}
             onClick={() => switchTo(t.value)}
-            className={`min-h-[44px] rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+            className={`min-h-[44px] rounded-sm px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
               view === t.value ? 'bg-purple text-white' : 'text-muted hover:text-ink'
             }`}
           >

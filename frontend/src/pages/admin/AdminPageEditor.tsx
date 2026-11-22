@@ -671,12 +671,12 @@ export default function AdminPageEditor() {
           <Button variant="ghost" size="sm" onClick={backToList} className="!px-2"><ChevronLeft size={16} aria-hidden="true" /> Secciones</Button>
           <span className="ml-auto text-xs text-subtle" aria-hidden="true">{selectedIdx + 1} de {blocks.length}</span>
           <button type="button" aria-label="Sección anterior" title="Sección anterior" disabled={selectedIdx <= 0} onClick={() => select(blocks[selectedIdx - 1].id)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink disabled:opacity-30"><ChevronLeft size={18} /></button>
+            className="inline-flex h-11 w-11 items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink disabled:opacity-30"><ChevronLeft size={18} /></button>
           <button type="button" aria-label="Sección siguiente" title="Sección siguiente" disabled={selectedIdx >= blocks.length - 1} onClick={() => select(blocks[selectedIdx + 1].id)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink disabled:opacity-30"><ChevronRight size={18} /></button>
+            className="inline-flex h-11 w-11 items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink disabled:opacity-30"><ChevronRight size={18} /></button>
         </div>
         <div className="mb-2 flex items-start gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple text-white" aria-hidden="true"><BlockIcon type={selectedBlock.type} locked={selLocked} size={17} /></span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-purple text-white" aria-hidden="true"><BlockIcon type={selectedBlock.type} locked={selLocked} size={17} /></span>
           <div className="min-w-0">
             <h2 ref={formHeading} tabIndex={-1} className="font-head text-base font-bold leading-snug text-ink focus:outline-none" title={selSpec?.label}>{selectedIdx + 1}. {selName}</h2>
             <p className="text-xs text-muted">{selSpec?.description}</p>
@@ -692,7 +692,7 @@ export default function AdminPageEditor() {
             </Button>
           )}
         </div>
-        {selectedBlock.hidden && <p className="mb-3 flex items-center gap-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink"><EyeOff size={14} aria-hidden="true" /> Esta sección está oculta: se conserva aquí pero no aparece en el sitio.</p>}
+        {selectedBlock.hidden && <p className="mb-3 flex items-center gap-2 rounded-sm bg-amber/10 px-3 py-2 text-xs text-ink"><EyeOff size={14} aria-hidden="true" /> Esta sección está oculta: se conserva aquí pero no aparece en el sitio.</p>}
         {(fieldErrors.blocks || fieldErrors.draft_blocks) && <p className="mb-2 text-sm text-coral-700" role="alert">{fieldErrors.blocks || fieldErrors.draft_blocks}</p>}
         <BlockForm block={selectedBlock} serverErrors={serverErrors.filter((x) => x.block_id === selectedBlock.id)} serverWarnings={serverWarnings.filter((x) => x.block_id === selectedBlock.id)} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
       </div>
@@ -740,18 +740,18 @@ export default function AdminPageEditor() {
         {legacy && <LegacyDraftBanner canLoad={!!original} onLoadDesign={loadDesign} />}
         {localCopy && !saver.conflict && <LocalCopyBanner copy={localCopy} onRestore={restoreLocalCopy} onDiscard={discardLocalCopy} />}
         {page.review_requested_at && (
-          <div className="flex flex-col gap-2 rounded-xl border border-brand-600/20 bg-brand-50 p-3 text-sm md:flex-row md:items-center md:justify-between" role="status">
+          <div className="flex flex-col gap-2 rounded-md border border-brand-600/20 bg-brand-50 p-3 text-sm md:flex-row md:items-center md:justify-between" role="status">
             <p className="text-ink">{page.review_requested_by_name || 'Un editor'} pidió a Dirección publicar estos cambios.</p>
             {isAdmin && <Button variant="secondary" size="md" onClick={() => setDialog('reject')}>Pedir cambios</Button>}
           </div>
         )}
         {page.review_note && !page.review_requested_at && (
-          <p className="rounded-xl border border-coral-600/20 bg-coral-50 px-3 py-2 text-sm text-coral-700" role="status">Dirección pidió cambios: {page.review_note}</p>
+          <p className="rounded-md border border-coral-600/20 bg-coral-50 px-3 py-2 text-sm text-coral-700" role="status">Dirección pidió cambios: {page.review_note}</p>
         )}
         {staleSince && <DraftAgeBanner since={staleSince} canPublish={isAdmin} onReview={openReview} />}
         <PageErrorSummary blocks={blocks} serverErrors={serverErrors} onJump={jumpToField} />
         {reviewCounts && !reviewOpen && (reviewCounts.errors > 0 || reviewCounts.warnings > 0) && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm" role="status">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white px-3 py-2 text-sm shadow-card" role="status">
             <p className="flex items-center gap-2 text-ink">
               <AlertTriangle size={16} className={`shrink-0 ${reviewCounts.errors ? 'text-coral-600' : 'text-amber'}`} aria-hidden="true" />
               <span><strong>Revisión:</strong> {reviewCounts.errors} por corregir · {reviewCounts.warnings} {reviewCounts.warnings === 1 ? 'advertencia' : 'advertencias'}</span>
@@ -766,7 +766,7 @@ export default function AdminPageEditor() {
           <aside
             ref={editColumn}
             aria-label="Secciones y formulario"
-            className="sticky overflow-y-auto overscroll-contain rounded-2xl"
+            className="sticky overflow-y-auto overscroll-contain rounded-md"
             style={{ top: barHeight + 8, maxHeight: Math.max(320, viewHeight - barHeight - 16) }}
           >
             {editPane}

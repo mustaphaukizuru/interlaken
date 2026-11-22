@@ -114,7 +114,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       onTouchEnd={onTouchEnd}
       aria-label="Navegación del portal"
       data-collapsed={rail || undefined}
-      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-4 overflow-hidden border-r border-line bg-white px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-[transform,width] duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-auto lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-drawer flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-4 overflow-hidden border-r border-line bg-white px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-[transform,width] duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-auto lg:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       } ${rail ? 'lg:w-[76px] lg:px-2.5' : ''}`}
     >
@@ -128,7 +128,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           onClick={toggleCollapsed}
           aria-label={rail ? 'Expandir menú' : 'Contraer menú'}
           aria-pressed={rail}
-          className="hidden h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-cream-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
+          className="hidden h-9 w-9 items-center justify-center rounded-sm text-subtle hover:bg-cream-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
         >
           {rail ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         </button>
@@ -136,8 +136,8 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
 
       {/* Role badge */}
       {!rail && (
-        <div className="flex items-center gap-2.5 rounded-[14px] border border-purple/10 bg-purple/[0.055] px-3.5 py-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-purple/10 text-purple">
+        <div className="flex items-center gap-2.5 rounded-md border border-purple/10 bg-purple/[0.055] px-3.5 py-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-purple/10 text-purple">
             <Users size={17} />
           </div>
           <div>
@@ -163,7 +163,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                 aria-expanded={!isFolded}
                 aria-controls={panelId}
                 onClick={() => toggleGroup(group.heading)}
-                className="flex w-full items-center justify-between rounded-lg px-3.5 pb-1 pt-1 text-left font-head text-[11px] font-bold uppercase tracking-[1.6px] text-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="flex w-full items-center justify-between rounded-sm px-3.5 pb-1 pt-1 text-left font-head text-[11px] font-bold uppercase tracking-[1.6px] text-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 {group.heading}
                 <ChevronDown size={13} aria-hidden="true" className={`transition-transform ${isFolded ? '-rotate-90' : ''}`} />
@@ -185,7 +185,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                     title={rail ? label : undefined}
                     aria-label={name}
                     className={({ isActive }) =>
-                      `relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+                      `relative flex items-center gap-3 rounded-md px-3.5 py-2.5 text-[14px] font-medium no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                         rail ? 'lg:justify-center lg:px-0' : ''
                       } ${
                         isActive
@@ -224,11 +224,11 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       {/* User card → account actions (P1-E5) */}
       <div className="relative">
         {menuOpen && (
-          <div role="menu" className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-[14px] border border-line bg-white p-1.5 shadow-card">
-            <Link role="menuitem" to="/portal/perfil" onClick={() => { setMenuOpen(false); onNavigate?.(); }} className="block rounded-lg px-3 py-2 text-sm text-ink hover:bg-cream-2">Mi perfil</Link>
-            <Link role="menuitem" to="/portal/notificaciones" onClick={() => { setMenuOpen(false); onNavigate?.(); }} className="block rounded-lg px-3 py-2 text-sm text-ink hover:bg-cream-2">Notificaciones</Link>
-            <Link role="menuitem" to="/" onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2 text-sm text-ink hover:bg-cream-2">Sitio público</Link>
-            <button role="menuitem" type="button" onClick={() => { void authApi.logout(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-coral hover:bg-coral/10">
+          <div role="menu" className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-md bg-white p-1.5 shadow-card">
+            <Link role="menuitem" to="/portal/perfil" onClick={() => { setMenuOpen(false); onNavigate?.(); }} className="block rounded-sm px-3 py-2 text-sm text-ink hover:bg-cream-2">Mi perfil</Link>
+            <Link role="menuitem" to="/portal/notificaciones" onClick={() => { setMenuOpen(false); onNavigate?.(); }} className="block rounded-sm px-3 py-2 text-sm text-ink hover:bg-cream-2">Notificaciones</Link>
+            <Link role="menuitem" to="/" onClick={() => setMenuOpen(false)} className="block rounded-sm px-3 py-2 text-sm text-ink hover:bg-cream-2">Sitio público</Link>
+            <button role="menuitem" type="button" onClick={() => { void authApi.logout(); }} className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-coral hover:bg-coral/10">
               <LogOut size={15} /> Cerrar sesión
             </button>
           </div>
@@ -239,9 +239,9 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           aria-label="Opciones de la cuenta"
-          className={`flex w-full items-center gap-2.5 rounded-[14px] border border-line bg-cream-2 px-3 py-2.5 text-left hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${rail ? 'lg:justify-center lg:px-0' : ''}`}
+          className={`flex w-full items-center gap-2.5 rounded-md border border-line bg-cream-2 px-3 py-2.5 text-left hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${rail ? 'lg:justify-center lg:px-0' : ''}`}
         >
-          <Avatar user={user} size={38} rounded="rounded-[10px]" />
+          <Avatar user={user} size={38} rounded="rounded-sm" />
           <div className={`min-w-0 flex-1 ${rail ? 'lg:hidden' : ''}`}>
             <div className="truncate text-[13px] font-semibold text-ink">{user?.first_name} {user?.last_name}</div>
             <div className="truncate text-[12px] text-subtle">{user?.email}</div>

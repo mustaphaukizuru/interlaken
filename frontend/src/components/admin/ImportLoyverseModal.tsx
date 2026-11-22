@@ -160,7 +160,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
         </div>
       ) : phase === 'error' ? (
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-xl2 border border-coral/30 bg-coral-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-md border border-coral/30 bg-coral-50 px-4 py-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-coral-dark" />
             <p className="text-sm text-ink">{error}</p>
           </div>
@@ -241,7 +241,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
           )}
 
           {imp.skipped?.length > 0 && (
-            <details className="rounded-xl border border-line px-3 py-2 text-xs text-muted">
+            <details className="rounded-md border border-line px-3 py-2 text-xs text-muted">
               <summary className="cursor-pointer font-semibold text-subtle">
                 {imp.skipped_non_student + (imp.skipped_duplicate ?? 0)} cliente(s) de Loyverse omitidos: ver motivos
               </summary>
@@ -289,7 +289,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold transition-colors ${
+      className={`min-h-[36px] rounded-sm border px-3 text-xs font-semibold transition-colors ${
         active ? 'border-purple bg-purple/10 text-purple' : 'border-line text-muted hover:text-ink'}`}
     >
       {children}
@@ -302,7 +302,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: 'pri
     ? 'text-brand-700 bg-brand-50 border-brand-600/20'
     : 'text-muted bg-cream border-line';
   return (
-    <div className={`rounded-xl border px-3 py-2 ${cls}`}>
+    <div className={`rounded-md border px-3 py-2 ${cls}`}>
       <div className="text-lg font-bold leading-tight">{value}</div>
       <div className="text-xs">{label}</div>
     </div>

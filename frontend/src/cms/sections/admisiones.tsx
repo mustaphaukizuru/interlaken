@@ -79,10 +79,10 @@ function AdmSepView(p: { title?: string; text?: string }) {
   return (
     <Section bg="white" spacing="sm">
       <Reveal>
-        <div className="rounded-[20px] border border-ink/10 bg-cream-2/60 px-5 py-5 shadow-card sm:px-6">
+        <div className="rounded-md bg-cream-2/60 px-5 py-5 shadow-card sm:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple/10 text-purple">
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple/10 text-purple">
                 <Award className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
@@ -115,7 +115,7 @@ const stepIcon = (name: unknown): ElementType => (name === 'WhatsApp' ? WhatsApp
 const stepKey = (s: StepItem) =>
   s.key || (s.title ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, '_');
 
-const STEP_LINK = 'mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+const STEP_LINK = 'mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
 /** Like CmsAnchor, with the analytics click handler the step CTAs need. */
 function TrackedLink({ href, onClick, children }: { href: string; onClick: () => void; children: ReactNode }) {
@@ -162,7 +162,7 @@ function AdmStepsView(p: StepsProps) {
                   {/* Numbered node + vertical connector (phones/tablets) */}
                   <div className="flex flex-col items-center lg:block">
                     <div
-                      className="relative z-[1] flex h-[58px] w-[58px] flex-shrink-0 items-center justify-center rounded-full border-[3px] bg-white lg:mx-auto"
+                      className="relative z-10 flex h-[58px] w-[58px] flex-shrink-0 items-center justify-center rounded-sm border-[3px] bg-white lg:mx-auto"
                       style={{ borderColor: color, boxShadow: `0 12px 26px -12px color-mix(in srgb, ${color} 53%, transparent)` }}
                     >
                       <Icon className="h-6 w-6" style={{ color }} aria-hidden="true" />
@@ -225,7 +225,7 @@ function AdmStepsView(p: StepsProps) {
 const CostEstimator = lazy(() => import('@/components/admissions/CostEstimator'));
 const ESTIMATOR_SKELETON = (
   <div aria-busy="true" aria-label="Cargando estimador de costos">
-    <div className="skeleton h-[420px] rounded-[20px]" aria-hidden="true" />
+    <div className="skeleton h-[420px] rounded-md" aria-hidden="true" />
   </div>
 );
 
@@ -278,9 +278,9 @@ function AdmDocsCtaView(p: DocsCtaProps) {
       <div className="grid gap-8 md:grid-cols-2">
         {/* Documentos: tarjeta con encabezado, conteo y enlaces oficiales */}
         <Reveal direction="right">
-          <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-ink/10 bg-white shadow-card">
+          <div className="flex h-full flex-col overflow-hidden rounded-md bg-white shadow-card">
             <div className="flex items-center gap-3 border-b border-ink/10 bg-green/5 px-5 py-4 sm:px-6">
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-green/15 text-green-dark">
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-green/15 text-green-dark">
                 <FileText className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
@@ -298,7 +298,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
                 {Array.from({ length: 10 }).map((_, i) => (
                   <li key={i} className="flex items-start gap-3 py-3">
                     <span className="skeleton mt-0.5 h-4 w-4 shrink-0 rounded-full" />
-                    <span className="skeleton h-4 rounded" style={{ width: `${50 + ((i * 17) % 40)}%` }} />
+                    <span className="skeleton h-4 rounded-sm" style={{ width: `${50 + ((i * 17) % 40)}%` }} />
                   </li>
                 ))}
               </ul>
@@ -340,7 +340,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
               </p>
             )}
             {p.docsNote && (
-              <p className="m-5 mt-2 rounded-lg bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted sm:mx-6">
+              <p className="m-5 mt-2 rounded-sm bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted sm:mx-6">
                 {t(p.docsNote)}
               </p>
             )}
@@ -349,7 +349,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
 
         {/* CTA con foto del salón: llena el espacio e invita a la visita (la ficha la envía el colegio) */}
         <Reveal direction="left">
-          <div className="group relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-[20px] shadow-card">
+          <div className="group relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-md shadow-card">
             {img.src && (
               <img
                 src={img.src}
@@ -384,7 +384,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
                   </CmsAnchor>
                   <CmsAnchor
                     link={{ ...secondary, label: t(secondary.label) }}
-                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border-2 border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-sm border-2 border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                   />
                 </div>
               )}

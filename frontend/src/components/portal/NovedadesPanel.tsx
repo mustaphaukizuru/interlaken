@@ -19,7 +19,7 @@ export function writeSeen(iso: string) {
 function NovedadRow({ it, Icon }: { it: NovedadItem; Icon: typeof Bell }) {
   return (
     <>
-      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${it.unread ? 'bg-purple/10 text-purple' : 'bg-cream-2 text-subtle'}`}><Icon size={14} aria-hidden="true" /></span>
+      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${it.unread ? 'bg-purple/10 text-purple' : 'bg-cream-2 text-subtle'}`}><Icon size={14} aria-hidden="true" /></span>
       <span className="min-w-0 flex-1">
         <span className={`block truncate text-sm ${it.unread ? 'font-semibold text-ink' : 'text-ink'}`}>{it.title}</span>
         {it.text && <span className="block truncate text-xs text-muted">{it.text}</span>}
@@ -48,11 +48,11 @@ export function NovedadesPanel({ className = '' }: { className?: string }) {
               <li key={i}>
                 {/* An item without a page to open (a school date) is a plain row, not a dead link. */}
                 {it.link ? (
-                  <Link to={it.link} className="flex items-start gap-3 py-2.5 hover:bg-cream-2 -mx-2 px-2 rounded-lg">
+                  <Link to={it.link} className="flex items-start gap-3 py-2.5 hover:bg-cream-2 -mx-2 px-2 rounded-sm">
                     <NovedadRow it={it} Icon={Icon} />
                   </Link>
                 ) : (
-                  <div className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5">
+                  <div className="-mx-2 flex items-start gap-3 rounded-sm px-2 py-2.5">
                     <NovedadRow it={it} Icon={Icon} />
                   </div>
                 )}

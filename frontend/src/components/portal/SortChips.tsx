@@ -42,7 +42,7 @@ export function SortChips({ options, sort, onSort, className = '' }: Props) {
             aria-pressed={active}
             aria-label={active ? `Ordenar por ${o.label}, ${DIR_LABEL[sort.dir]}` : `Ordenar por ${o.label}`}
             onClick={() => onSort(nextSort(sort, o.key))}
-            className={`inline-flex min-h-[44px] items-center gap-1 rounded-full px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px] ${
+            className={`inline-flex min-h-[44px] items-center gap-1 rounded-sm px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px] ${
               active ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'
             }`}
           >

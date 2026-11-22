@@ -228,7 +228,7 @@ function AdjustmentImport({ open, onClose }: { open: boolean; onClose: () => voi
             resultante; una fila que dejaría el saldo en negativo se rechaza. Máximo 500 filas por archivo.
           </p>
           <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
-            <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
             Notificar a las familias
           </label>
           <p className="text-xs text-muted">
@@ -471,7 +471,7 @@ function RosterTab() {
             </Button>
             <Link
               to={`/admin/cafeteria/${b.student.id}`}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted hover:bg-cream md:min-h-[36px] md:min-w-[36px]"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-muted hover:bg-cream md:min-h-[36px] md:min-w-[36px]"
               title="Ver detalle"
               aria-label={`Ver detalle de ${b.student.user.full_name}`}
             >
@@ -1084,7 +1084,7 @@ function ReconcileTab() {
           <label className="inline-flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+              className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
               checked={onlyDrift}
               onChange={(e) => set({ solo: e.target.checked ? null : 'todos', page: null })}
             />

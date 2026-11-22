@@ -2,25 +2,26 @@ import { type ButtonHTMLAttributes, forwardRef } from 'react';
 import { clsx } from 'clsx';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** primary = purple pill (matches .btn-primary); cta = pink gradient (.btn-pink) */
+  /** primary = purple (matches .btn-primary); cta = pink gradient (.btn-pink) */
   variant?: 'primary' | 'cta' | 'secondary' | 'danger' | 'ghost' | 'green';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
 }
 
 /**
- * Shared button primitive — pill shape aligned with public `.btn-*` CSS so
- * portal forms and marketing CTAs no longer look like two design systems.
+ * Shared button primitive. Same shape as the public `.btn-*` classes so
+ * portal forms and marketing CTAs read as one system: radius-sm (8px), never
+ * a pill (D2, 2026-11-21); at least 44px tall; labels start with a verb.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', loading, disabled, children, className, ...props }, ref) => {
     const base =
-      'inline-flex min-h-[44px] items-center justify-center gap-2 font-semibold rounded-full transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed motion-safe:active:scale-[0.97]';
+      'inline-flex min-h-[44px] items-center justify-center gap-2 font-semibold rounded-sm transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed motion-safe:active:scale-[0.97]';
     const variants = {
       primary:
         'bg-purple text-white shadow-sm hover:bg-purple-mid focus-visible:ring-purple/40',
       cta:
-        'text-white shadow-[0_10px_28px_-8px_rgba(239,37,88,0.55)] hover:-translate-y-0.5 focus-visible:ring-pink/40 [background:var(--grad-cta)]',
+        'text-white shadow-pink hover:-translate-y-0.5 focus-visible:ring-pink/40 [background:var(--grad-cta)]',
       secondary:
         'border-2 border-purple bg-white text-purple shadow-sm hover:bg-purple hover:text-white focus-visible:ring-purple/30',
       danger:

@@ -104,7 +104,7 @@ function VersionsOverview() {
                   <Button className="min-h-[44px] justify-center" onClick={() => create.mutate()} loading={create.isPending}><FilePlus2 size={16} aria-hidden="true" /> Nueva versión</Button>
                 )}
                 {current && <Link to={`${BASE}/${current.id}`} className="btn-outline min-h-[44px] justify-center"><Eye size={16} aria-hidden="true" /> Ver el texto vigente</Link>}
-                <a href="/aviso-de-privacidad" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
+                <a href="/aviso-de-privacidad" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 text-sm font-semibold text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
               </div>
             </div>
           </Card>
@@ -116,7 +116,7 @@ function VersionsOverview() {
                 ['Editar y revisar', 'Cambie los apartados y revise la vista previa: es la página tal como se verá.'],
                 ['Publicar', 'El sitio muestra el texto nuevo y el portal pide a cada familia aceptarlo. Los consentimientos anteriores se conservan con su versión.'],
               ].map(([title, text], i) => (
-                <li key={title} className="rounded-xl bg-cream-2 p-3">
+                <li key={title} className="rounded-md bg-cream-2 p-3">
                   <span className="mb-1 flex items-center gap-2 font-semibold text-ink">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-strong text-xs font-bold text-white">{i + 1}</span>{title}
                   </span>
@@ -177,7 +177,7 @@ function PublishedView({ notice }: { notice: NoticeVersion }) {
       <Card className="mb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-cream-2 text-muted"><Lock size={18} aria-hidden="true" /></span>
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-cream-2 text-muted"><Lock size={18} aria-hidden="true" /></span>
             <div className="text-sm">
               <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">Versión publicada <Badge variant={STATUS[notice.status].variant}>{STATUS[notice.status].label}</Badge></p>
               <p className="mt-1 text-muted">Su texto quedó fijo: es lo que aceptaron las familias. Para cambiarlo, cree una versión nueva desde la lista.</p>
@@ -206,7 +206,7 @@ function NoticePreview({ notice }: { notice: Pick<NoticeVersion, 'version' | 'ti
     integral_notice_url: notice.integral_notice_url, effective_date: notice.effective_date,
   };
   return (
-    <section aria-label="Vista previa" className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
+    <section aria-label="Vista previa" className="overflow-hidden rounded-md bg-white shadow-card">
       <p className="flex items-center gap-2 border-b border-line bg-cream-2 px-4 py-2.5 text-xs font-semibold text-muted">
         <Eye size={14} aria-hidden="true" /> Vista previa: así se verá en /aviso-de-privacidad
       </p>
@@ -293,10 +293,10 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
     <>
       <PageHeader title={`Borrador ${meta.version || notice.version}`} subtitle="Nada de esto se ve en el sitio hasta que publique la versión." />
 
-      <div className="mb-4 inline-flex rounded-xl border border-line bg-white p-1" role="tablist" aria-label="Modo del borrador">
+      <div className="mb-4 inline-flex rounded-md bg-white p-1 shadow-card" role="tablist" aria-label="Modo del borrador">
         {(['edit', 'preview'] as const).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-            className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 text-sm font-semibold transition-colors ${tab === k ? 'bg-purple text-white' : 'text-muted hover:text-ink'}`}>
+            className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-4 text-sm font-semibold transition-colors ${tab === k ? 'bg-purple text-white' : 'text-muted hover:text-ink'}`}>
             {k === 'edit' ? <><PencilLine size={15} aria-hidden="true" /> Editar</> : <><Eye size={15} aria-hidden="true" /> Vista previa</>}
           </button>
         ))}
@@ -318,7 +318,7 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
           <Card title="Texto del aviso" subtitle="Escriba como en un documento: una línea en blanco separa los párrafos. Cada apartado se muestra en la página como una sección que se abre y se cierra.">
             <div className="space-y-5">
               {(problems.structure || errors.body) && (
-                <p className="rounded-lg bg-amber/10 px-3 py-2 text-sm text-ink" role="status">{errors.body || problems.structure}</p>
+                <p className="rounded-sm bg-amber/10 px-3 py-2 text-sm text-ink" role="status">{errors.body || problems.structure}</p>
               )}
               <div>
                 <label className="label" htmlFor="nv-intro">Texto antes del primer apartado</label>
@@ -333,10 +333,10 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
                   const Icon = sectionIcon(s.title.toLocaleUpperCase('es-MX'));
                   const p = problems.sections[i] ?? {};
                   return (
-                    <li key={i} className="rounded-xl border border-line bg-cream-2/60 p-3 sm:p-4">
+                    <li key={i} className="rounded-md bg-cream-2/60 p-3 sm:p-4">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green/10 text-green-dark"><Icon size={16} aria-hidden="true" /></span>
+                          <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-green/10 text-green-dark"><Icon size={16} aria-hidden="true" /></span>
                           Apartado {i + 1}
                         </span>
                         <span className="flex gap-1">
@@ -366,7 +366,7 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
             </div>
           </Card>
 
-          <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white/95 p-3 shadow-card backdrop-blur">
+          <div className="sticky bottom-0 z-sticky -mx-1 flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/95 p-3 shadow-card backdrop-blur">
             <Button type="button" variant="ghost" className="min-h-[44px] text-coral-600" onClick={() => setDiscarding(true)}><Trash2 size={16} aria-hidden="true" /> Descartar borrador</Button>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" variant="secondary" className="min-h-[44px]" loading={save.isPending} disabled={!dirty}>Guardar borrador</Button>
@@ -387,7 +387,7 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
             <li><strong className="text-ink">Los consentimientos que ya existen no cambian.</strong> {current ? `Los ${plural(consents, 'consentimiento', 'consentimientos')} de la versión ${current.version} siguen ligados a esa versión, que se conserva como «Anterior».` : 'Siguen ligados a la versión que cada familia aceptó.'}</li>
             <li><strong className="text-ink">Después de publicar, este texto ya no se puede editar.</strong> Para corregirlo habrá que publicar otra versión.</li>
           </ul>
-          <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
+          <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-md border border-line p-3">
             <input type="checkbox" className="mt-0.5 h-5 w-5" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
             <span>Revisé la vista previa y Dirección aprobó este texto.</span>
           </label>

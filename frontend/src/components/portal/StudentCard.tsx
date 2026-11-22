@@ -64,7 +64,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-sm overflow-hidden rounded-xl3 shadow-purple ring-1 ring-black/5">
+      <div data-testid="credencial-face" className="mx-auto w-full max-w-sm overflow-hidden rounded-md shadow-purple ring-1 ring-black/5">
         {/* Gradient face */}
         <div className="relative overflow-hidden bg-gradient-to-br from-purple via-pink-hot to-pink px-5 pb-5 pt-4 text-white">
           <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10 blur-xl" />
@@ -113,7 +113,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
               <button
                 type="button"
                 onClick={() => setFull(true)}
-                className="mx-auto mt-2 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-purple transition hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                className="mx-auto mt-2 flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[12.5px] font-semibold text-purple transition hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
               >
                 <Maximize2 className="h-3.5 w-3.5" /> Mostrar en pantalla completa
               </button>
@@ -132,7 +132,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
       {full && card.code && (
         <div
           ref={overlayRef}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white p-[max(1.5rem,env(safe-area-inset-bottom))]"
+          className="fixed inset-0 z-overlay flex flex-col items-center justify-center gap-6 bg-white p-[max(1.5rem,env(safe-area-inset-bottom))]"
           role="dialog"
           aria-modal="true"
           aria-label="Código para escanear en caja"
@@ -149,7 +149,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             type="button"
             onClick={() => setFull(false)}
             aria-label="Cerrar"
-            className="absolute right-4 top-4 z-10 rounded-full p-2 text-ink/60 transition hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+            className="absolute right-4 top-4 z-10 rounded-sm p-2 text-ink/60 transition hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
           >
             <X className="h-6 w-6" />
           </button>

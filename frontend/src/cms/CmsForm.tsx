@@ -28,7 +28,7 @@ export function CmsForm({ slug }: { slug: string }) {
     onError: (e) => setErrors(apiFieldErrors(e)),
   });
   if (isError || !def) return null;
-  if (done) return <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center" role="status"><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" aria-hidden="true" /><p className="font-semibold text-ink">{done}</p></div>;
+  if (done) return <div className="rounded-md border border-green-200 bg-green-50 p-6 text-center" role="status"><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" aria-hidden="true" /><p className="font-semibold text-ink">{done}</p></div>;
   const set = (k: string, v: string | boolean) => setValues((p) => ({ ...p, [k]: v }));
   const onSubmit = (e: FormEvent) => { e.preventDefault(); setErrors({}); submit.mutate(); };
   return (

@@ -128,10 +128,10 @@ export default function ProfilePage() {
     <>
       <PageHeader title="Mi información" subtitle="Tus datos, tu familia, tu seguridad y tus avisos." />
       <div className="mx-auto max-w-2xl space-y-4">
-        <div role="tablist" aria-label="Secciones" className="flex gap-1 overflow-x-auto rounded-xl bg-cream-2 p-1">
+        <div role="tablist" aria-label="Secciones" className="flex gap-1 overflow-x-auto rounded-md bg-cream-2 p-1">
           {tabs.map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => set({ tab: t.key === 'perfil' ? null : t.key })}
-              className={`min-h-[40px] flex-1 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
+              className={`min-h-[40px] flex-1 whitespace-nowrap rounded-sm px-3 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
               {t.label}
             </button>
           ))}
@@ -155,7 +155,7 @@ export default function ProfilePage() {
         <Card>
           {!locked && <div className="mb-5 border-b border-line pb-5"><AvatarUpload /></div>}
           {locked && (
-            <p className="mb-4 rounded-xl bg-cream-2 px-4 py-3 text-sm text-muted" role="note">
+            <p className="mb-4 rounded-md bg-cream-2 px-4 py-3 text-sm text-muted" role="note">
               Sus datos los actualiza el colegio. ¿Algo está mal?{' '}
               <a href={`mailto:info@interlaken.com.mx?subject=${encodeURIComponent('Corrección de mis datos en el portal')}`} className="font-semibold text-purple hover:underline">Solicite la corrección</a>.
             </p>

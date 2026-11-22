@@ -42,7 +42,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
       {/* Barra lateral */}
       <aside className="self-start lg:sticky lg:top-24">
-        <div className="rounded-[20px] border border-ink/10 bg-white p-4 shadow-card sm:p-5">
+        <div className="rounded-md bg-white p-4 shadow-card sm:p-5">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
             <input
@@ -68,7 +68,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
                   type="button"
                   aria-pressed={active}
                   onClick={() => setTopic(t)}
-                  className={`flex min-h-[42px] items-center justify-between gap-2 rounded-xl px-3 text-sm font-semibold transition-colors ${
+                  className={`flex min-h-[42px] items-center justify-between gap-2 rounded-sm px-3 text-sm font-semibold transition-colors ${
                     active
                       ? 'bg-purple text-white shadow-purple'
                       : 'text-ink/80 hover:bg-purple/[0.07] hover:text-purple'
@@ -102,7 +102,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
       {/* Lista de preguntas */}
       <div className="min-w-0">
         {visible.length === 0 ? (
-          <div className="rounded-[20px] border border-ink/10 bg-white p-8 text-center shadow-card">
+          <div className="rounded-md bg-white p-8 text-center shadow-card">
             <p className="text-sm text-muted">
               {c('empty')}{' '}
               <CmsAnchor link={emptyLink} className="font-semibold text-green-dark underline" />{' '}
@@ -110,7 +110,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-ink/5 overflow-hidden rounded-[20px] border border-ink/10 bg-white shadow-card">
+          <div className="divide-y divide-ink/5 overflow-hidden rounded-md bg-white shadow-card">
             {visible.map((f, i) => (
               <details key={`${i}-${f.q}`} className="group">
                 <summary className="flex cursor-pointer items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-cream-2/60 sm:px-6 [&::-webkit-details-marker]:hidden">
@@ -122,7 +122,7 @@ function FaqExplorer({ faqs, c, emptyLink }: { faqs: Required<FaqItem>[]; c: (pr
                       {f.q}
                     </span>
                   </span>
-                  <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple/10 text-purple transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none">
+                  <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm bg-purple/10 text-purple transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none">
                     <Plus className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </summary>

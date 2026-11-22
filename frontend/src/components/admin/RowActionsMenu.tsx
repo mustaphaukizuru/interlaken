@@ -102,7 +102,7 @@ export function RowActionsMenu({ label, items }: { label: string; items: RowMenu
         aria-label={label}
         title="Más acciones"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle transition-colors hover:bg-cream-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:min-w-[36px]"
+        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle transition-colors hover:bg-cream-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:min-w-[36px]"
       >
         <MoreHorizontal size={18} aria-hidden="true" />
       </button>
@@ -114,7 +114,7 @@ export function RowActionsMenu({ label, items }: { label: string; items: RowMenu
           tabIndex={-1}
           onKeyDown={onMenuKey}
           style={{ position: 'fixed', top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: WIDTH }}
-          className="z-[60] rounded-xl border border-line bg-white p-1.5 shadow-[0_12px_32px_-12px_rgba(16,12,40,0.35)] motion-safe:animate-[dropdown-in_0.16s_ease-out]"
+          className="z-dropdown rounded-md bg-white p-1.5 shadow-[0_12px_32px_-12px_rgba(16,12,40,0.35)] motion-safe:animate-[dropdown-in_0.16s_ease-out]"
         >
           {items.map((it) => {
             const Icon = it.icon;
@@ -126,7 +126,7 @@ export function RowActionsMenu({ label, items }: { label: string; items: RowMenu
                   role="menuitem"
                   aria-label={it.ariaLabel}
                   onClick={() => { setOpen(false); it.onSelect(); }}
-                  className={`flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+                  className={`flex min-h-[44px] w-full items-center gap-2.5 rounded-sm px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                     it.danger ? 'text-coral-700 hover:bg-coral-50' : 'text-ink hover:bg-cream-2'
                   }`}
                 >

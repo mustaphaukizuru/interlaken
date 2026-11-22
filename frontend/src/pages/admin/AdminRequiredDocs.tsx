@@ -29,7 +29,7 @@ const EMPTY: RequiredDocWrite = {
 };
 
 /** 44 px touch targets for the iPad (Button size="sm" drops to 36 px from 640 px). */
-const ICON_BTN = 'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold text-muted transition hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-40';
+const ICON_BTN = 'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm font-semibold text-muted transition hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
  * /admin/admisiones/documentos — the documents each level asks for (Fase 4).
@@ -118,7 +118,7 @@ export default function AdminRequiredDocs() {
                   aria-pressed={on}
                   onClick={() => setTab(t.value)}
                   className={clsx(
-                    'inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40',
+                    'inline-flex min-h-[44px] items-center gap-2 rounded-sm border px-4 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40',
                     on ? 'border-purple bg-purple text-white' : 'border-line bg-white text-muted hover:border-purple/40 hover:text-ink',
                   )}
                 >
@@ -298,8 +298,8 @@ function DocForm({ doc, onClose, onSaved }: { doc: RequiredDoc | null; onClose: 
         <legend className="label">Niveles que lo piden</legend>
         <div className="flex flex-wrap gap-2">
           {LEVELS.map((l) => (
-            <label key={l.value} className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-line px-3.5 text-sm text-ink has-[:checked]:border-purple has-[:checked]:bg-brand-50">
-              <input type="checkbox" className="h-5 w-5 rounded border-line text-purple focus:ring-purple/40"
+            <label key={l.value} className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-line px-3.5 text-sm text-ink has-[:checked]:border-purple has-[:checked]:bg-brand-50">
+              <input type="checkbox" className="h-5 w-5 rounded-sm border-line text-purple focus:ring-purple/40"
                 checked={form.levels.includes(l.value)} onChange={(e) => toggleLevel(l.value, e.target.checked)} />
               {l.label}
             </label>
@@ -309,10 +309,10 @@ function DocForm({ doc, onClose, onSaved }: { doc: RequiredDoc | null; onClose: 
         {errors.levels && <p id={`${id}-levels-error`} className="mt-1 text-xs text-coral-600">{errors.levels}</p>}
       </fieldset>
       {ficha ? (
-        <p className="rounded-xl bg-cream px-3.5 py-2.5 text-sm text-muted">La ficha se llena en línea: queda lista en cuanto la familia la envía. No se sube como archivo.</p>
+        <p className="rounded-md bg-cream px-3.5 py-2.5 text-sm text-muted">La ficha se llena en línea: queda lista en cuanto la familia la envía. No se sube como archivo.</p>
       ) : (
         <label className="flex min-h-[44px] cursor-pointer items-start gap-2.5 text-sm text-ink">
-          <input type="checkbox" className="mt-0.5 h-5 w-5 rounded border-line text-purple focus:ring-purple/40"
+          <input type="checkbox" className="mt-0.5 h-5 w-5 rounded-sm border-line text-purple focus:ring-purple/40"
             checked={form.multiple_files} onChange={(e) => set('multiple_files', e.target.checked)} />
           <span>Permite varios archivos<span className="block text-xs text-muted">Por ejemplo, la INE de papá y la de mamá, o frente y reverso.</span></span>
         </label>
@@ -324,7 +324,7 @@ function DocForm({ doc, onClose, onSaved }: { doc: RequiredDoc | null; onClose: 
           placeholder="Consultar CURP" error={errors.link_label} />
       </div>
       <label className="flex min-h-[44px] cursor-pointer items-start gap-2.5 text-sm text-ink">
-        <input type="checkbox" className="mt-0.5 h-5 w-5 rounded border-line text-purple focus:ring-purple/40"
+        <input type="checkbox" className="mt-0.5 h-5 w-5 rounded-sm border-line text-purple focus:ring-purple/40"
           checked={form.active} onChange={(e) => set('active', e.target.checked)} />
         <span>Visible para las familias<span className="block text-xs text-muted">Oculto, no se pide en ninguna inscripción ni aparece en el sitio.</span></span>
       </label>

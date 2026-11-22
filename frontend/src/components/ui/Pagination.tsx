@@ -26,7 +26,7 @@ export function Pagination({ page, pageSize, count, onChange, itemLabel = 'resul
   const to = Math.min(page * pageSize, count);
 
   const btn =
-    'inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white';
+    'inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-sm border border-line bg-white px-3 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white';
 
   return (
     <nav

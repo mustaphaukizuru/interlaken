@@ -122,7 +122,7 @@ export default function PrivacyPage() {
               <h2 className="font-head text-base font-semibold text-ink">Consentimientos</h2>
             </div>
             {consentQ.data?.needs_acceptance && (
-              <p className="mb-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-sm text-muted">
+              <p className="mb-3 rounded-sm border border-amber/30 bg-amber/5 px-3 py-2 text-sm text-muted">
                 Debe aceptar el tratamiento académico del aviso vigente
                 {consentQ.data.notice_version ? ` (v${consentQ.data.notice_version})` : ''}.
               </p>
@@ -250,7 +250,7 @@ export default function PrivacyPage() {
                   statutory_deadline: string | null;
                   created_at: string;
                 }) => (
-                  <li key={row.id} className="rounded-xl border border-line px-3 py-2.5 text-sm">
+                  <li key={row.id} className="rounded-md border border-line px-3 py-2.5 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium text-ink">
                         {ARCO_TYPE_LABEL[row.request_type] ?? row.request_type}

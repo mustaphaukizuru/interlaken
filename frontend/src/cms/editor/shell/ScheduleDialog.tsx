@@ -66,12 +66,12 @@ function ScheduleForm({ onClose, value, onSave, canEdit, hasOriginalDesign, savi
 
   return (
     <div className="space-y-5">
-      <p className="flex items-start gap-2 rounded-xl bg-cream px-3 py-2 text-sm text-ink">
+      <p className="flex items-start gap-2 rounded-md bg-cream px-3 py-2 text-sm text-ink">
         <Globe2 size={16} className="mt-0.5 shrink-0 text-subtle" aria-hidden="true" />
         <span>Las horas son de <strong>Ciudad de México</strong>. El sistema revisa cada 5 minutos, así que puede tardar hasta 5 minutos.</span>
       </p>
       {!canEdit && (
-        <p className="rounded-xl border border-line px-3 py-2 text-sm text-muted">
+        <p className="rounded-md border border-line px-3 py-2 text-sm text-muted">
           Solo Dirección programa publicaciones. Puede ver aquí lo que está programado y pedirlo al solicitar aprobación.
         </p>
       )}

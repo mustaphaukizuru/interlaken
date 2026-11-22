@@ -34,7 +34,7 @@ export default function SandboxCheckout() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-md overflow-hidden rounded-md bg-white shadow-2xl">
         <div className="bg-slate-900 px-6 py-5 text-white">
           <div className="flex items-center gap-1.5 text-xs text-white/60">
             <Lock size={13} /> Pago seguro
@@ -43,7 +43,7 @@ export default function SandboxCheckout() {
         </div>
 
         <div className="space-y-5 p-6">
-          <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <strong>Modo de prueba (sandbox).</strong> No se realiza ningún cargo real —
             simula el resultado del pago para probar el flujo completo.
           </div>
@@ -65,7 +65,7 @@ export default function SandboxCheckout() {
               type="button"
               onClick={() => finish('success')}
               disabled={!!busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3 font-semibold text-white transition hover:bg-green-700 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-sm bg-green-600 px-4 py-3 font-semibold text-white transition hover:bg-green-700 disabled:opacity-60"
             >
               <CheckCircle2 size={18} /> {busy === 'success' ? 'Procesando…' : 'Simular pago exitoso'}
             </button>
@@ -73,7 +73,7 @@ export default function SandboxCheckout() {
               type="button"
               onClick={() => finish('failed')}
               disabled={!!busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-sm border border-slate-300 px-4 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
             >
               <XCircle size={18} /> Simular pago fallido
             </button>

@@ -28,7 +28,7 @@ export function VideoEmbed({ url }: { url: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-[880px] overflow-hidden rounded-xl3 border border-line bg-cream shadow-card">
+    <div className="mx-auto max-w-[880px] overflow-hidden rounded-md bg-cream shadow-card">
       <div className="relative aspect-video w-full bg-dark">
         {playing ? (
           <iframe
@@ -68,7 +68,7 @@ export function VideoEmbed({ url }: { url: string }) {
               aria-hidden="true"
               className="absolute inset-0 bg-dark/30 transition-colors group-hover:bg-dark/40"
             />
-            <span className="relative flex h-[72px] w-[72px] items-center justify-center rounded-full bg-pink text-white shadow-[0_18px_38px_-12px_rgba(0,0,0,0.55)] transition-transform group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+            <span className="relative flex h-[72px] w-[72px] items-center justify-center rounded-md bg-pink text-white shadow-[0_18px_38px_-12px_rgba(0,0,0,0.55)] transition-transform group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
               <Play size={30} fill="currentColor" className="ml-1" aria-hidden="true" />
             </span>
           </button>

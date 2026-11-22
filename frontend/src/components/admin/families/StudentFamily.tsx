@@ -65,10 +65,10 @@ export function StudentFamily({ studentId }: { studentId: number }) {
               const kids = others(sg);
               if (!kids.length) return null;
               return (
-                <li key={sg.key} className="rounded-2xl border border-line p-4">
+                <li key={sg.key} className="rounded-md border border-line p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex min-w-0 gap-3">
-                      <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber/10 text-amber">
+                      <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-amber/10 text-amber">
                         <Lightbulb className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 space-y-2">
@@ -106,7 +106,7 @@ export function StudentFamily({ studentId }: { studentId: number }) {
       ) : (
         <Card title="Familia">
           <div className="flex flex-col items-center px-4 py-8 text-center">
-            <span aria-hidden="true" className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-purple">
+            <span aria-hidden="true" className="flex h-12 w-12 items-center justify-center rounded-sm bg-brand-50 text-purple">
               <UsersRound className="h-6 w-6" />
             </span>
             <h4 className="mt-3 font-semibold text-ink">Sin hermanos vinculados</h4>

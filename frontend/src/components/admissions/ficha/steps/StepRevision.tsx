@@ -38,7 +38,7 @@ export function StepRevision({ sections, all, errors, incomplete, onEdit }: {
           const rows = step.fields.filter((f) => f.name !== 'not_applicable' && !isHidden(f, values));
           const headingId = `review-${key}`;
           return (
-            <section key={key} aria-labelledby={headingId} className="rounded-xl2 border border-line bg-white">
+            <section key={key} aria-labelledby={headingId} className="rounded-md bg-white shadow-card">
               <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
                 <h3 id={headingId} className="min-w-0 break-words text-[15px] font-bold leading-snug text-ink">
                   <NumberedTitle number={number} title={title} />
@@ -46,7 +46,7 @@ export function StepRevision({ sections, all, errors, incomplete, onEdit }: {
                 <button
                   type="button"
                   onClick={() => onEdit(key)}
-                  className="-mr-2 inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-purple hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                  className="-mr-2 inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-sm px-3 text-sm font-semibold text-purple hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
                   aria-label={`${copy.t('reviewEdit')}: ${numberedTitle(number, title)}`}
                 >
                   <Pencil className="h-4 w-4" aria-hidden="true" /> {copy.t('reviewEdit')}
@@ -89,7 +89,7 @@ export function StepRevision({ sections, all, errors, incomplete, onEdit }: {
         })}
       </div>
 
-      <section className="space-y-4 rounded-xl2 border border-purple/20 bg-purple-light/30 p-4 sm:p-5">
+      <section className="space-y-4 rounded-md border border-purple/20 bg-purple-light/30 p-4 sm:p-5">
         <h3 className="text-[15px] font-bold text-ink">{copy.t('privacyTitle')}</h3>
         <p className="text-[15px] leading-relaxed text-muted">
           {copy.t('privacyText')}{' '}

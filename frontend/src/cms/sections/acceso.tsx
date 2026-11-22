@@ -93,7 +93,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
               </Link>
             </div>
 
-            <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
+            <div className="rounded-md bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
               <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">{c('heading')}</h2>
               <p className="mb-6 mt-1 text-center text-[13px] text-muted">{c('subheading')}</p>
 
@@ -101,7 +101,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                 <div
                   role="status"
                   aria-live="polite"
-                  className="mb-[18px] rounded-xl border border-purple/25 bg-purple/[0.06] px-3.5 py-3 text-center text-[13px] text-ink"
+                  className="mb-[18px] rounded-md border border-purple/25 bg-purple/[0.06] px-3.5 py-3 text-center text-[13px] text-ink"
                 >
                   {c('googleBusy')}
                 </div>
@@ -111,7 +111,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                 <div
                   id="login-error"
                   role="alert"
-                  className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark"
+                  className="mb-[18px] rounded-md border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark"
                 >
                   {s.alert}
                 </div>
@@ -121,7 +121,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                 type="button"
                 disabled={s.bootstrapping}
                 onClick={a.onGoogle}
-                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
+                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-sm border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
               >
                 <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -176,7 +176,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                     onClick={a.onTogglePassword}
                     disabled={s.bootstrapping}
                     aria-label={s.showPassword ? c('hidePassword') : c('showPassword')}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-sm text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
                   >
                     {s.showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
@@ -214,7 +214,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
 
             <p className="mt-5 text-center text-[12.5px] text-subtle">
               {c('signupText')}{' '}
-              <CmsAnchor link={signup} className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">{t(signup.label)}</CmsAnchor>
+              <CmsAnchor link={signup} className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded-sm">{t(signup.label)}</CmsAnchor>
             </p>
           </div>
         </main>

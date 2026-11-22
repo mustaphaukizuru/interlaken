@@ -19,7 +19,7 @@ export function ConflictBanner({ conflict, onReload, onOverwrite, busy }: {
   const who = conflict.by || 'Otra persona';
   const when = conflict.at ? ` ${timeAgo(conflict.at)}` : '';
   return (
-    <div role="alert" className="flex flex-col gap-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-sm md:flex-row md:items-center md:justify-between">
+    <div role="alert" className="flex flex-col gap-3 rounded-md border border-amber/40 bg-amber/10 p-3 text-sm md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-2">
         <Users size={18} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />
         <div>
@@ -44,7 +44,7 @@ export function LocalCopyBanner({ copy, onRestore, onDiscard }: { copy: LocalCop
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
   return (
-    <div role="status" className="flex flex-col gap-3 rounded-xl border border-line bg-white p-3 text-sm md:flex-row md:items-center md:justify-between">
+    <div role="status" className="flex flex-col gap-3 rounded-md bg-white p-3 text-sm md:flex-row md:items-center md:justify-between shadow-card">
       <div className="flex items-start gap-2">
         <History size={18} className="mt-0.5 shrink-0 text-purple" aria-hidden="true" />
         <p className="text-ink">Este navegador guardó una copia de cambios suyos que no llegaron al servidor ({timeAgo(copy.savedAt, now)}).</p>

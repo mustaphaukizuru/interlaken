@@ -66,9 +66,9 @@ function DocsListView(p: ListProps) {
   return (
     <section className="bg-cream-2 py-10 sm:py-14">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <div className="overflow-hidden rounded-xl2 border border-ink/10 bg-white shadow-card">
+        <div className="overflow-hidden rounded-md bg-white shadow-card">
           <div className="flex items-center gap-3 border-b border-ink/10 bg-green/5 px-5 py-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green/15 text-green-dark">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-green/15 text-green-dark">
               <FolderOpen className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
@@ -117,7 +117,7 @@ function DocsListView(p: ListProps) {
                 {Array.from({ length: 10 }).map((_, i) => (
                   <li key={i} className="flex items-start gap-3 px-5 py-4">
                     <span className="skeleton mt-0.5 h-4 w-4 shrink-0 rounded-full" />
-                    <span className="skeleton h-4 rounded" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
+                    <span className="skeleton h-4 rounded-sm" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
                   </li>
                 ))}
               </ul>
@@ -155,7 +155,7 @@ function DocsListView(p: ListProps) {
         </div>
 
         {(p.ctaTitle || p.ctaText || cta.href) && (
-          <div className="mt-8 flex flex-col items-center gap-3 rounded-xl2 border border-green/25 bg-green/5 px-6 py-7 text-center">
+          <div className="mt-8 flex flex-col items-center gap-3 rounded-md border border-green/25 bg-green/5 px-6 py-7 text-center">
             <FileText className="h-7 w-7 text-green-dark" aria-hidden="true" />
             {p.ctaTitle && <p className="font-head text-lg font-bold text-ink">{t(p.ctaTitle)}</p>}
             {p.ctaText && <p className="max-w-md text-sm text-muted">{t(p.ctaText)}</p>}

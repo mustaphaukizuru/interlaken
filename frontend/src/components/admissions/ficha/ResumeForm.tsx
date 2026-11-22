@@ -41,7 +41,7 @@ export function ResumeForm({ copy, startOpen = false, className }: { copy: Ficha
       {!startOpen ? (
         <button
           type="button"
-          className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded"
+          className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded-sm"
           aria-expanded={open}
           aria-controls={`${id}-panel`}
           onClick={() => setOpen((v) => !v)}
@@ -49,7 +49,7 @@ export function ResumeForm({ copy, startOpen = false, className }: { copy: Ficha
           {copy.t('resumeToggle')}
         </button>
       ) : null}
-      {open ? <div id={`${id}-panel`} className={clsx(!startOpen && 'mt-3 rounded-xl2 border border-line bg-cream-2 p-4')}>
+      {open ? <div id={`${id}-panel`} className={clsx(!startOpen && 'mt-3 rounded-md border border-line bg-cream-2 p-4')}>
         {done ? (
           <p role="status" className="flex items-start gap-2 text-[15px] text-ink">
             <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-dark" aria-hidden="true" />

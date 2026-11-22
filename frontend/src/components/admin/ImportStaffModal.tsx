@@ -178,7 +178,7 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
   if (phase === 'error') {
     return (
       <div className="space-y-4">
-        <div role="alert" className="flex items-start gap-3 rounded-xl2 border border-coral/30 bg-coral-50 px-4 py-3">
+        <div role="alert" className="flex items-start gap-3 rounded-md border border-coral/30 bg-coral-50 px-4 py-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-coral-dark" aria-hidden="true" />
           <p className="text-sm text-ink">{error}</p>
         </div>
@@ -228,19 +228,19 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
       </div>
 
       {toImport.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-cream px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-cream px-3 py-2 text-sm">
           <p className="text-muted" aria-live="polite">
             <strong className="text-ink">{willImport}</strong> de {toImport.length} marcada{toImport.length === 1 ? '' : 's'} para importar
             {leftOut.length > 0 && <>; {leftOut.length} se queda{leftOut.length === 1 ? '' : 'n'} fuera</>}.
           </p>
           <div className="flex items-center gap-1" role="group" aria-label={filtered ? 'Marcar las personas mostradas' : 'Marcar a todo el personal'}>
             <button type="button" onClick={() => markShown(true)} disabled={shownToImport.length === 0}
-              className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-purple hover:bg-purple/10 disabled:opacity-40">
+              className="min-h-[36px] rounded-sm px-2 text-xs font-semibold text-purple hover:bg-purple/10 disabled:opacity-40">
               Marcar todos{filtered ? ' (mostrados)' : ''}
             </button>
             <span className="text-subtle" aria-hidden="true">/</span>
             <button type="button" onClick={() => markShown(false)} disabled={shownToImport.length === 0}
-              className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-purple hover:bg-purple/10 disabled:opacity-40">
+              className="min-h-[36px] rounded-sm px-2 text-xs font-semibold text-purple hover:bg-purple/10 disabled:opacity-40">
               Ninguno{filtered ? ' (mostrados)' : ''}
             </button>
           </div>
@@ -379,7 +379,7 @@ function ImportResult({ result, onClose }: { result: StaffImportReport; onClose:
   ];
   return (
     <div className="space-y-4">
-      <div role="status" className="flex items-start gap-2.5 rounded-xl border border-green-600/25 bg-green-50 px-4 py-3 text-sm text-green-800">
+      <div role="status" className="flex items-start gap-2.5 rounded-md border border-green-600/25 bg-green-50 px-4 py-3 text-sm text-green-800">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
         <div className="space-y-1">
           <p className="font-semibold">{lines.length ? lines.map(([n, w]) => `${n} ${w}`).join(', ') : 'Nada que importar'}.</p>
@@ -391,7 +391,7 @@ function ImportResult({ result, onClose }: { result: StaffImportReport; onClose:
         {stats.map((s) => <Stat key={s.label} label={s.label} value={s.value} tone={s.tone} />)}
       </div>
       {result.errors.length > 0 && (
-        <div role="alert" className="rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink">
+        <div role="alert" className="rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink">
           <p className="font-semibold">{result.errors.length} no se pudieron importar:</p>
           <ul className="mt-1 list-disc pl-5 text-xs">
             {result.errors.map((e) => <li key={`${e.code}:${e.name}`}>{e.name} ({e.code || 'sin código'}): {e.error}</li>)}
@@ -406,7 +406,7 @@ function ImportResult({ result, onClose }: { result: StaffImportReport; onClose:
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
-      className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold transition-colors ${
+      className={`min-h-[36px] rounded-sm border px-3 text-xs font-semibold transition-colors ${
         active ? 'border-purple bg-purple/10 text-purple' : 'border-line text-muted hover:text-ink'}`}>
       {children}
     </button>
@@ -417,7 +417,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: 'pri
   const cls = tone === 'primary' ? 'text-brand-700 bg-brand-50 border-brand-600/20'
     : tone === 'warn' ? 'text-ink bg-amber/[0.08] border-amber/40' : 'text-muted bg-cream border-line';
   return (
-    <div className={`rounded-xl border px-3 py-2 ${cls}`}>
+    <div className={`rounded-md border px-3 py-2 ${cls}`}>
       <div className="text-lg font-bold leading-tight">{value}</div>
       <div className="text-xs">{label}</div>
     </div>

@@ -190,7 +190,7 @@ export function CaseHistory({ entries }: { entries: CaseHistoryEntry[] }) {
       </ol>
       {entries.length > shown && (
         <button type="button" onClick={() => setShown((n) => n + PAGE * 2)}
-          className="mt-3 inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-purple hover:bg-purple/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+          className="mt-3 inline-flex min-h-[44px] items-center rounded-sm px-3 text-sm font-semibold text-purple hover:bg-purple/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
           Ver {Math.min(PAGE * 2, entries.length - shown)} movimientos más
         </button>
       )}

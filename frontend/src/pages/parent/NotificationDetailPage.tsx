@@ -91,7 +91,7 @@ export default function NotificationDetailPage() {
       ) : (
         <Card className="max-w-3xl">
           <div className="flex items-start gap-3">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${meta.cls}`}>
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${meta.cls}`}>
               <Icon size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
@@ -115,7 +115,7 @@ export default function NotificationDetailPage() {
           <NotificationBody message={data.message} className="mt-5 border-t border-line pt-5" />
 
           {data.announcement_title && (
-            <p className="mt-4 rounded-xl border border-line bg-cream-2 px-4 py-3 text-sm text-muted">
+            <p className="mt-4 rounded-md bg-cream-2 px-4 py-3 text-sm text-muted">
               Comunicado relacionado: <span className="font-semibold text-ink">{data.announcement_title}</span>
             </p>
           )}

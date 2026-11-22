@@ -23,7 +23,7 @@ const fmtDay = (ymd: string) => format(parseISO(ymd), 'd MMM yyyy', { locale: es
 
 function Stat({ icon: Icon, label, value, hint }: { icon: typeof Store; label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl2 border border-line bg-white p-3">
+    <div className="rounded-md bg-white p-3 shadow-card">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-subtle">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
@@ -79,7 +79,7 @@ export default function CredencialPage() {
       {isError ? (
         <Card><ErrorState onRetry={() => refetch()} /></Card>
       ) : isLoading ? (
-        <div className="mx-auto h-[280px] w-full max-w-sm skeleton rounded-xl3" aria-busy="true" />
+        <div className="mx-auto h-[280px] w-full max-w-sm skeleton rounded-md" aria-busy="true" />
       ) : !cards?.length ? (
         <Card>
           <EmptyState icon={Coffee} title="Sin credencial de cafetería"
@@ -105,7 +105,7 @@ export default function CredencialPage() {
                     type="button"
                     onClick={() => setSelectedId(c.student.id)}
                     aria-pressed={on}
-                    className={`inline-flex min-h-[44px] items-center rounded-full border px-4 text-sm font-semibold transition ${
+                    className={`inline-flex min-h-[44px] items-center rounded-sm border px-4 text-sm font-semibold transition ${
                       on ? 'border-purple bg-purple text-white' : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
                     }`}
                   >

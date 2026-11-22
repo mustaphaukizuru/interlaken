@@ -35,7 +35,7 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
     <div>
       {groupNotifs(visible).map((g) => (
         <section key={g.label} aria-label={g.label}>
-          <h3 className="sticky top-0 z-[1] bg-white/95 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[1.4px] text-subtle backdrop-blur">
+          <h3 className="sticky top-0 z-10 bg-white/95 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[1.4px] text-subtle backdrop-blur">
             {g.label}
           </h3>
           <ul>
@@ -54,7 +54,7 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
                     }`}
                   >
                     {!n.is_read && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-purple" aria-hidden="true" />}
-                    <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${m.cls}`}>
+                    <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${m.cls}`}>
                       <Icon size={17} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">

@@ -185,7 +185,7 @@ export default function AdminCafeteriaStudent() {
 
       {/* Paid card top-ups not in the balance yet (scheduled POS load). */}
       {!!balance.pending_topups?.length && (
-        <div role="note" className="flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.07] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+        <div role="note" className="flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.07] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
           <p>
             <strong>Recargas pagadas por aplicar:</strong>{' '}
             {balance.pending_topups.map((t) => `$${parseFloat(t.amount).toFixed(2)} (folio ${t.folio ?? '—'})`).join(', ')}.

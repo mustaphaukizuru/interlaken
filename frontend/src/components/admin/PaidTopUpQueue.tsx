@@ -210,7 +210,7 @@ export function PaidTopUpQueue() {
         </div>
       </div>
       {hiddenInactive > 0 && (
-        <div role="note" className="mb-3 flex flex-col gap-2 rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-2.5 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+        <div role="note" className="mb-3 flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-2.5 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
           <span>
             <strong>{hiddenInactive} recarga{hiddenInactive === 1 ? '' : 's'} pagada{hiddenInactive === 1 ? '' : 's'}</strong> de
             personas que ya no están activas no se muestra{hiddenInactive === 1 ? '' : 'n'} con el filtro «Activos».
@@ -377,7 +377,7 @@ export function AppliedTodayList() {
 /** What staff must type at the POS. */
 function LoadFacts({ row }: { row: TopUpLogEntry }) {
   return (
-    <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 rounded-lg bg-cream px-3 py-2 text-xs leading-5 text-ink">
+    <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 rounded-sm bg-cream px-3 py-2 text-xs leading-5 text-ink">
       <dt className="text-muted">Alumno</dt><dd>{row.student_name} <span className="text-subtle">({row.student_code})</span></dd>
       <dt className="text-muted">Cliente Loyverse</dt><dd className="font-mono">{row.loyverse_code || '—'}</dd>
       <dt className="text-muted">Monto a cargar</dt><dd className="font-semibold">{mxn(row.amount)}</dd>
@@ -442,7 +442,7 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
       </p>
       <LoadFacts row={row} />
       {refusal && (
-        <div role="alert" className="space-y-1 rounded-lg border border-coral/40 bg-coral-50 px-3 py-2 text-sm text-ink">
+        <div role="alert" className="space-y-1 rounded-sm border border-coral/40 bg-coral-50 px-3 py-2 text-sm text-ink">
           <p>{refusal.message}</p>
           {refusal.points && (
             <p className="text-xs text-muted">Loyverse: {mxn(refusal.points)} · App: {mxn(refusal.wallet)}</p>
@@ -450,11 +450,11 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
         </div>
       )}
       {canForce && (
-        <div className="space-y-2 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-ink">
+        <div className="space-y-2 rounded-sm border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-ink">
           <label className="flex min-h-[44px] cursor-pointer items-start gap-2.5">
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+              className="mt-1 h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
               checked={force}
               onChange={(e) => setForce(e.target.checked)}
             />
@@ -512,15 +512,15 @@ function RefundPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => v
       </p>
       <LoadFacts row={row} />
       <Input label="Motivo" maxLength={500} required value={note} onChange={(e) => setNote(e.target.value)} />
-      <div className="space-y-1 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-ink">
+      <div className="space-y-1 rounded-sm border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-ink">
         {realCharge && (
           <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5">
-            <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={bankDone} onChange={(e) => setBankDone(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40" checked={bankDone} onChange={(e) => setBankDone(e.target.checked)} />
             Ya hice la devolución del cargo en MultiCobros (Banorte)
           </label>
         )}
         <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5">
-          <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={notInPos} onChange={(e) => setNotInPos(e.target.checked)} />
+          <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40" checked={notInPos} onChange={(e) => setNotInPos(e.target.checked)} />
           Este monto no está cargado en el POS de Loyverse (o ya lo quité)
         </label>
       </div>

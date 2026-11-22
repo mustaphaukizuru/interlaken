@@ -22,7 +22,7 @@ export function QuickActions() {
           aria-label="Crear"
           aria-expanded={open}
           aria-haspopup="menu"
-          className="flex h-11 items-center gap-1.5 rounded-xl bg-purple px-3.5 text-[13px] font-semibold text-white shadow-[0_8px_20px_-6px_rgba(64,26,142,0.6)] hover:bg-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="flex h-11 items-center gap-1.5 rounded-sm bg-purple px-3.5 text-[13px] font-semibold text-white shadow-[0_8px_20px_-6px_rgba(64,26,142,0.6)] hover:bg-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           <Plus size={17} aria-hidden="true" /> <span className="hidden sm:inline">Nuevo</span>
         </button>
@@ -31,7 +31,7 @@ export function QuickActions() {
       {({ close }) => (
         <div role="menu" className="p-1.5">
           {ACTIONS.map(({ icon: Icon, label, to }) => (
-            <Link key={to} role="menuitem" to={to} onClick={close} className="flex min-h-[40px] items-center gap-2.5 rounded-lg px-3 text-sm text-ink hover:bg-cream-2">
+            <Link key={to} role="menuitem" to={to} onClick={close} className="flex min-h-[40px] items-center gap-2.5 rounded-sm px-3 text-sm text-ink hover:bg-cream-2">
               <Icon size={16} className="text-purple" aria-hidden="true" /> {label}
             </Link>
           ))}

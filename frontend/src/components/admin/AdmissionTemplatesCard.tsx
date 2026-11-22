@@ -46,14 +46,14 @@ export function AdmissionTemplatesCard() {
   if (isLoading) {
     return (
       <Card title="Plantillas de admisiones">
-        <div className="skeleton h-48 rounded-xl" role="status" aria-label="Cargando plantilla" />
+        <div className="skeleton h-48 rounded-md" role="status" aria-label="Cargando plantilla" />
       </Card>
     );
   }
 
   return (
     <Card title="Plantillas de admisiones">
-      <p className="mb-2 text-sm text-subtle">Correo que se envía desde el pipeline con «Pedir documentos». Puede usar: {(data?.placeholders ?? []).map((p) => <code key={p} className="mx-0.5 rounded bg-cream-2 px-1">{p}</code>)}</p>
+      <p className="mb-2 text-sm text-subtle">Correo que se envía desde el pipeline con «Pedir documentos». Puede usar: {(data?.placeholders ?? []).map((p) => <code key={p} className="mx-0.5 rounded-sm bg-cream-2 px-1">{p}</code>)}</p>
       <label className="label" htmlFor="tpl-missing">Documentos faltantes</label>
       <textarea id="tpl-missing" className="input-field font-mono text-sm" rows={8} value={value} onChange={(e) => setDraft(e.target.value)} />
       {error && <p className="mt-1 text-sm text-coral-600" role="alert">{error}</p>}

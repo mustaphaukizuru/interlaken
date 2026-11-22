@@ -37,7 +37,7 @@ export function LiveBadge({ updatedAt, isFetching, onRefresh, className = '' }: 
         onClick={onRefresh}
         aria-label="Actualizar ahora"
         title="Actualizar ahora"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
       >
         <RefreshCw size={13} className={isFetching ? 'animate-spin' : undefined} aria-hidden="true" />
       </button>

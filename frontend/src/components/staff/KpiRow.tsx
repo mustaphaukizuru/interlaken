@@ -164,7 +164,7 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
             {spark && <div className="mt-2"><Sparkline points={spark.points} color={spark.color} /></div>}
           </>
         );
-        const cls = 'group block min-w-0 rounded-xl2 border border-line bg-white p-4 shadow-card transition-colors hover:border-purple/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 dark:border-white/10 dark:bg-dark-card dark:shadow-none dark:hover:border-white/25';
+        const cls = 'group block min-w-0 rounded-md border border-line bg-white p-4 shadow-card transition-colors hover:border-purple/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 dark:border-white/10 dark:bg-dark-card dark:shadow-none dark:hover:border-white/25';
         if (!isAdmin) {
           return <div key={key} className={cls}>{body}</div>;
         }

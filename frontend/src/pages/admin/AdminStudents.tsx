@@ -76,7 +76,7 @@ const FAMILY_ACTION: BulkActionDef = { name: 'family', label: 'Vincular como her
 // A column of icons wide enough to stay pinned beside the data; below lg the
 // table moves them into its overflow menu, where the words show too.
 const ROW_ACTION_BASE =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:px-2';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:px-2';
 const ROW_ACTION = `${ROW_ACTION_BASE} text-purple hover:bg-cream-2`;
 // Below lg the table already folds the row into a menu, so the items show as plain buttons there;
 // the destructive one is coral, behind a divider (one color class each: Tailwind order would pick the winner).
@@ -260,7 +260,7 @@ export default function AdminStudents() {
       cell: (s: RosterStudent) => (s.family ? (
         <Link to={`/admin/familias?q=${encodeURIComponent(s.family.name)}`} title={`Ver ${s.family.name}`}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+          className="inline-flex max-w-full items-center gap-1.5 rounded-sm bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
           <House className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{s.family.name}</span>
         </Link>
@@ -397,7 +397,7 @@ export default function AdminStudents() {
                         key={key}
                         type="button"
                         role="menuitem"
-                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2"
+                        className="flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2"
                         onClick={() => { close(); run(); }}
                       >
                         <Icon size={16} aria-hidden="true" /> {label}
@@ -435,7 +435,7 @@ export default function AdminStudents() {
         <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
 
         {/* Pupils and staff cafetería accounts live in two lists (A4). */}
-        <div role="tablist" aria-label="Tipo de registro" className="inline-flex gap-1 rounded-xl bg-cream-2 p-1">
+        <div role="tablist" aria-label="Tipo de registro" className="inline-flex gap-1 rounded-md bg-cream-2 p-1">
           {([['alumno', 'Alumnos', Users], ['personal', 'Personal', Briefcase]] as const).map(([value, label, Icon]) => {
             const on = (value === 'personal') === personal;
             const n = on ? undefined : otherCount;
@@ -446,7 +446,7 @@ export default function AdminStudents() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => !on && switchTipo(value)}
-                className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[38px] ${
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[38px] ${
                   on ? 'bg-white text-purple shadow-sm ring-1 ring-purple/15' : 'text-muted hover:text-ink'
                 }`}
               >
@@ -466,7 +466,7 @@ export default function AdminStudents() {
 
         {/* The note leaves once nobody is left to review (the table says «Sin resultados»). */}
         {vinculado === MISSING ? (isLoading || count > 0) && (
-          <div role="note" className="flex flex-col gap-3 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+          <div role="note" className="flex flex-col gap-3 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
             <p>
               <strong>Estos alumnos ya no existen en Loyverse</strong>, así que no pueden comprar en cafetería.{' '}
               {canDelete
@@ -482,7 +482,7 @@ export default function AdminStudents() {
         ) : missingCount > 0 && (
           <Link
             to={`/admin/alumnos?vinculado=${MISSING}`}
-            className="flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
           >
             <span className="flex items-center gap-2.5">
               <AlertTriangle className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
@@ -650,7 +650,7 @@ export default function AdminStudents() {
         />
       </div>
       {twoPane && selectedId && (
-        <aside className="min-w-0 rounded-xl2 border border-line bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto" aria-label="Detalle del alumno">
+        <aside className="min-w-0 rounded-md bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto shadow-card" aria-label="Detalle del alumno">
           <div className="mb-2 flex justify-end"><button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelectedId(null)}>Cerrar panel</button></div>
           <AdminStudentDetail id={selectedId} embedded onDeleted={() => setSelectedId(null)} />
         </aside>

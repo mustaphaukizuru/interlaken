@@ -147,7 +147,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
         </div>
       ) : phase === 'error' ? (
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-xl2 border border-coral/30 bg-coral-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-md border border-coral/30 bg-coral-50 px-4 py-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-coral-dark" />
             <p className="text-sm text-ink">{error}</p>
           </div>
@@ -267,7 +267,7 @@ function LeaverGroup({ rows, selected, onToggle, onToggleAll, selectAllLabel, ti
 }) {
   const allSelected = rows.length > 0 && rows.every((u) => selected.has(u.id));
   return (
-    <div className="rounded-xl border border-line">
+    <div className="rounded-md border border-line">
       <div className="border-b border-line px-3 py-2">
         <label className="flex items-center gap-2 text-xs font-semibold text-subtle">
           <input type="checkbox" checked={allSelected} onChange={onToggleAll} aria-label={selectAllLabel} />
@@ -307,7 +307,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: 'pri
     : tone === 'warn' ? 'text-amber bg-amber/10 border-amber/30'
     : 'text-muted bg-cream border-line';
   return (
-    <div className={`rounded-xl border px-3 py-2 ${cls}`}>
+    <div className={`rounded-md border px-3 py-2 ${cls}`}>
       <div className="text-lg font-bold leading-tight">{value}</div>
       <div className="text-xs">{label}</div>
     </div>

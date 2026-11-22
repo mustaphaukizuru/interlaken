@@ -135,7 +135,7 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
 
   return (
     <>
-      <Link to="/admin/admisiones" className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-sm font-semibold text-purple hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+      <Link to="/admin/admisiones" className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm text-sm font-semibold text-purple hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
         <ArrowLeft size={16} aria-hidden="true" /> Expedientes
       </Link>
       <PageHeader
@@ -161,7 +161,7 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
         </div>
 
         {detail.closed && (
-          <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl bg-coral-50 px-4 py-3" role="status">
+          <div className="flex flex-wrap items-start justify-between gap-3 rounded-md bg-coral-50 px-4 py-3" role="status">
             <div className="min-w-0 text-sm">
               <p className="flex items-center gap-2 font-semibold text-coral-700">
                 <Ban size={17} aria-hidden="true" /> Expediente cerrado: {detail.closed.outcome_label}
@@ -180,7 +180,7 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
         <StageBar stage={detail.stage} closedFrom={detail.closed?.from_stage} onJump={(s) => jump(s)} />
 
         {openCase && next && (
-          <div role="group" aria-labelledby="case-next-step" className="flex flex-col gap-3 rounded-xl2 border border-line bg-cream-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div role="group" aria-labelledby="case-next-step" className="flex flex-col gap-3 rounded-md bg-cream-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p id="case-next-step" className="text-xs font-semibold uppercase tracking-wide text-subtle">Siguiente paso</p>
               <p className="text-sm font-semibold text-ink">{next.label}</p>
@@ -219,7 +219,7 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
   );
 }
 
-const QUICK = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-sm font-semibold text-ink transition hover:border-purple/40 hover:text-purple focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+const QUICK = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm border border-line bg-white px-3.5 text-sm font-semibold text-ink transition hover:border-purple/40 hover:text-purple focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
 /** WhatsApp, llamar, correo, «Exportar ficha» and the staff preview of «Cuotas (PDF)». */
 function QuickActions({ detail }: { detail: CaseDetail }) {
@@ -280,7 +280,7 @@ function QuickActions({ detail }: { detail: CaseDetail }) {
 function CaseMenu({ detail, onPick }: { detail: CaseDetail; onPick: (d: 'move' | 'close' | 'reopen') => void }) {
   const openCase = detail.stage !== 'cerrado' && detail.stage !== 'inscrito';
   if (detail.stage === 'inscrito') return null;
-  const item = 'flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+  const item = 'flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
   return (
     <Dropdown
       width={260}

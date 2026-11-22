@@ -18,7 +18,7 @@ export function EmptyState({ icon: Icon, title, description, action }: Props) {
             aria-hidden="true"
             className="absolute h-16 w-16 rounded-full bg-gradient-to-br from-purple/15 to-pink/10 blur-lg"
           />
-          <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-cream ring-1 ring-line dark:bg-white/5 dark:ring-white/10">
+          <span className="relative flex h-14 w-14 items-center justify-center rounded-md bg-cream ring-1 ring-line dark:bg-white/5 dark:ring-white/10">
             <Icon className="h-6 w-6 text-purple/80 dark:text-white/70" />
           </span>
         </div>

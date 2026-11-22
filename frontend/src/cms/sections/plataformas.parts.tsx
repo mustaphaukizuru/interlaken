@@ -117,7 +117,7 @@ export function PlatformsView(p: PlatformsProps) {
 
       {p.note && (
         <Reveal delay={120} className="mt-8">
-          <div className="flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
+          <div className="flex items-start gap-3 rounded-md bg-white p-5 text-sm text-muted shadow-card">
             <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
             <p>
               <NoteText text={t(p.note)} />

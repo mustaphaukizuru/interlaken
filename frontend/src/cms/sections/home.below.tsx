@@ -67,13 +67,13 @@ function HomeAboutView(p: AboutProps) {
         </m.div>
         <m.div variants={fadeLeft} className="relative">
           <div className="grid grid-cols-2 gap-3.5">
-            {imgs[0] && <img src={imageSrc(imgs[0], 'md')} srcSet={imageSrcSet(imgs[0])} sizes={CARD_SIZES} alt={altOf(imgs[0])} loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full max-w-full rounded-2xl object-cover" onError={hideOnError} />}
-            {imgs[1] && <img src={imageSrc(imgs[1], 'md')} srcSet={imageSrcSet(imgs[1])} sizes={CARD_SIZES} alt={altOf(imgs[1])} loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />}
-            {imgs[2] && <img src={imageSrc(imgs[2], 'md')} srcSet={imageSrcSet(imgs[2])} sizes={CARD_SIZES} alt={altOf(imgs[2])} loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />}
+            {imgs[0] && <img src={imageSrc(imgs[0], 'md')} srcSet={imageSrcSet(imgs[0])} sizes={CARD_SIZES} alt={altOf(imgs[0])} loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full max-w-full rounded-md object-cover" onError={hideOnError} />}
+            {imgs[1] && <img src={imageSrc(imgs[1], 'md')} srcSet={imageSrcSet(imgs[1])} sizes={CARD_SIZES} alt={altOf(imgs[1])} loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
+            {imgs[2] && <img src={imageSrc(imgs[2], 'md')} srcSet={imageSrcSet(imgs[2])} sizes={CARD_SIZES} alt={altOf(imgs[2])} loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
           </div>
           {p.badgeValue && (
-            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-right-2">
-              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-purple/10"><Star size={20} color="var(--purple)" /></div>
+            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-md bg-white px-4 py-3.5 shadow-purple sm:-right-2">
+              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-md bg-purple/10"><Star size={20} color="var(--purple)" /></div>
               <div>
                 <div className="font-head text-xl font-extrabold leading-none text-ink">{t(p.badgeValue)}</div>
                 <div className="text-[11.5px] text-muted">{t(p.badgeLabel)}</div>
@@ -143,7 +143,7 @@ function HomeLevelsView(p: LevelsProps) {
                 </div>
                 <div className="px-5 py-[18px]">
                   {l.text && <p className="text-sm leading-relaxed text-muted">{t(l.text)}</p>}
-                  <CmsAnchor link={{ href: l.href }} className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2 rounded">{t(l.linkLabel) || `Conocer ${t(l.name)}`} <ArrowRight size={14} style={{ color: accent }} /></CmsAnchor>
+                  <CmsAnchor link={{ href: l.href }} className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm">{t(l.linkLabel) || `Conocer ${t(l.name)}`} <ArrowRight size={14} style={{ color: accent }} /></CmsAnchor>
                 </div>
               </div>
             </m.div>
@@ -182,7 +182,7 @@ function HomeProgramsView(p: ProgramsProps) {
                 <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${accent} 53%, transparent)` }}>
                   {it.image && <img src={imageSrc(it.image, 'md')} srcSet={imageSrcSet(it.image)} sizes={CARD_SIZES} alt={altOf(it.image, it.name)} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />}
                 </div>
-                <div className="absolute bottom-0.5 right-0.5 flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]" style={{ background: accent }}>
+                <div className="absolute bottom-0.5 right-0.5 flex h-10 w-10 items-center justify-center rounded-sm shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]" style={{ background: accent }}>
                   <Icon size={19} color="white" />
                 </div>
               </div>
@@ -212,7 +212,7 @@ function HomePromosView({ items }: { items?: PromoItem[] }) {
           const link = asLink(it.link);
           return (
             <m.div key={i} variants={i % 2 === 0 ? fadeRight : fadeLeft}>
-              <div className="hover-lift relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-xl3 px-8 py-10 text-white shadow-[0_24px_48px_-20px_rgba(16,12,40,0.4)] sm:px-9" style={{ background: `linear-gradient(135deg, ${cmsColor(it.color)} 0%, ${cmsColor(it.color2, cmsColor(it.color))} 100%)` }}>
+              <div className="hover-lift relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-md px-8 py-10 text-white shadow-[0_24px_48px_-20px_rgba(16,12,40,0.4)] sm:px-9" style={{ background: `linear-gradient(135deg, ${cmsColor(it.color)} 0%, ${cmsColor(it.color2, cmsColor(it.color))} 100%)` }}>
                 <div className="pointer-events-none absolute -top-12 -right-12 h-[200px] w-[200px] rounded-full bg-white/[0.08]" />
                 <Icon size={40} color="rgba(255,255,255,0.9)" className="relative" />
                 <div className="relative mt-5">
@@ -247,7 +247,7 @@ function HomeStrengthsView(p: { eyebrow?: string; title?: string; items?: Streng
           return (
             <m.div key={i} variants={sectionReveal} className="h-full">
               <div className="card hover-lift flex h-full flex-col gap-[18px]">
-                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
+                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
                   <Icon size={26} color={color} />
                 </div>
                 <h3 className="font-head text-[19px] font-bold text-ink">{t(s.title)}</h3>
@@ -289,7 +289,7 @@ function HomeGalleryView(p: GalleryProps) {
       </m.div>
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
         {asList<Img & { caption?: string }>(p.images).filter((im) => im.image).map((im, i) => (
-          <Link key={i} to={href} aria-label="Ver la galería completa" className="group block overflow-hidden rounded-[14px] border border-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+          <Link key={i} to={href} aria-label="Ver la galería completa" className="group block overflow-hidden rounded-md border border-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
             <img src={imageSrc(im.image, 'md')} srcSet={imageSrcSet(im.image)} sizes="(min-width: 640px) 280px, 45vw" alt={altOf(im.image, im.caption ?? '')} loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none sm:h-[150px]" onError={hideOnError} />
           </Link>
         ))}
@@ -337,10 +337,10 @@ function LeadForm(p: LeadProps) {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl3 bg-gradient-to-br from-purple to-brand-500 text-white px-6 py-10 text-center sm:px-10 sm:py-12 lg:py-14">
+    <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-purple to-brand-500 text-white px-6 py-10 text-center sm:px-10 sm:py-12 lg:py-14">
       <div className="pointer-events-none absolute -top-16 -right-10 hidden h-56 w-56 rounded-full bg-white/[0.06] sm:block" />
       <div className="relative mx-auto max-w-[620px]">
-        <div className="mx-auto mb-4 inline-flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-white/[0.14]">
+        <div className="mx-auto mb-4 inline-flex h-[52px] w-[52px] items-center justify-center rounded-md bg-white/[0.14]">
           <Mail size={24} />
         </div>
         <h2 className="font-head font-extrabold text-fluid-3xl tracking-tight">{t(p.title)}</h2>
@@ -362,7 +362,7 @@ function LeadForm(p: LeadProps) {
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+                className="w-full rounded-sm border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
               />
             </label>
             <label className="min-w-0 flex-1 sm:flex-[1_1_220px]">
@@ -372,7 +372,7 @@ function LeadForm(p: LeadProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+                className="w-full rounded-sm border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
               />
             </label>
             <button

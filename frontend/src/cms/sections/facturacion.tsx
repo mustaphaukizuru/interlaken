@@ -66,9 +66,9 @@ function FacturacionNoticesView(p: { title?: string; items?: { text?: string }[]
   return (
     <CardBand>
       <Reveal>
-        <div className="rounded-xl2 border border-ink/10 bg-cream-2 p-6 sm:p-7">
+        <div className="rounded-md bg-cream-2 p-6 sm:p-7">
           <p className="flex items-center gap-2.5 font-head text-lg font-bold text-ink sm:text-xl">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-coral/10 text-coral-700">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-coral/10 text-coral-700">
               <Info size={19} aria-hidden="true" />
             </span>
             {t(p.title)}
@@ -92,9 +92,9 @@ function FacturacionRequestView(p: { title?: string; text?: string; email?: stri
   return (
     <CardBand>
       <Reveal delay={70}>
-        <div className="rounded-xl2 border border-green/30 bg-green/5 p-6 sm:p-7">
+        <div className="rounded-md border border-green/30 bg-green/5 p-6 sm:p-7">
           <h2 className="flex items-center gap-2.5 font-head text-lg font-bold text-ink sm:text-xl">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-green/15 text-green-dark">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-green/15 text-green-dark">
               <Mail size={18} aria-hidden="true" />
             </span>
             {t(p.title)}
@@ -123,9 +123,9 @@ function FacturacionDownloadView(p: { title?: string; text?: string; link?: CmsL
   return (
     <CardBand>
       <Reveal delay={140}>
-        <div className="rounded-xl2 border border-ink/10 bg-white p-6 sm:p-7">
+        <div className="rounded-md bg-white p-6 sm:p-7 shadow-card">
           <p className="flex items-center gap-2.5 font-head text-lg font-bold text-ink sm:text-xl">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple/10 text-purple">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-purple/10 text-purple">
               <ReceiptText size={18} aria-hidden="true" />
             </span>
             {t(p.title)}

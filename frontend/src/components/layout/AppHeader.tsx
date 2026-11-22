@@ -19,7 +19,7 @@ export default function AppHeader() {
     <>
       <div className="accent-bar" />
       <header
-        className={`z-30 flex items-center gap-3 border-b border-line bg-cream/95 px-4 transition-[box-shadow,padding] duration-200 sm:gap-4 sm:px-6 lg:px-8 ${
+        className={`z-header flex items-center gap-3 border-b border-line bg-cream/95 px-4 transition-[box-shadow,padding] duration-200 sm:gap-4 sm:px-6 lg:px-8 ${
           scrolled ? 'py-2 shadow-[0_10px_24px_-18px_rgba(16,12,40,0.55)]' : 'py-3'
         }`}
       >
@@ -29,7 +29,7 @@ export default function AppHeader() {
           onClick={toggle}
           aria-label="Abrir menú"
           aria-expanded={open}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-dark text-white shadow-[0_8px_20px_-6px_rgba(64,26,142,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60 lg:hidden"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-dark text-white shadow-[0_8px_20px_-6px_rgba(64,26,142,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60 lg:hidden"
         >
           <Menu size={20} />
         </button>
@@ -48,11 +48,11 @@ export default function AppHeader() {
             type="button"
             onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
             aria-label={user.role === 'admin' ? 'Buscar alumnos o reservas' : 'Ir a una sección'}
-            className="hidden w-[230px] items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-[9px] text-left shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
+            className="hidden w-[230px] items-center gap-2 rounded-sm border border-line bg-white px-3.5 py-[9px] text-left shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
           >
             <Search size={15} className="text-subtle" aria-hidden="true" />
             <span className="flex-1 text-[13px] text-subtle">{user.role === 'admin' ? 'Buscar…' : 'Ir a…'}</span>
-            <kbd className="rounded border border-line px-1.5 py-0.5 text-[10px] font-semibold text-subtle">Ctrl K</kbd>
+            <kbd className="rounded-sm border border-line px-1.5 py-0.5 text-[10px] font-semibold text-subtle">Ctrl K</kbd>
           </button>
         )}
 

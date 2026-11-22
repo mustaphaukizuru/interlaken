@@ -124,13 +124,13 @@ export function InstallHint() {
   return (
     <section
       aria-label="Instalar la aplicación del portal"
-      className="relative rounded-xl2 border border-purple/20 bg-purple-light/50 px-4 py-3 text-sm text-ink"
+      className="relative rounded-md border border-purple/20 bg-purple-light/50 px-4 py-3 text-sm text-ink"
     >
       <button
         type="button"
         onClick={dismissForever}
         aria-label="No volver a mostrar esta sugerencia"
-        className="absolute right-1.5 top-1.5 rounded-lg p-2 text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        className="absolute right-1.5 top-1.5 rounded-sm p-2 text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
       >
         <X size={16} aria-hidden="true" />
       </button>
@@ -155,7 +155,7 @@ export function InstallHint() {
                 type="button"
                 onClick={onInstall}
                 disabled={busy}
-                className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-xl2 bg-purple px-4 py-2 text-sm font-semibold text-white hover:bg-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
+                className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-sm bg-purple px-4 py-2 text-sm font-semibold text-white hover:bg-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
               >
                 Agregar a pantalla de inicio
               </button>

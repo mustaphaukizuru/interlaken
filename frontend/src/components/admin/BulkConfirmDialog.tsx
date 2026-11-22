@@ -322,7 +322,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
       {(phase === 'plan' || phase === 'running') && plan && (
         <>
           <div className="flex gap-3">
-            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${action.danger ? 'bg-coral-50 text-coral-600' : 'bg-brand-50 text-purple'}`}>
+            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm ${action.danger ? 'bg-coral-50 text-coral-600' : 'bg-brand-50 text-purple'}`}>
               <AlertTriangle className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="space-y-1 text-sm text-muted">
@@ -345,7 +345,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
               )}
               {renderPlan?.(plan)}
               {plan.warnings && plan.warnings.length > 0 && (
-                <div className="rounded-lg border border-amber/40 bg-amber/10 p-2 text-xs text-ink" role="note">
+                <div className="rounded-sm border border-amber/40 bg-amber/10 p-2 text-xs text-ink" role="note">
                   <p className="font-semibold">Atención ({plan.warnings.length}):</p>
                   <ul className="mt-1 max-h-32 list-disc space-y-0.5 overflow-y-auto pl-5" aria-label="Avisos">
                     {plan.warnings.map((w) => <li key={String(w.id)}>{w.message}</li>)}
@@ -359,7 +359,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
           {needsNote && (
             <div>
               {!action.requiresNote && action.noteWhen && (
-                <p id="bulk-note-why" className="mb-2 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink" role="note">
+                <p id="bulk-note-why" className="mb-2 rounded-sm border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink" role="note">
                   {action.noteWhen.explain(noteRows)}
                 </p>
               )}
@@ -395,7 +395,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
 
           {action.notifyOption && (
             <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
-              <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+              <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
               Notificar a las familias
             </label>
           )}
@@ -450,7 +450,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
       {phase === 'done' && result && (
         <div className="space-y-3">
           <div className="flex gap-3">
-            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${result.failed.length ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-700'}`}>
+            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm ${result.failed.length ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-700'}`}>
               {result.failed.length ? <AlertTriangle className="h-5 w-5" aria-hidden="true" /> : <CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
             </span>
             <div className="text-sm text-muted" role="status">
@@ -470,7 +470,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </div>
           </div>
           {result.failed.length > 0 && (
-            <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line bg-cream-2 p-2 text-xs" aria-label="Filas fallidas">
+            <ul className="max-h-48 space-y-1 overflow-y-auto rounded-sm border border-line bg-cream-2 p-2 text-xs" aria-label="Filas fallidas">
               {result.failed.map((f) => (
                 <li key={String(f.id)} className="flex gap-2">
                   <span className={rowName ? 'font-semibold text-ink' : 'font-mono text-subtle'}>{nameOf(f.id)}</span>
@@ -481,7 +481,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
           )}
           {/* With row names the skipped rows are listed too: each row's result in one place. */}
           {rowName && result.skipped.length > 0 && (
-            <ul className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-line p-2 text-xs" aria-label="Filas omitidas">
+            <ul className="max-h-32 space-y-1 overflow-y-auto rounded-sm border border-line p-2 text-xs" aria-label="Filas omitidas">
               {result.skipped.map((s) => (
                 <li key={String(s.id)} className="flex gap-2">
                   <span className="font-semibold text-ink">{nameOf(s.id)}</span>

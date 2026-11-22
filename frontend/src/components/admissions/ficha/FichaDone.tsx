@@ -26,7 +26,7 @@ export function FichaDone({ copy, childName, headingRef, download }: {
   return (
     <div className="card p-6 sm:p-10">
       <div className="text-center">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-light text-green-dark" aria-hidden="true">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-sm bg-green-light text-green-dark" aria-hidden="true">
           <CheckCircle2 className="h-8 w-8" />
         </div>
         <h2 ref={headingRef} tabIndex={-1} className="font-head text-fluid-2xl font-bold text-ink focus:outline-none">{copy.t('doneTitle')}</h2>

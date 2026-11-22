@@ -136,8 +136,8 @@ function StoryPart({ item, color, first, id }: { item: StoryItem; color: string;
             const lead = `**${name}** `;
             const body = name && text.startsWith(lead) ? text.slice(lead.length) : text;
             return (
-              <li key={k} className="flex gap-4 rounded-xl2 border border-line bg-cream-2 p-5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink" style={{ background: `color-mix(in srgb, ${color} 14.9%, transparent)` }}>
+              <li key={k} className="flex gap-4 rounded-md bg-cream-2 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink" style={{ background: `color-mix(in srgb, ${color} 14.9%, transparent)` }}>
                   <Icon size={20} aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
@@ -173,7 +173,7 @@ function Story({ items, color, photo, photoAlt, photoAfter }: { items: StoryItem
           </Reveal>
           {img.src && after === i && (
             <Reveal>
-              <figure className="overflow-hidden rounded-xl2 bg-cream-2">
+              <figure className="overflow-hidden rounded-md bg-cream-2">
                 <img
                   src={img.src}
                   srcSet={img.srcSet}
@@ -228,7 +228,7 @@ function NivelContentView(p: ContentProps) {
                 {p.groupsTitle && <h2 className="font-head text-fluid-xl font-bold text-ink">{t(p.groupsTitle)}</h2>}
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   {groups.map((g, i) => (
-                    <div key={i} className={`rounded-xl2 border ${accent.ring} ${accent.soft} p-5`}>
+                    <div key={i} className={`rounded-md border ${accent.ring} ${accent.soft} p-5`}>
                       <p className="flex items-center gap-2 font-head font-bold text-ink">
                         <Users size={17} className={accent.text} aria-hidden="true" /> {t(g.name)}
                       </p>
@@ -256,7 +256,7 @@ function NivelContentView(p: ContentProps) {
           {/* Incorporación SEP de este nivel (moved here from the footer, school instruction 2026-08-21) */}
           {sep && (
             <Reveal>
-              <div className="rounded-xl2 border border-line bg-cream-2 p-5" style={{ borderLeft: `4px solid ${color}` }}>
+              <div className="rounded-md bg-cream-2 p-5" style={{ borderLeft: `4px solid ${color}` }}>
                 <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[1.2px] text-subtle">
                   <ShieldCheck size={14} aria-hidden="true" /> {t(p.sepTitle)}
                 </p>
@@ -268,7 +268,7 @@ function NivelContentView(p: ContentProps) {
         </div>
 
         {/* Sidebar de acciones (paralela al menú del sitio anterior) */}
-        <aside className="h-fit rounded-xl2 border border-ink/10 bg-cream-2 p-5 lg:sticky lg:top-24">
+        <aside className="h-fit rounded-md bg-cream-2 p-5 lg:sticky lg:top-24">
           {p.sideTitle && (
             <p className="font-head text-sm font-bold uppercase tracking-wide text-subtle">
               {t(p.sideTitle)}
@@ -309,7 +309,7 @@ function NivelOthersView(p: { title?: string; items?: OtherItem[] }) {
             <CmsAnchor
               key={i}
               link={{ label: o.name, href: o.href }}
-              className="group flex items-center justify-between rounded-xl2 border border-ink/10 bg-white p-5 hover:border-green/40"
+              className="group flex items-center justify-between rounded-md border border-ink/10 bg-white p-5 hover:border-green/40"
             >
               <span className="font-head text-lg font-bold text-ink group-hover:text-green-dark">
                 {t(o.name)}

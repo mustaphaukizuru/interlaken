@@ -112,11 +112,11 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
         )}
       </div>
       {discounts.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin becas ni descuentos acordados.</p>
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin becas ni descuentos acordados.</p>
       ) : (
         <ul className="space-y-2" aria-label="Becas y descuentos">
           {discounts.map((d) => (
-            <li key={d.id} className="rounded-xl border border-line bg-white px-3.5 py-3">
+            <li key={d.id} className="rounded-md bg-white px-3.5 py-3 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-ink">{d.summary}</p>
@@ -129,11 +129,11 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
                 {!readOnly && (
                   <div className="flex gap-1">
                     <button type="button" onClick={() => setEditing(d)} aria-label={`Editar: ${d.summary}`}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                       <Pencil size={16} aria-hidden="true" />
                     </button>
                     <button type="button" onClick={() => setVoiding(d)} aria-label={`Anular: ${d.summary}`}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                       <Trash2 size={16} aria-hidden="true" />
                     </button>
                   </div>
@@ -179,9 +179,9 @@ export function DiscountForm({ detail, discount, onDone }: { detail: CaseDetail;
       <fieldset>
         <legend className="label">Valor</legend>
         <div className="flex flex-wrap items-start gap-2">
-          <div className="inline-flex rounded-full bg-cream p-1" role="radiogroup" aria-label="Porcentaje o monto fijo">
+          <div className="inline-flex rounded-md bg-cream p-1" role="radiogroup" aria-label="Porcentaje o monto fijo">
             {(['percent', 'amount'] as const).map((m) => (
-              <label key={m} className={clsx('inline-flex min-h-[40px] cursor-pointer items-center rounded-full px-4 text-sm font-semibold focus-within:ring-2 focus-within:ring-purple/40',
+              <label key={m} className={clsx('inline-flex min-h-[40px] cursor-pointer items-center rounded-sm px-4 text-sm font-semibold focus-within:ring-2 focus-within:ring-purple/40',
                 form.mode === m ? 'bg-white text-ink shadow-sm' : 'text-muted')}>
                 <input type="radio" name="disc-mode" className="sr-only" checked={form.mode === m} onChange={() => set('mode', m)} />
                 {m === 'percent' ? 'Porcentaje' : 'Monto fijo'}

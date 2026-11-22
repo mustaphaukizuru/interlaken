@@ -16,7 +16,7 @@ import {
 const FORMATS: FichaFormat[] = ['xlsx', 'pdf'];
 const ICON = { xlsx: FileSpreadsheet, pdf: FileText } as const;
 const BTN = 'btn-outline min-h-[44px] text-sm sm:min-h-[40px]';
-const ITEM = 'flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2 disabled:opacity-50';
+const ITEM = 'flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2 disabled:opacity-50';
 
 /** Row «⋯» menu: «Ficha (Excel)» / «Ficha (PDF)». */
 export function FichaRowMenu({ id, childName }: { id: number; childName: string }) {

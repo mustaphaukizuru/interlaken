@@ -31,8 +31,8 @@ interface Props {
 }
 
 /** «Editar» and «Personalizar» share one size so the column lines up. */
-const mainAction = 'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 md:w-[150px] md:flex-none';
-const iconLink = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+const mainAction = 'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-sm px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 md:w-[150px] md:flex-none';
+const iconLink = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
 /**
  * One group of «Contenido» (public pages, or the school's own pages): a table
@@ -48,7 +48,7 @@ export function PageListGroup({ title, listLabel, rows, total, base, isAdmin, se
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           {selected && onToggleAll && selectable.length > 0 && (
-            <input type="checkbox" className="h-5 w-5 rounded border-line text-purple focus:ring-purple/40" checked={allOn}
+            <input type="checkbox" className="h-5 w-5 rounded-sm border-line text-purple focus:ring-purple/40" checked={allOn}
               aria-label={allOn ? `Quitar la selección de ${listLabel}` : `Seleccionar todas: ${listLabel}`} onChange={() => onToggleAll(selectable, !allOn)} />
           )}
           <h2 id={headingId} className="font-semibold text-ink">
@@ -71,7 +71,7 @@ export function PageListGroup({ title, listLabel, rows, total, base, isAdmin, se
                 <li key={r.key} data-state={r.state.key} className="grid gap-3 px-4 py-3 sm:px-5 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_minmax(0,1.2fr)_auto] md:items-center md:gap-4">
                   <div className="flex min-w-0 items-start gap-3">
                     {selected && onToggle && (
-                      p ? <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 rounded border-line text-purple focus:ring-purple/40" checked={selected.has(p.id)}
+                      p ? <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-line text-purple focus:ring-purple/40" checked={selected.has(p.id)}
                         aria-label={`Seleccionar ${r.title}`} onChange={() => onToggle(p.id)} />
                         : <span className="h-5 w-5 shrink-0" aria-hidden="true" />
                     )}

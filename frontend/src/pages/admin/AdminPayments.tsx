@@ -150,7 +150,7 @@ export default function AdminPayments() {
               const max = Math.max(...s.series.map((d) => Number(d.total)), 1);
               return s.series.map((d) => (
                 <li key={d.date} className="group relative flex-1" title={`${d.date}: ${formatMXN(d.total)} (${d.count})`}>
-                  <div className="w-full rounded-t bg-green/70 transition group-hover:bg-green" style={{ height: `${Math.max(4, (Number(d.total) / max) * 100)}%` }} />
+                  <div className="w-full rounded-t-sm bg-green/70 transition group-hover:bg-green" style={{ height: `${Math.max(4, (Number(d.total) / max) * 100)}%` }} />
                 </li>
               ));
             })()}

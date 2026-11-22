@@ -85,7 +85,7 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
 
   return (
     <StageCard stage="documentacion" state={state} open={open} onToggle={onToggle} summary={documentacionSummary(detail)}>
-      <div className="rounded-xl2 border border-line p-4">
+      <div className="rounded-md border border-line p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 font-semibold text-ink"><FileSignature size={17} aria-hidden="true" /> Ficha de inscripción</h3>
@@ -129,7 +129,7 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
       </div>
 
       {docs && docMeta && (
-        <div className={clsx('flex flex-wrap items-start justify-between gap-3 rounded-xl px-3.5 py-3', docMeta.cls)}>
+        <div className={clsx('flex flex-wrap items-start justify-between gap-3 rounded-md px-3.5 py-3', docMeta.cls)}>
           <p className="flex min-w-0 items-start gap-2 text-sm">
             <DocIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>

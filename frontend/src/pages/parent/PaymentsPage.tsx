@@ -197,7 +197,7 @@ export default function PaymentsPage() {
                   <div key={p.id} className="py-4 first:pt-0 last:pb-0">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cream">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-cream">
                           <Icon className="h-4 w-4 text-muted" />
                         </div>
                         <div className="min-w-0">
@@ -261,7 +261,7 @@ function SummaryTiles({ summary, loading }: { summary?: PaymentSummary; loading:
   return (
     <div className="mb-6 grid gap-3 sm:grid-cols-3" aria-busy={loading}>
       {tiles.map((t) => (
-        <div key={t.label} className="rounded-xl2 border border-line bg-white p-4 shadow-card">
+        <div key={t.label} className="rounded-md bg-white p-4 shadow-card">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-subtle">
             <t.icon size={14} aria-hidden="true" /> {t.label}
           </div>
@@ -279,9 +279,9 @@ function ActionCard({ to, icon: Icon, title, desc, gradient }: {
   return (
     <Link
       to={to}
-      className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+      className="hover-lift group flex items-center gap-4 rounded-md border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
     >
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-purple`}>
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gradient-to-br ${gradient} text-white shadow-purple`}>
         <Icon className="h-6 w-6" />
       </span>
       <span className="min-w-0 flex-1">

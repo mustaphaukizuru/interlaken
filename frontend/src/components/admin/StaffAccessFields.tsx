@@ -61,13 +61,13 @@ export function StaffAccessFields({ value, onChange, idPrefix = 'acc' }: {
         <legend className="label">Áreas de la consola</legend>
         <div className="grid gap-1.5">
           {AREAS.map((a) => (
-            <label key={a.key} htmlFor={`${idPrefix}-area-${a.key}`} className="grid min-h-[44px] cursor-pointer grid-cols-[auto,1fr] items-start gap-x-2.5 rounded-lg border border-line px-3 py-2 hover:border-purple/40">
+            <label key={a.key} htmlFor={`${idPrefix}-area-${a.key}`} className="grid min-h-[44px] cursor-pointer grid-cols-[auto,1fr] items-start gap-x-2.5 rounded-sm border border-line px-3 py-2 hover:border-purple/40">
               <input
                 id={`${idPrefix}-area-${a.key}`}
                 type="checkbox"
                 aria-labelledby={`${idPrefix}-area-${a.key}-name`}
                 aria-describedby={`${idPrefix}-area-${a.key}-desc`}
-                className="row-span-2 mt-1 h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                className="row-span-2 mt-1 h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                 checked={value.staff_areas.includes(a.key)}
                 onChange={(e) => toggle(a.key, e.target.checked)}
               />

@@ -532,7 +532,7 @@ export default function CafeteriaPage() {
       {balancesLoading ? (
         <div className="space-y-4" aria-busy="true" aria-label="Cargando cafetería">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[0, 1].map((i) => <div key={i} className="skeleton h-[260px] rounded-xl2" />)}
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[260px] rounded-md" />)}
           </div>
           <Card><ListSkeleton rows={4} /></Card>
         </div>
@@ -565,7 +565,7 @@ export default function CafeteriaPage() {
               className={`flex flex-col ${isSelected ? 'ring-2 ring-purple/35' : ''}`}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-green-50 text-green-700">
                   <Coffee className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -601,11 +601,11 @@ export default function CafeteriaPage() {
               <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} applyTime={policy?.apply_time} />
 
               {left ? (
-                <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
+                <p className="mt-3 rounded-sm border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
                   Este alumno ya no está activo en el colegio. Para aclarar su saldo, contacta al colegio.
                 </p>
               ) : notLinked && (
-                <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
+                <p className="mt-3 rounded-sm border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
                   Este alumno aún no está vinculado a cafetería/Loyverse. Contacta al colegio para activar el servicio.
                 </p>
               )}
@@ -629,7 +629,7 @@ export default function CafeteriaPage() {
                   setThresholdStudent(b);
                   setThresholdValue(parseFloat(b.low_balance_threshold ?? '20').toFixed(0));
                 }}
-                className="mt-2 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                className="mt-2 self-start rounded-sm text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
               >
                 Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '20').toFixed(0)}</span> · Cambiar
               </button>
@@ -645,7 +645,7 @@ export default function CafeteriaPage() {
                     <button
                       type="button"
                       onClick={() => openBudget(b)}
-                      className="mt-2 flex items-center gap-1 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                      className="mt-2 flex items-center gap-1 self-start rounded-sm text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
                     >
                       <Wallet className="h-3 w-3" /> Establecer presupuesto
                     </button>
@@ -687,7 +687,7 @@ export default function CafeteriaPage() {
                     <button
                       type="button"
                       onClick={() => openBudget(b)}
-                      className="self-start rounded text-left text-[11px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                      className="self-start rounded-sm text-left text-[11px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
                     >
                       Cambiar presupuesto
                     </button>
@@ -790,7 +790,7 @@ export default function CafeteriaPage() {
                     key={amt}
                     type="button"
                     onClick={() => setTopupAmount(String(amt))}
-                    className={`min-h-[40px] rounded-full border px-4 text-sm font-semibold transition ${
+                    className={`min-h-[40px] rounded-sm border px-4 text-sm font-semibold transition ${
                       topupAmount === String(amt)
                         ? 'border-purple bg-purple text-white'
                         : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
@@ -810,7 +810,7 @@ export default function CafeteriaPage() {
                 recargas are made directly at the cafetería POS. */}
             <p className="label">Método de pago</p>
             <div
-              className={`flex min-h-[56px] items-start gap-3 rounded-xl border p-3 ${
+              className={`flex min-h-[56px] items-start gap-3 rounded-md border p-3 ${
                 onlineAvailable ? 'border-purple bg-purple/[0.04]' : 'border-line bg-cream/60 opacity-70'}`}
             >
               <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-purple" aria-hidden="true" />
@@ -836,18 +836,18 @@ export default function CafeteriaPage() {
               </span>
             </div>
             {onlineAvailable && availability?.test_mode && (
-              <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
+              <p className="rounded-md border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
                 <strong>Modo de prueba Banorte:</strong> no se realiza ningún cargo real.
               </p>
             )}
             {onlineAvailable && availability?.certification && (
-              <p className="rounded-xl border border-coral/40 bg-coral-50 px-3 py-2 text-xs text-ink">
+              <p className="rounded-md border border-coral/40 bg-coral-50 px-3 py-2 text-xs text-ink">
                 <strong>Certificación Banorte: cargo real a la tarjeta.</strong> Solo cuentas de prueba
                 ven esta opción; el pago puede devolverse desde MultiCobros.
               </p>
             )}
             {onlineAvailable && scheduled && (
-              <p role="note" className="rounded-xl border border-amber/40 bg-amber/[0.07] px-3 py-2.5 text-xs leading-relaxed text-ink">
+              <p role="note" className="rounded-md border border-amber/40 bg-amber/[0.07] px-3 py-2.5 text-xs leading-relaxed text-ink">
                 {applyNotice(policy)}
               </p>
             )}
@@ -867,7 +867,7 @@ export default function CafeteriaPage() {
         )}
 
         {topupStep === 4 && (
-          <dl className="divide-y divide-line rounded-xl border border-line text-sm">
+          <dl className="divide-y divide-line rounded-md border border-line text-sm">
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>

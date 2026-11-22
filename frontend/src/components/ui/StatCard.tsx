@@ -67,10 +67,10 @@ export function StatCard({ title, value, suffix, icon: Icon, color, trend, subti
     // Sizing is responsive, not fixed: at 390px these tiles sit two-per-row, so
     // padding, the icon chip and the figure all step down instead of forcing a
     // one-per-screen scroll through the KPIs.
-    <div className="hover-lift relative overflow-hidden rounded-[18px] border border-line bg-white p-4 shadow-card sm:p-[22px]">
+    <div className="hover-lift relative overflow-hidden rounded-md bg-white p-4 shadow-card sm:p-[22px]">
       <div className="mb-3 flex items-center justify-between sm:mb-[18px]">
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-[12px] sm:h-11 sm:w-11"
+          className="flex h-10 w-10 items-center justify-center rounded-md sm:h-11 sm:w-11"
           style={{ background: t.bg }}
         >
           <Icon size={20} color={t.color} className="sm:h-[22px] sm:w-[22px]" />

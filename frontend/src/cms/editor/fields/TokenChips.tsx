@@ -104,8 +104,8 @@ export function useTokenUndo(value: string, onChange: (v: string) => void) {
     };
     toast.success((t) => (
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        <span>Se insertó <code className="rounded bg-cream px-1 font-mono text-xs">{token}</code>{today && today !== token ? ` (hoy: ${today})` : ''}.</span>
-        <button type="button" onClick={() => undo(t.id)} className="min-h-[44px] rounded-lg px-2 font-semibold text-purple underline-offset-2 hover:underline sm:min-h-[32px]">
+        <span>Se insertó <code className="rounded-sm bg-cream px-1 font-mono text-xs">{token}</code>{today && today !== token ? ` (hoy: ${today})` : ''}.</span>
+        <button type="button" onClick={() => undo(t.id)} className="min-h-[44px] rounded-sm px-2 font-semibold text-purple underline-offset-2 hover:underline sm:min-h-[32px]">
           Deshacer
         </button>
       </span>
@@ -143,7 +143,7 @@ export function TokenChips({ target, value = '', onChange, onInsert, tokens = MA
     setActive(to);
     e.currentTarget.querySelectorAll<HTMLButtonElement>('button')[to]?.focus();
   };
-  const chip = 'inline-flex min-h-[44px] items-center gap-1 rounded-full border px-2.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple sm:min-h-[30px]';
+  const chip = 'inline-flex min-h-[44px] items-center gap-1 rounded-sm border px-2.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple sm:min-h-[30px]';
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Insertar un dato que se actualiza solo" onKeyDown={onKey}>
       <span className="text-[11px] font-semibold uppercase tracking-wide text-subtle" aria-hidden="true">Insertar dato:</span>

@@ -59,7 +59,7 @@ function Shell({ c, children }: { c: Copy; children: ReactNode }) {
               <Logo variant="stacked" size={88} theme="light" eager />
             </Link>
           </div>
-          <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-8 sm:py-9">
+          <div className="rounded-md bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-8 sm:py-9">
             {children}
           </div>
           <p className="mt-6 text-center text-xs leading-relaxed text-subtle">
@@ -78,7 +78,7 @@ function Badge({ tone, children }: { tone: 'brand' | 'success' | 'warning' | 'da
     warning: 'bg-amber/15 text-amber',
     danger: 'bg-coral/10 text-coral-dark',
   };
-  return <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${tones[tone]}`} aria-hidden="true">{children}</span>;
+  return <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-md ${tones[tone]}`} aria-hidden="true">{children}</span>;
 }
 
 /** The facts the link confirms, as label/value rows. */
@@ -92,7 +92,7 @@ function Facts({ link, c }: { link: NotifyEmailLink; c: Copy }) {
   rows.push([c('factReceives'), c('factReceivesValue')]);
   if (link.expires_at) rows.push([c('factExpires'), fmtExpiry(link.expires_at)]);
   return (
-    <dl className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-cream-2/60 text-sm">
+    <dl className="mt-6 divide-y divide-line overflow-hidden rounded-md bg-cream-2/60 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="grid gap-0.5 px-4 py-3 sm:grid-cols-[120px_1fr] sm:gap-3">
           <dt className="text-subtle">{k}</dt>
@@ -158,7 +158,7 @@ function Ready({ link, c, pending, failed, onConfirm }: { link: NotifyEmailLink;
       </div>
       <Facts link={link} c={c} />
       {link.separate_account && (
-        <p className="mt-4 flex gap-2.5 rounded-xl border border-purple/20 bg-purple/[0.05] px-4 py-3 text-[13px] leading-relaxed text-ink">
+        <p className="mt-4 flex gap-2.5 rounded-md border border-purple/20 bg-purple/[0.05] px-4 py-3 text-[13px] leading-relaxed text-ink">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
           <span>{c('separateAccount')}</span>
         </p>

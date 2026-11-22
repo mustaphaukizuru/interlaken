@@ -106,10 +106,10 @@ function PickStep({ mode, picked, setPicked, minimum, onCancel, onNext }: {
       {picked.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Alumnos elegidos">
           {picked.map((p) => (
-            <li key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 py-1 pl-3 pr-1 text-sm font-medium text-brand-700">
+            <li key={p.id} className="inline-flex items-center gap-1.5 rounded-sm bg-brand-50 py-1 pl-3 pr-1 text-sm font-medium text-brand-700">
               {p.name}
               <button type="button" onClick={() => setPicked(picked.filter((x) => x.id !== p.id))}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:h-6 sm:w-6"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:h-6 sm:w-6"
                 aria-label={`Quitar a ${p.name}`}>
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -134,19 +134,19 @@ function PickStep({ mode, picked, setPicked, minimum, onCancel, onNext }: {
 
       <div className="min-h-[180px]" aria-live="polite" aria-busy={isFetching}>
         {!searching ? (
-          <p className="rounded-xl bg-cream-2 px-4 py-6 text-center text-sm text-muted">
+          <p className="rounded-md bg-cream-2 px-4 py-6 text-center text-sm text-muted">
             Los resultados aparecen mientras escribe.
           </p>
         ) : isError ? (
-          <div className="rounded-xl bg-coral-50 px-4 py-4 text-sm text-coral-700">
+          <div className="rounded-md bg-coral-50 px-4 py-4 text-sm text-coral-700">
             No se pudo buscar. <button type="button" className="font-semibold underline" onClick={() => refetch()}>Reintentar</button>
           </div>
         ) : results.length === 0 && !isFetching ? (
-          <p className="rounded-xl bg-cream-2 px-4 py-6 text-center text-sm text-muted">
+          <p className="rounded-md bg-cream-2 px-4 py-6 text-center text-sm text-muted">
             Nadie coincide con «{q}». Pruebe con un solo apellido o con la matrícula.
           </p>
         ) : (
-          <ul className="divide-y divide-cream overflow-hidden rounded-xl border border-line" aria-label="Resultados">
+          <ul className="divide-y divide-cream overflow-hidden rounded-md border border-line" aria-label="Resultados">
             {results.map((s) => {
               const reason = blocked(s);
               const on = isPicked(s.id);
@@ -243,7 +243,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
   if (error) {
     return (
       <div className="space-y-4">
-        <div role="alert" className="flex gap-3 rounded-xl bg-coral-50 px-4 py-3 text-sm text-coral-700">
+        <div role="alert" className="flex gap-3 rounded-md bg-coral-50 px-4 py-3 text-sm text-coral-700">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <p>{error}</p>
         </div>
@@ -264,7 +264,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
 
   return (
     <div className="space-y-5">
-      <div className={`flex gap-3 rounded-xl px-4 py-3 text-sm ${plan.action === 'merge' ? 'bg-amber/10 text-ink' : 'bg-brand-50 text-brand-700'}`} role="status">
+      <div className={`flex gap-3 rounded-md px-4 py-3 text-sm ${plan.action === 'merge' ? 'bg-amber/10 text-ink' : 'bg-brand-50 text-brand-700'}`} role="status">
         {plan.action === 'merge'
           ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
           : <Info className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />}
@@ -296,7 +296,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
         <h4 id={`${nameId}-members`} className="text-xs font-semibold uppercase tracking-wide text-subtle">
           Hermanos ({plan.students_after.length})
         </h4>
-        <ul className="mt-2 divide-y divide-cream rounded-xl border border-line">
+        <ul className="mt-2 divide-y divide-cream rounded-md border border-line">
           {plan.students_after.map((s) => (
             <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
               <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream text-xs font-bold text-purple">{initial(s.name)}</span>
@@ -320,7 +320,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
           ) : (
             <ul className="mt-2 space-y-2">
               {plan.new_access.map((g) => (
-                <li key={g.id} className="flex gap-3 rounded-xl bg-cream-2 px-3 py-2.5">
+                <li key={g.id} className="flex gap-3 rounded-md bg-cream-2 px-3 py-2.5">
                   {g.kind === 'student'
                     ? <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
                     : <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />}
@@ -340,7 +340,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
 
       {!nothing && (
         <label className="flex min-h-[44px] cursor-pointer items-start gap-2.5 text-sm text-ink">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+          <input type="checkbox" className="mt-0.5 h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
             checked={notify} onChange={(e) => setNotify(e.target.checked)} />
           <span>
             Avisar a la familia

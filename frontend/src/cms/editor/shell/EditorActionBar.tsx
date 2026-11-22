@@ -46,7 +46,7 @@ interface Props {
   barRef?: Ref<HTMLDivElement>;
 }
 
-const iconBtn = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-30 disabled:hover:bg-transparent';
+const iconBtn = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-30 disabled:hover:bg-transparent';
 
 /**
  * The editor's top bar: always in view (sticky inside the console's scroll
@@ -58,7 +58,7 @@ export function EditorActionBar({ backTo, title, path, liveHref, state, save, hi
     <div
       ref={barRef}
       data-editor-bar
-      className="sticky top-0 z-20 -mx-[clamp(16px,4vw,32px)] mb-4 border-b border-line bg-cream px-[clamp(16px,4vw,32px)] py-2"
+      className="sticky top-0 z-sticky -mx-[clamp(16px,4vw,32px)] mb-4 border-b border-line bg-cream px-[clamp(16px,4vw,32px)] py-2"
     >
       {/* One row from 1280 px; below that the actions take a second row together, so «Publicar» never wraps alone. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
@@ -90,7 +90,7 @@ export function EditorActionBar({ backTo, title, path, liveHref, state, save, hi
         )}
       </div>
       {pane && !desktop && (
-        <div role="tablist" aria-label="Modo del editor" className="mt-2 grid grid-cols-2 gap-1 rounded-full bg-white p-1 ring-1 ring-line">
+        <div role="tablist" aria-label="Modo del editor" className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-white p-1 ring-1 ring-line">
           {([['edit', 'Editar', Pencil], ['preview', 'Vista previa', Eye]] as const).map(([value, label, Icon]) => (
             <button
               key={value}
@@ -108,7 +108,7 @@ export function EditorActionBar({ backTo, title, path, liveHref, state, save, hi
                 pane.onChange(next);
                 document.getElementById(`editor-tab-${next}`)?.focus();
               }}
-              className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${pane.value === value ? 'bg-purple text-white shadow-sm' : 'text-muted hover:text-ink'}`}
+              className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-sm text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${pane.value === value ? 'bg-purple text-white shadow-sm' : 'text-muted hover:text-ink'}`}
             >
               <Icon size={15} aria-hidden="true" /> {label}
             </button>
@@ -174,7 +174,7 @@ export function EditorBottomBar({ actions, more }: { actions: ReactNode; more: M
       <div
         role="region"
         aria-label="Acciones de la página"
-        className="fixed inset-x-0 z-30 border-t border-line bg-white/95 px-3 pt-2 shadow-[0_-6px_24px_-12px_rgba(64,26,142,0.25)] backdrop-blur-lg"
+        className="fixed inset-x-0 z-sticky border-t border-line bg-white/95 px-3 pt-2 shadow-[0_-6px_24px_-12px_rgba(64,26,142,0.25)] backdrop-blur-lg"
         style={{ bottom: navHeight, paddingBottom: navHeight ? 8 : 'max(8px, env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto flex max-w-3xl items-center gap-2 [&>*]:min-w-0">

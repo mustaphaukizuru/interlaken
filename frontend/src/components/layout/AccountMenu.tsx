@@ -32,7 +32,7 @@ export function AccountMenu() {
           aria-label="Cuenta"
           aria-expanded={open}
           aria-haspopup="true"
-          className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-line bg-white py-1.5 pl-3.5 pr-2.5 shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="flex shrink-0 items-center gap-2.5 rounded-sm border border-line bg-white py-1.5 pl-3.5 pr-2.5 shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           <div className="hidden text-right leading-tight sm:block">
             <div className="text-[13px] font-semibold text-ink">
@@ -40,7 +40,7 @@ export function AccountMenu() {
             </div>
             <div className="text-[12px] text-subtle">{roleText}</div>
           </div>
-          <Avatar user={user} size={36} rounded="rounded-[10px]" />
+          <Avatar user={user} size={36} rounded="rounded-sm" />
           <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       )}
@@ -48,7 +48,7 @@ export function AccountMenu() {
       {({ close }) => (
         <>
           <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
-            <Avatar user={user} size={44} rounded="rounded-xl" />
+            <Avatar user={user} size={44} rounded="rounded-md" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">
                 {user?.first_name} {user?.last_name}
@@ -60,14 +60,14 @@ export function AccountMenu() {
             <Link
               to={home}
               onClick={close}
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
+              className="flex items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
             >
               <LayoutDashboard size={16} className="text-muted" /> Mi panel
             </Link>
             <Link
               to="/portal/perfil"
               onClick={close}
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
+              className="flex items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
             >
               <UserIcon size={16} className="text-muted" /> Mi información
             </Link>
@@ -75,7 +75,7 @@ export function AccountMenu() {
               <Link
                 to="/admin/ajustes"
                 onClick={close}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
+                className="flex items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
               >
                 <Settings size={16} className="text-muted" /> Ajustes
               </Link>
@@ -85,7 +85,7 @@ export function AccountMenu() {
             <button
               type="button"
               onClick={() => { close(); void authApi.logout(); }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-coral transition-colors hover:bg-coral/10 focus-visible:bg-coral/10 focus-visible:outline-none"
+              className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm font-semibold text-coral transition-colors hover:bg-coral/10 focus-visible:bg-coral/10 focus-visible:outline-none"
             >
               <LogOut size={16} /> Cerrar sesión
             </button>

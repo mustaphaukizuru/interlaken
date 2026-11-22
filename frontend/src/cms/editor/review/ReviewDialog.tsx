@@ -90,7 +90,7 @@ function ReviewBody({ pageTitle, report, loading, onClose, onFix, onJump, canPub
         <IssueGroup title="Advertencias" hint="Pueden publicarse, pero casi siempre son un descuido." tone="warning" issues={warnings} onFix={onFix} onJump={onJump} busy={loading} />
       )}
       {suggestions.length > 0 && (
-        <details className="group rounded-xl border border-line bg-white p-3">
+        <details className="group rounded-md bg-white p-3 shadow-card">
           <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink sm:min-h-[32px]">
             <ChevronDown size={16} className="shrink-0 -rotate-90 transition-transform group-open:rotate-0" aria-hidden="true" />
             <Lightbulb size={16} className="shrink-0 text-subtle" aria-hidden="true" />
@@ -105,9 +105,9 @@ function ReviewBody({ pageTitle, report, loading, onClose, onFix, onJump, canPub
 
       <Changes changes={changes} baseline={report.baseline} />
 
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:-mx-6 sm:px-6 sm:pb-6">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:-mx-6 sm:px-6 sm:pb-6">
         {warnings.length > 0 && !blocked && canPublish && (
-          <label htmlFor={ackId} className="mb-3 flex min-h-[44px] items-center gap-3 rounded-lg bg-amber/10 px-3 text-sm font-semibold text-ink">
+          <label htmlFor={ackId} className="mb-3 flex min-h-[44px] items-center gap-3 rounded-sm bg-amber/10 px-3 text-sm font-semibold text-ink">
             <input
               id={ackId}
               type="checkbox"
@@ -164,7 +164,7 @@ function Summary({ pageTitle, errors, warnings, loading }: { pageTitle: string; 
       ? `«${pageTitle}» puede publicarse, pero revise ${warnings === 1 ? 'la advertencia' : `las ${warnings} advertencias`}.`
       : `«${pageTitle}»: todo en orden, lista para publicar.`;
   return (
-    <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${tone}`} role="status" aria-live="polite">
+    <div className={`flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm font-semibold ${tone}`} role="status" aria-live="polite">
       <Icon size={18} className="mt-px shrink-0" aria-hidden="true" />
       <span>{text}{loading && <span className="font-normal"> Revisando de nuevo…</span>}</span>
     </div>
@@ -199,7 +199,7 @@ function IssueItem({ issue, box, icon, onFix, onJump, busy }: { issue: ReviewIss
   const place = issuePlace(issue);
   const showPreview = !!issue.preview && issue.code !== 'private_link';
   return (
-    <li className={`rounded-xl border p-3 ${box}`} data-issue={issue.code}>
+    <li className={`rounded-md border p-3 ${box}`} data-issue={issue.code}>
       <div className="flex items-start gap-2">
         {icon}
         <div className="min-w-0 flex-1" id={`${id}-text`}>
@@ -262,11 +262,11 @@ function Changes({ changes, baseline }: { changes: ReviewChange[]; baseline: Rev
       <h4 id={headingId} className="text-sm font-bold text-ink">Qué cambia {changes.length > 0 && <span className="font-normal text-subtle">({changes.length})</span>}</h4>
       <p className="mb-2 text-xs text-muted">{BASELINE[baseline]}</p>
       {changes.length === 0 ? (
-        <p className="rounded-xl border border-line bg-cream-2 px-3 py-2.5 text-sm text-muted">No hay cambios: el borrador es igual a lo que muestra el sitio.</p>
+        <p className="rounded-md bg-cream-2 px-3 py-2.5 text-sm text-muted">No hay cambios: el borrador es igual a lo que muestra el sitio.</p>
       ) : (
         <div className="space-y-2">
           {groups.map((g) => (
-            <div key={g.key} className="rounded-xl border border-line bg-white">
+            <div key={g.key} className="rounded-md bg-white shadow-card">
               <p className="border-b border-line px-3 py-2 text-xs font-semibold text-ink">{g.title}</p>
               <ul className="divide-y divide-line">
                 {g.items.map((c, n) => <ChangeRow key={`${c.kind}-${c.field}-${n}`} change={c} />)}

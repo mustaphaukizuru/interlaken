@@ -90,7 +90,7 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
           )}
         </div>
         {detail.visita.bookings.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line px-3 py-4 text-sm text-subtle">
+          <p className="rounded-md border border-dashed border-line px-3 py-4 text-sm text-subtle">
             Aún no hay visitas. Envíe la liga de visita: la que agende la familia aparece aquí.
           </p>
         ) : (
@@ -105,7 +105,7 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
           onSend={() => onSend('send-visit-link')} />
       )}
 
-      <div className="space-y-3 rounded-xl2 border border-line p-4">
+      <div className="space-y-3 rounded-md border border-line p-4">
         <h3 className="font-semibold text-ink">Resultado de la visita</h3>
         {detail.visita.outcome && (
           <p className="text-sm text-muted">Registrado: <strong className="text-ink">{detail.visita.outcome_label}</strong>
@@ -132,7 +132,7 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
             />
             {outcome === 'no_asistio' && (
               <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
-                <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                   checked={reschedule} onChange={(e) => setReschedule(e.target.checked)} />
                 Reagendar la visita (la familia sigue interesada)
               </label>
@@ -164,7 +164,7 @@ export function VisitaCard({ detail, state, open, onToggle, onSend }: {
 
 function BookingLine({ booking: b }: { booking: CaseBooking }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm">
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white px-3.5 py-2.5 text-sm shadow-card">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 font-semibold text-ink">
           <CalendarClock className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
@@ -233,7 +233,7 @@ function LinkVisitBody({ detail, onClose }: { detail: CaseDetail; onClose: () =>
       </form>
       <div aria-live="polite">
         {forbidden ? (
-          <p className="rounded-xl bg-amber/10 px-3 py-2 text-sm text-ink">Su cuenta no tiene acceso a Visitas. Pida a quien lleva la agenda que vincule la visita.</p>
+          <p className="rounded-md bg-amber/10 px-3 py-2 text-sm text-ink">Su cuenta no tiene acceso a Visitas. Pida a quien lleva la agenda que vincule la visita.</p>
         ) : search.isLoading ? (
           <p className="text-sm text-subtle">Buscando…</p>
         ) : search.isError ? (
@@ -246,7 +246,7 @@ function LinkVisitBody({ detail, onClose }: { detail: CaseDetail; onClose: () =>
             <ul className="space-y-2">
               {search.data.map((b) => (
                 <li key={b.id}>
-                  <label className={clsx('flex min-h-[48px] cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm', picked === b.id ? 'border-purple bg-purple/5' : 'border-line')}>
+                  <label className={clsx('flex min-h-[48px] cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5 text-sm', picked === b.id ? 'border-purple bg-purple/5' : 'border-line')}>
                     <input type="radio" name="link-visit" className="mt-0.5" checked={picked === b.id} onChange={() => setPicked(b.id)} />
                     <span className="min-w-0 font-semibold text-ink">
                       {fmtDay(b.slot_date)}, {String(b.slot_start_time).slice(0, 5)} · {b.parent_name}

@@ -193,7 +193,7 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
       />
 
       {archived && (
-        <div role="status" className="mb-4 flex flex-col gap-3 rounded-xl2 border border-line bg-cream-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div role="status" className="mb-4 flex flex-col gap-3 rounded-md bg-cream-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2.5 text-sm text-ink">
             <Archive className="mt-0.5 h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
             <span>
@@ -207,10 +207,10 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
         </div>
       )}
 
-      <div role="tablist" aria-label="Secciones del expediente" className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-cream-2 p-1">
+      <div role="tablist" aria-label="Secciones del expediente" className="mb-4 flex gap-1 overflow-x-auto rounded-md bg-cream-2 p-1">
         {TABS.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} aria-label={t.label}
-            className={`min-h-[44px] whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors sm:min-h-[40px] sm:px-4 ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
+            className={`min-h-[44px] whitespace-nowrap rounded-sm px-3 text-sm font-semibold transition-colors sm:min-h-[40px] sm:px-4 ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
             {t.short ? <><span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span></> : t.label}
           </button>
         ))}

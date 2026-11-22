@@ -54,7 +54,7 @@ export const ErrorSummary = forwardRef<HTMLDivElement, { title: string; items: S
       target.focus({ preventScroll: true });
     };
     return (
-      <div ref={ref} tabIndex={-1} role="alert" className="mb-6 rounded-xl2 border border-coral-200 bg-coral-50 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400/40">
+      <div ref={ref} tabIndex={-1} role="alert" className="mb-6 rounded-md border border-coral-200 bg-coral-50 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400/40">
         <p className="flex items-start gap-2 font-semibold text-coral-800">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <span>{title}</span>
@@ -111,7 +111,7 @@ export function Panel({ icon, tone = 'neutral', title, children, headingRef }: {
 }) {
   return (
     <div className="card p-6 text-center sm:p-10">
-      <div className={clsx('mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full', {
+      <div className={clsx('mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-sm', {
         'bg-cream text-purple': tone === 'neutral',
         'bg-green-light text-green-dark': tone === 'success',
         'bg-coral-50 text-coral-700': tone === 'warn',

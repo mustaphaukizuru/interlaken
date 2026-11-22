@@ -47,7 +47,7 @@ export default function AdminDashboard() {
           {!!data?.paid_topups_to_apply && (
             <Link
               to="/admin/cafeteria?tab=pos"
-              className="mb-4 flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
+              className="mb-4 flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="flex items-center gap-2.5">
                 <Coffee className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
@@ -64,7 +64,7 @@ export default function AdminDashboard() {
           {!!data?.stale_links && (
             <Link
               to="/admin/alumnos?vinculado=missing"
-              className="mb-4 flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
+              className="mb-4 flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="flex items-center gap-2.5">
                 <Users className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
@@ -123,11 +123,11 @@ export default function AdminDashboard() {
           <div className="mb-6">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="font-head text-[15px] font-bold text-ink">Indicadores · últimos 30 días</h2>
-              <Link to="/staff" className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">
+              <Link to="/staff" className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded-sm">
                 Analítica completa <ArrowRight size={13} />
               </Link>
             </div>
-            <Suspense fallback={<div className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />}>
+            <Suspense fallback={<div className="skeleton h-[280px] rounded-md" aria-hidden="true" />}>
               <ChartsSection data={analytics} />
             </Suspense>
           </div>
@@ -160,14 +160,14 @@ export default function AdminDashboard() {
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
             <Link
               to="/admin/comunicados"
-              className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded"
+              className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded-sm"
             >
               Ver comunicados <ArrowRight size={13} />
             </Link>
           </div>
           {isLoading ? (
             <div className="space-y-3 p-5">
-              {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
+              {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14 rounded-md" />)}
             </div>
           ) : !(data?.announcements ?? []).length ? (
             <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">

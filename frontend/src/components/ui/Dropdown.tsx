@@ -52,8 +52,7 @@ export function Dropdown({ trigger, children, align = 'right', width = 320 }: Dr
       {open && (
         <div
           style={{ width: `min(${width}px, calc(100vw - 24px))` }}
-          className={`absolute top-[calc(100%+10px)] z-50 origin-top animate-[dropdown-in_0.16s_ease-out] overflow-hidden rounded-2xl border border-line bg-white shadow-[0_20px_54px_-18px_rgba(16,12,40,0.32)] ${
-            align === 'right' ? 'right-0' : 'left-0'
+          className={`absolute top-[calc(100%+10px)] z-dropdown origin-top animate-[dropdown-in_0.16s_ease-out] overflow-hidden rounded-md bg-white shadow-raised ${ align === 'right' ? 'right-0' : 'left-0'
           }`}
         >
           {children({ close: () => setOpen(false) })}

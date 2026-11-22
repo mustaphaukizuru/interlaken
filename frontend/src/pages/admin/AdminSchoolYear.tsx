@@ -75,7 +75,7 @@ export default function AdminSchoolYear() {
               <div className="space-y-3">
                 <Input label="Nuevo ciclo" value={newCycle} onChange={(e) => setCycle(e.target.value)} placeholder="2027-2028" hint="Formato AAAA-AAAA." error={errors.new_cycle} />
                 {data.grades_from_loyverse && (
-                  <div className="rounded-xl border border-amber/30 bg-amber/5 px-3 py-2.5 text-sm text-ink">
+                  <div className="rounded-md border border-amber/30 bg-amber/5 px-3 py-2.5 text-sm text-ink">
                     <label htmlFor="promote-grades" className="flex items-center gap-2 font-semibold">
                       <input
                         id="promote-grades"

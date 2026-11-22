@@ -41,7 +41,7 @@ export function StepBar({ items, current, copy, onPick, intro, headingRef }: {
         <p aria-hidden="true" className="min-w-0 text-xs font-bold uppercase tracking-[0.12em] text-pink">{number}</p>
         <button
           type="button"
-          className="-mr-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-3 text-sm font-semibold text-purple hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="-mr-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-sm px-3 text-sm font-semibold text-purple hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           aria-expanded={open}
           aria-controls={listId}
           onClick={() => setOpen((v) => !v)}
@@ -66,7 +66,7 @@ export function StepBar({ items, current, copy, onPick, intro, headingRef }: {
           />
         ))}
       </div>
-      <nav id={listId} aria-label={copy.t('stepsLabel')} hidden={!open} className="mt-3 rounded-xl2 border border-line bg-cream-2 p-1.5">
+      <nav id={listId} aria-label={copy.t('stepsLabel')} hidden={!open} className="mt-3 rounded-md bg-cream-2 p-1.5">
         <ol className="sm:columns-2 sm:gap-1.5">
           {items.map((s, i) => {
             const clickable = s.reachable && s.state !== 'current';
@@ -94,7 +94,7 @@ export function StepBar({ items, current, copy, onPick, intro, headingRef }: {
                 {clickable ? <ChevronRight className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" /> : null}
               </>
             );
-            const cls = 'flex min-h-[52px] w-full items-center gap-3 rounded-xl px-2.5 py-2';
+            const cls = 'flex min-h-[52px] w-full items-center gap-3 rounded-md px-2.5 py-2';
             return (
               <li key={s.key} className="mb-1 break-inside-avoid last:mb-0">
                 {clickable ? (

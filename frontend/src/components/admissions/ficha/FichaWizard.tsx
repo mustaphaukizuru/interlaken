@@ -605,7 +605,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   return (
     <Shell topRef={topRef} banner={staffBanner}>
       {invitedBanner ? (
-        <div className="mb-4 flex items-start gap-3 rounded-xl2 border border-green/30 bg-green-light px-4 py-3 text-[15px] text-ink" role="status">
+        <div className="mb-4 flex items-start gap-3 rounded-md border border-green/30 bg-green-light px-4 py-3 text-[15px] text-ink" role="status">
           <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-dark" aria-hidden="true" />
           <p><strong>{copy.t('invitedTitle')}</strong> {copy.t('invitedText')}</p>
         </div>
@@ -625,9 +625,9 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           {isFirma && submitProblems.length ? (
             <ul className="mt-3 space-y-2 sm:pl-7">
               {submitProblems.map((k) => (
-                <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 rounded-xl bg-white/70 py-1 pl-3 pr-1 text-sm text-coral-800">
+                <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 rounded-md bg-white/70 py-1 pl-3 pr-1 text-sm text-coral-800">
                   <span className="min-w-0 font-semibold">{sectionLabel(k)}</span>
-                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-full px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-sm px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
                     aria-label={`${copy.t('fixLabel')}: ${sectionLabel(k)}`}
                     onClick={() => go(k, { review: true })}>
                     {copy.t('fixLabel')}
@@ -649,7 +649,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
               data-ficha-actions=""
               data-sticky={barDocked ? undefined : ''}
               className={clsx(
-                'z-20 -mx-4 mt-8 flex items-center gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+                'z-sticky -mx-4 mt-8 flex items-center gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]',
                 'shadow-[0_-12px_24px_-18px_rgba(64,26,142,0.45)] backdrop-blur',
                 barDocked ? 'static' : 'sticky bottom-0',
                 'sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-6 sm:shadow-none sm:backdrop-blur-none',
@@ -669,7 +669,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
             </div>
             <div className="mt-2 flex flex-col items-center gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
               <button type="button" onClick={() => void saveForLater()} disabled={busy}
-                className="-mx-2 inline-flex min-h-[44px] items-center rounded-full px-2 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50">
+                className="-mx-2 inline-flex min-h-[44px] items-center rounded-sm px-2 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50">
                 {copy.t('laterLabel')}
               </button>
               <SaveStatus state={saveState} labels={{ saving: copy.t('saving'), saved: copy.t('saved'), error: copy.t('saveError') }} />

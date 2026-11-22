@@ -18,7 +18,7 @@ export function ErrorState({
 }: Props) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-coral-50">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-coral-50">
         <AlertTriangle className="h-6 w-6 text-coral-600" />
       </div>
       <p className="mb-1 font-semibold text-ink">{title}</p>

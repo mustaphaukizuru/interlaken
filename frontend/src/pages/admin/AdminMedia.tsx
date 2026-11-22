@@ -138,7 +138,7 @@ export default function AdminMedia() {
   const columns: Column<MediaAsset>[] = [
     {
       id: 'preview', header: 'Vista', hideable: false, minWidth: 72,
-      cell: (a) => <img src={a.urls.thumb ?? a.urls.original} alt={a.alt || ''} loading="lazy" className="h-12 w-12 rounded-lg object-cover ring-1 ring-line" />,
+      cell: (a) => <img src={a.urls.thumb ?? a.urls.original} alt={a.alt || ''} loading="lazy" className="h-12 w-12 rounded-sm object-cover ring-1 ring-line" />,
     },
     { id: 'filename', header: 'Archivo', sortKey: 'filename', hideable: false, minWidth: 180, className: 'font-medium text-ink break-all', cell: (a) => a.filename },
     {
@@ -175,7 +175,7 @@ export default function AdminMedia() {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         data-testid="media-dropzone"
-        className={`mb-4 rounded-xl2 border-2 border-dashed px-4 py-5 text-center text-sm transition-colors ${dragging ? 'border-purple bg-brand-50 text-ink' : 'border-line bg-cream-2 text-muted'}`}
+        className={`mb-4 rounded-md border-2 border-dashed px-4 py-5 text-center text-sm transition-colors ${dragging ? 'border-purple bg-brand-50 text-ink' : 'border-line bg-cream-2 text-muted'}`}
       >
         <UploadCloud className="mx-auto mb-1 h-6 w-6 text-subtle" aria-hidden="true" />
         Arrastre aquí sus imágenes (JPG, PNG, WebP o GIF, hasta 10 MB cada una) o use «Subir imágenes».
@@ -185,7 +185,7 @@ export default function AdminMedia() {
         <Card className="mb-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="font-head text-base font-bold text-ink">Resultado de la carga</h2>
-            <button type="button" onClick={() => setResults([])} aria-label="Cerrar resultado de la carga" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink"><X size={16} aria-hidden="true" /></button>
+            <button type="button" onClick={() => setResults([])} aria-label="Cerrar resultado de la carga" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink"><X size={16} aria-hidden="true" /></button>
           </div>
           <ul className="space-y-1 text-sm" aria-live="polite" aria-label="Archivos subidos">
             {results.map((r, i) => (
@@ -307,7 +307,7 @@ function AssetForm({ asset, onClose, onSaved, onDelete }: { asset: MediaAsset; o
   return (
     <div className="grid gap-5 sm:grid-cols-[200px_1fr]">
       <div>
-        <img src={asset.urls.md ?? asset.urls.original} alt={asset.alt || ''} className="w-full rounded-xl ring-1 ring-line" />
+        <img src={asset.urls.md ?? asset.urls.original} alt={asset.alt || ''} className="w-full rounded-md ring-1 ring-line" />
         <p className="mt-2 text-xs text-subtle">{asset.width}×{asset.height} · {formatBytes(asset.size)} · {asset.content_type}</p>
         <ul className="mt-2 space-y-1 text-xs">
           {Object.entries(asset.urls).map(([k, u]) => (

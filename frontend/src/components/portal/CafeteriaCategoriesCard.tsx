@@ -59,7 +59,7 @@ export default function CafeteriaCategoriesCard({ student }: { student?: number 
         </div>
       ) : isLoading ? (
         <div className="space-y-3 p-5" aria-hidden="true">
-          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-9 rounded-lg" />)}
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-9 rounded-sm" />)}
         </div>
       ) : total === 0 ? (
         <SectionEmpty icon={Coffee}>Sin compras registradas en este periodo.</SectionEmpty>

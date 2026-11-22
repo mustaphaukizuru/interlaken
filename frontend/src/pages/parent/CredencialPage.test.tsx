@@ -76,7 +76,7 @@ describe('CredencialPage activity: «Consumo registrado» (owner, 2026-11-08)', 
 
 describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => {
   beforeEach(() => vi.clearAllMocks());
-  const face = () => screen.getByText('Código Loyverse').closest('.rounded-xl3') as HTMLElement;
+  const face = () => screen.getByText('Código Loyverse').closest('[data-testid="credencial-face"]') as HTMLElement;
 
   it('the card shows the real balance, the projection, and the line on white', async () => {
     getCards.mockResolvedValue({ data: [{
@@ -103,7 +103,7 @@ describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => 
 
 describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-11-19)', () => {
   beforeEach(() => vi.clearAllMocks());
-  const face = () => screen.getByText('Código Loyverse').closest('.rounded-xl3') as HTMLElement;
+  const face = () => screen.getByText('Código Loyverse').closest('[data-testid="credencial-face"]') as HTMLElement;
   const staff = (puesto: string, puesto_label: string) => ({
     ...CARD,
     student: { ...CARD.student, name: 'Caja Ejemplo', grade: '', group: '', tipo: 'personal' as const, puesto: puesto as never, puesto_label },

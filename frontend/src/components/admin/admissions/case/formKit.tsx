@@ -22,7 +22,7 @@ export function ErrorSummary({ errors, labels }: { errors: FieldErrorMap; labels
   const detail = errors.detail;
   if (!detail && known.length === 0) return null;
   return (
-    <div role="alert" className="rounded-xl bg-coral-50 px-3 py-2.5 text-sm text-coral-700">
+    <div role="alert" className="rounded-md bg-coral-50 px-3 py-2.5 text-sm text-coral-700">
       <p className="flex items-start gap-2 font-semibold">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         {detail || 'Revise los datos marcados.'}
@@ -109,7 +109,7 @@ export function ChoiceGroup<T extends string>({ legend, name, value, options, on
             <label
               key={o.value}
               className={clsx(
-                'flex min-h-[48px] cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition focus-within:ring-2 focus-within:ring-purple/40',
+                'flex min-h-[48px] cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5 text-sm transition focus-within:ring-2 focus-within:ring-purple/40',
                 checked
                   ? o.tone === 'negative' ? 'border-coral-400 bg-coral-50/60' : 'border-purple bg-purple/5'
                   : 'border-line bg-white hover:border-purple/40',

@@ -11,7 +11,7 @@ export function Testimonials({ limit = 3, title = 'Lo que dicen las familias', e
   if (isLoading) {
     return (
       <div aria-hidden="true" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2].map((i) => <div key={i} className="skeleton h-[168px] rounded-xl2" />)}
+        {[0, 1, 2].map((i) => <div key={i} className="skeleton h-[168px] rounded-md" />)}
       </div>
     );
   }

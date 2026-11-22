@@ -67,7 +67,7 @@ export function actionCopy(action: CaseAction, detail: CaseDetail): ActionCopy {
   return ACTION_COPY[action];
 }
 
-const OPTION = 'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm transition focus-within:ring-2 focus-within:ring-purple/40';
+const OPTION = 'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-md border px-3.5 py-3 text-sm transition focus-within:ring-2 focus-within:ring-purple/40';
 
 /** Opens a tab inside the click (iPad Safari blocks a window opened after an await). */
 function openBlankTab(): Window | null {
@@ -190,7 +190,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
       {last && <p className="text-xs text-subtle">Último envío: {fmtDayTime(last)}</p>}
 
       {fichaGate && (
-        <div className={clsx('rounded-xl px-3 py-2.5 text-sm', blocked ? 'bg-amber/10 text-ink' : 'bg-cream text-muted')}>
+        <div className={clsx('rounded-md px-3 py-2.5 text-sm', blocked ? 'bg-amber/10 text-ink' : 'bg-cream text-muted')}>
           {blocked ? (
             <p className="flex items-start gap-2" role="status" aria-live="polite">
               <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
@@ -201,7 +201,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
           )}
           {blocked && canOverride && (
             <label className="mt-2 flex min-h-[44px] cursor-pointer items-center gap-2.5 font-medium">
-              <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+              <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                 checked={override} onChange={(e) => { setOverride(e.target.checked); setReasonError(''); }} />
               Enviar de todos modos (administrador; queda en el historial)
             </label>
@@ -242,7 +242,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
       </fieldset>
 
       {error && !tooEarly && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl bg-coral-50 px-3 py-2.5 text-sm text-coral-700">
+        <div role="alert" className="flex items-start gap-2 rounded-md bg-coral-50 px-3 py-2.5 text-sm text-coral-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{error.message}</span>
         </div>
@@ -303,7 +303,7 @@ function SendDone({ headingRef, result, hasLink, onClose }: {
       {!emailed && (
         <div className="space-y-2">
           <div className="relative">
-            <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-line bg-cream-2 p-3 pr-10 font-sans text-sm text-ink">{result.whatsapp_text}</pre>
+            <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-cream-2 p-3 pr-10 font-sans text-sm text-ink">{result.whatsapp_text}</pre>
             <CopyButton value={result.whatsapp_text} label="el mensaje" className="absolute right-2 top-2" />
           </div>
           {hasLink && result.link && (

@@ -97,7 +97,7 @@ function Lightbox({
       role="dialog"
       aria-modal="true"
       aria-label={fill(copy.dialogLabel, { n: index + 1, total: photos.length })}
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-dark/95 p-4"
+      className="fixed inset-0 z-overlay flex items-center justify-center bg-dark/95 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <button
@@ -105,7 +105,7 @@ function Lightbox({
         type="button"
         onClick={onClose}
         aria-label={copy.closeLabel}
-        className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
+        className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-sm bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
       >
         <X className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -114,7 +114,7 @@ function Lightbox({
         type="button"
         onClick={(e) => { e.stopPropagation(); prev(); }}
         aria-label={copy.prevLabel}
-        className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green sm:left-4"
+        className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green sm:left-4"
       >
         <ChevronLeft className="h-6 w-6" aria-hidden="true" />
       </button>
@@ -127,7 +127,7 @@ function Lightbox({
           <img
             src={photos[index].src}
             alt={photos[index].alt}
-            className="max-h-full max-w-full rounded-xl2 object-contain"
+            className="max-h-full max-w-full rounded-md object-contain"
           />
         </div>
         <figcaption className="mt-3 text-center text-sm text-white/70">
@@ -140,7 +140,7 @@ function Lightbox({
         type="button"
         onClick={(e) => { e.stopPropagation(); next(); }}
         aria-label={copy.nextLabel}
-        className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green sm:right-4"
+        className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green sm:right-4"
       >
         <ChevronRight className="h-6 w-6" aria-hidden="true" />
       </button>
@@ -190,7 +190,7 @@ function GaleriaGridView(p: GridProps) {
                   type="button"
                   aria-pressed={active === fl.key}
                   onClick={() => { setFilter(fl.key!); setOpen(null); }}
-                  className={`min-h-[44px] rounded-full border-2 px-5 text-sm font-semibold transition-colors ${
+                  className={`min-h-[44px] rounded-sm border-2 px-5 text-sm font-semibold transition-colors ${
                     active === fl.key
                       ? 'border-green-strong bg-green-strong text-white'
                       : 'border-ink/15 text-muted hover:border-green hover:text-green-dark'
@@ -214,7 +214,7 @@ function GaleriaGridView(p: GridProps) {
                 type="button"
                 onClick={() => setOpen(i)}
                 aria-label={fill(copy.zoomAria, { n: i + 1, total: visible.length })}
-                className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-2xl bg-cream shadow-card ring-1 ring-ink/5 transition-shadow duration-300 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
+                className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-sm bg-cream shadow-card ring-1 ring-ink/5 transition-shadow duration-300 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
               >
                 <img
                   src={photo.src}

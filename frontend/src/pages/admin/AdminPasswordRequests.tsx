@@ -40,7 +40,7 @@ const BULK_ACTIONS: BulkActionDef[] = [
   { name: 'reject', label: 'Rechazar', danger: true, requiresNote: true, icon: XCircle, planVerb: 'Se rechazarán' },
 ];
 const ROW_ACTION =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
 
 /**
  * /admin/contrasenas — password request inbox (BACKLOG P1-A4) on the Data Ops UI
@@ -311,7 +311,7 @@ function DeliveryModal({ resolved, onClose }: { resolved: PasswordRequestResolve
           Envíe el acceso a <strong>{resolved.user_name || resolved.user_email}</strong> por el mismo medio en que lo pidió.
           La contraseña <strong>no se volverá a mostrar</strong>.
         </p>
-        <div className="rounded-2xl bg-cream/70 p-4 text-center">
+        <div className="rounded-md bg-cream/70 p-4 text-center">
           <code className="block select-all break-all font-mono text-xl font-bold tracking-wide text-ink">{resolved.temporary_password}</code>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">

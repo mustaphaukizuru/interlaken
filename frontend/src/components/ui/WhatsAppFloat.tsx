@@ -39,8 +39,8 @@ export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: 
   }, [open]);
 
   if (!whatsapp_number) return null;
-  const wrap = `fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 ${stickyCtaVisible ? 'hidden md:flex' : 'flex'} flex-col items-end gap-2 md:right-6 md:bottom-6 max-[767px]:[html[data-ficha-steps]_&]:hidden`;
-  const item = 'flex min-h-[44px] items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink shadow-card ring-1 ring-line hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+  const wrap = `fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-sticky ${stickyCtaVisible ? 'hidden md:flex' : 'flex'} flex-col items-end gap-2 md:right-6 md:bottom-6 max-[767px]:[html[data-ficha-steps]_&]:hidden`;
+  const item = 'flex min-h-[44px] items-center gap-2 rounded-sm bg-white px-4 text-sm font-semibold text-ink shadow-card ring-1 ring-line hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
   return (
     <div className={wrap}>
@@ -65,7 +65,7 @@ export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: 
         aria-haspopup="menu"
         aria-label={open ? 'Cerrar contacto rápido' : 'Contactar al colegio'}
         title="Contactar al colegio"
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-green-600 text-white shadow-green transition-transform hover:scale-105 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+        className="flex h-14 w-14 items-center justify-center rounded-md bg-green-600 text-white shadow-green transition-transform hover:scale-105 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
       >
         {open ? <X className="h-6 w-6" aria-hidden="true" /> : <WhatsAppIcon className="h-7 w-7" />}
       </button>

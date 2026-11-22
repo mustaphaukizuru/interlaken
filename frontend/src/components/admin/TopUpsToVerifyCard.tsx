@@ -34,7 +34,7 @@ export function TopUpsToVerifyCard({ count, total, oldest }: { count?: number; t
       className="card mb-4 flex flex-col gap-4 border-amber/40 !p-4 sm:flex-row sm:items-center sm:justify-between sm:!px-5"
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber/10 text-amber">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-amber/10 text-amber">
           <ShieldAlert className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">

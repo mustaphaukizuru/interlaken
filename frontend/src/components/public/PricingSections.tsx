@@ -135,9 +135,9 @@ export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, pen
     pink:   { border: 'border-pink/25',   bg: 'bg-pink-light/60',  chip: 'bg-pink/15 text-pink-dark',    label: 'text-pink-dark' },
   }[tone];
   return (
-    <div className={`overflow-hidden rounded-xl2 border ${tones.border} bg-white shadow-card`}>
+    <div className={`overflow-hidden rounded-md border ${tones.border} bg-white shadow-card`}>
       <div className={`flex items-start gap-3 border-b border-ink/10 ${tones.bg} px-5 py-4`}>
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones.chip}`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${tones.chip}`}>
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
@@ -228,7 +228,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
             ) : isLoading ? (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Cargando costos">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className={`skeleton h-[280px] rounded-xl2 ${i > 1 ? 'hidden md:block' : ''}`} aria-hidden="true" />
+                  <div key={i} className={`skeleton h-[280px] rounded-md ${i > 1 ? 'hidden md:block' : ''}`} aria-hidden="true" />
                 ))}
               </div>
             ) : (
@@ -278,7 +278,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                         type="button"
                         aria-pressed={modality === key}
                         onClick={() => setModality(key)}
-                        className={`min-h-[44px] flex-1 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
+                        className={`min-h-[44px] flex-1 rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
                           modality === key ? 'bg-purple text-white' : 'bg-cream text-muted hover:text-ink'
                         }`}
                       >
@@ -396,7 +396,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
 
               {/* Políticas — letra chica visible, recargos/devoluciones destacados */}
               {policies.length > 0 && (
-                <div className="rounded-xl2 border border-ink/10 bg-white p-5 shadow-card">
+                <div className="rounded-md bg-white p-5 shadow-card">
                   {c.policiesTitle && <h2 className="font-head text-lg font-bold text-ink">{t(c.policiesTitle)}</h2>}
                   <ul className="mt-3 space-y-2.5">
                     {policies.map((p) => {
@@ -420,7 +420,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
 
           {/* Always shown (also with the error) so the page below never jumps. */}
           {(c.noteText || c.noteStrong || c.noteLinkLead || c.noteLink?.href) && (
-            <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
+            <div className="mt-6 flex items-start gap-3 rounded-md bg-white p-5 text-sm text-muted shadow-card">
               <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
               <p>
                 {t(c.noteText)}{' '}
@@ -433,7 +433,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
 
           {/* Page CTA — Costos keeps in-page CTAs; sticky Agendar bar stays global */}
           {(c.ctaTitle || c.ctaText || c.ctaPrimary?.href || c.ctaSecondary?.href) && (
-            <div className="mt-10 flex flex-col items-center gap-3 rounded-xl2 bg-dark px-6 py-8 text-center text-white sm:py-10">
+            <div className="mt-10 flex flex-col items-center gap-3 rounded-md bg-dark px-6 py-8 text-center text-white sm:py-10">
               <CircleDollarSign className="h-8 w-8 text-green" aria-hidden="true" />
               {c.ctaTitle && <h2 className="font-head text-fluid-xl font-bold">{t(c.ctaTitle)}</h2>}
               {c.ctaText && <p className="max-w-xl text-sm text-white/70">{t(c.ctaText)}</p>}

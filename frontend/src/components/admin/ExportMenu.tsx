@@ -131,9 +131,9 @@ export function ExportMenu(props: Props) {
                 role="menuitemcheckbox"
                 aria-checked={useSelected}
                 onClick={() => setSelectedOnly((v) => !v)}
-                className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2"
+                className="flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2"
               >
-                <span className={`flex h-4 w-4 items-center justify-center rounded border ${useSelected ? 'border-purple bg-purple text-white' : 'border-line bg-white'}`} aria-hidden="true">
+                <span className={`flex h-4 w-4 items-center justify-center rounded-sm border ${useSelected ? 'border-purple bg-purple text-white' : 'border-line bg-white'}`} aria-hidden="true">
                   {useSelected && <Check size={12} />}
                 </span>
                 Solo seleccionados ({selectedCount.toLocaleString('es-MX')})
@@ -149,7 +149,7 @@ export function ExportMenu(props: Props) {
                 role="menuitem"
                 type="button"
                 onClick={() => run(fmt, close)}
-                className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2"
+                className="flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2"
               >
                 <Icon size={15} className="text-purple" aria-hidden="true" /> {EXPORT_FORMAT_LABEL[fmt]}
                 <span className="ml-auto text-xs text-subtle">.{fmt}</span>
@@ -165,7 +165,7 @@ export function ExportMenu(props: Props) {
                 role="menuitem"
                 type="button"
                 onClick={() => runExtra(item, close)}
-                className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2"
+                className="flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2"
               >
                 <Icon size={15} className="text-purple" aria-hidden="true" /> {item.label}
                 {item.hint && <span className="ml-auto text-xs text-subtle">{item.hint}</span>}
@@ -207,7 +207,7 @@ function LegacyExportMenu({ options, label = 'Exportar' }: LegacyProps) {
       {({ close }) => (
         <div role="menu" className="p-1.5">
           {options.map((o) => (
-            <button key={o.key} role="menuitem" type="button" onClick={() => run(o, close)} className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2">
+            <button key={o.key} role="menuitem" type="button" onClick={() => run(o, close)} className="flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm text-ink hover:bg-cream-2">
               <FileDown size={15} className="text-purple" aria-hidden="true" /> {o.label}
             </button>
           ))}

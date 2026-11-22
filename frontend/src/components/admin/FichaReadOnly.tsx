@@ -37,7 +37,7 @@ function Rows({ rows }: { rows: [string, string | null][] }) {
 
 function Group({ title, missing, children }: { title: string; missing?: boolean; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-line px-3 py-2.5">
+    <section className="rounded-md border border-line px-3 py-2.5">
       <h3 className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-subtle">
         {title}
         {missing ? <span className="rounded-full bg-amber-bright/20 px-2 py-0.5 text-[11px] normal-case tracking-normal text-amber">Faltan datos</span> : null}

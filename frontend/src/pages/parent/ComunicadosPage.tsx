@@ -56,7 +56,7 @@ export default function ComunicadosPage() {
         <SectionCard title="Todos los comunicados">
           {isLoading ? (
             <div className="space-y-3 p-5">
-              {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-16 rounded-xl2" />)}
+              {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-16 rounded-md" />)}
             </div>
           ) : !announcements.length ? (
             <EmptyState
@@ -73,7 +73,7 @@ export default function ComunicadosPage() {
                       to={`/portal/comunicados/${a.id}`}
                       className={`group flex items-start gap-3 px-5 py-4 transition hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/30 ${i === 0 ? '' : 'border-t border-cream'}`}
                     >
-                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl2 bg-gradient-to-br from-pink to-purple text-white">
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-pink to-purple text-white">
                         <Megaphone className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 flex-1">

@@ -235,7 +235,7 @@ export default function AdminPricing() {
         actions={(
           <>
             <a href="/admisiones/costos" target="_blank" rel="noopener noreferrer" style={{ fontFamily: "'Poppins', sans-serif" }}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border-2 border-purple bg-white px-3 py-1.5 text-xs font-semibold text-purple shadow-sm transition hover:bg-purple hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 focus-visible:ring-offset-2 sm:min-h-[36px]">
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm border-2 border-purple bg-white px-3 py-1.5 text-xs font-semibold text-purple shadow-sm transition hover:bg-purple hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 focus-visible:ring-offset-2 sm:min-h-[36px]">
               <ExternalLink size={15} aria-hidden="true" /> Ver en el sitio<span className="sr-only"> (se abre en otra pestaña)</span>
             </a>
             <Button variant="secondary" size="sm" onClick={exportXlsx}><FileDown size={15} aria-hidden="true" /> Exportar Excel</Button>
@@ -244,12 +244,12 @@ export default function AdminPricing() {
         )}
       />
 
-      <div className="mb-5 flex gap-3 rounded-xl2 border border-green/25 bg-green-50/60 p-4 text-sm text-ink">
+      <div className="mb-5 flex gap-3 rounded-md border border-green/25 bg-green-50/60 p-4 text-sm text-ink">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-green-700" aria-hidden="true" />
         <div className="space-y-1">
           <p>Estos precios se ven en <strong>Admisiones › Costos</strong> y alimentan el <strong>estimador de Admisiones</strong>: un cambio aquí cambia los dos.</p>
           <p className="text-muted">
-            El ciclo escolar no se escribe aquí: el sitio lo calcula solo (hoy {CURRENT_CYCLE}) y en los textos de la página se escribe <code className="rounded bg-white px-1 text-ink">{'{{ciclo}}'}</code>.
+            El ciclo escolar no se escribe aquí: el sitio lo calcula solo (hoy {CURRENT_CYCLE}) y en los textos de la página se escribe <code className="rounded-sm bg-white px-1 text-ink">{'{{ciclo}}'}</code>.
             Títulos, encabezados y notas de las tablas se editan en <Link to="/admin/contenido" className="font-semibold text-green-700 underline underline-offset-2">Páginas › Costos</Link>.
           </p>
         </div>
@@ -264,7 +264,7 @@ export default function AdminPricing() {
             <button key={t.key} id={`tab-${t.key}`} type="button" role="tab" aria-selected={selected} aria-controls="pricing-panel" tabIndex={selected ? 0 : -1}
               onClick={() => setTab(t.key)}
               onKeyDown={onTabKey}
-              className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px] ${selected ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'}`}>
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px] ${selected ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'}`}>
               {t.tab}
               {errs > 0 ? (
                 <span className={`rounded-full px-1.5 text-[11px] font-bold tabular-nums ${selected ? 'bg-white text-coral-700' : 'bg-coral-600 text-white'}`}>{errs}<span className="sr-only"> {errs === 1 ? 'dato por corregir' : 'datos por corregir'}</span></span>
@@ -311,10 +311,10 @@ export default function AdminPricing() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {showPreview && (
-              <div role="group" aria-label="Qué mostrar" className="flex rounded-full bg-cream-2 p-1">
+              <div role="group" aria-label="Qué mostrar" className="flex rounded-md bg-cream-2 p-1">
                 {([['tables', 'Tablas de Costos'], ['estimator', 'Estimador']] as const).map(([v, label]) => (
                   <button key={v} type="button" aria-pressed={previewView === v} onClick={() => setPreviewView(v)}
-                    className={`min-h-[36px] rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${previewView === v ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{label}</button>
+                    className={`min-h-[36px] rounded-sm px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${previewView === v ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{label}</button>
                 ))}
               </div>
             )}
@@ -324,7 +324,7 @@ export default function AdminPricing() {
           </div>
         </div>
         {showPreview && bundle && (
-          <div id="pricing-preview" className="overflow-hidden rounded-b-xl2">
+          <div id="pricing-preview" className="overflow-hidden rounded-b-md">
             <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center"><LoadingSpinner /></div>}>
               <PricingPreview bundle={bundle} view={previewView} copy={pricingCopy} estimatorCopy={estimatorCopy} />
             </Suspense>
@@ -334,7 +334,7 @@ export default function AdminPricing() {
 
       {dirty.length > 0 && (
         // Above the phone tab bar (62 px + safe area, MobileTabBar); at the bottom edge on desktop.
-        <div className="sticky bottom-[calc(62px+env(safe-area-inset-bottom))] z-20 mt-6 rounded-xl2 border border-line bg-white/95 px-4 py-3 shadow-card backdrop-blur lg:bottom-0">
+        <div className="sticky bottom-[calc(62px+env(safe-area-inset-bottom))] z-sticky mt-6 rounded-md bg-white/95 px-4 py-3 shadow-card backdrop-blur lg:bottom-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink" role="status">
               <strong>{changesLabel(totalChanges)}</strong> sin guardar en {dirty.map((k) => TABLES.find((t) => t.key === k)!.tab).join(', ')}

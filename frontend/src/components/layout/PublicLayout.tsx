@@ -157,7 +157,7 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded-sm"
       >
         {label}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -169,15 +169,15 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
         // ordinary links — role="menu"/"menuitem" would promise app-menu
         // keyboard behavior these plain links don't implement.
         <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-64">
-          <ul className="overflow-hidden rounded-2xl border border-line bg-white p-2 shadow-xl ring-1 ring-ink/5">
+          <ul className="overflow-hidden rounded-md bg-white p-2 shadow-xl ring-1 ring-ink/5">
             {items.map((item) => (
               <li key={item.label}>
                 <MenuLink
                   to={item.to}
                   onClick={() => setOpen(false)}
-                  className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                  className="group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green-strong group-hover:text-white">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm bg-green/10 text-green-dark transition-colors group-hover:bg-green-strong group-hover:text-white">
                     <item.icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <span className="font-medium">{item.label}{isExternalHref(item.to) && <ExternalMark />}</span>
@@ -289,7 +289,7 @@ export function PublicLayout() {
 
       {/* Main nav */}
       <div className="accent-bar" />
-      <header className="bg-white border-b border-line sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-line sticky top-0 z-header shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
@@ -327,7 +327,7 @@ export function PublicLayout() {
                 href={`tel:${settings.phone_e164}`}
                 aria-label={`Llamar al colegio, ${settings.phone_display}`}
                 onClick={() => trackEvent(ConversionEvent.PhoneCta, { context: 'header_movil' })}
-                className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                className="grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
               >
                 <Phone className="h-5 w-5" aria-hidden="true" />
               </a>
@@ -338,7 +338,7 @@ export function PublicLayout() {
               aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
               aria-expanded={open}
               aria-controls="mobile-menu"
-              className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             >
               {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -365,7 +365,7 @@ export function PublicLayout() {
               to="/contacto"
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `block px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
+                `block px-3 py-2.5 min-h-[44px] rounded-sm text-sm font-medium transition-colors ${
                   isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-cream'
                 }`
               }
@@ -381,7 +381,7 @@ export function PublicLayout() {
                   type="button"
                   aria-expanded={openGroup === group.label}
                   onClick={() => setOpenGroup((g) => (g === group.label ? null : group.label))}
-                  className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                  className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-sm text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
                   {group.label}
                   <ChevronDown className={`w-4 h-4 transition-transform ${openGroup === group.label ? 'rotate-180' : ''}`} />
@@ -393,9 +393,9 @@ export function PublicLayout() {
                         key={item.label}
                         to={item.to}
                         onClick={() => setOpen(false)}
-                        className="flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-cream hover:text-ink"
+                        className="flex min-h-[44px] items-center gap-3 rounded-sm px-3 py-2 text-sm text-muted hover:bg-cream hover:text-ink"
                       >
-                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark">
+                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-sm bg-green/10 text-green-dark">
                           <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
                         <span>{item.label}{isExternalHref(item.to) && <ExternalMark />}</span>
@@ -427,7 +427,7 @@ export function PublicLayout() {
           primary action. ONE bar with two actions: Agendar (primary) +
           WhatsApp (secondary, hidden when no number is configured). */}
       {showStickyCta && (
-        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-stretch gap-2 md:hidden">
+        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-sticky flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-stretch gap-2 md:hidden">
           <ChromeLink button={{ label: chrome.sticky_label, href: chrome.sticky_href }} className="btn-pink min-w-0 flex-1 justify-center shadow-lg" />
           {settings.whatsapp_number && (
             <a
@@ -437,7 +437,7 @@ export function PublicLayout() {
               aria-label="Escribir por WhatsApp"
               title="Escribir por WhatsApp"
               onClick={() => trackEvent(ConversionEvent.WhatsappCta, { context: 'barra_fija' })}
-              className="flex w-[52px] flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white shadow-lg transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+              className="flex w-[52px] flex-shrink-0 items-center justify-center rounded-sm bg-green-600 text-white shadow-lg transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
             >
               <WhatsAppIcon className="h-6 w-6" />
             </a>

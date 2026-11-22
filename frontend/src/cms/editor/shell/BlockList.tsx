@@ -73,7 +73,7 @@ export function BlockList({ blocks, selectedId, onSelect, onMove, onToggleHidden
                 onDragLeave={() => setDragOver(null)}
                 onDrop={(e) => { e.preventDefault(); if (dragging !== null && dragging !== i) move(dragging, i); setDragging(null); setDragOver(null); }}
                 onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                className={`group flex items-center gap-1 rounded-xl border pl-1 pr-0.5 text-sm transition-colors ${selected ? 'border-purple/40 bg-purple/5' : 'border-transparent hover:bg-cream-2'} ${dragOver === i && dragging !== i ? 'ring-2 ring-purple/50' : ''} ${dragging === i ? 'opacity-50' : ''}`}
+                className={`group flex items-center gap-1 rounded-md border pl-1 pr-0.5 text-sm transition-colors ${selected ? 'border-purple/40 bg-purple/5' : 'border-transparent hover:bg-cream-2'} ${dragOver === i && dragging !== i ? 'ring-2 ring-purple/50' : ''} ${dragging === i ? 'opacity-50' : ''}`}
               >
                 <span className="hidden cursor-grab text-subtle md:inline" aria-hidden="true" title="Arrastre para reordenar"><GripVertical size={15} /></span>
                 <button
@@ -82,9 +82,9 @@ export function BlockList({ blocks, selectedId, onSelect, onMove, onToggleHidden
                   onKeyDown={onKey(i)}
                   aria-current={selected ? 'true' : undefined}
                   title={[spec?.label ?? b.type, summary].filter(Boolean).join('\n')}
-                  className="flex min-h-[44px] min-w-0 flex-1 items-start gap-2 rounded-lg py-2 pl-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                  className="flex min-h-[44px] min-w-0 flex-1 items-start gap-2 rounded-sm py-2 pl-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
                 >
-                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${selected ? 'bg-purple text-white' : 'bg-cream text-purple'} ${b.hidden ? 'opacity-50' : ''}`} aria-hidden="true">
+                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${selected ? 'bg-purple text-white' : 'bg-cream text-purple'} ${b.hidden ? 'opacity-50' : ''}`} aria-hidden="true">
                     <BlockIcon type={b.type} locked={locked} />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -106,7 +106,7 @@ export function BlockList({ blocks, selectedId, onSelect, onMove, onToggleHidden
                     aria-label={b.hidden ? 'Mostrar en el sitio' : 'Ocultar del sitio'}
                     aria-pressed={!!b.hidden}
                     title={b.hidden ? 'Oculta: no aparece en el sitio. Pulse para mostrarla.' : 'Ocultar sin eliminar'}
-                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${b.hidden ? 'text-amber' : 'text-subtle'}`}
+                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${b.hidden ? 'text-amber' : 'text-subtle'}`}
                     onClick={() => onToggleHidden(b)}
                   >
                     {b.hidden ? <EyeOff size={16} /> : <Eye size={16} />}

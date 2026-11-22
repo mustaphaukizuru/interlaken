@@ -22,7 +22,7 @@ function KpiSkeletons() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="skeleton h-[130px] rounded-xl2" aria-hidden="true" />
+        <div key={i} className="skeleton h-[130px] rounded-md" aria-hidden="true" />
       ))}
     </div>
   );
@@ -31,10 +31,10 @@ function KpiSkeletons() {
 function ChartSkeletons() {
   return (
     <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />
-      <div className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />
-      <div className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />
-      <div className="skeleton h-[320px] rounded-xl2 lg:col-span-2" aria-hidden="true" />
+      <div className="skeleton h-[280px] rounded-md" aria-hidden="true" />
+      <div className="skeleton h-[280px] rounded-md" aria-hidden="true" />
+      <div className="skeleton h-[280px] rounded-md" aria-hidden="true" />
+      <div className="skeleton h-[320px] rounded-md lg:col-span-2" aria-hidden="true" />
     </div>
   );
 }
@@ -48,7 +48,7 @@ function Toolbar({ range, onRange, data }: {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <div role="group" aria-label="Rango de fechas"
-           className="flex overflow-hidden rounded-[10px] border border-line dark:border-white/10">
+           className="flex overflow-hidden rounded-sm border border-line dark:border-white/10">
         {RANGES.map((r) => (
           <button
             key={r}
@@ -76,7 +76,7 @@ function Toolbar({ range, onRange, data }: {
           type="button"
           onClick={() => data && downloadAnalyticsCsv(data)}
           disabled={!data}
-          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-[10px] border border-line bg-white px-3 text-xs font-semibold text-muted transition-colors hover:text-ink disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 dark:border-white/10 dark:bg-dark-card dark:text-white/60 dark:hover:text-white"
+          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-sm border border-line bg-white px-3 text-xs font-semibold text-muted transition-colors hover:text-ink disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 dark:border-white/10 dark:bg-dark-card dark:text-white/60 dark:hover:text-white"
         >
           <Download size={14} aria-hidden="true" /> CSV
         </button>

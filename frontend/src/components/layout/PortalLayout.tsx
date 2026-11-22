@@ -142,7 +142,7 @@ function PortalShell({ role }: Props) {
         <div
           onClick={close}
           aria-hidden="true"
-          className={`fixed inset-0 z-40 bg-dark/55 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
+          className={`fixed inset-0 z-dropdown bg-dark/55 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
             open ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         />

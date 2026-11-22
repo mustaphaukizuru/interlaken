@@ -81,7 +81,7 @@ export function StepInicio({ schema, copy, onStarted, onClosed, headingRef }: {
     <div className="card p-4 sm:p-8">
       <StepHeading ref={headingRef} title={copy.t('startTitle')} intro={copy.t('startIntro')} />
       {checklist.length ? (
-        <div className="mb-6 rounded-xl2 border border-line bg-cream-2 p-4">
+        <div className="mb-6 rounded-md bg-cream-2 p-4">
           <p className="text-sm font-bold text-ink">{copy.t('checklistTitle')}</p>
           <ul className="mt-2 space-y-1.5">
             {checklist.map((item) => (

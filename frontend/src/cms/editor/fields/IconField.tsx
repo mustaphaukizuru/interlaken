@@ -47,9 +47,9 @@ export function IconField({ id, label, required, hint, error, warning, onBlur, v
         aria-haspopup="dialog"
         aria-describedby={describedBy(id, { hint, error, warning })}
         aria-label={`${label}: ${value ? iconName(value) : 'sin ícono'}. Cambiar`}
-        className={`flex min-h-[44px] w-full items-center gap-2 rounded-xl border bg-white px-2 text-left hover:border-purple/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple ${error ? 'border-coral-400' : 'border-line'}`}
+        className={`flex min-h-[44px] w-full items-center gap-2 rounded-sm border bg-white px-2 text-left hover:border-purple/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple ${error ? 'border-coral-400' : 'border-line'}`}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cream-2 text-ink" aria-hidden="true">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-cream-2 text-ink" aria-hidden="true">
           {Icon ? <Icon size={17} /> : <Ban size={15} className="text-subtle" />}
         </span>
         <span className={`min-w-0 flex-1 truncate [contain:inline-size] text-sm ${value ? 'font-medium text-ink' : 'text-subtle'}`}>{value ? iconName(value) : 'Sin ícono'}</span>
@@ -111,7 +111,7 @@ function IconGrid({ choices, value, allowNone, onPick, onCancel }: { choices: Ic
                   aria-pressed={selected}
                   onClick={() => onPick(c.value)}
                   onFocus={() => setActive(i)}
-                  className={`flex min-h-[76px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border p-2 text-center ${selected ? 'border-purple bg-purple/10 text-purple' : 'border-line bg-white text-ink hover:border-purple/50 hover:bg-purple/5'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple`}
+                  className={`flex min-h-[76px] w-full flex-col items-center justify-center gap-1.5 rounded-sm border p-2 text-center ${selected ? 'border-purple bg-purple/10 text-purple' : 'border-line bg-white text-ink hover:border-purple/50 hover:bg-purple/5'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple`}
                 >
                   <c.Icon size={22} className={c.value ? undefined : 'text-subtle'} />
                   <span className="text-[11px] leading-tight">{c.value ? iconName(c.value) : 'Sin ícono'}</span>

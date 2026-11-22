@@ -108,7 +108,7 @@ function ContactMainView(p: MainProps) {
             {INFO.map(({ icon: Icon, label, value, href }, i) => {
               const inner = (
                 <>
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple/[0.08]">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple/[0.08]">
                     <Icon className="h-5 w-5 text-purple" />
                   </div>
                   <div>
@@ -122,7 +122,7 @@ function ContactMainView(p: MainProps) {
                   key={i}
                   href={href}
                   {...(href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                  className="group flex items-start gap-3.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+                  className="group flex items-start gap-3.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
                 >
                   {inner}
                 </a>
@@ -135,7 +135,7 @@ function ContactMainView(p: MainProps) {
           {/* Foto de la fachada + dirección y CTA "Cómo llegar".
               El mapa interactivo preciso vive en su propia sección más abajo. */}
           {settings.address && (
-            <div className="group mt-6 overflow-hidden rounded-[20px] border border-line bg-white shadow-card transition-shadow hover:shadow-purple">
+            <div className="group mt-6 overflow-hidden rounded-md bg-white shadow-card transition-shadow hover:shadow-purple">
               <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream-2">
                 {facade.src && (
                   <img
@@ -149,7 +149,7 @@ function ContactMainView(p: MainProps) {
               </div>
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-purple/10 text-purple">
+                  <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm bg-purple/10 text-purple">
                     <MapPin className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <p className="text-sm font-medium leading-snug text-ink">{settings.address}</p>
@@ -159,7 +159,7 @@ function ContactMainView(p: MainProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`${t(p.directionsLabel)} a ${settings.address} en Google Maps`}
-                  className="group/btn inline-flex min-h-[44px] flex-shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple to-purple-mid px-5 text-sm font-semibold text-white shadow-purple transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  className="group/btn inline-flex min-h-[44px] flex-shrink-0 items-center justify-center gap-2 rounded-sm bg-gradient-to-r from-purple to-purple-mid px-5 text-sm font-semibold text-white shadow-purple transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                 >
                   <Navigation className="h-4 w-4" aria-hidden="true" />
                   {t(p.directionsLabel)}
@@ -176,7 +176,7 @@ function ContactMainView(p: MainProps) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Escribir por WhatsApp al Colegio Interlaken"
-              className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-md bg-green-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
             >
               <WhatsAppIcon className="h-4 w-4" aria-hidden="true" />
               {t(p.whatsappLabel)}
@@ -248,7 +248,7 @@ function ContactDirectoryView(p: { eyebrow?: string; title?: string; items?: Dir
             const email = t(d.email);
             return (
               <Reveal key={i}>
-                <div className="h-full rounded-xl2 border border-ink/10 bg-white p-5">
+                <div className="h-full rounded-md bg-white p-5 shadow-card">
                   <p className="font-head text-lg font-bold text-ink">{level}</p>
                   <ul className="mt-3 space-y-2 text-sm">
                     <li>
@@ -311,7 +311,7 @@ function ContactMapView(p: MapProps) {
           )}
         </p>
         {embed && (
-          <div className="mt-4 overflow-hidden rounded-xl2 border border-ink/10">
+          <div className="mt-4 overflow-hidden rounded-md border border-ink/10">
             <iframe
               src={embed}
               title={t(p.mapTitle)}

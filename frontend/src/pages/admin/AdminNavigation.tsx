@@ -102,7 +102,7 @@ function ChromeEditor() {
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-ink">Botones del encabezado (también en el menú móvil)</legend>
           {value.header_buttons.map((b, i) => (
-            <div key={i} className="grid items-end gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
+            <div key={i} className="grid items-end gap-2 rounded-sm bg-cream-2 p-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
               <Input label="Texto" value={b.label} onChange={(e) => setButton(i, { label: e.target.value })} />
               <HrefInput id={`chrome-btn-${i}`} label="Destino" value={b.href} onChange={(href) => setButton(i, { href })} />
               <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={!!b.primary} onChange={(e) => setButton(i, { primary: e.target.checked })} /> Destacado</label>
@@ -180,27 +180,27 @@ function MenuEditor() {
           <Button size="sm" onClick={() => { setCustom(true); save.mutate(menu); }} loading={save.isPending}>Guardar menú</Button>
         </div>
       </div>
-      {!custom && <p className="mb-3 rounded-lg bg-cream-2 px-3 py-2 text-xs text-muted">Actualmente el sitio usa el menú integrado. Edite y guarde para reemplazarlo.</p>}
+      {!custom && <p className="mb-3 rounded-sm bg-cream-2 px-3 py-2 text-xs text-muted">Actualmente el sitio usa el menú integrado. Edite y guarde para reemplazarlo.</p>}
       {error && <p className="mb-3 text-sm text-coral-600" role="alert">{error}</p>}
       <div className="space-y-4">
         {menu.map((g, gi) => (
-          <fieldset key={gi} className="rounded-xl border border-line p-3">
+          <fieldset key={gi} className="rounded-md border border-line p-3">
             <div className="mb-2 flex items-end gap-2">
               <div className="flex-1"><Input label="Grupo" value={g.label} onChange={(e) => setGroup(gi, { label: e.target.value })} /></div>
-              <button type="button" aria-label="Subir grupo" disabled={gi === 0} className="rounded p-2 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setMenu((m) => moveAt(m, gi, -1))}><ArrowUp size={16} /></button>
-              <button type="button" aria-label="Bajar grupo" disabled={gi === menu.length - 1} className="rounded p-2 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setMenu((m) => moveAt(m, gi, 1))}><ArrowDown size={16} /></button>
-              <button type="button" aria-label="Eliminar grupo" className="rounded p-2 text-subtle hover:text-coral-600" onClick={() => setMenu((m) => m.filter((_, i) => i !== gi))}><Trash2 size={16} /></button>
+              <button type="button" aria-label="Subir grupo" disabled={gi === 0} className="rounded-sm p-2 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setMenu((m) => moveAt(m, gi, -1))}><ArrowUp size={16} /></button>
+              <button type="button" aria-label="Bajar grupo" disabled={gi === menu.length - 1} className="rounded-sm p-2 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setMenu((m) => moveAt(m, gi, 1))}><ArrowDown size={16} /></button>
+              <button type="button" aria-label="Eliminar grupo" className="rounded-sm p-2 text-subtle hover:text-coral-600" onClick={() => setMenu((m) => m.filter((_, i) => i !== gi))}><Trash2 size={16} /></button>
             </div>
             <ul className="space-y-2">
               {g.items.map((it, ii) => (
-                <li key={ii} className="grid items-end gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_190px_auto]">
+                <li key={ii} className="grid items-end gap-2 rounded-sm bg-cream-2 p-2 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_190px_auto]">
                   <Input label="Texto" value={it.label} onChange={(e) => setItem(gi, ii, { label: e.target.value })} />
                   <HrefInput id={`menu-to-${gi}-${ii}`} label="Destino" value={it.to} onChange={(to) => setItem(gi, ii, { to })} />
                   <IconField id={`ic-${gi}-${ii}`} label="Ícono" value={it.icon ?? ''} onChange={(icon) => setItem(gi, ii, { icon })} choices={NAV_ICON_CHOICES} allowNone compact />
                   <div className="flex gap-1 pb-1">
-                    <button type="button" aria-label="Subir enlace" disabled={ii === 0} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setGroup(gi, { items: moveAt(g.items, ii, -1) })}><ArrowUp size={14} /></button>
-                    <button type="button" aria-label="Bajar enlace" disabled={ii === g.items.length - 1} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setGroup(gi, { items: moveAt(g.items, ii, 1) })}><ArrowDown size={14} /></button>
-                    <button type="button" aria-label="Quitar enlace" className="rounded p-1 text-subtle hover:text-coral-600" onClick={() => setGroup(gi, { items: g.items.filter((_, j) => j !== ii) })}><Trash2 size={14} /></button>
+                    <button type="button" aria-label="Subir enlace" disabled={ii === 0} className="rounded-sm p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setGroup(gi, { items: moveAt(g.items, ii, -1) })}><ArrowUp size={14} /></button>
+                    <button type="button" aria-label="Bajar enlace" disabled={ii === g.items.length - 1} className="rounded-sm p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setGroup(gi, { items: moveAt(g.items, ii, 1) })}><ArrowDown size={14} /></button>
+                    <button type="button" aria-label="Quitar enlace" className="rounded-sm p-1 text-subtle hover:text-coral-600" onClick={() => setGroup(gi, { items: g.items.filter((_, j) => j !== ii) })}><Trash2 size={14} /></button>
                   </div>
                 </li>
               ))}

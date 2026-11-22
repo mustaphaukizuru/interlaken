@@ -51,7 +51,7 @@ function AboutMissionView(p: MissionProps) {
               const Icon = cmsIcon(it.icon);
               return (
                 <div key={i} className={`${i === 0 ? 'mt-6' : 'mt-5'} flex gap-4`}>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl" style={{ background: `color-mix(in srgb, ${color} 10%, transparent)` }}>
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 10%, transparent)` }}>
                     <Icon size={22} color={color} />
                   </div>
                   <div>
@@ -68,14 +68,14 @@ function AboutMissionView(p: MissionProps) {
         <Reveal direction="left" className="relative">
           <Accent tone="green" variant="ring" size={64} opacity={0.4} className="hidden sm:block" style={{ top: -24, right: 20 }} />
           <div className="relative grid grid-cols-2 gap-3.5">
-            {p.image1 && <img src={imageSrc(p.image1, 'md')} srcSet={imageSrcSet(p.image1)} sizes={CARD_SIZES} alt={altOf(p.image1, t(p.alt1))} width={520} height={240} loading="lazy" className="row-span-2 h-60 w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />}
-            {p.image2 && <img src={imageSrc(p.image2, 'md')} srcSet={imageSrcSet(p.image2)} sizes={CARD_SIZES} alt={altOf(p.image2, t(p.alt2))} width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />}
-            {p.image3 && <img src={imageSrc(p.image3, 'md')} srcSet={imageSrcSet(p.image3)} sizes={CARD_SIZES} alt={altOf(p.image3, t(p.alt3))} width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />}
+            {p.image1 && <img src={imageSrc(p.image1, 'md')} srcSet={imageSrcSet(p.image1)} sizes={CARD_SIZES} alt={altOf(p.image1, t(p.alt1))} width={520} height={240} loading="lazy" className="row-span-2 h-60 w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
+            {p.image2 && <img src={imageSrc(p.image2, 'md')} srcSet={imageSrcSet(p.image2)} sizes={CARD_SIZES} alt={altOf(p.image2, t(p.alt2))} width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
+            {p.image3 && <img src={imageSrc(p.image3, 'md')} srcSet={imageSrcSet(p.image3)} sizes={CARD_SIZES} alt={altOf(p.image3, t(p.alt3))} width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-md object-cover" onError={hideOnError} />}
           </div>
           {/* Floating mini-stat card */}
           {p.badgeValue && (
-            <div className="absolute -bottom-5 -left-2.5 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-left-2.5">
-              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-pink/10">
+            <div className="absolute -bottom-5 -left-2.5 flex items-center gap-3 rounded-md bg-white px-4 py-3.5 shadow-purple sm:-left-2.5">
+              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-md bg-pink/10">
                 <Award size={20} color="var(--pink)" />
               </div>
               <div>
@@ -130,7 +130,7 @@ function AboutValuesView(p: CardsProps) {
             <Reveal key={i} delay={i * 70}>
               <div className="card hover-lift h-full">
                 <div
-                  className="flex h-[46px] w-[46px] items-center justify-center rounded-xl2"
+                  className="flex h-[46px] w-[46px] items-center justify-center rounded-md"
                   style={{ background: `color-mix(in srgb, ${color} 9%, transparent)` }}
                 >
                   <Icon size={22} color={color} />
@@ -171,7 +171,7 @@ function AboutLevelsView(p: { eyebrow?: string; title?: string; items?: LevelIte
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {asList<LevelItem>(p.items).map((l, i) => (
           <Reveal key={i} delay={i * 80}>
-            <div className={`rounded-2xl border-2 p-5 ${LEVEL_TONES[l.tone ?? ''] ?? LEVEL_TONES.green}`}>
+            <div className={`rounded-md border-2 p-5 ${LEVEL_TONES[l.tone ?? ''] ?? LEVEL_TONES.green}`}>
               <h4 className="font-bold text-lg mb-1">{t(l.name)}</h4>
               {l.grades && <p className="text-sm opacity-80">{t(l.grades)}</p>}
               {l.age && <p className="text-xs opacity-60 mt-1">{t(l.age)}</p>}
@@ -199,7 +199,7 @@ function AboutCredentialsView(p: CardsProps) {
           return (
             <Reveal key={i} delay={i * 90}>
               <div className="card hover-lift flex h-full flex-col gap-[18px]">
-                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
+                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
                   <Icon size={26} color={color} />
                 </div>
                 <h3 className="font-head text-[19px] font-bold text-ink">{t(c.title)}</h3>

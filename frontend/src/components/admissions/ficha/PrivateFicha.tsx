@@ -26,7 +26,7 @@ export function PrivateFicha({ copy, headingRef }: { copy: FichaCopy; headingRef
     <>
       <section className="card p-6 sm:p-10" aria-labelledby="ficha-private-title">
         <div className="text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-cream text-purple" aria-hidden="true">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-sm bg-cream text-purple" aria-hidden="true">
             <Lock className="h-7 w-7" />
           </div>
           <h2 id="ficha-private-title" ref={headingRef} tabIndex={-1} className="font-head text-fluid-xl font-bold text-ink focus:outline-none">

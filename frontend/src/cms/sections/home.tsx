@@ -107,7 +107,7 @@ function HomeStatsView({ items }: { items?: StatItem[] }) {
             const Icon = cmsIcon(s.icon);
             return (
               <m.div key={i} variants={sectionReveal} className="flex items-center gap-3 sm:gap-4">
-                <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${color} 13%, transparent)` }}>
+                <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 13%, transparent)` }}>
                   <Icon size={24} color={color} />
                 </div>
                 <div>

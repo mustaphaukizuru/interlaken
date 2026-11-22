@@ -72,7 +72,7 @@ export function SortableTh({ columnKey, sort, onSort, children, align = 'left', 
         // Browsers reset text-transform on form controls, so the button has to
         // restate the header typography or sortable columns render in mixed
         // case next to the uppercase static ones.
-        className={`inline-flex min-h-[36px] items-center gap-1.5 rounded px-1 font-head text-[11px] font-bold uppercase tracking-wider transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+        className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-sm px-1 font-head text-[11px] font-bold uppercase tracking-wider transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
           active ? 'text-ink' : ''
         } ${align === 'right' ? 'flex-row-reverse' : ''}`}
       >

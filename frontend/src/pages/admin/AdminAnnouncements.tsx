@@ -274,17 +274,17 @@ export default function AdminAnnouncements() {
             <>
               <button type="button" onClick={() => (a.is_active ? toggleActive.mutate(a) : setToActivate(a))}
                 disabled={toggleActive.isPending && toggleActive.variables?.id === a.id}
-                className="min-h-[36px] rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-cream disabled:opacity-50">
+                className="min-h-[36px] rounded-sm border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-cream disabled:opacity-50">
                 {toggleActive.isPending && toggleActive.variables?.id === a.id
                   ? 'Guardando…'
                   : a.is_active ? 'Desactivar' : 'Activar'}
               </button>
               <button type="button" onClick={() => setReport(a)} aria-label={`Ver entrega del comunicado "${a.title}"`}
-                className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Send className="h-4 w-4" aria-hidden="true" /></button>
+                className="rounded-sm p-2 text-subtle hover:bg-cream hover:text-ink"><Send className="h-4 w-4" aria-hidden="true" /></button>
               <button type="button" onClick={() => openEdit(a)} aria-label={`Editar el comunicado "${a.title}"`}
-                className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" aria-hidden="true" /></button>
+                className="rounded-sm p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" aria-hidden="true" /></button>
               <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
-                className="rounded-lg p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                className="rounded-sm p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
             </>
           )}
           toolbar={(
@@ -357,21 +357,21 @@ export default function AdminAnnouncements() {
           </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
-              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+              className="h-4 w-4 rounded-sm border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Publicado (se envía a la audiencia al guardar o en la fecha programada)
           </label>
-          <p className="rounded-lg bg-cream-2 px-3 py-2 text-xs text-muted">
+          <p className="rounded-sm bg-cream-2 px-3 py-2 text-xs text-muted">
             Las familias lo reciben como notificación en «Notificaciones» de su portal, por correo y, si lo activa, por push.
             El portal ya no tiene una sección de comunicados, así que no se envían adjuntos ni se pide «Enterado».
           </p>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.push_enabled} onChange={(e) => setForm((f) => ({ ...f, push_enabled: e.target.checked }))}
-              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+              className="h-4 w-4 rounded-sm border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Enviar notificación push a los dispositivos suscritos
           </label>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.show_on_site} onChange={(e) => setForm((f) => ({ ...f, show_on_site: e.target.checked }))}
-              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+              className="h-4 w-4 rounded-sm border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Publicar en el sitio público (franja de aviso arriba del encabezado)
           </label>
           {form.show_on_site && (
@@ -385,7 +385,7 @@ export default function AdminAnnouncements() {
           <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setForm((f) => ({ ...f, publish_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} hint="Vacío = se envía al publicar." />
           {confirmSend && sendsNow ? (
             <div role="alertdialog" aria-labelledby="ann-send-title" aria-describedby="ann-send-desc"
-              className="space-y-3 rounded-xl border border-amber/40 bg-amber/10 p-3">
+              className="space-y-3 rounded-md border border-amber/40 bg-amber/10 p-3">
               <p id="ann-send-title" className="text-sm font-semibold text-ink">¿Enviar ahora?</p>
               <p id="ann-send-desc" className="text-sm text-muted">
                 «{form.title.trim()}» se enviará ahora a: {audienceMeta(form.audience).label.toLowerCase()}
@@ -419,7 +419,7 @@ export default function AdminAnnouncements() {
         maxWidth={520}
       >
         <div className="space-y-4">
-          <p className="rounded-xl border border-coral/30 bg-coral/5 px-3 py-2 text-sm text-ink">
+          <p className="rounded-md border border-coral/30 bg-coral/5 px-3 py-2 text-sm text-ink">
             Se creará un comunicado y se notificará de inmediato (app + primer lote de correo/push).
             El resto lo completa el cron. Use solo para contingencias reales.
           </p>
@@ -456,7 +456,7 @@ export default function AdminAnnouncements() {
               type="checkbox"
               checked={alertForm.whatsapp}
               onChange={(e) => setAlertForm((f) => ({ ...f, whatsapp: e.target.checked }))}
-              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40"
+              className="h-4 w-4 rounded-sm border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40"
             />
             También WhatsApp (solo números registrados, uno por número; requiere Cloud API). Se envía en segundo plano y el avance se ve en «Entrega».
           </label>
@@ -465,7 +465,7 @@ export default function AdminAnnouncements() {
               type="checkbox"
               checked={alertConfirm}
               onChange={(e) => setAlertConfirm(e.target.checked)}
-              className="h-4 w-4 rounded border-line text-pink focus-visible:ring-2 focus-visible:ring-pink/40"
+              className="h-4 w-4 rounded-sm border-line text-pink focus-visible:ring-2 focus-visible:ring-pink/40"
             />
             Confirmo que este aviso es urgente y debe enviarse ahora a la audiencia seleccionada.
           </label>

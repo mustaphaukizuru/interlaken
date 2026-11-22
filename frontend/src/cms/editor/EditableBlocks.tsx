@@ -32,7 +32,7 @@ export function EditableBlocks({ blocks, selectedId, onSelect }: { blocks: Block
             onSubmitCapture={(e) => e.preventDefault()}
             className={`relative cursor-pointer outline-offset-[-2px] hover:outline hover:outline-2 hover:outline-purple/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple ${selectedId === b.id ? 'outline outline-2 outline-purple' : ''} ${b.hidden ? 'opacity-40' : ''}`}
           >
-            <span className="pointer-events-none absolute left-2 top-2 z-30 inline-flex items-center gap-1 rounded bg-purple px-2 py-0.5 text-[10px] font-bold text-white">
+            <span className="pointer-events-none absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-sm bg-purple px-2 py-0.5 text-[10px] font-bold text-white">
               {b.hidden && <EyeOff size={10} aria-hidden="true" />}{label}{b.hidden ? ' · oculto' : ''}
             </span>
             <BlockView block={b} />

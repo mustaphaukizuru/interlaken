@@ -78,8 +78,8 @@ export function MoreMenu({ items, label = 'Más', iconOnly = false, placement = 
         aria-label={iconOnly ? label : undefined}
         title={iconOnly ? label : undefined}
         className={iconOnly
-          ? 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-40'
-          : 'inline-flex min-h-[44px] items-center justify-center gap-1 whitespace-nowrap rounded-full border-2 border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-purple hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50'}
+          ? 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-40'
+          : 'inline-flex min-h-[44px] items-center justify-center gap-1 whitespace-nowrap rounded-sm border-2 border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-purple hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50'}
       >
         {iconOnly ? <MoreHorizontal size={18} aria-hidden="true" /> : (
           <>
@@ -96,7 +96,7 @@ export function MoreMenu({ items, label = 'Más', iconOnly = false, placement = 
           tabIndex={-1}
           onKeyDown={onMenuKey}
           style={{ width: 'min(290px, calc(100vw - 24px))' }}
-          className={`absolute right-0 z-50 overflow-hidden rounded-2xl border border-line bg-white p-1.5 shadow-[0_20px_54px_-18px_rgba(16,12,40,0.32)] ${placement === 'up' ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'}`}
+          className={`absolute right-0 z-dropdown overflow-hidden rounded-md bg-white p-1.5 shadow-raised ${placement === 'up' ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'}`}
         >
           {items.map((item) => (
             <button
@@ -106,7 +106,7 @@ export function MoreMenu({ items, label = 'Más', iconOnly = false, placement = 
               disabled={item.disabled}
               // Focus goes back to «Más» first, so a dialog opened by the item returns it there.
               onClick={() => { close(); item.onSelect(); }}
-              className={`flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 disabled:opacity-40 ${item.danger ? 'text-coral-700 hover:bg-coral-50' : 'text-ink hover:bg-cream'}`}
+              className={`flex min-h-[44px] w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 disabled:opacity-40 ${item.danger ? 'text-coral-700 hover:bg-coral-50' : 'text-ink hover:bg-cream'}`}
             >
               <item.icon size={17} aria-hidden="true" className={`shrink-0 ${item.danger ? '' : 'text-subtle'}`} />
               <span className="min-w-0">

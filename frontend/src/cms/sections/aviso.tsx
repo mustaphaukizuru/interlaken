@@ -142,7 +142,7 @@ export function AvisoNoticeBody({ data, isLoading = false, isError = false, ...p
               {cards.map((c, i) => {
                 const Icon = cmsIcon(c.icon, FileText);
                 return (
-                  <div key={i} className="rounded-xl2 border border-ink/10 bg-cream-2 p-4">
+                  <div key={i} className="rounded-md bg-cream-2 p-4">
                     <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-subtle">
                       <Icon className="h-3.5 w-3.5 text-green-dark" aria-hidden="true" /> {t(c.label)}
                     </p>
@@ -173,10 +173,10 @@ export function AvisoNoticeBody({ data, isLoading = false, isError = false, ...p
                     <details
                       key={s.title}
                       open={i === 0}
-                      className="group rounded-xl2 border border-ink/10 bg-white open:shadow-card"
+                      className="group rounded-md bg-white open:shadow-card shadow-card"
                     >
                       <summary className="flex min-h-[52px] cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-                        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark">
+                        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm bg-green/10 text-green-dark">
                           <Icon className="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span className="flex-1 text-sm font-semibold normal-case text-ink">

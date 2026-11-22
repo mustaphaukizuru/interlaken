@@ -11,7 +11,7 @@ export function EditorOnboarding({ onDismiss, canPublish }: { onDismiss: () => v
       : ['Pida aprobación', '«Solicitar aprobación» avisa a Dirección, que la publica. Hasta entonces nadie ve sus cambios.'],
   ];
   return (
-    <section aria-labelledby="cms-onboarding-title" className="relative rounded-2xl border border-line bg-white p-4 pr-12">
+    <section aria-labelledby="cms-onboarding-title" className="relative rounded-md bg-white p-4 pr-12 shadow-card">
       <h2 id="cms-onboarding-title" className="mb-3 flex items-center gap-2 font-semibold text-ink">
         <Lightbulb size={18} className="text-amber" aria-hidden="true" /> Cómo editar una página
       </h2>
@@ -24,7 +24,7 @@ export function EditorOnboarding({ onDismiss, canPublish }: { onDismiss: () => v
         ))}
       </ol>
       <button type="button" onClick={onDismiss} aria-label="Cerrar la guía «Cómo editar una página»"
-        className="absolute right-1.5 top-1.5 inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+        className="absolute right-1.5 top-1.5 inline-flex h-11 w-11 items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
         <X size={18} aria-hidden="true" />
       </button>
     </section>

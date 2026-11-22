@@ -35,7 +35,7 @@ export default function GenericBlockView({ block }: { block: Block }) {
     case 'rich_text': return <RichText html={String(p.html ?? '')} />;
     case 'image': return (
       <Section bg="white" containerSize="md">
-        <figure><img src={mediaUrl(p.image)} srcSet={mediaSrcSet(p.image)} sizes="(min-width: 768px) 768px, 100vw" alt={String(p.alt ?? p.caption ?? '')} loading="lazy" decoding="async" className="w-full rounded-xl2" />
+        <figure><img src={mediaUrl(p.image)} srcSet={mediaSrcSet(p.image)} sizes="(min-width: 768px) 768px, 100vw" alt={String(p.alt ?? p.caption ?? '')} loading="lazy" decoding="async" className="w-full rounded-md" />
           {p.caption && <figcaption className="mt-2 text-center text-sm text-muted">{p.caption}</figcaption>}</figure>
       </Section>
     );
@@ -70,7 +70,7 @@ export default function GenericBlockView({ block }: { block: Block }) {
     ); }
     case 'faq': return (
       <Section bg="white" containerSize="md">
-        <div className="divide-y divide-line rounded-xl2 border border-line bg-white">
+        <div className="divide-y divide-line rounded-md bg-white shadow-card">
           {((p.items as unknown as { q: string; a: string }[]) ?? []).map((f, i) => (
             <details key={i} className="group px-5 py-4"><summary className="cursor-pointer list-none font-semibold text-ink">{f.q}</summary><p className="mt-2 text-sm leading-relaxed text-muted">{f.a}</p></details>
           ))}
@@ -126,7 +126,7 @@ function GalleryBlock({ images }: { images: { image: number | string; caption?: 
     <Section bg="cream">
       <ul className="columns-1 gap-4 sm:columns-2 lg:columns-3">
         {images.filter((im) => im.image).map((im, i) => (
-          <li key={i} className="mb-4 break-inside-avoid overflow-hidden rounded-2xl bg-white shadow-card">
+          <li key={i} className="mb-4 break-inside-avoid overflow-hidden rounded-md bg-white shadow-card">
             <img src={mediaUrl(im.image, 'md')} srcSet={mediaSrcSet(im.image)} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" alt={altOf(im.image, im.caption ?? '')} loading="lazy" decoding="async" className="w-full object-cover" />
             {im.caption && <p className="px-3 py-2 text-xs text-muted">{im.caption}</p>}
           </li>
@@ -175,7 +175,7 @@ function CalendarBlock() {
   return (
     <Section bg="cream" containerSize="md">
       <h2 className="mb-4 flex items-center gap-2 font-head text-xl font-bold text-ink"><CalendarDays size={20} className="text-purple" aria-hidden="true" /> Próximas fechas</h2>
-      <ul className="divide-y divide-line rounded-xl2 border border-line bg-white">{next.map((e) => (
+      <ul className="divide-y divide-line rounded-md bg-white shadow-card">{next.map((e) => (
         <li key={e.id} className="flex justify-between gap-3 px-4 py-3 text-sm"><span className="text-ink">{e.title}</span><span className="text-muted">{e.start_date}</span></li>
       ))}</ul>
     </Section>
@@ -190,7 +190,7 @@ function OpenSchoolBlock() {
     <Section bg="white" containerSize="md">
       <h2 className="mb-4 font-head text-xl font-bold text-ink">Clases abiertas</h2>
       {events.length === 0 ? <p className="text-sm text-muted">Por ahora no hay clases abiertas programadas. Puede agendar una visita individual.</p> : (
-        <ul className="divide-y divide-line rounded-xl2 border border-line bg-white">{events.map((e) => (
+        <ul className="divide-y divide-line rounded-md bg-white shadow-card">{events.map((e) => (
           <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><div><p className="font-semibold text-ink">{e.title}</p><p className="text-muted">{e.date}{e.description ? ` · ${e.description}` : ''}</p></div><span className="shrink-0 text-xs text-subtle">{e.spots_remaining} lugares</span></li>
         ))}</ul>
       )}

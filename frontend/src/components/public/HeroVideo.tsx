@@ -136,12 +136,12 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
       />
 
       {wanted && ready && (
-        <div className="absolute bottom-4 right-4 z-20 flex gap-2 sm:bottom-6 sm:right-6">
+        <div className="absolute bottom-4 right-4 z-10 flex gap-2 sm:bottom-6 sm:right-6">
           <button
             type="button"
             onClick={togglePlay}
             aria-label={paused ? 'Reanudar el video' : 'Pausar el video'}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-11 w-11 items-center justify-center rounded-sm border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
           </button>
@@ -150,7 +150,7 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
             onClick={toggleSound}
             aria-pressed={!muted}
             aria-label={muted ? 'Activar el sonido del video' : 'Silenciar el video'}
-            className="flex h-11 items-center gap-2 rounded-full border border-white/25 bg-black/35 px-4 text-[13px] font-semibold text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-11 items-center gap-2 rounded-sm border border-white/25 bg-black/35 px-4 text-[13px] font-semibold text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {muted ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
             <span className="hidden xs:inline">{muted ? 'Activar sonido' : 'Sonido activado'}</span>

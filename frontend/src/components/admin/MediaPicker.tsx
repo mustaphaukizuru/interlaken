@@ -45,9 +45,9 @@ export function MediaPicker({ value, onChange, label, multiple = false, onPickMa
       <span className="label">{label}</span>
       <div className="flex items-center gap-3">
         {multiple ? null : preview ? (
-          <img src={preview} alt="" title={typeof value === 'string' ? 'Foto original del sitio' : undefined} className="h-16 w-16 rounded-lg object-cover ring-1 ring-line" />
+          <img src={preview} alt="" title={typeof value === 'string' ? 'Foto original del sitio' : undefined} className="h-16 w-16 rounded-sm object-cover ring-1 ring-line" />
         ) : (
-          <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-cream-2 text-subtle"><ImageIcon size={20} aria-hidden="true" /></span>
+          <span className="flex h-16 w-16 items-center justify-center rounded-sm bg-cream-2 text-subtle"><ImageIcon size={20} aria-hidden="true" /></span>
         )}
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>{multiple ? 'Elegir fotos de la biblioteca' : value ? 'Cambiar' : 'Elegir imagen'}</Button>
@@ -63,7 +63,7 @@ export function MediaPicker({ value, onChange, label, multiple = false, onPickMa
           <ErrorState title="No se pudo cargar la biblioteca" onRetry={() => refetch()} />
         ) : isLoading ? (
           <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Cargando imágenes">
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <li key={i} className="skeleton aspect-square rounded-lg" />)}
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <li key={i} className="skeleton aspect-square rounded-sm" />)}
           </ul>
         ) : assets.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted">{q ? 'Ninguna imagen coincide con la búsqueda.' : 'La biblioteca está vacía.'}</p>
@@ -71,7 +71,7 @@ export function MediaPicker({ value, onChange, label, multiple = false, onPickMa
         <ul className="grid max-h-[60vh] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4" aria-label="Imágenes">
           {assets.map((a) => (
             <li key={a.id}>
-              <button type="button" onClick={() => pick(a.id)} aria-pressed={multiple ? picked.includes(a.id) : undefined} className={`block aspect-square w-full overflow-hidden rounded-lg ring-2 ${(multiple ? picked.includes(a.id) : value === a.id) ? 'ring-purple' : 'ring-transparent hover:ring-purple/40'}`} aria-label={a.alt || a.filename}>
+              <button type="button" onClick={() => pick(a.id)} aria-pressed={multiple ? picked.includes(a.id) : undefined} className={`block aspect-square w-full overflow-hidden rounded-sm ring-2 ${(multiple ? picked.includes(a.id) : value === a.id) ? 'ring-purple' : 'ring-transparent hover:ring-purple/40'}`} aria-label={a.alt || a.filename}>
                 <img src={a.urls.thumb ?? a.urls.original} alt={a.alt || ''} className="h-full w-full object-cover" loading="lazy" />
               </button>
               {!a.alt && <span className="block text-[10px] text-coral-600">Sin alt</span>}

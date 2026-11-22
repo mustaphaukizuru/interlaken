@@ -45,8 +45,9 @@
   --cream-2: #FAF9FD;
   --text-main: #1A1130;
   --text-muted: #6E6885;
-  /* Darkened from #9A93AE (2.93:1 — failed AA) to pass 4.5:1 on white AND cream. */
-  --text-light: #726B89;
+  /* Darkened from #9A93AE (2.93:1, failed AA). One value everywhere since
+     2026-11-21: it mirrors Tailwind `subtle`, the email and the Unfold skin. */
+  --text-light: #6B6482;
   --border: #ECEAF3;
   --border-2: #EEEBF5;
   /* Gradients */
@@ -58,12 +59,44 @@
   --shadow-pink: 0 12px 28px -10px rgba(224,26,78,0.3);
   --shadow-green: 0 12px 28px -10px rgba(71,160,40,0.32);
   --shadow-coral: 0 12px 28px -10px rgba(221,38,34,0.3);
-  --radius: 18px;
+  /* Shape (D1, 2026-11-21): two radii only. sm = controls (buttons, inputs,
+     selects, chips, small tiles); md = surfaces (cards, panels, dialogs,
+     sheets, images, email blocks). Pills (9999px) are for badges, avatars,
+     switch thumbs and dots only. Tailwind: rounded-sm / rounded-md / rounded-full. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius: var(--radius-md); /* legacy alias */
+
+  /* Status pairs (fg on its own bg passes AA). Status colours are for status only. */
+  --success-fg: var(--green-dark);
+  --success-bg: var(--green-light);
+  --warning-fg: var(--amber);
+  --warning-bg: #FDF3E4;
+  --danger-fg: var(--coral-dark);
+  --danger-bg: var(--coral-light);
+  --info-fg: var(--purple);
+  --info-bg: var(--purple-light);
+  --neutral-fg: var(--text-muted);
+  --neutral-bg: var(--cream);
+
+  /* Elevation: two levels. raised = popovers, menus, dialogs, sheets. */
+  --shadow-raised: 0 18px 44px -20px rgba(26,17,48,0.32), 0 2px 6px rgba(26,17,48,0.06);
+
+  /* Layers (D: page < sticky < dropdown < drawer < modal < toast). Tailwind: z-sticky … z-toast. */
+  --z-raised: 5;      /* pinned table cells */
+  --z-sticky: 30;     /* tab bar, sticky CTA bars, sticky footers, WhatsApp button */
+  --z-header: 35;     /* app header and public nav: their menus open over the sticky bars */
+  --z-dropdown: 40;   /* menus, popovers, the child picker */
+  --z-drawer: 50;     /* sidebar drawer */
+  --z-modal: 60;      /* dialogs and bottom sheets */
+  --z-toast: 70;      /* toasts */
+  --z-overlay: 80;    /* full-screen credencial scan, skip link */
   /* Motion scale — standard easing; fast 150ms / base 200ms / slow 300ms (max). */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 0.15s var(--ease);
   --transition: 0.2s var(--ease);
   --transition-slow: 0.3s var(--ease);
+  --motion-rise: 8px; /* sections and dialogs enter from 8px below */
 }
 
 @layer base {
@@ -87,15 +120,15 @@
   :where(a, button, [role="button"], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
     outline: 2px solid var(--purple);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   /* Skip-to-content link — visually hidden until focused. */
   .skip-link {
-    position: fixed; top: 8px; left: 8px; z-index: 100;
+    position: fixed; top: 8px; left: 8px; z-index: var(--z-overlay);
     transform: translateY(-150%);
     background: var(--purple); color: #fff;
-    padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px;
+    padding: 10px 16px; border-radius: var(--radius-sm); font-weight: 600; font-size: 14px;
     transition: transform var(--transition);
   }
   .skip-link:focus { transform: translateY(0); }
@@ -135,7 +168,7 @@
 .skeleton {
   background: rgba(64,26,142,0.08);
   animation: shimmer-pulse 1.4s ease-in-out infinite;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
 }
 
 /* Hide scrollbar while keeping scrollability (dark sidebar nav, etc.) */
@@ -166,32 +199,33 @@
 
   /* ── Legacy component classes (kept so existing pages stay intact) ── */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-purple px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-mid focus:outline-none focus:ring-2 focus:ring-purple/40 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-sm bg-purple px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-mid focus:outline-none focus:ring-2 focus:ring-purple/40 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
     font-family: 'Poppins', sans-serif;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-purple bg-white px-5 py-2.5 text-sm font-semibold text-purple shadow-sm transition-colors hover:bg-purple hover:text-white focus:outline-none focus:ring-2 focus:ring-purple/30 focus:ring-offset-2 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-sm border-2 border-purple bg-white px-5 py-2.5 text-sm font-semibold text-purple shadow-sm transition-colors hover:bg-purple hover:text-white focus:outline-none focus:ring-2 focus:ring-purple/30 focus:ring-offset-2 disabled:opacity-50;
     font-family: 'Poppins', sans-serif;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-pink px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-dark focus:outline-none focus:ring-2 focus:ring-pink/40 focus:ring-offset-2 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-sm bg-pink px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-dark focus:outline-none focus:ring-2 focus:ring-pink/40 focus:ring-offset-2 disabled:opacity-50;
   }
   .input-field {
     /* text-base (16px) prevents iOS Safari auto-zoom on focus; min-h keeps a 44px tap target. */
-    @apply block w-full min-h-[44px] rounded-xl border border-[#ECEAF3] bg-white px-3.5 py-2.5 text-base text-ink shadow-sm placeholder:text-subtle focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/15 transition-colors;
+    @apply block w-full min-h-[44px] rounded-sm border border-line bg-white px-3.5 py-2.5 text-base text-ink shadow-sm placeholder:text-subtle focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/15 transition-colors;
   }
+  /* Borderless surface (D3): white on the cream page, separated by a soft shadow. */
   .card {
-    @apply rounded-xl2 border border-line bg-white p-6;
+    @apply rounded-md bg-white p-6;
     box-shadow:
-      0 1px 2px rgba(16, 12, 40, 0.03),
-      0 6px 18px -12px rgba(64, 26, 142, 0.10);
+      0 1px 2px rgba(16, 12, 40, 0.04),
+      0 6px 18px -12px rgba(64, 26, 142, 0.12);
   }
   .label {
     @apply block text-sm font-medium text-muted mb-1.5;
   }
 
   /* ── New premium buttons ── */
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 50px; transition: var(--transition); cursor: pointer; border: none; white-space: nowrap; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: var(--radius-sm); transition: var(--transition); cursor: pointer; border: none; white-space: nowrap; }
   .btn-pink { @apply btn; background: var(--grad-cta); color: #fff; box-shadow: 0 10px 28px -8px rgba(224,26,78,0.55); }
   .btn-pink:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -8px rgba(239,37,88,0.75); }
   .btn-outline { @apply btn; background: transparent; border: 2px solid var(--purple); color: var(--purple); }
@@ -206,7 +240,7 @@
   @media (prefers-reduced-motion: reduce) { .btn:active:not(:disabled) { transform: none; } }
 
   /* Cards */
-  .card-dark { background: var(--dark-card); border: 1px solid rgba(124,77,214,0.25); border-radius: var(--radius); }
+  .card-dark { background: var(--dark-card); border-radius: var(--radius-md); }
   /* Hover lift — subtle raise + deeper shadow on interactive cards */
   .hover-lift { transition: transform var(--transition), box-shadow var(--transition); }
   .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 18px 36px -20px rgba(64,26,142,0.22); }
@@ -218,11 +252,11 @@
   /* `backwards`, not `both`: a fill that outlives the animation keeps an identity
      transform on the page, which makes it a stacking context and buries every
      dialog it opens (z-50) under the phone tab bar (z-30). */
-  .route-enter { animation: route-enter 0.32s cubic-bezier(0.4,0,0.2,1) backwards; }
+  .route-enter { animation: route-enter 0.3s var(--ease) backwards; }
   @media (prefers-reduced-motion: reduce) { .route-enter { animation: none; } }
 
   /* Navigation portal items */
-  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.58); transition: var(--transition); cursor: pointer; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.58); transition: var(--transition); cursor: pointer; }
   .nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
   .nav-item-active { background: var(--grad-purple); color: #fff; box-shadow: 0 12px 26px -10px rgba(64,26,142,0.9); }
   .sidebar-section-label { font-size: 9.5px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(255,255,255,0.3); padding: 10px 14px 5px; }
@@ -233,19 +267,20 @@
   .badge-pink   { @apply badge; background: var(--pink-light); color: var(--pink-text); }  /* 4.6:1 on pink-light (WCAG AA) */
   .badge-coral  { @apply badge; background: var(--coral-light); color: var(--coral-dark); }
   .badge-green  { @apply badge; background: var(--green-light); color: var(--green-dark); }
-  .badge-amber  { @apply badge; background: rgba(217,119,6,0.1); color: var(--amber); }
+  .badge-amber  { @apply badge; background: var(--warning-bg); color: var(--warning-fg); }
 
-  /* Section labels */
-  .section-label-purple { @apply badge-purple; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
-  .section-label-green  { @apply badge-green;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
-  .section-label-coral  { @apply badge-coral;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
-  .section-label-pink   { @apply badge-pink;   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
+  /* Section labels (eyebrows): tinted tags, not pills (D2). Plain-text eyebrows
+     need a per-section contrast check on the dark heroes first (UX-AUDIT D·P1-4). */
+  .section-label-purple { @apply badge-purple; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; border-radius: var(--radius-sm); }
+  .section-label-green  { @apply badge-green;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; border-radius: var(--radius-sm); }
+  .section-label-coral  { @apply badge-coral;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; border-radius: var(--radius-sm); }
+  .section-label-pink   { @apply badge-pink;   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; border-radius: var(--radius-sm); }
 
   /* ── Admin data tables (DENSE variant — single source of admin table density) ──
      Sticky header works because the wrapper is a bounded scroll container. On
      mobile these tables are replaced by card stacks, so internal scroll is
      desktop-only by design. */
-  .admin-table-wrap { @apply w-full overflow-auto rounded-xl2 border border-line; max-height: 68vh; }
+  .admin-table-wrap { @apply w-full overflow-auto rounded-md bg-white shadow-card; max-height: 68vh; }
   .admin-table--dense tbody td { @apply py-1.5 text-[13px]; }
   .admin-table { @apply w-full border-collapse text-sm; }
   .admin-table thead th {
@@ -304,12 +339,12 @@
      they're display:none here and render their own cards. Each row becomes a
      card and each cell a label/value line driven by the td's data-label. */
   @media (max-width: 767px) {
-    .admin-table-wrap:not(.hidden) { max-height: none; overflow: visible; border: 0; border-radius: 0; }
+    .admin-table-wrap:not(.hidden) { max-height: none; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
     .admin-table-wrap:not(.hidden) .admin-table,
     .admin-table-wrap:not(.hidden) tbody,
     .admin-table-wrap:not(.hidden) tr { display: block; width: 100%; }
     .admin-table-wrap:not(.hidden) thead { display: none; }
-    .admin-table-wrap:not(.hidden) tbody tr { @apply mb-3 rounded-xl2 border border-line bg-white p-1.5 shadow-card; }
+    .admin-table-wrap:not(.hidden) tbody tr { @apply mb-3 rounded-md bg-white p-1.5 shadow-card; }
     .admin-table-wrap:not(.hidden) tbody tr:last-child { @apply mb-0; }
     .admin-table-wrap:not(.hidden) tbody tr:hover { @apply bg-white; }
     .admin-table-wrap:not(.hidden) tbody td {
@@ -327,6 +362,6 @@
     .admin-table-wrap:not(.hidden) tbody td:not([data-label])::before { content: none; }
     .admin-table-wrap:not(.hidden) .num { @apply text-right; }
     .admin-table-wrap:not(.hidden) tbody td.admin-table__select { width: auto; }
-    .admin-table-wrap:not(.hidden) tbody tr.admin-table__row--selected { @apply border-brand-300 bg-brand-50; }
+    .admin-table-wrap:not(.hidden) tbody tr.admin-table__row--selected { @apply bg-brand-50; box-shadow: inset 0 0 0 1px theme('colors.brand.300'); }
   }
 }
