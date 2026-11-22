@@ -1,7 +1,7 @@
 /** Text or multi-line text with insertable data chips while focused, and a «Se verá así» line when it holds data. */
 import { useRef, useState, type FocusEvent } from 'react';
 import { describedBy, FieldLabel, FieldNotes, invalidClass, type FieldBaseProps } from './FieldShell';
-import { MAIN_TOKENS, TokenChips, useResolvedText, type TokenName } from './TokenChips';
+import { MAIN_TOKENS, TokenChips, useResolvedText, useTokenUndo, type TokenName } from './TokenChips';
 
 export interface TextFieldProps extends FieldBaseProps {
   value: string;
@@ -25,6 +25,7 @@ export function TextField({ id, label, required, hint, error, warning, onBlur, v
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const [focused, setFocused] = useState(false);
   const resolve = useResolvedText();
+  const tokenUndo = useTokenUndo(value, onChange);
   const common = {
     id,
     value,
@@ -58,7 +59,7 @@ export function TextField({ id, label, required, hint, error, warning, onBlur, v
           onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } } : undefined}
         />
       )}
-      {focused && tokens && tokens.length > 0 && <TokenChips target={ref} value={value} onChange={onChange} tokens={tokens} more={moreTokens} />}
+      {focused && tokens && tokens.length > 0 && <TokenChips target={ref} value={value} onChange={onChange} tokens={tokens} more={moreTokens} onInserted={tokenUndo} />}
       {preview && preview !== value && (
         <p className="mt-1.5 text-xs text-subtle">Se verá así: <span className="text-ink">{preview}</span></p>
       )}
