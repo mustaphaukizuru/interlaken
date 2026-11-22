@@ -26,7 +26,7 @@ const OFFSET: Record<NonNullable<RevealProps['direction']>, string> = {
 export function Reveal({
   direction = 'up',
   delay = 0,
-  distance = 24,
+  distance = 12,
   style,
   children,
   as: Tag = 'div',
@@ -62,7 +62,10 @@ export function Reveal({
     return () => observer.disconnect();
   }, [reduced]);
 
-  const travel = OFFSET[direction].replace('24px', `${distance}px`);
+  // Motion standard (docs/UIUX-REFINEMENT-PROMPT.md §3.5): rise 8-12 px, 300 ms
+  // ceiling, list stagger capped at 6 items (6 x 60 ms).
+  const travel = OFFSET[direction].replace('24px', `${Math.min(distance, 12)}px`);
+  const wait = Math.min(delay, 360);
 
   return (
     <Tag
@@ -72,7 +75,7 @@ export function Reveal({
         transform: shown ? 'none' : travel,
         transition: reduced
           ? 'none'
-          : `opacity 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}ms, transform 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}ms`,
+          : `opacity 0.3s cubic-bezier(0.4,0,0.2,1) ${wait}ms, transform 0.3s cubic-bezier(0.4,0,0.2,1) ${wait}ms`,
         willChange: 'opacity, transform',
         ...style,
       }}

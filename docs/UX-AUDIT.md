@@ -67,7 +67,26 @@ the auditors' ranking (P0 broken or risky, P1 inconsistent, P2 polish).
 
 ## 4 · Missing-feature proposals (not built)
 
-_Filled in at the end of the run._
+New capabilities the audit found missing. None is built in this branch;
+each needs the owner's go-ahead. Effort in hours, one engineer.
+
+| # | Proposal | Why | Effort |
+|---|---|---|---|
+| P1 | Notification **priority** field (urgent / action / info) on `portal.Notification`, used by the panel, email and push | Urgent pinning today is a client-side sort on `notif_type`; the API has no priority | 8–12 |
+| P2 | **Family onboarding checklist** (link your children, turn on avisos, save the credencial) | Only staff accounts get a profile checklist | 6–8 |
+| P3 | **Ficha autosave** (debounced save on blur/idle, behind a flag) | A reload loses the step being typed; tonight only a leave-page warning was added | 6–10 |
+| P4 | **Record drawer** with Prev/Next and a `?ver=<id>` deep link across console lists | Records open in modals with no Prev/Next and no shareable link | 16–24 |
+| P5 | Comunicado **test send** to the signed-in admin's own inbox | The composer has no way to see the real email before a school-wide send | 4–6 |
+| P6 | Public **calendar** with audience/level filters and a public «Suscribirse» link to the existing `content/calendar.ics` feed | The public calendar was removed; the ICS feed exists but is only linked in the console | 6–10 |
+| P7 | **Marketing email** family (open day, admissions campaigns): consent purpose in the aviso de privacidad, one-click unsubscribe + `List-Unsubscribe`, suppression list honouring refusals and REPEP, campaign composer with preview and test send | Doesn't exist; needs legal review first (LFPDPPP 2025, LFPC art. 18 Bis) | 30–40 |
+| P8 | `List-Unsubscribe` header (pointing to the avisos preferences page) on comunicado blasts | Deliverability of school-wide sends | 2–3 |
+| P9 | Threaded family ↔ school **messaging** | Today: comunicado comments and the contact inbox only | 40–60 |
+| P10 | Public **site search** | No search UI or endpoint | 16–24 |
+| P11 | Route-level **axe in CI** (`@axe-core/playwright`, new dev dependency) and authenticated Lighthouse for one portal and one console route | Today axe runs per component only | 4–8 |
+| P12 | A **flag channel to the SPA** (D14: an env setting exposed through an existing config response) | Behaviour changes in the UI have no off switch without a rebuild | 4–6 |
+| P13 | One shared **Hero** component for the ~11 copied dark heroes | P2 duplicate markup on public sections | 12–16 |
+| P14 | Eyebrows as plain text after a per-section contrast check on dark heroes | Tonight they became 8 px tags | 2–3 |
+| P15 | i18n framework / SPA dark theme | Out of scope by D8/D9; listed only for completeness | 40+ each |
 
 ## 5 · Tickets
 
@@ -75,7 +94,33 @@ _Filled in at the end of the run._
 
 ## 6 · Read-only production queries for the owner
 
-_Filled in at the end of the run._
+Real completion and error rates need production data, which this branch never
+touches. Run these read-only in `docker compose exec app python manage.py shell`
+on the VPS (check field names against the models first; nothing here writes).
+
+```python
+from datetime import timedelta
+from django.db.models import Count
+from django.utils import timezone
+since = timezone.now() - timedelta(days=90)
+
+# Admissions funnel: pre-registros by status, fichas invited → submitted → accepted
+from apps.admissions.models import PreRegistration, Registration
+print(PreRegistration.objects.filter(created_at__gte=since).values('status').annotate(n=Count('id')))
+print(Registration.objects.filter(created_at__gte=since).values('status').annotate(n=Count('id')))
+
+# Top-up funnel: online card payments by status (failed = lost top-ups)
+from apps.payments.models import Payment
+print(Payment.objects.filter(created_at__gte=since, type='cafeteria').values('status').annotate(n=Count('id')))
+
+# Visits: created vs confirmed vs cancelled
+from apps.bookings.models import Booking
+print(Booking.objects.filter(created_at__gte=since).values('status').annotate(n=Count('id')))
+
+# Notifications never delivered (email/push failures)
+from apps.portal.models import Notification
+print(Notification.objects.filter(created_at__gte=since, delivered_at__isnull=True).count())
+```
 
 ---
 
