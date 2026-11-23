@@ -179,6 +179,13 @@ def apply_head(doc: str, head: dict, path: str | None = None) -> str:
         doc = re.sub(r'(<link rel="canonical" href=")[^"]*(")', lambda m: m.group(1) + _attr(canonical) + m.group(2), doc, count=1)
         doc = _set_meta(doc, 'property', 'og:url', canonical)
     extra = []
+    preload = head.get('preload')
+    if isinstance(preload, dict) and preload.get('href'):
+        # The LCP image of a published designed page (content.pages.hero_preload).
+        extra.append(
+            f'<link rel="preload" as="image" href="{_attr(preload["href"])}" '
+            f'imagesrcset="{_attr(preload.get("srcset", ""))}" imagesizes="{_attr(preload.get("sizes", ""))}" '
+            'fetchpriority="high" />')
     if robots:
         extra.append(f'<meta name="robots" content="{_attr(robots)}" />')
     extra.extend(_ld(b) for b in head.get('jsonLd') or [] if isinstance(b, dict))
@@ -198,6 +205,8 @@ def _cms_refine(head: dict, seo: dict) -> dict:
         out['image'] = seo['image']
     if seo.get('noindex'):
         out['robots'] = 'noindex'
+    if seo.get('preload'):
+        out['preload'] = seo['preload']
     return out
 
 
