@@ -110,6 +110,10 @@ def _valid_href(v: str) -> bool:
     return v.startswith('/') or v.startswith('https://') or v.startswith('mailto:') or v.startswith('tel:')
 
 
+# Header button placements; '' / 'all' = desktop header and mobile menu.
+BUTTON_PLACEMENTS = ('all', 'mobile_icon')
+
+
 def validate_chrome(chrome) -> dict:
     """SiteSettings.chrome: header buttons, footer text, mobile CTA. Empty values = built-in copy."""
     if not isinstance(chrome, dict):
@@ -158,6 +162,17 @@ def validate_chrome(chrome) -> dict:
         icon = str((b or {}).get('icon') or '').strip()[:40]
         if icon:
             button['icon'] = icon
+        # Where it shows: everywhere (default, not stored) or, with 'mobile_icon',
+        # only as an icon in the phone and tablet bar, next to the menu button
+        # (hidden from 1024 px up and from the mobile menu). Owner, 2026-11-23:
+        # «Colegiaturas».
+        placement = str((b or {}).get('placement') or '').strip()
+        if placement and placement not in BUTTON_PLACEMENTS:
+            raise serializers.ValidationError(f'Botón "{label}": ubicación no válida.')
+        if placement == 'mobile_icon':
+            if not icon:
+                raise serializers.ValidationError(f'Botón "{label}": elija un ícono para mostrarlo solo como ícono.')
+            button['placement'] = placement
         clean.append(button)
     if clean:
         out['header_buttons'] = clean

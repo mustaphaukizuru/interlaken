@@ -4,8 +4,16 @@
  * one below, so the site never renders a blank button. Mirrors
  * backend/apps/content/navigation.py validate_chrome.
  */
+/** Where a header button shows: everywhere (default), or `mobile_icon`: only as
+ *  an icon in the phone and tablet bar next to the menu button, not on laptops
+ *  and up and not in the mobile menu (owner, 2026-11-23: «Colegiaturas»). */
+export type ButtonPlacement = 'all' | 'mobile_icon';
+
 /** `icon` names a lucide icon from the public menu's set (PublicLayout ICONS); unknown names draw none. */
-export interface ChromeButton { label: string; href: string; primary?: boolean; icon?: string }
+export interface ChromeButton { label: string; href: string; primary?: boolean; icon?: string; placement?: ButtonPlacement }
+
+/** A button that shows only as an icon in the phone/tablet bar (needs an icon to draw). */
+export const isMobileIcon = (b: ChromeButton) => b.placement === 'mobile_icon' && !!b.icon;
 
 export interface SiteChrome {
   header_buttons: ChromeButton[];

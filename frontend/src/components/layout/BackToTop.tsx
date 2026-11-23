@@ -7,8 +7,11 @@ import { isRootScroll, scrollTop, scrollToY, viewHeight } from '@/lib/scrollRoot
  * a half, scrolls back to the top and gives the focus to the page title (so a
  * keyboard user is not left on a button that just disappeared). `className`
  * places it above whatever else floats at the bottom of each layout.
+ * `inline`: it sits in another floating column (the public site's WhatsApp
+ * button, WhatsAppFloat `above`) instead of being fixed on its own, so the two
+ * keep their right edges on one line whatever their sizes.
  */
-export function BackToTop({ className = '' }: { className?: string }) {
+export function BackToTop({ className = '', inline = false }: { className?: string; inline?: boolean }) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -45,8 +48,8 @@ export function BackToTop({ className = '' }: { className?: string }) {
       tabIndex={show ? 0 : -1}
       aria-hidden={show ? undefined : true}
       data-back-to-top=""
-      className={`fixed z-sticky flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink shadow-raised transition-[opacity,transform] duration-300 hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 motion-reduce:transition-none print:hidden ${
-        show ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
+      className={`${inline ? '' : 'fixed z-sticky '}flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink shadow-raised transition-[opacity,transform] duration-300 hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 motion-reduce:transition-none print:hidden ${
+        show ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
       } ${className}`}
     >
       <ArrowUp className="h-5 w-5" aria-hidden="true" />

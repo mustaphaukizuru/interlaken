@@ -102,11 +102,34 @@ function ChromeEditor() {
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-ink">Botones del encabezado (también en el menú móvil)</legend>
           {value.header_buttons.map((b, i) => (
-            <div key={i} className="grid items-end gap-2 rounded-sm bg-cream-2 p-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
-              <Input label="Texto" value={b.label} onChange={(e) => setButton(i, { label: e.target.value })} />
-              <HrefInput id={`chrome-btn-${i}`} label="Destino" value={b.href} onChange={(href) => setButton(i, { href })} />
-              <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={!!b.primary} onChange={(e) => setButton(i, { primary: e.target.checked })} /> Destacado</label>
-              <Button type="button" size="sm" variant="ghost" aria-label={`Quitar botón ${b.label}`} onClick={() => set({ header_buttons: value.header_buttons.filter((_, j) => j !== i) })}><Trash2 size={14} aria-hidden="true" /></Button>
+            <div key={i} className="space-y-2 rounded-sm bg-cream-2 p-2">
+              <div className="grid items-end gap-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
+                <Input label="Texto" value={b.label} onChange={(e) => setButton(i, { label: e.target.value })} />
+                <HrefInput id={`chrome-btn-${i}`} label="Destino" value={b.href} onChange={(href) => setButton(i, { href })} />
+                <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={!!b.primary} onChange={(e) => setButton(i, { primary: e.target.checked })} /> Destacado</label>
+                <Button type="button" size="sm" variant="ghost" aria-label={`Quitar botón ${b.label}`} onClick={() => set({ header_buttons: value.header_buttons.filter((_, j) => j !== i) })}><Trash2 size={14} aria-hidden="true" /></Button>
+              </div>
+              <div className="grid items-end gap-2 sm:grid-cols-[auto_1fr]">
+                <IconField id={`chrome-btn-icon-${i}`} label="Ícono" value={b.icon ?? ''} onChange={(icon) => setButton(i, { icon: icon || undefined, ...(icon ? {} : { placement: undefined }) })} choices={NAV_ICON_CHOICES} allowNone compact />
+                <div>
+                  <label className="label" htmlFor={`chrome-btn-where-${i}`}>Dónde se muestra</label>
+                  <select
+                    id={`chrome-btn-where-${i}`}
+                    className="input-field"
+                    value={b.placement === 'mobile_icon' ? 'mobile_icon' : 'all'}
+                    onChange={(e) => setButton(i, { placement: e.target.value === 'mobile_icon' ? 'mobile_icon' : undefined })}
+                    aria-describedby={`chrome-btn-where-hint-${i}`}
+                  >
+                    <option value="all">Encabezado y menú del celular</option>
+                    <option value="mobile_icon" disabled={!b.icon}>Solo ícono en celular y tableta</option>
+                  </select>
+                  <p id={`chrome-btn-where-hint-${i}`} className="mt-1 text-xs text-muted">
+                    {b.placement === 'mobile_icon'
+                      ? 'No aparece en computadoras: en celular y tableta se ve solo el ícono, junto al botón del menú.'
+                      : b.icon ? 'Se ve en el encabezado de computadoras y dentro del menú del celular.' : 'Elija un ícono para poder mostrarlo solo como ícono en celular y tableta.'}
+                  </p>
+                </div>
+              </div>
             </div>
           ))}
           {value.header_buttons.length < 4 && (

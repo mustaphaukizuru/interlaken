@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
 import { waHref } from '@/lib/siteContact';
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown, ArrowUpRight,
   GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
@@ -14,7 +14,7 @@ import { RouteTransition } from '@/components/layout/RouteTransition';
 import { BackToTop } from '@/components/layout/BackToTop';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { isExternalHref, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteTexts, withYear, type ChromeButton } from '@/lib/siteChrome';
+import { isExternalHref, isMobileIcon, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteTexts, withYear, type ChromeButton } from '@/lib/siteChrome';
 import { setWaEstimatorTemplate, waMessage } from '@/lib/whatsapp';
 import { saveOfflineCopy } from '@/lib/offlineCopy';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
@@ -22,6 +22,10 @@ import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { SiteNoticeBanner } from '@/components/public/SiteNoticeBanner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useAuthStore } from '@/store/authStore';
+
+// Signed-in visitors only: the avatar menu (and its icons) never loads for the public.
+const AccountMenu = lazy(() => import('./AccountMenu'));
 
 /** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
 const HIDE_STICKY_CTA = [
@@ -111,17 +115,34 @@ function MenuLink({ to, className, onClick, children }: { to: string; className:
  *  show just the icon. The name stays for screen readers and as a tooltip;
  *  from 1150 px (iPad landscape is 1180) it shows. Two buttons (the default
  *  since 2026-11-22: Portal Cafetería / Agendar visita) always show names. */
-function ChromeLink({ button, className, onClick, compact = false }: { button: ChromeButton; className: string; onClick?: () => void; compact?: boolean }) {
+function ChromeLink({ button, className, onClick, compact = false, bar = false }: { button: ChromeButton; className: string; onClick?: () => void; compact?: boolean; bar?: boolean }) {
   const Icon = button.icon ? ICONS[button.icon] : undefined;
-  const iconOnly = compact && !!Icon && !button.primary;
-  const label = iconOnly ? <span className="sr-only min-[1150px]:not-sr-only">{button.label}</span> : button.label;
-  const content = <>{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}{label}</>;
+  // `bar`: a «Solo ícono en celular y tableta» button in the phone/tablet bar,
+  // always just the icon (its text stays for screen readers and as a tooltip).
+  const iconOnly = bar || (compact && !!Icon && !button.primary);
+  const label = iconOnly ? <span className={bar ? 'sr-only' : 'sr-only min-[1150px]:not-sr-only'}>{button.label}</span> : button.label;
+  const content = <>{Icon && <Icon className={bar ? 'size-6' : 'size-4'} aria-hidden="true" />}{label}</>;
   const title = iconOnly ? button.label : undefined;
   if (isExternalHref(button.href)) {
     return <a href={button.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className} title={title}>{content}</a>;
   }
   return <Link to={button.href} onClick={onClick} className={className} title={title}>{content}</Link>;
 }
+
+/** The avatar menu of a signed-in visitor, with a 44 px placeholder while its chunk loads. */
+function SignedInMenu() {
+  return (
+    <Suspense fallback={<span aria-hidden="true" className="block h-11 w-11" />}>
+      <AccountMenu variant="public" />
+    </Suspense>
+  );
+}
+
+/** The header's way into the portal («Portal Cafetería» → /login): a signed-in visitor gets the avatar instead. */
+const isPortalButton = (b: ChromeButton) => b.href === '/login' || b.href.startsWith('/portal');
+
+/** The 44 px icon buttons of the phone/tablet bar (menu, icon-only header buttons). */
+const BAR_BTN = 'grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40';
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
@@ -239,6 +260,12 @@ export function PublicLayout() {
   const { pathname } = useLocation();
   const settings = useSiteSettings();
   const chrome = resolveChrome(settings.chrome);
+  // Laptop header + mobile menu show the usual buttons; «Solo ícono en celular
+  // y tableta» ones only appear as an icon next to the burger.
+  const barIcons = chrome.header_buttons.filter(isMobileIcon);
+  // Signed in (owner, 2026-11-23): the avatar replaces «Portal Cafetería».
+  const signedIn = useAuthStore((s) => s.isAuthenticated && !!s.user);
+  const wideButtons = chrome.header_buttons.filter((b) => !isMobileIcon(b) && !(signedIn && isPortalButton(b)));
   // Navegación → «Textos del sitio»: blank = the built-in text.
   const text = siteTexts(settings.chrome, LAYOUT_TEXT_DEFAULTS);
   const contactLabel = text.nav_contact;
@@ -360,30 +387,32 @@ export function PublicLayout() {
 
           {/* CTA */}
           <div className="hidden lg:flex items-center gap-2">
-            {chrome.header_buttons.map((b) => (
-              <ChromeLink key={b.label + b.href} button={b} compact={chrome.header_buttons.length > 2} className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-3.5 py-2`} />
+            {wideButtons.map((b) => (
+              <ChromeLink key={b.label + b.href} button={b} compact={wideButtons.length > 2} className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-3.5 py-2`} />
             ))}
+            {signedIn && (
+              <>
+                <span aria-hidden="true" className="ml-1.5 h-7 w-px bg-line" />
+                <SignedInMenu />
+              </>
+            )}
           </div>
 
-          {/* Mobile: tap-to-call + burger (the phone strip above is desktop-only) */}
+          {/* Mobile: icon-only buttons (Navegación › «Solo ícono en celular y
+              tableta», e.g. «Colegiaturas») + burger. No call icon here
+              (owner, 2026-11-23); the phone stays in the footer. */}
           <div className="flex items-center gap-1 lg:hidden">
-            {settings.phone_e164 && (
-              <a
-                href={`tel:${settings.phone_e164}`}
-                aria-label={`Llamar al colegio, ${settings.phone_display}`}
-                onClick={() => trackEvent(ConversionEvent.PhoneCta, { context: 'header_movil' })}
-                className="grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-              >
-                <Phone className="h-5 w-5" aria-hidden="true" />
-              </a>
-            )}
+            {barIcons.map((b) => (
+              <ChromeLink key={b.label + b.href} button={b} bar className={BAR_BTN} />
+            ))}
+            {signedIn && <SignedInMenu />}
             <button
               ref={burgerRef}
               onClick={() => setOpen(!open)}
               aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
               aria-expanded={open}
               aria-controls="mobile-menu"
-              className="grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              className={BAR_BTN}
             >
               {open ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
             </button>
@@ -401,7 +430,7 @@ export function PublicLayout() {
             className="lg:hidden bg-white border-t border-line px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto"
           >
             <div className="flex flex-col gap-2 pb-2">
-              {chrome.header_buttons.map((b) => (
+              {wideButtons.map((b) => (
                 <ChromeLink key={b.label + b.href} button={b} onClick={() => setOpen(false)} className={`${b.primary ? 'btn-pink' : 'btn-secondary'} justify-center min-h-[44px]`} />
               ))}
             </div>
@@ -491,18 +520,18 @@ export function PublicLayout() {
         </div>
       )}
 
-      {/* Floating WhatsApp bubble — right side, every public page. */}
-      <WhatsAppFloat stickyCtaVisible={showStickyCta} />
-      {/* «Volver arriba» sits above the phone bar or the WhatsApp bubble (centred on it). */}
-      <BackToTop
-        className={`${
-          showStickyCta
-            ? 'right-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4rem)]'
-            : settings.whatsapp_number
-              ? 'right-[1.375rem] bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.25rem)]'
-              : 'right-4 bottom-[max(1rem,env(safe-area-inset-bottom))]'
-        } ${settings.whatsapp_number ? 'md:right-[1.875rem] md:bottom-[5.75rem]' : 'md:right-6 md:bottom-6'} max-[767px]:[html[data-ficha-steps]_&]:hidden`}
-      />
+      {/* Floating WhatsApp bubble — right side, every public page — with
+          «Volver arriba» in its column, right edges aligned (owner, 2026-11-23). */}
+      <WhatsAppFloat stickyCtaVisible={showStickyCta} above={<BackToTop inline />} />
+      {/* On its own where the bubble is not: no WhatsApp number, or phones
+          while the «Agendar visita» bar shows (above that bar). */}
+      {(showStickyCta || !settings.whatsapp_number) && (
+        <BackToTop
+          className={`right-4 ${showStickyCta ? 'bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4rem)]' : 'bottom-[max(1rem,env(safe-area-inset-bottom))]'} ${
+            settings.whatsapp_number ? 'md:hidden' : 'md:right-6 md:bottom-6'
+          } max-[767px]:[html[data-ficha-steps]_&]:hidden`}
+        />
+      )}
 
       {/* Footer */}
       <footer
