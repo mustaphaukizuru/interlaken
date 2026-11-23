@@ -55,6 +55,45 @@ def _square_webp(data: bytes) -> bytes:
     return out.getvalue()
 
 
+def store_avatar(user: User, f) -> Response | None:
+    """Validate, square-crop and save ``f`` as ``user``'s photo. A 400 Response on bad input, else None.
+
+    Shared by «me» (this module) and the family upload of a child's card photo
+    (cafeteria.views.StudentPhotoView)."""
+    if not f:
+        return Response({'file': ['Seleccione una imagen.']}, status=status.HTTP_400_BAD_REQUEST)
+    if f.size > MAX_UPLOAD:
+        return Response({'file': ['La imagen supera 5 MB.']}, status=status.HTTP_400_BAD_REQUEST)
+    if (f.content_type or '') not in ALLOWED:
+        return Response({'file': ['Use una imagen JPG, PNG o WebP.']}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        data = _square_webp(f.read())
+    except Exception:  # noqa: BLE001 - Pillow raises many types for corrupt input
+        return Response({'file': ['No se pudo leer la imagen.']}, status=status.HTTP_400_BAD_REQUEST)
+    old = user.avatar_file.name if user.avatar_file else ''
+    from django.core.files.base import ContentFile
+    user.avatar_file.save(f'avatars/{uuid.uuid4().hex}.webp', ContentFile(data), save=False)
+    user.save(update_fields=['avatar_file'])
+    if old:
+        try:
+            user.avatar_file.storage.delete(old)
+        except Exception:  # noqa: BLE001
+            pass
+    return None
+
+
+def remove_avatar(user: User) -> None:
+    """Drop the uploaded photo (the Google picture, if any, shows again)."""
+    if user.avatar_file:
+        name = user.avatar_file.name
+        user.avatar_file = None
+        user.save(update_fields=['avatar_file'])
+        try:
+            user.avatar_file.storage.delete(name)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 class MyAvatarView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -63,44 +102,18 @@ class MyAvatarView(APIView):
 
         if profile_locked(request.user):
             return locked_response()
-        f = request.FILES.get('file')
-        if not f:
-            return Response({'file': ['Seleccione una imagen.']}, status=status.HTTP_400_BAD_REQUEST)
-        if f.size > MAX_UPLOAD:
-            return Response({'file': ['La imagen supera 5 MB.']}, status=status.HTTP_400_BAD_REQUEST)
-        if (f.content_type or '') not in ALLOWED:
-            return Response({'file': ['Use una imagen JPG, PNG o WebP.']}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            data = _square_webp(f.read())
-        except Exception:  # noqa: BLE001 - Pillow raises many types for corrupt input
-            return Response({'file': ['No se pudo leer la imagen.']}, status=status.HTTP_400_BAD_REQUEST)
-        user: User = request.user
-        old = user.avatar_file.name if user.avatar_file else ''
-        from django.core.files.base import ContentFile
-        user.avatar_file.save(f'avatars/{uuid.uuid4().hex}.webp', ContentFile(data), save=False)
-        user.save(update_fields=['avatar_file'])
-        if old:
-            try:
-                user.avatar_file.storage.delete(old)
-            except Exception:  # noqa: BLE001
-                pass
-        return Response(UserSerializer(user, context={'request': request}).data)
+        error = store_avatar(request.user, request.FILES.get('file'))
+        if error is not None:
+            return error
+        return Response(UserSerializer(request.user, context={'request': request}).data)
 
     def delete(self, request):
         from .profile_lock import locked_response, profile_locked
 
         if profile_locked(request.user):
             return locked_response()
-        user: User = request.user
-        if user.avatar_file:
-            name = user.avatar_file.name
-            user.avatar_file = None
-            user.save(update_fields=['avatar_file'])
-            try:
-                user.avatar_file.storage.delete(name)
-            except Exception:  # noqa: BLE001
-                pass
-        return Response(UserSerializer(user, context={'request': request}).data)
+        remove_avatar(request.user)
+        return Response(UserSerializer(request.user, context={'request': request}).data)
 
 
 class AvatarServeView(APIView):

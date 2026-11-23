@@ -80,6 +80,13 @@ class SiteSettings(models.Model):
     # year shows «Precios 2028: pendientes» once the site announces 2028.
     pricing_years = models.JSONField('Año de los precios publicados', default=dict, blank=True)
 
+    # Credential photo (owner, 2026-11-22: a school decision, photos of minors).
+    # Off: the photo is the one the school uploads or the student's Google
+    # picture. On: a parent may upload or remove their own child's photo from
+    # the family portal's credential page.
+    families_upload_photos = models.BooleanField(
+        'Las familias pueden subir la foto de la credencial', default=False)
+
     # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
     tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')
     # Expediente de admisión (Fase 5): {clave: texto} of the WhatsApp/email

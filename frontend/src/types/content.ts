@@ -28,5 +28,7 @@ export interface SiteSettings {
   admissions_next_from_month?: number;
   /** Costos: the year each price group was published for ({fees: 2027, ...}); set in «Costos y precios». */
   pricing_years?: Partial<Record<string, number>>;
+  /** Ajustes «Fotos de la credencial» (admin settings only): families may upload their child's photo. */
+  families_upload_photos?: boolean;
   updated_at?: string;
 }

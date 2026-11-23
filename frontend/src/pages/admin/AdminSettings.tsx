@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
 import { AdmissionsPublicStartCard } from '@/components/admin/AdmissionsPublicStartCard';
 import { SchoolCycleCard } from '@/components/admin/SchoolCycleCard';
+import { CredentialPhotosCard } from '@/components/admin/CredentialPhotosCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -363,6 +364,8 @@ export default function AdminSettings() {
             <SchoolCycleCard value={data?.admissions_next_from_month} loaded={loaded} />
 
             <AdmissionsPublicStartCard value={data?.admissions_public_start} loaded={loaded} />
+
+            <CredentialPhotosCard value={data?.families_upload_photos} loaded={loaded} />
 
             <AdmissionTemplatesCard />
 

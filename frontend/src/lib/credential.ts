@@ -35,6 +35,21 @@ export function schoolCycle(now = new Date()): string {
   return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
 }
 
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/**
+ * The card is valid for the school year in progress: until 31 July of its
+ * second year. Every August the card moves to the new year by itself.
+ */
+export function validUntil(now = new Date()): Date {
+  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return new Date(start + 1, 6, 31);
+}
+/** «31 JUL 2027» (on the card). */
+export const validityShort = (d: Date) => `${d.getDate()} ${MESES[d.getMonth()].slice(0, 3).toUpperCase()} ${d.getFullYear()}`;
+/** «31 de julio de 2027» (in sentences). */
+export const validityLong = (d: Date) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+
 /**
  * Each level's SEP registration (C.C.T. and acuerdo), the same figures as the
  * official list in lib/sepIncorporations.ts. Copied, not imported: sharing

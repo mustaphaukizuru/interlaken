@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Share, Smartphone, X } from 'lucide-react';
+import { installEvent } from '@/lib/installPrompt';
 
 /**
  * Dismissible "Agregar a pantalla de inicio" card for the parent portal.
@@ -77,7 +78,9 @@ export function InstallHint() {
     const current = parseInt(localStorage.getItem(VISITS_KEY) ?? '0', 10) || 0;
     return sessionStorage.getItem(SESSION_KEY) ? current : current + 1;
   });
-  const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(capturedPrompt);
+  // main.tsx also keeps the event from the very first moment (lib/installPrompt),
+  // for when it fired before this portal chunk loaded.
+  const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(() => capturedPrompt ?? (installEvent() as BeforeInstallPromptEvent | null));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {

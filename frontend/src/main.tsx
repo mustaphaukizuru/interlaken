@@ -5,6 +5,7 @@ import App from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import { freshPageLoad, markUpdateReady } from './lib/appUpdate';
+import { captureInstallPrompt } from './lib/installPrompt';
 
 // Sentry is dynamically imported (perf budget): a static import would put the
 // whole @sentry/react runtime (~30 kB gz) in the critical `index` chunk of
@@ -58,6 +59,9 @@ if (import.meta.env.PROD) {
     caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
   }
 }
+
+// The browser's «install this app» offer fires once, early: keep it for the credential page.
+captureInstallPrompt();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

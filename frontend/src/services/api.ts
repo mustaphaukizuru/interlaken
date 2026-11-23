@@ -262,7 +262,11 @@ api.interceptors.response.use(
 export async function bootstrapSession(): Promise<boolean> {
   try {
     useAuthStore.getState().setAccess(await coalescedRefresh());
-  } catch {
+  } catch (err) {
+    // No answer at all (no signal): keep the saved session, so the card and the
+    // other pages the phone keeps open offline; the first request back online
+    // gets a 401 and refreshes as usual. A real answer (expired, revoked) logs out.
+    if (axios.isAxiosError(err) && !err.response) return false;
     useAuthStore.getState().logout();
     return false;
   }
@@ -616,6 +620,13 @@ export const cafeteriaApi = {
   getCards: (mine?: boolean) => mine
     ? api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/', { params: MINE })
     : api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/'),
+  /** «Subir foto» on a child's credential (only while the school allows it). */
+  uploadCardPhoto: (studentId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<{ photo: string }>(`/cafeteria/cards/${studentId}/photo/`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  removeCardPhoto: (studentId: number) => api.delete<{ photo: string }>(`/cafeteria/cards/${studentId}/photo/`),
 
   // Read-only recent purchases pulled live from Loyverse (does not touch the ledger).
   getLoyverseHistory: (student?: number, limit = 20, mine?: boolean) =>

@@ -177,6 +177,8 @@ export interface CafeteriaCard {
     /** The account's uploaded photo or its Google picture; '' = the empty frame. */
     photo?: string;
   };
+  /** «Subir foto»: the school allows families to set the photo, and this is the caller's child. */
+  can_upload_photo?: boolean;
   code: string;            // matrícula the POS scans (QR/barcode payload)
   linked: boolean;
   balance: string;

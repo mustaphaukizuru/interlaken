@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { Barcode } from '@/components/ui/Barcode';
-import { gradeBadge, levelOf, photoSrc, schoolCycle, sepLines, type Level } from '@/lib/credential';
+import { gradeBadge, levelOf, photoSrc, schoolCycle, sepLines, validityShort, validUntil, type Level } from '@/lib/credential';
 import type { CafeteriaCard } from '@/types';
 
 /**
@@ -9,7 +9,8 @@ import type { CafeteriaCard } from '@/types';
  * like a bank card or a wallet pass). Navy band with the logo, the C.C.T.
  * and the «45 años» mark; the level's colour with the clock-ray pattern;
  * photo, grade, Nombre, Ciclo escolar, Matrícula and a barcode strip the
- * cafetería POS scans.
+ * cafetería POS scans. «Vigencia» (31 July of the school year in progress)
+ * sits in the band under the C.C.T. and moves to the new year every August.
  *
  * Positions are in artboard units (4050 x 2550, CR80 landscape at 1200 dpi,
  * the template's scale), so the card keeps its proportions at any width;
@@ -22,7 +23,7 @@ const PHOTO = { x: 1250, y: 220, w: 1150, h: 1530 }; // 3:4 portrait
 const DATA = { x: 2590, y: 220, w: 1260, h: 1530 };
 const STRIP = { x: 1250, y: 1900, w: 2600, h: 430 }; // the barcode strip
 
-const box = (x: number, y: number, w: number, h: number) => ({
+export const box = (x: number, y: number, w: number, h: number) => ({
   left: `${(x / W) * 100}%`,
   top: `${(y / H) * 100}%`,
   width: `${(w / W) * 100}%`,
@@ -69,7 +70,7 @@ function Field({ label, value, className = '' }: { label: string; value: string;
 }
 
 /** The empty frame: a quiet head-and-shoulders, as on a blank ID. */
-function NoPhoto() {
+export function NoPhoto() {
   return (
     <svg viewBox="0 0 100 130" className="h-full w-full" aria-hidden="true" focusable="false">
       <rect width="100" height="130" className="fill-cream" />
@@ -125,6 +126,12 @@ export function CredentialFace({ card, className = '' }: { card: CafeteriaCard; 
           {sep.lines.map((l) => <p key={l} className={`${l.length > 16 ? 'cred-sep-long' : 'cred-sep'} whitespace-nowrap font-light`}>{l}</p>)}
         </div>
       )}
+
+      {/* «Vigencia»: until the end of the school year in progress (it renews itself in August). */}
+      <div className="absolute flex flex-col items-center justify-center text-center text-white" style={box(50, 1420, 950, 380)}>
+        <p className="cred-label font-semibold uppercase tracking-[0.08em] text-white/70">Vigencia</p>
+        <p className="cred-value whitespace-nowrap font-bold">{validityShort(validUntil())}</p>
+      </div>
 
       <div className="absolute overflow-hidden rounded-sm bg-white" style={box(PHOTO.x, PHOTO.y, PHOTO.w, PHOTO.h)}>
         {photo ? (

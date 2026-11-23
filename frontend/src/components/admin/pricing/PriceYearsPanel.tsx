@@ -100,15 +100,15 @@ export function PriceYearsPanel() {
           const year = years[key];
           const late = (year ?? 0) < due;
           return (
-            <li key={key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-              <span className="min-w-[12rem] flex-1 font-medium text-ink">{label}</span>
-              <span className="w-28 text-sm tabular-nums text-muted">{year ? priceYearLabel(year) : 'Sin año'}</span>
-              <span className="w-40">
+            <li key={key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-3 md:grid-cols-[minmax(0,1fr)_7rem_9.5rem_16rem]">
+              <span className="font-medium text-ink">{label}</span>
+              <span className="text-sm tabular-nums text-muted">{year ? priceYearLabel(year) : 'Sin año'}</span>
+              <span>
                 {late
                   ? <Badge variant="warning" icon={Hourglass}>Pendiente: {due}</Badge>
                   : <Badge variant="success">Al día</Badge>}
               </span>
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-end gap-2">
                 {late && (
                   <Button size="sm" variant="secondary" onClick={() => setAsking({ groups: [key], year: due })}>
                     Publicar {due}

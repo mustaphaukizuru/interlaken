@@ -9,6 +9,7 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import StudentCard from '@/components/portal/StudentCard';
+import { InstallPrompt, LowBalancePrompt, useLowBalancePrompt } from '@/components/portal/CardPrompts';
 import { useFamilyChildren } from '@/components/portal/familyChildren';
 import { cafeteriaApi } from '@/services/api';
 import { useMineScope } from '@/lib/cafeteriaScope';
@@ -92,6 +93,11 @@ export default function CredencialPage() {
     setChildId(cards[0].student.id);
   }, [mine, cards, storedId, missingChild, pickUnresolved, setChildId]);
 
+  // «Saldo bajo» (once a day per card) and «Instalar la app»: never both at once.
+  const lowPrompt = useLowBalancePrompt(active);
+  // Brothers and sisters: a swipe on the card moves between their credentials.
+  const siblings = !mine && cards && cards.length > 1 ? cards.map((c) => ({ id: c.student.id, name: c.student.name })) : [];
+
   const studentId = active?.student.id;
   const {
     data: history,
@@ -158,7 +164,9 @@ export default function CredencialPage() {
         </Card>
       ) : active ? (
         <>
-          <StudentCard card={active} footer={<Freshness at={freshAt(dataUpdatedAt, servedAt)} />} />
+          <StudentCard card={active} footer={<Freshness at={freshAt(dataUpdatedAt, servedAt)} />} siblings={siblings} onPick={setChildId} />
+          {lowPrompt.open && <LowBalancePrompt card={active} mine={mine} onClose={lowPrompt.close} />}
+          <InstallPrompt hold={lowPrompt.open} />
 
           {/* Activity: visits from Loyverse; consumption from the school's
               ledger. Loyverse's own "total_spent" only counts cash/card (the

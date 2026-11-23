@@ -237,8 +237,58 @@ kept; pages gained 3D illustrations and photos and the cards were re-arranged.
   those win and must be edited there; the same holds for a home page saved in
   Contenido with three hero buttons.
 
+### Automatic years, card features, navigation and form safety (owner, 22 Nov 2026)
+The owner asked for every year to update itself when the year ends, except
+Costos, which the administration publishes (next cycle «pendiente» until it
+does), plus the features listed in the session (items 1 to 21). All built.
+
+- **Years.** Footer «©», «45 años», the card's cycle and validity, the
+  console's running cycle and every `{{ciclo}}` follow the calendar. Page
+  titles keep tokens; the server (spa.py) and RouteSeo fill them per visit,
+  so a December build is right in January. A past year typed after «©» shows
+  the current one (Navegación warns and offers «Año en curso»).
+- **Costos follows its published prices.** `SiteSettings.pricing_years`
+  (migration 0035, backfilled from the published page or the 2026-11 sheet).
+  The page shows the newest of the announced cycle and the published years; a
+  group on an older year reads «Precios AAAA: pendientes». The hand-typed
+  «Precios 2027» / «pendientes» CMS fields are gone; the estimator writes its
+  year note. «Costos y precios» › «Año de los precios» publishes a year per
+  group (audited). From a month before the site moves to the next cycle the
+  console asks: a «Pendientes» row (admin-only) and a once-a-day pop-up.
+- **Ajustes.** «Ciclo escolar del sitio»: from which date (1 Jan, or 1 Sep to
+  1 Dec) Admisiones announces the next cycle; new admissions records follow
+  it. «Fotos de la credencial»: off by default (photos of minors, a school
+  decision); on, a parent uploads or removes their own child's photo (0036,
+  audited).
+- **Card.** Validity in the navy band («VIGENCIA 31 JUL 2027», renews each
+  August); tap or «Ver reverso» turns it over (school details, how to use
+  it, what to do if found; built from public data, to be replaced by the
+  printed back when the school sends it); swipe or dots move between
+  siblings through the shared child pick; the counter view shows the photo,
+  a larger barcode, keeps the screen on and closes with a swipe down;
+  «Saldo bajo» pop-up once a day with «Recargar ahora» (linked cards only);
+  «Tenga la credencial a un toque» install sheet on phones (shares its
+  dismissal with the dashboard's InstallHint). Offline: reopening with no
+  signal keeps the session (the refresh got no answer), so the cached card
+  opens.
+- **Navigation.** One scroll rule (top on a new page, the same spot on Back,
+  `#section` below the sticky header, query-only changes keep the position,
+  a link to the open page scrolls to its top), the new page's `<h1>` takes the
+  focus, «Volver arriba», back on a list the opened row is tinted and in
+  view. New version: no automatic reload mid-form; the next page change or
+  «Hay una versión nueva · Actualizar» loads it.
+- **Forms and money.** «¿Descartar los cambios?» on 19 admin forms; 10 money
+  or send actions locked against a double press; the manual wallet
+  adjustment also carries a request id the server refuses to apply twice.
+  Server-side idempotency gaps found but not changed (bookings, admissions
+  resends, comunicados) are listed in the session report for a later PR.
+- **Budgets.** The portal/staff/admin route tables moved to a lazy chunk
+  (routes/ConsoleRoutes): home 172.0 → 169.8 kB with everything above,
+  /admisiones 151.4 → 149.3 kB; budgets back to 170 / 150.
+
 ### Deploy notes (when approved)
-Standard `deploy.sh`; no migrations, no env vars, no crontab change. After
+Standard `deploy.sh`. Migrations: content 0035 (price years, backfilled) and
+0036 (photo switch, off). No env vars, no crontab change. After
 deploy: hard-refresh once (new CSS), check `/`, `/portal` and `/admin` on a
 phone, and run `python manage.py render_emails --out /tmp/emails` only on a
 DEBUG machine (it refuses in production). Rollback: redeploy `master` fd8f03cc.
