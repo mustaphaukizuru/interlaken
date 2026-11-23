@@ -12,6 +12,7 @@ import { ColumnControls } from '@/components/admin/ColumnControls';
 import { ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useTablePrefs } from '@/hooks/useTablePrefs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useReturnHighlight } from '@/hooks/useReturnHighlight';
 import type { DataTableSelection, RowKey } from '@/hooks/useRowSelection';
 
 export type { DataTableSelection, RowKey } from '@/hooks/useRowSelection';
@@ -112,6 +113,10 @@ interface Props<Row> {
   rowLabel?: (row: Row) => string;
   /** Screen-reader caption for the table. */
   caption?: string;
+  /** Key of the record shown beside the table (a side panel that is not a
+   *  dialog); when it goes back to null, its row is pointed at again. Detail
+   *  routes and dialogs opened from a row are noticed without it. */
+  openKey?: RowKey | null;
 }
 
 const MIN_WIDTH = 56;
@@ -134,7 +139,7 @@ export function DataTable<Row>({
   columns, rows, rowKey, sort, onSort, page, count = 0, onPage, pageSize = ADMIN_PAGE_SIZE, itemLabel = 'resultados',
   isLoading, isError, onRetry, empty, noResults, rowClassName, wrapClassName = '',
   tableId, selection, toolbar, bulkBar, columnControls = false, pinFirstColumn = false, pinActions = false, resizable = false,
-  onRowClick, stickyHeader = true, rowActions, rowLabel, caption,
+  onRowClick, stickyHeader = true, rowActions, rowLabel, caption, openKey,
 }: Props<Row>) {
   const cols = useMemo(
     () => columns.map((c) => ({ ...c, id: c.id ?? c.header, hideable: c.hideable ?? true })),
@@ -214,6 +219,26 @@ export function DataTable<Row>({
   const showSelectAllMatching =
     !!selection?.onSelectAllMatching && allOnPage && !selection.allMatching && matching > selection.selected.size;
 
+  // ── «volver a la misma fila» ──
+  // The row a person opened (detail route, dialog, side panel) is tinted for
+  // about 2 s when they come back, and scrolled into view only if hidden.
+  const tableRef = useRef<HTMLTableElement>(null);
+  const back = useReturnHighlight({
+    listId: tableId ?? caption,
+    keys: rows && !isError ? pageKeys : undefined,
+    settled: !isLoading,
+    openKey,
+    rootRef: tableRef,
+  });
+  // A link, a button or the row itself may open the record: remember the row.
+  // Form controls (the selection checkbox, inline edits) open nothing.
+  const noteRowOpen = (key: RowKey) => (e: MouseEvent<HTMLTableRowElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('input,select,textarea,label')) return;
+    if (!onRowClick && !target.closest('a[href],button,[role="menuitem"]')) return;
+    back.noteOpen(key);
+  };
+
   // ── row click ──
   const rowClick = (row: Row) => (e: MouseEvent<HTMLTableRowElement>) => {
     if (!onRowClick) return;
@@ -225,6 +250,7 @@ export function DataTable<Row>({
     if (!onRowClick || e.target !== e.currentTarget) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      back.noteOpen(rowKey(row));
       onRowClick(row);
     }
   };
@@ -258,6 +284,7 @@ export function DataTable<Row>({
         aria-busy={isLoading || undefined}
       >
         <table
+          ref={tableRef}
           className={[
             'admin-table',
             prefs.density === 'dense' ? 'admin-table--dense' : '',
@@ -335,14 +362,17 @@ export function DataTable<Row>({
             {rows.map((row) => {
               const key = rowKey(row);
               const isSelected = !!selection && (selection.allMatching || selection.selected.has(key));
+              const flash = back.flashProps(key);
               return (
                 // Row click is a pointer shortcut; the same target is always
                 // reachable through a link/button in a cell, and the row itself
                 // takes Enter/Space when focused.
                 <tr
                   key={key}
-                  className={`${rowClassName?.(row) ?? ''} ${isSelected ? 'admin-table__row--selected' : ''}`.trim() || undefined}
+                  className={[rowClassName?.(row), isSelected ? 'admin-table__row--selected' : '', flash?.className].filter(Boolean).join(' ') || undefined}
+                  data-last-opened={flash?.['data-last-opened']}
                   aria-selected={selection ? isSelected : undefined}
+                  onClickCapture={noteRowOpen(key)}
                   onClick={onRowClick ? rowClick(row) : undefined}
                   onKeyDown={onRowClick ? rowKeyDown(row) : undefined}
                   tabIndex={onRowClick ? 0 : undefined}

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Clock } from 'lucide-react';
@@ -7,6 +8,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ALL_STAGES, STAGE_META, isStale, waitingText, type StageKey } from '@/lib/caseStages';
 import { casesApi, caseKeys, type CaseListParams, type CaseRow } from '@/hooks/queries/cases';
+import { useReturnHighlight, type ReturnHighlight } from '@/hooks/useReturnHighlight';
 
 /** Cards per column; the column header links to the full list when there are more. */
 export const BOARD_LIMIT = 30;
@@ -32,6 +34,14 @@ export default function AdminPipeline() {
     queryFn: () => Promise.all(ALL_STAGES.map(async (stage) => (await casesApi.list(columnParams(stage))).data)),
   });
   const counts = data?.find((c) => c.counts)?.counts ?? {};
+  // Back from an Expediente, the card that was opened is pointed at (as in the lists).
+  const boardRef = useRef<HTMLDivElement>(null);
+  const back = useReturnHighlight({
+    listId: 'pipeline',
+    keys: data?.flatMap((col) => (col?.results ?? []).map((c) => c.id)),
+    settled: !isLoading,
+    rootRef: boardRef,
+  });
 
   return (
     <>
@@ -45,7 +55,7 @@ export default function AdminPipeline() {
         )}
       />
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" role="list" aria-label="Etapas del proceso">
+        <div ref={boardRef} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" role="list" aria-label="Etapas del proceso">
           {ALL_STAGES.map((stage, i) => {
             const meta = STAGE_META[stage];
             const Icon = meta.icon;
@@ -63,7 +73,17 @@ export default function AdminPipeline() {
                 </h2>
                 <ul className="space-y-2">
                   {cards.length === 0 && <li className="rounded-sm border border-dashed border-line p-3 text-center text-xs text-subtle">Sin expedientes</li>}
-                  {cards.map((c) => <BoardCard key={c.id} card={c} onOpen={() => navigate(`/admin/admisiones/${c.id}`)} />)}
+                  {cards.map((c) => (
+                    <BoardCard
+                      key={c.id}
+                      card={c}
+                      flash={back.flashProps(c.id)}
+                      onOpen={() => {
+                        back.noteOpen(c.id);
+                        navigate(`/admin/admisiones/${c.id}`);
+                      }}
+                    />
+                  ))}
                 </ul>
                 {total > cards.length && (
                   <Link to={`/admin/admisiones?etapa=${stage}`} className="mt-2 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-sm text-xs font-semibold text-purple hover:bg-white">
@@ -79,7 +99,7 @@ export default function AdminPipeline() {
   );
 }
 
-function BoardCard({ card: c, onOpen }: { card: CaseRow; onOpen: () => void }) {
+function BoardCard({ card: c, onOpen, flash }: { card: CaseRow; onOpen: () => void; flash: ReturnType<ReturnHighlight['flashProps']> }) {
   const done = c.stage === 'inscrito' || c.stage === 'cerrado';
   return (
     <li>
@@ -87,7 +107,11 @@ function BoardCard({ card: c, onOpen }: { card: CaseRow; onOpen: () => void }) {
         type="button"
         onClick={onOpen}
         aria-label={`Abrir el expediente de ${c.child_name}`}
-        className="block min-h-[44px] w-full rounded-sm border border-line bg-white p-3 text-left text-sm shadow-card transition hover:border-purple/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        data-last-opened={flash?.['data-last-opened']}
+        className={clsx(
+          'block min-h-[44px] w-full rounded-sm border border-line bg-white p-3 text-left text-sm shadow-card transition hover:border-purple/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40',
+          flash?.className,
+        )}
       >
         <span className="block truncate font-semibold text-ink">{c.child_name}</span>
         <span className="block truncate text-xs text-subtle">{c.grade_applying} · {c.parent_name}</span>

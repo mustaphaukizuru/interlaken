@@ -523,6 +523,8 @@ export default function AdminStudents() {
             pinFirstColumn
             pinActions
             selection={selection}
+            // 2xl: the student opens in the panel beside the list; closing it points at the row.
+            openKey={twoPane ? selectedId : null}
             rowActions={(s) => (
               <>
                 {/* From lg the name is this link, and the pinned column has no room to spare. */}

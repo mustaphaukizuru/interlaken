@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import AdminPipeline, { columnParams } from './AdminPipeline';
 import { api } from '@/services/api';
@@ -70,6 +70,27 @@ describe('AdminPipeline (stages board)', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Abrir el expediente de Sofía Prueba' }));
     expect(await screen.findByText('Expediente abierto')).toBeInTheDocument();
+  });
+
+  it('back from an Expediente, the card that was opened is pointed at', async () => {
+    sessionStorage.clear();
+    function Expediente() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate(-1)}>Atrás</button>;
+    }
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/admisiones/pipeline" element={<AdminPipeline />} />
+        <Route path="/admin/admisiones/:caseId" element={<Expediente />} />
+      </Routes>,
+      { route: '/admin/admisiones/pipeline' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Abrir el expediente de Sofía Prueba' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Atrás' }));
+    const card = await screen.findByRole('button', { name: 'Abrir el expediente de Sofía Prueba' });
+    await waitFor(() => expect(card).toHaveAttribute('data-last-opened', 'true'));
+    expect(screen.getByRole('button', { name: 'Abrir el expediente de Lucía Prueba' })).not.toHaveAttribute('data-last-opened');
+    sessionStorage.clear();
   });
 
   it('shows the error state and retries', async () => {
