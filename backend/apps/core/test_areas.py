@@ -54,6 +54,7 @@ ADMIN_ONLY = {
     'apps.content.pricing_admin.AdminPricingImportView',
     'apps.content.pricing_admin.AdminPricingTableView',
     'apps.content.pricing_admin.AdminPricingView',
+    'apps.content.pricing_admin.AdminPricingYearsView',
     'apps.content.views.AdminSiteSettingsView',
     'apps.content.views.AdminTestimonialDetailView',
     'apps.content.views.AdminTestimonialsBulkView',

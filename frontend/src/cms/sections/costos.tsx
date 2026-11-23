@@ -14,6 +14,7 @@ import { PricingSections, PRICING_COPY, type PricingCopy } from '@/components/pu
 import { Reveal } from '@/components/ui/Reveal';
 import { Illustration, IllustrationPanel, wash } from '@/components/ui/Illustration';
 import { isIllustration, type IllustrationName } from '@/lib/illustrations';
+import { usePriceYears } from '@/lib/priceYears';
 import type { FieldSpec } from '../blocks/registry';
 import { imageSrc, imageSrcSet, useTokens, type CmsLink } from '../runtime';
 import { CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
@@ -29,7 +30,9 @@ const artField = (key: string, label: string, group: string) =>
 /* ── Portada ────────────────────────────────────────────────────────────── */
 interface HeroProps { label?: string; title?: string; badge?: string; image?: number | string }
 function CostosHeroView(p: HeroProps) {
-  const t = useTokens();
+  // {{ciclo}} here is the cycle of the published prices, never the calendar's alone (lib/priceYears).
+  const prices = usePriceYears();
+  const t = useTokens({ ciclo: prices.cycle });
   return (
     <section className="relative overflow-hidden bg-dark text-white">
       {p.image && <img src={imageSrc(p.image)} srcSet={imageSrcSet(p.image, { full: true })} sizes="100vw" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />}
@@ -38,7 +41,8 @@ function CostosHeroView(p: HeroProps) {
         {p.label && <span className="section-label-pink inline-flex">{t(p.label)}</span>}
         <h1 className="mt-3 font-head text-fluid-3xl font-black tracking-[-0.02em]">{t(p.title)}</h1>
         {p.badge && (
-          <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-white/85">
+          // Hidden (space kept) until the published years arrive, so the cycle never flips in front of the visitor.
+          <p className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold text-white/85 ${prices.ready ? '' : 'invisible'}`}>
             <CalendarDays className="h-4 w-4" aria-hidden="true" />
             {t(p.badge)}
           </p>
@@ -72,7 +76,7 @@ const DRAWN_HERE: Partial<PricingCopy> = {
 };
 
 function CostosPricesView({ structureIllustration, noteIllustration, ctaIllustration, ...copy }: PricesProps) {
-  const t = useTokens();
+  const t = useTokens({ ciclo: usePriceYears().cycle });
   // Stored content may predate a key: the built-in copy fills it, as in PricingSections.
   const c: PricingCopy = { ...PRICING_COPY, ...copy };
   const structure = Array.isArray(c.structure) ? c.structure : [];
@@ -176,12 +180,14 @@ function CostosPricesView({ structureIllustration, noteIllustration, ctaIllustra
   );
 }
 
-/** Label, title, year badge and subtitle of one price card, with the card's other texts, as one group in the editor. */
+/**
+ * Label, title and subtitle of one price card, with the card's other texts, as
+ * one group in the editor. «Precios 2027» and «Precios 2028: pendientes» are
+ * not texts any more: they follow the year published in «Costos y precios».
+ */
 const card = (key: string, name: string, group: string, extra: FieldSpec[] = []): FieldSpec[] => grouped(group, [
   f.text(`${key}Label`, `${name}: etiqueta`),
   f.text(`${key}Title`, `${name}: título`),
-  f.text(`${key}Year`, `${name}: año de los precios`, { hint: 'Insignia junto al título, por ejemplo «Precios 2027». Déjelo vacío para ocultarla.' }),
-  f.text(`${key}Pending`, `${name}: aviso de precios pendientes`, { hint: 'Aviso ámbar cuando aún no hay precios del próximo año, por ejemplo «Precios 2027: pendientes». Déjelo vacío cuando ya estén publicados.' }),
   f.text(`${key}Subtitle`, `${name}: subtítulo`),
   ...extra,
 ]);
@@ -193,7 +199,7 @@ export const sections = [
     fields: [
       f.text('label', 'Etiqueta superior'),
       f.text('title', 'Título', { required: true }),
-      f.text('badge', 'Insignia', { hint: '{{ciclo}} muestra el ciclo escolar vigente.' }),
+      f.text('badge', 'Insignia', { hint: 'Aquí {{ciclo}} es el ciclo de los precios publicados en «Costos y precios», no cambia solo con el calendario.' }),
       f.image('image', 'Foto'),
     ],
     defaults: { label: 'Admisiones', title: 'Costos', badge: 'Ciclo Escolar {{ciclo}}', image: '/assets/facade.webp' },
@@ -203,7 +209,7 @@ export const sections = [
     component: CostosPricesView,
     fields: [
       // Where the figures are edited: the console screen, in another tab (the draft stays open).
-      f.action('editPrices', 'Editar precios', '/admin/costos', { hint: 'Las cifras, los niveles y las políticas se editan en «Costos y precios». Aquí, los textos que los acompañan.' }),
+      f.action('editPrices', 'Editar precios', '/admin/costos', { hint: 'Las cifras, los niveles, las políticas y el año de cada sección («Precios 2027», «pendientes») se editan en «Costos y precios». Aquí, los textos que los acompañan.' }),
       ...grouped('Cómo se paga', [
         f.text('structureTitle', 'Título de la explicación'),
         f.items('structure', 'Cómo se estructura el pago', [f.text('title', 'Concepto', { required: true }), f.text('text', 'Explicación')]),

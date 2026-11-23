@@ -201,6 +201,20 @@ def _cms_refine(head: dict, seo: dict) -> dict:
     return out
 
 
+def _with_years(head: dict, path: str) -> dict:
+    """Title and description with today's school cycle and years ({{ciclo}}, {{anios}}).
+
+    The build writes the route table with the tokens, not the values, so a
+    deploy made in December still says the right cycle in January.
+    """
+    from apps.content.site_years import expand_tokens
+    out = dict(head)
+    for k in ('title', 'description'):
+        if isinstance(out.get(k), str):
+            out[k] = expand_tokens(out[k], costos=path == '/admisiones/costos')
+    return out
+
+
 def _redirect(to: str, permanent: bool, query: str):
     if query and not to.startswith('http') and '?' not in to:
         to = f'{to}?{query}'
@@ -265,6 +279,7 @@ def spa_index(request):
     if head is not None:
         if cms:
             head = _cms_refine(head, cms)
+        head = _with_years(head, path)
         doc = doc.replace(MARKER, '' if cms else shell_for(path), 1)
         return _render(apply_head(doc, head, path), 200, path)
 
@@ -277,7 +292,7 @@ def spa_index(request):
     # 5. CMS landing pages (/verano; /p/verano is the same page, so it points its canonical there).
     if cms:
         canonical = SITE + ('/' + path[3:] if path.startswith('/p/') else path)
-        head = _cms_refine({'jsonLd': [], 'canonical': canonical}, cms)
+        head = _with_years(_cms_refine({'jsonLd': [], 'canonical': canonical}, cms), path)
         return _render(apply_head(doc, head, path), 200, path)
 
     # 6. Nothing here.

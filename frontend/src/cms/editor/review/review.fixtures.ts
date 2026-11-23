@@ -13,7 +13,7 @@ export const COSTOS_BLOCKS: Block[] = [
   { id: 'costos-1', type: 'costos.hero', props: { title: 'Costos y colegiaturas' } },
   {
     id: 'costos-2', type: 'costos.prices',
-    props: { ctaPrimary: FICHA, daycareYear: 'Precios 2026{{anio}}', tuitionPending: '{{ciclo}}', feesPending: '{{ciclo}}{{anio}}{{anios}}' },
+    props: { ctaPrimary: FICHA, daycareSubtitle: 'Precios 2026{{anio}}', tuitionLabel: '{{ciclo}}', feesLabel: '{{ciclo}}{{anio}}{{anios}}' },
   },
 ];
 
@@ -29,25 +29,25 @@ export const PRIVATE_LINK: ReviewIssue = {
 };
 
 export const GLUED: ReviewIssue = {
-  ...base, level: 'warning', code: 'token_glued', key: 'token_glued:costos-2:daycareYear', acknowledge: true,
-  message: 'Sección 2 (Costos · Tablas de precios), campo «Estancia: año de los precios»: {{anio}} quedó pegado al texto.',
-  field: 'daycareYear', field_label: 'Estancia: año de los precios',
+  ...base, level: 'warning', code: 'token_glued', key: 'token_glued:costos-2:daycareSubtitle', acknowledge: true,
+  message: 'Sección 2 (Costos · Tablas de precios), campo «Estancia: subtítulo»: {{anio}} quedó pegado al texto.',
+  field: 'daycareSubtitle', field_label: 'Estancia: subtítulo',
   field_message: '{{anio}} quedó pegado al texto: se verá «Precios 20262026».',
   value: 'Precios 2026{{anio}}', preview: 'Precios 20262026',
   fix: { kind: 'remove_token', label: 'Quitar {{anio}}', value: 'Precios 2026', preview: 'Precios 2026' },
 };
 
 export const ONLY_TUITION: ReviewIssue = {
-  ...base, level: 'warning', code: 'token_only_label', key: 'token_only_label:costos-2:tuitionPending', acknowledge: true,
+  ...base, level: 'warning', code: 'token_only_label', key: 'token_only_label:costos-2:tuitionLabel', acknowledge: true,
   message: 'Sección 2 (Costos · Tablas de precios), campo «Colegiaturas: aviso de precios pendientes»: solo tiene datos automáticos.',
-  field: 'tuitionPending', field_label: 'Colegiaturas: aviso de precios pendientes',
+  field: 'tuitionLabel', field_label: 'Colegiaturas: aviso de precios pendientes',
   field_message: 'Solo tiene datos automáticos ({{ciclo}}): se verá «2026–2027». Parece que se insertaron por error.',
   value: '{{ciclo}}', preview: '2026–2027',
   fix: { kind: 'clear', label: 'Vaciar', value: '', preview: '' },
 };
 
 export const ONLY_FEES: ReviewIssue = {
-  ...ONLY_TUITION, key: 'token_only_label:costos-2:feesPending', field: 'feesPending', field_label: 'Inscripción: aviso de precios pendientes',
+  ...ONLY_TUITION, key: 'token_only_label:costos-2:feesLabel', field: 'feesLabel', field_label: 'Inscripción: etiqueta',
   field_message: 'Solo tiene datos automáticos ({{ciclo}}{{anio}}{{anios}}): se verá «2026–2027202645». Parece que se insertaron por error.',
   value: '{{ciclo}}{{anio}}{{anios}}', preview: '2026–2027202645',
 };
@@ -65,8 +65,8 @@ export function report(parts: Partial<ReviewReport> = {}): ReviewReport {
   return {
     ok: errors.length === 0, errors, warnings, suggestions, issues: [...errors, ...warnings, ...suggestions], baseline: 'published',
     changes: parts.changes ?? [
-      { kind: 'changed', ...base, field: 'daycareYear', field_label: 'Estancia: año de los precios', before: 'Precios 2026', after: 'Precios 20262026', before_code: '', after_code: 'Precios 2026{{anio}}' },
-      { kind: 'changed', ...base, field: 'feesPending', field_label: 'Inscripción: aviso de precios pendientes', before: '', after: '2026–2027202645', before_code: '', after_code: '{{ciclo}}{{anio}}{{anios}}' },
+      { kind: 'changed', ...base, field: 'daycareSubtitle', field_label: 'Estancia: subtítulo', before: 'Precios 2026', after: 'Precios 20262026', before_code: '', after_code: 'Precios 2026{{anio}}' },
+      { kind: 'changed', ...base, field: 'feesLabel', field_label: 'Inscripción: etiqueta', before: '', after: '2026–2027202645', before_code: '', after_code: '{{ciclo}}{{anio}}{{anios}}' },
     ],
     ...parts,
   };

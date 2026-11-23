@@ -59,6 +59,7 @@ from .models import (
     ExtracurricularActivity,
     FixedConcept,
     PricingPolicy,
+    SiteSettings,
     TuitionCost,
 )
 from .ops import audit_value, delete_keep_pk
@@ -556,6 +557,69 @@ def _save_response(payload: dict, request) -> Response:
             tables=exc.tables,
         )
     return Response(result)
+
+
+# ── year of the published prices (Costos never follows the calendar) ──
+PRICE_GROUPS = ("fees", "tuition", "insurance", "extras", "daycare")
+
+
+def clean_years(raw) -> dict:
+    """{group: year} with only known groups and plausible years."""
+    out = {}
+    for key, value in (raw or {}).items() if isinstance(raw, dict) else ():
+        try:
+            year = int(value)
+        except (TypeError, ValueError):
+            continue
+        if key in PRICE_GROUPS and 2000 <= year <= 2100:
+            out[key] = year
+    return out
+
+
+class AdminPricingYearsView(APIView):
+    """GET ``{years, admissions_next_from_month}``; PATCH ``{years: {group: year}}``.
+
+    «Publicar precios del ciclo 2027-2028» in Costos y precios: marks which
+    school year each price group belongs to. The public Costos page shows that
+    year and, once the site announces a newer cycle, «Precios AAAA: pendientes»
+    for every group still on an older one. Audited.
+    """
+
+    permission_classes = [IsAdmin]
+    parser_classes = [JSONParser]
+
+    def get(self, request):
+        settings_ = SiteSettings.load()
+        return Response({
+            "years": clean_years(settings_.pricing_years),
+            "admissions_next_from_month": settings_.admissions_next_from_month,
+        })
+
+    def patch(self, request):
+        years = request.data.get("years") if isinstance(request.data, dict) else None
+        if not isinstance(years, dict) or not years:
+            return error_response("Envíe «years» con al menos una sección.")
+        unknown = [k for k in years if k not in PRICE_GROUPS]
+        if unknown:
+            return error_response(f'Sección desconocida: {", ".join(unknown)}.')
+        wanted = {}
+        for key, value in years.items():
+            try:
+                year = int(value)
+            except (TypeError, ValueError):
+                return error_response("El año debe ser un número, por ejemplo 2027.")
+            if not 2000 <= year <= 2100:
+                return error_response("El año debe estar entre 2000 y 2100.")
+            wanted[key] = year
+        settings_ = SiteSettings.load()
+        before = clean_years(settings_.pricing_years)
+        after = {**before, **wanted}
+        if after != before:
+            settings_.pricing_years = after
+            settings_.save(update_fields=["pricing_years"])
+            record("update", settings_, {"pricing_years": [before, after]}, actor=request.user,
+                   context="Costos y precios: año de los precios")
+        return self.get(request)
 
 
 # ── views ─────────────────────────────────────────────────

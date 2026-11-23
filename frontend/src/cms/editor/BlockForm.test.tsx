@@ -59,9 +59,9 @@ describe('BlockForm groups (C4)', () => {
     const fees = screen.getByRole('button', { name: /^Inscripción y reinscripción/ });
     expect(first).toHaveAttribute('aria-expanded', 'true');
     expect(fees).toHaveAttribute('aria-expanded', 'false');
-    expect(fees).toHaveTextContent('10 de 11'); // «aviso de precios pendientes» is empty for Inscripción
+    expect(fees).toHaveTextContent('9 de 9'); // the year and «pendientes» follow «Costos y precios», not fields here
     // «Editar precios» (the tables branch's action) sits above the groups.
-    expect(screen.getByText(/Las cifras, los niveles y las políticas se editan/)).toBeInTheDocument();
+    expect(screen.getByText(/Las cifras, los niveles, las políticas y el año de cada sección/)).toBeInTheDocument();
     await userEvent.click(fees);
     expect(fees).toHaveAttribute('aria-expanded', 'true');
     expect(JSON.parse(localStorage.getItem('cms-field-groups') ?? '{}')['costos.prices']['Inscripción y reinscripción']).toBe(true);

@@ -20,7 +20,7 @@ import { withoutToken } from './TokenChips';
 
 function Field({ initial }: { initial: string }) {
   const [v, setV] = useState(initial);
-  return <><TextField id="f" label="Estancia: año de los precios" value={v} onChange={setV} /><output data-testid="value">{v}</output></>;
+  return <><TextField id="f" label="Estancia: subtítulo" value={v} onChange={setV} /><output data-testid="value">{v}</output></>;
 }
 
 /** The toast's content, rendered as react-hot-toast would. */
@@ -33,7 +33,7 @@ beforeEach(() => { shown.length = 0; vi.clearAllMocks(); });
 describe('token chips: «Deshacer»', () => {
   it('announces the token with today\'s value and takes it out again', async () => {
     renderWithProviders(<Field initial="Precios 2026" />);
-    const input = screen.getByLabelText('Estancia: año de los precios') as HTMLInputElement;
+    const input = screen.getByLabelText('Estancia: subtítulo') as HTMLInputElement;
     await userEvent.click(input);
     input.setSelectionRange(input.value.length, input.value.length);
     await userEvent.click(screen.getByRole('button', { name: /Insertar Año en curso/ }));
@@ -51,7 +51,7 @@ describe('token chips: «Deshacer»', () => {
 
   it('undoes the token even after more typing', async () => {
     renderWithProviders(<Field initial="Ciclo " />);
-    const input = screen.getByLabelText('Estancia: año de los precios') as HTMLInputElement;
+    const input = screen.getByLabelText('Estancia: subtítulo') as HTMLInputElement;
     await userEvent.click(input);
     input.setSelectionRange(input.value.length, input.value.length);
     await userEvent.click(screen.getByRole('button', { name: /Insertar Ciclo escolar/ }));

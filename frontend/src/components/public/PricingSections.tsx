@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
 import { formatPrice } from '@/lib/format';
 import { useTokens, type CmsLink } from '@/cms/runtime';
+import { pendingLabel, priceYearLabel, usePriceYears, type PriceGroup } from '@/lib/priceYears';
 import { CmsAnchor, INFORMES_CTA, VISIT_CTA } from '@/cms/sections/kit';
 
 interface EnrollmentFee {
@@ -54,10 +55,6 @@ export interface PricingCopy {
   insuranceLabel: string; insuranceTitle: string; insuranceSubtitle: string;
   extrasLabel: string; extrasTitle: string; extrasSubtitle: string;
   daycareLabel: string; daycareTitle: string; daycareSubtitle: string;
-  /** Small badge next to each card title saying which year's prices it shows («Precios 2027»); empty hides it. */
-  feesYear: string; tuitionYear: string; insuranceYear: string; extrasYear: string; daycareYear: string;
-  /** Amber «pending» status next to the year badge for a card whose next-year prices are not set yet; empty hides it. */
-  feesPending: string; tuitionPending: string; insurancePending: string; extrasPending: string; daycarePending: string;
   policiesTitle: string;
   /** Policies that mention one of these words (comma separated, accents ignored) stand out. */
   policyHighlight: string;
@@ -66,7 +63,11 @@ export interface PricingCopy {
   ctaTitle: string; ctaText: string; ctaPrimary: CmsLink; ctaSecondary: CmsLink;
 }
 
-/** Today's copy; `{{ciclo}}` keeps the school cycle current. */
+/**
+ * Today's copy; `{{ciclo}}` is the cycle of the published prices (lib/priceYears).
+ * Each card's «Precios 2027» and «Precios 2028: pendientes» are not copy: they
+ * come from the year the administration published each group for.
+ */
 export const PRICING_COPY: PricingCopy = {
   emptyTitle: 'Costos próximamente',
   emptyText: 'El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo {{ciclo}}. Mientras tanto, nuestro equipo de admisiones puede orientarle.',
@@ -86,13 +87,6 @@ export const PRICING_COPY: PricingCopy = {
   insuranceLabel: 'Anual · obligatorio', insuranceTitle: 'Seguros y credenciales', insuranceSubtitle: 'Contratación obligatoria para todos los alumnos',
   extrasLabel: 'Anualidad', extrasTitle: 'Extraescolares', extrasSubtitle: '10 parcialidades de septiembre a junio · se definen en agosto',
   daycareLabel: 'Horario extendido', daycareTitle: 'Estancia', daycareSubtitle: 'Costo diario, con tarifa mensual opcional',
-  // The school's 2026-11 price sheet: inscripción and colegiaturas carry next
-  // year's prices; seguros, extraescolares and estancia still this year's.
-  feesYear: 'Precios 2027', tuitionYear: 'Precios 2027',
-  insuranceYear: 'Precios 2026', extrasYear: 'Precios 2026', daycareYear: 'Precios 2026',
-  // Seguros, extraescolares and estancia have no 2027 prices yet (price sheet: crossed out).
-  feesPending: '', tuitionPending: '',
-  insurancePending: 'Precios 2027: pendientes', extrasPending: 'Precios 2027: pendientes', daycarePending: 'Precios 2027: pendientes',
   policiesTitle: 'Políticas de pago',
   policyHighlight: 'recargo, devolución',
   errorTitle: 'No fue posible cargar los costos',
@@ -186,7 +180,13 @@ function Row({ left, sub, right, rightMuted, rightNote }: {
 
 /** Pricing body (tabs, tables, policies); also rendered by the CMS `pricing_table` block. */
 export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) {
-  const t = useTokens();
+  const prices = usePriceYears();
+  const t = useTokens({ ciclo: prices.cycle });
+  /** «Precios 2027» beside a card's title, and «Precios 2028: pendientes» while its new prices are missing. */
+  const yearOf = (group: PriceGroup) => {
+    const { year, pending } = prices.status(group);
+    return { badge: year != null ? priceYearLabel(year) : undefined, pending: pending ? pendingLabel(prices.target) : undefined };
+  };
   const c: PricingCopy = { ...PRICING_COPY, ...(copy ?? {}) };
   const structure = Array.isArray(c.structure) ? c.structure : [];
   const link = (l: CmsLink | undefined): CmsLink => ({ label: t(l?.label), href: l?.href });
@@ -266,8 +266,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   tone="green" icon={GraduationCap} label={t(c.feesLabel)}
                   title={t(c.feesTitle)}
                   subtitle={t(c.feesSubtitle)}
-                  badge={t(c.feesYear) || undefined}
-                  pending={t(c.feesPending) || undefined}
+                  {...yearOf('fees')}
                 >
                   <div className="flex gap-2 border-b border-ink/5 px-5 py-3" role="group" aria-label="Modalidad de inscripción">
                     {([['nuevo_ingreso', t(c.newTag)], ['reinscripcion', t(c.returningTag)]] as const).map(([key, tag]) => (
@@ -320,8 +319,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                 <PriceCard
                   tone="purple" icon={Wallet} label={t(c.tuitionLabel)} title={t(c.tuitionTitle)}
                   subtitle={t(c.tuitionSubtitle)}
-                  badge={t(c.tuitionYear) || undefined}
-                  pending={t(c.tuitionPending) || undefined}
+                  {...yearOf('tuition')}
                 >
                   <ul>
                     {tuition.map((r) => (
@@ -335,8 +333,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="coral" icon={ShieldCheck} label={t(c.insuranceLabel)}
                     title={t(c.insuranceTitle)}
                     subtitle={t(c.insuranceSubtitle)}
-                    badge={t(c.insuranceYear) || undefined}
-                    pending={t(c.insurancePending) || undefined}
+                    {...yearOf('insurance')}
                   >
                     <ul>
                       {seguros.map((s) => (
@@ -354,8 +351,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="pink" icon={Sparkles} label={t(c.extrasLabel)}
                     title={t(c.extrasTitle)}
                     subtitle={t(c.extrasSubtitle)}
-                    badge={t(c.extrasYear) || undefined}
-                    pending={t(c.extrasPending) || undefined}
+                    {...yearOf('extras')}
                   >
                     <ul>
                       {extras.map((e) => (
@@ -370,8 +366,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="purple" icon={Clock} label={t(c.daycareLabel)}
                     title={t(c.daycareTitle)}
                     subtitle={t(c.daycareSubtitle)}
-                    badge={t(c.daycareYear) || undefined}
-                    pending={t(c.daycarePending) || undefined}
+                    {...yearOf('daycare')}
                   >
                     <ul>
                       {estancia.map((d) => (

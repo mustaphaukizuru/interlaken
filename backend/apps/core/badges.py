@@ -217,4 +217,11 @@ def _compute_badges(user) -> dict:
     if getattr(user, 'role', None) == User.Role.ADMIN:
         queue('arco', ArcoRequest.objects.filter(status__in=OPEN_STATUSES), 'created_at')
         out['arco_vencidas'] = ArcoRequest.objects.filter(overdue_q()).count()
+        # Costos sections without the next cycle's prices (from a month before the
+        # site moves to it; «Costos y precios» is admin-only). No query: cached settings.
+        from apps.content.site_years import missing_price_groups
+        year, missing = missing_price_groups()
+        out['precios'] = len(missing)
+        if missing:
+            out['precios_anio'] = year
     return out

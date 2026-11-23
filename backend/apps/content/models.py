@@ -64,6 +64,22 @@ class SiteSettings(models.Model):
     school_year = models.CharField('Ciclo escolar', max_length=9, blank=True, help_text='AAAA-AAAA')
     last_rollover_at = models.DateTimeField(null=True, blank=True)
 
+    # ── Años automáticos (2026-11-22) ───────────────────────────────────────
+    # From which month the public site announces the NEXT school cycle in its
+    # texts ({{ciclo}}): 1 = January (the rule until now), or September to
+    # December. Every other year on the site follows the calendar by itself.
+    ADMISSIONS_NEXT_FROM_CHOICES = [
+        (1, '1 de enero'), (9, '1 de septiembre'), (10, '1 de octubre'),
+        (11, '1 de noviembre'), (12, '1 de diciembre'),
+    ]
+    admissions_next_from_month = models.PositiveSmallIntegerField(
+        'El sitio anuncia el siguiente ciclo desde', choices=ADMISSIONS_NEXT_FROM_CHOICES, default=1)
+    # Costos is the exception: its prices belong to the cycle the school
+    # published them for ({group: year}, «Precios 2027» = ciclo 2027-2028).
+    # The page never moves them with the calendar; a group still on an older
+    # year shows «Precios 2028: pendientes» once the site announces 2028.
+    pricing_years = models.JSONField('Año de los precios publicados', default=dict, blank=True)
+
     # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
     tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')
     # Expediente de admisión (Fase 5): {clave: texto} of the WhatsApp/email
@@ -105,6 +121,8 @@ class SiteSettings(models.Model):
         self.pk = 1
         super().save(*args, **kwargs)
         cache.delete(SETTINGS_CACHE_KEY)
+        from .site_years import forget_year_settings
+        forget_year_settings()
 
     @classmethod
     def load(cls) -> 'SiteSettings':

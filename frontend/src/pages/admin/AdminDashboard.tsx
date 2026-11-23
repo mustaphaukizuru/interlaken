@@ -12,7 +12,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PendingList } from '@/components/admin/PendingList';
 import { activitySentence, actorLabel } from '@/components/admin/auditLabels';
 import { portalApi } from '@/services/api';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { cycleLabel, runningCycleStart } from '@/lib/siteMeta';
+import { PriceYearsReminder } from '@/components/admin/pricing/PriceYearsReminder';
 import { useAuthStore } from '@/store/authStore';
 import { areasOf, canOpen } from '@/lib/areas';
 import { AREA_LABEL } from '@/lib/areaCatalog';
@@ -99,7 +100,10 @@ function AdminHome() {
 
   return (
     <>
-      <PageHeader title="Panel de administración" subtitle={`Ciclo escolar ${CURRENT_CYCLE}`} />
+      {/* The school year in progress (turns in August), not the one admissions announce. */}
+      <PageHeader title="Panel de administración" subtitle={`Ciclo escolar ${cycleLabel(runningCycleStart())}`} />
+      {/* «Faltan los precios del ciclo…»: once a day while Costos lacks next cycle's prices. */}
+      <PriceYearsReminder />
 
       {/* Exceptions first (UX Phase 7): what is waiting, each a link to its list. */}
       <PendingList totals={{ verificar: data?.topups_to_verify_total, verificarCargadas: data?.topups_to_verify_loaded, aplicar: data?.paid_topups_to_apply_total }} />

@@ -20,7 +20,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
             'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'chrome', 'sep_incorporations', 'school_year',
-            'updated_at',
+            'admissions_next_from_month', 'pricing_years', 'updated_at',
         ]
         read_only_fields = fields
 
@@ -33,9 +33,10 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
             'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'chrome', 'sep_incorporations', 'school_year',
-            'admissions_public_start', 'updated_at',
+            'admissions_public_start', 'admissions_next_from_month', 'pricing_years', 'updated_at',
         ]
-        read_only_fields = ['updated_at']
+        # The price years change only through «Costos y precios» (audited, per group).
+        read_only_fields = ['pricing_years', 'updated_at']
 
     def validate_sep_incorporations(self, value):
         if not isinstance(value, list) or len(value) > 6:

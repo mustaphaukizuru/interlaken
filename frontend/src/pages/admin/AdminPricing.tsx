@@ -20,7 +20,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { apiErrorMessage } from '@/lib/apiErrors';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { PriceYearsPanel } from '@/components/admin/pricing/PriceYearsPanel';
 import { downloadBlob } from '@/services/api';
 import { pricingAdminApi, type PricingRowError, type PricingTableKey, type PricingTablePayload } from '@/services/pricingAdminApi';
 import { usePublishedPage } from '@/cms/published';
@@ -249,11 +249,13 @@ export default function AdminPricing() {
         <div className="space-y-1">
           <p>Estos precios se ven en <strong>Admisiones › Costos</strong> y alimentan el <strong>estimador de Admisiones</strong>: un cambio aquí cambia los dos.</p>
           <p className="text-muted">
-            El ciclo escolar no se escribe aquí: el sitio lo calcula solo (hoy {CURRENT_CYCLE}) y en los textos de la página se escribe <code className="rounded-sm bg-white px-1 text-ink">{'{{ciclo}}'}</code>.
+            Costos es la única página cuyo ciclo no cambia solo con el calendario: sigue el año que publique para cada sección (abajo, «Año de los precios»). En los textos se escribe <code className="rounded-sm bg-white px-1 text-ink">{'{{ciclo}}'}</code>.
             Títulos, encabezados y notas de las tablas se editan en <Link to="/admin/contenido" className="font-semibold text-green-700 underline underline-offset-2">Páginas › Costos</Link>.
           </p>
         </div>
       </div>
+
+      <PriceYearsPanel />
 
       <div role="tablist" aria-label="Tablas de precios" className="mb-4 flex flex-wrap gap-2">
         {TABLES.map((t) => {

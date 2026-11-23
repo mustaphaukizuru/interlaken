@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ORG, canonicalFor } from './siteMeta';
+import { ORG, canonicalFor, expandYearTokens } from './siteMeta';
 import { ROUTE_META, breadcrumbLd, routeHead } from './routeMeta';
 
 const root = join(__dirname, '..', '..', '..');
@@ -17,9 +17,13 @@ describe('ROUTE_META', () => {
 
   it.each(Object.keys(ROUTE_META))('%s has a search-friendly title and description', (path) => {
     const head = routeHead(path)!;
-    expect(head.title.length).toBeLessThanOrEqual(65);
-    expect(head.description.length).toBeGreaterThanOrEqual(60);
-    expect(head.description.length).toBeLessThanOrEqual(165);
+    // Measured as visitors see them: {{ciclo}} / {{anios}} filled in (server and RouteSeo do it per visit).
+    const title = expandYearTokens(head.title)!;
+    const description = expandYearTokens(head.description)!;
+    expect(title).not.toMatch(/\{\{/);
+    expect(title.length).toBeLessThanOrEqual(65);
+    expect(description.length).toBeGreaterThanOrEqual(60);
+    expect(description.length).toBeLessThanOrEqual(165);
     expect(head.canonical).toBe(canonicalFor(path));
   });
 

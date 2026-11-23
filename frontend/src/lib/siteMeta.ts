@@ -19,12 +19,44 @@ export const FOUNDED_YEAR = 1981;
 export const SCHOOL_YEARS = new Date().getFullYear() - FOUNDED_YEAR;
 
 /**
- * Ciclo escolar mexicano (agosto–junio). Las admisiones de un año natural
- * corresponden al ciclo que inicia en agosto de ese año: en 2026 → «2026–2027»,
- * y rueda solo cada 1° de enero.
+ * Ciclo escolar mexicano (agosto–junio) que anuncia el sitio. Las admisiones
+ * de un año natural corresponden al ciclo que inicia en agosto de ese año: en
+ * 2026 → «2026–2027», y rueda solo. `fromMonth` (Ajustes, SiteSettings.
+ * admissions_next_from_month) adelanta el cambio: con 11, desde el 1 de
+ * noviembre de 2026 el sitio ya anuncia «2027–2028». 1 = cada 1 de enero.
  */
-const _cycleStart = new Date().getFullYear();
-export const CURRENT_CYCLE = `${_cycleStart}–${_cycleStart + 1}`;
+export function announcedCycleStart(now = new Date(), fromMonth = 1): number {
+  const y = now.getFullYear();
+  return fromMonth > 1 && now.getMonth() + 1 >= fromMonth ? y + 1 : y;
+}
+export const cycleLabel = (start: number) => `${start}–${start + 1}`;
+/** The school year in progress (it turns in August): what the console and the student card show. */
+export function runningCycleStart(now = new Date()): number {
+  return now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+}
+/** The announced cycle with the January rule (where the settings are not at hand). */
+export const CURRENT_CYCLE = cycleLabel(announcedCycleStart());
+
+/** Costos' cycle: the announced one, or a newer one the school already published prices for (lib/priceYears). */
+export function priceCycleStartOf(fromMonth = 1, priceYears?: Partial<Record<string, number>>, now = new Date()): number {
+  let start = announcedCycleStart(now, fromMonth);
+  for (const y of Object.values(priceYears ?? {})) if (typeof y === 'number' && y > start && y <= 2100) start = y;
+  return start;
+}
+
+/**
+ * {{ciclo}} and {{anios}} in the route titles (lib/routeMeta keeps tokens so the
+ * server fills them per request too). `priceYears` (Costos): the cycle is the
+ * newest of the announced one and the published price years. Mirror of
+ * backend/apps/content/site_years.py expand_tokens.
+ */
+export function expandYearTokens(text: string | undefined, fromMonth = 1, priceYears?: Partial<Record<string, number>>, now = new Date()): string | undefined {
+  if (!text || !text.includes('{{')) return text;
+  const start = priceYears ? priceCycleStartOf(fromMonth, priceYears, now) : announcedCycleStart(now, fromMonth);
+  return text
+    .replace(/\{\{\s*ciclo\s*\}\}/g, cycleLabel(start))
+    .replace(/\{\{\s*anios\s*\}\}/g, String(now.getFullYear() - FOUNDED_YEAR));
+}
 
 /** Appended to every page title except the home page's. */
 export const TITLE_SUFFIX = ` · ${SITE_NAME}`;

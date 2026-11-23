@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AlertOctagon, CalendarCheck, CalendarClock, CheckCircle2, ChevronRight, ClipboardList, Coffee, CreditCard,
+  AlertOctagon, CalendarCheck, CalendarClock, CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, Coffee, CreditCard,
   FileCheck2, FormInput, Inbox, KeyRound, RefreshCw, Scale, ShieldAlert, UserPlus, UserX, Wallet, type LucideIcon,
 } from 'lucide-react';
 import { coreApi } from '@/services/api';
@@ -102,6 +102,11 @@ const ITEMS: Item[] = [
   { key: 'loyverse_alertas', area: 'cafeteria', icon: RefreshCw, tone: 'danger',
     one: 'alerta de sincronización con Loyverse', many: 'alertas de sincronización con Loyverse',
     to: '/admin/cafeteria', hint: () => 'Revise «Estado de la sincronización».' },
+  // Costos sections without the next cycle's prices (admin-only counter, from a
+  // month before the site moves to that cycle; lib/priceYears).
+  { key: 'precios', area: null, icon: CircleDollarSign, tone: 'warning',
+    one: 'sección de Costos sin precios nuevos', many: 'secciones de Costos sin precios nuevos', to: '/admin/costos',
+    hint: (c) => (c.precios_anio ? `Faltan los precios ${c.precios_anio}. Publíquelos en «Costos y precios».` : undefined) },
   { key: 'arco', area: null, icon: Scale, tone: 'info',
     one: 'solicitud ARCO abierta', many: 'solicitudes ARCO abiertas', to: '/admin/arco',
     hint: (c) => (c.arco_vencidas ? `${c.arco_vencidas} fuera de plazo legal.` : undefined) },

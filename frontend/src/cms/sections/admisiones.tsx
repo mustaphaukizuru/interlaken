@@ -18,6 +18,7 @@ import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { waMessage } from '@/lib/whatsapp';
+import { cycleLabel, priceCycleStartOf } from '@/lib/siteMeta';
 import { usePublicRequiredDocs } from '@/hooks/queries/requiredDocsPublic';
 import { docsSummary, levelsLabel, LEVELS } from '@/lib/requiredDocs';
 import { Testimonials } from '@/components/public/Testimonials';
@@ -273,7 +274,9 @@ const estimatorText = (group: string, pairs: [string, string][]) => grouped(grou
 
 function AdmEstimatorView({ eyebrow, title, text, illustration, ...copy }: { eyebrow?: string; title?: string; text?: string; illustration?: string } & Partial<EstimatorCopy>) {
   const p = { eyebrow, title, text };
-  const t = useTokens();
+  // «Costos {{ciclo}}»: the cycle of the published prices, as on the Costos page (lib/priceYears).
+  const s = useSiteSettings();
+  const t = useTokens({ ciclo: cycleLabel(priceCycleStartOf(s.admissions_next_from_month, s.pricing_years)) });
   const art = artOf(illustration, 'costos');
   return (
     <Section bg="white" id="estimador">

@@ -34,12 +34,12 @@ describe('ReviewDialog («Revisión antes de publicar»)', () => {
     const { dialog } = renderDialog(report());
     const changes = within(dialog).getByRole('region', { name: /Qué cambia/ });
     expect(changes).toHaveTextContent('Comparado con lo que el sitio muestra hoy (la versión publicada).');
-    const row = changes.querySelector('[data-change-field="daycareYear"]') as HTMLElement;
-    expect(row).toHaveTextContent('Estancia: año de los precios');
+    const row = changes.querySelector('[data-change-field="daycareSubtitle"]') as HTMLElement;
+    expect(row).toHaveTextContent('Estancia: subtítulo');
     expect(within(row).getByText('Precios 2026')).toBeInTheDocument();          // Antes
     expect(within(row).getByText('Precios 20262026')).toBeInTheDocument();      // Ahora, as visitors read it
     expect(row).toHaveTextContent('Guardado como: Precios 2026{{anio}}');
-    expect(changes.querySelector('[data-change-field="feesPending"]')).toHaveTextContent('(vacío)');
+    expect(changes.querySelector('[data-change-field="feesLabel"]')).toHaveTextContent('(vacío)');
   });
 
   it('quick fixes and «Ir al campo» hand the issue back', async () => {

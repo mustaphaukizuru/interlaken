@@ -18,9 +18,9 @@ describe('applyFix', () => {
   it('writes each quick fix of the incident into its field', () => {
     let blocks = COSTOS_BLOCKS;
     for (const issue of [PRIVATE_LINK, GLUED, ONLY_FEES]) blocks = applyFix(blocks, {}, issue)!.blocks!;
-    expect(blocks[1].props).toMatchObject({ ctaPrimary: VISIT, daycareYear: 'Precios 2026', feesPending: '', tuitionPending: '{{ciclo}}' });
+    expect(blocks[1].props).toMatchObject({ ctaPrimary: VISIT, daycareSubtitle: 'Precios 2026', feesLabel: '', tuitionLabel: '{{ciclo}}' });
     expect(blocks[0]).toBe(COSTOS_BLOCKS[0]);
-    expect(COSTOS_BLOCKS[1].props.daycareYear).toBe('Precios 2026{{anio}}');
+    expect(COSTOS_BLOCKS[1].props.daycareSubtitle).toBe('Precios 2026{{anio}}');
   });
 
   it('fixes SEO texts and shows a hidden locked section', () => {

@@ -1,8 +1,8 @@
 """«Revisión antes de publicar» (publish_checks.py), on the incident of 2026-11-21.
 
 Production's «costos» page had unpublished draft edits where editor token
-chips were inserted by accident (``daycareYear`` «Precios 2026{{anio}}»,
-``tuitionPending`` «{{ciclo}}», ``feesPending`` «{{ciclo}}{{anio}}{{anios}}»),
+chips were inserted by accident (``daycareSubtitle`` «Precios 2026{{anio}}»,
+``tuitionLabel`` «{{ciclo}}», ``feesLabel`` «{{ciclo}}{{anio}}{{anios}}»),
 and its published version still had a button to /pre-registro, which is
 private now. Synthetic data only.
 """
@@ -31,8 +31,8 @@ def prices(**props):
 
 HERO = {'id': 'costos-1', 'type': 'costos.hero', 'props': {'title': 'Costos y colegiaturas'}}
 LIVE = [HERO, prices(ctaPrimary=FICHA_BUTTON)]
-DRAFT = [HERO, prices(ctaPrimary=FICHA_BUTTON, daycareYear='Precios 2026{{anio}}', tuitionPending='{{ciclo}}',
-                      feesPending='{{ciclo}}{{anio}}{{anios}}')]
+DRAFT = [HERO, prices(ctaPrimary=FICHA_BUTTON, daycareSubtitle='Precios 2026{{anio}}', tuitionLabel='{{ciclo}}',
+                      feesLabel='{{ciclo}}{{anio}}{{anios}}')]
 
 
 @pytest.fixture(autouse=True)
@@ -77,7 +77,7 @@ def test_the_incident_draft_is_blocked_with_every_slip_named(costos):
     assert private['fix'] == {'kind': 'replace_link', 'label': 'Cambiar por «Agendar visita»', 'value': VISIT,
                               'preview': 'Agendar visita → /agendar-visita'}
 
-    glued = by_code(report, 'token_glued')['daycareYear']
+    glued = by_code(report, 'token_glued')['daycareSubtitle']
     assert glued['level'] == 'warning'
     assert glued['preview'] == f'Precios 2026{year()}'
     assert f'se verá «Precios 2026{year()}»' in glued['message']
@@ -85,12 +85,13 @@ def test_the_incident_draft_is_blocked_with_every_slip_named(costos):
     assert glued['fix']['value'] == 'Precios 2026'
 
     only = by_code(report, 'token_only_label')
-    assert set(only) == {'tuitionPending', 'feesPending'}
-    assert only['tuitionPending']['fix'] == {'kind': 'clear', 'label': 'Vaciar', 'value': '', 'preview': ''}
-    assert only['feesPending']['fix']['value'] == ''
-    assert only['feesPending']['preview'] == f'{year()}–{year() + 1}{year()}{year() - 1981}'
+    assert set(only) == {'tuitionLabel', 'feesLabel'}
+    # Labels with a built-in text: the quick fix puts it back («Mensual», «Pago único»).
+    assert only['tuitionLabel']['fix'] == {'kind': 'restore', 'label': 'Restaurar el valor original', 'value': 'Mensual', 'preview': 'Mensual'}
+    assert only['feesLabel']['fix']['value'] == 'Pago único'
+    assert only['feesLabel']['preview'] == f'{year()}–{year() + 1}{year()}{year() - 1981}'
     # One issue per slip: the pending labels are not also «glued».
-    assert 'feesPending' not in by_code(report, 'token_glued')
+    assert 'feesLabel' not in by_code(report, 'token_glued')
 
 
 @pytest.mark.django_db
@@ -103,8 +104,8 @@ def test_the_quick_fixes_clear_the_review(costos):
     after = pc.review(costos, blocks=blocks)
     assert after['ok'] is True and after['warnings'] == []
     props = blocks[1]['props']
-    assert props['ctaPrimary'] == VISIT and props['daycareYear'] == 'Precios 2026'
-    assert props['tuitionPending'] == '' and props['feesPending'] == ''
+    assert props['ctaPrimary'] == VISIT and props['daycareSubtitle'] == 'Precios 2026'
+    assert props['tuitionLabel'] == 'Mensual' and props['feesLabel'] == 'Pago único'
 
 
 @pytest.mark.django_db
@@ -160,10 +161,10 @@ def test_checks_endpoint_reviews_the_saved_or_the_posted_draft(admin_client, cos
 @pytest.mark.django_db
 def test_que_cambia_shows_what_visitors_will_read(costos):
     changes = {c['field']: c for c in pc.review(costos)['changes'] if c['kind'] == 'changed'}
-    assert changes['daycareYear']['before'] == 'Precios 2026'          # the design's default
-    assert changes['daycareYear']['after'] == f'Precios 2026{year()}'
-    assert changes['daycareYear']['after_code'] == 'Precios 2026{{anio}}'
-    assert changes['feesPending']['before'] == '' and changes['feesPending']['field_label'] == 'Inscripción: aviso de precios pendientes'
+    assert changes['daycareSubtitle']['before'] == 'Costo diario, con tarifa mensual opcional'  # the design's default
+    assert changes['daycareSubtitle']['after'] == f'Precios 2026{year()}'
+    assert changes['daycareSubtitle']['after_code'] == 'Precios 2026{{anio}}'
+    assert changes['feesLabel']['before'] == 'Pago único' and changes['feesLabel']['field_label'] == 'Inscripción: etiqueta'
     assert 'ctaPrimary' not in changes   # unchanged since the published version
 
 

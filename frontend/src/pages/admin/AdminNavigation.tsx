@@ -29,7 +29,7 @@ import { contentApi, type BulkActionDef, type SiteRedirect } from '@/services/ap
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
-import { resolveChrome, type SiteChrome } from '@/lib/siteChrome';
+import { copyrightWithToken, fixedCopyrightYear, resolveChrome, type SiteChrome } from '@/lib/siteChrome';
 import { CHROME_KEYS, mergeChrome } from '@/lib/chromeMerge';
 import { SiteTextsEditor } from '@/components/admin/SiteTextsEditor';
 import { apiFieldErrors } from '@/lib/apiErrors';
@@ -118,7 +118,17 @@ function ChromeEditor() {
           <textarea id="chrome-tagline" className="input-field" rows={2} value={value.footer_tagline} onChange={(e) => set({ footer_tagline: e.target.value })} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField id="chrome-copyright" label="Derechos reservados" value={value.footer_copyright} onChange={(v) => set({ footer_copyright: v })} tokens={['anio']} moreTokens={false} hint="Use «Año en curso» para que el año cambie solo cada enero." />
+          <div>
+            <TextField id="chrome-copyright" label="Derechos reservados" value={value.footer_copyright} onChange={(v) => set({ footer_copyright: v })} tokens={['anio']} moreTokens={false} hint="Use «Año en curso» para que el año cambie solo cada enero." />
+            {fixedCopyrightYear(value.footer_copyright) && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-warning" role="status">
+                <span>Tiene el año {fixedCopyrightYear(value.footer_copyright)} escrito a mano. El sitio muestra el año en curso de todos modos.</span>
+                <button type="button" onClick={() => set({ footer_copyright: copyrightWithToken(value.footer_copyright) })} className="font-semibold underline underline-offset-2 hover:text-ink">
+                  Cambiar por «Año en curso»
+                </button>
+              </p>
+            )}
+          </div>
           <Input label="Nota legal del pie" value={value.footer_note} onChange={(e) => set({ footer_note: e.target.value })} />
           <Input label="Botón de la barra móvil" value={value.sticky_label} onChange={(e) => set({ sticky_label: e.target.value })} />
           <HrefInput id="chrome-sticky" label="Destino del botón de la barra móvil" value={value.sticky_href} onChange={(href) => set({ sticky_href: href })} />

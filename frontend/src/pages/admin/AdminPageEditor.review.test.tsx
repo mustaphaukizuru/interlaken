@@ -139,7 +139,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     const dialog = await openReview();
     await userEvent.click((await within(dialog).findAllByRole('button', { name: /Ir al campo/ }))[1]);
     expect(screen.queryByRole('dialog', { name: 'Revisión antes de publicar' })).not.toBeInTheDocument();
-    await waitFor(() => expect(document.getElementById('f-costos-2-daycareYear-warn')).toHaveTextContent('quedó pegado al texto'));
+    await waitFor(() => expect(document.getElementById('f-costos-2-daycareSubtitle-warn')).toHaveTextContent('quedó pegado al texto'));
     expect(document.getElementById('f-costos-2-ctaPrimary-error')).toHaveTextContent('La ficha de inscripción es personal');
     expect(screen.getByText('Revisión:')).toBeInTheDocument();
   });

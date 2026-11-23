@@ -11,6 +11,7 @@ import { contentApi } from '@/services/api';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { useTokens } from '@/cms/runtime';
 import { CmsAnchor } from '@/cms/sections/kit';
+import { estimatorPriceNote, namesPriceYear, usePriceYears } from '@/lib/priceYears';
 import { ESTIMATOR_COPY, type EstimatorCopy } from './estimatorCopy';
 
 // Same /content/pricing/ bundle shapes CostosPage consumes.
@@ -77,7 +78,14 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
   const [section, setSection] = useState<string>(() => (sections.includes(t(c.startSection)) ? t(c.startSection) : sections[0]));
   const [modality, setModality] = useState<Modality>('nuevo_ingreso');
   const { whatsapp_number } = useSiteSettings();
-  const notes = Array.isArray(c.notes) ? c.notes.filter((n) => n?.text) : [];
+  // Which year each figure's prices are (published in «Costos y precios») comes first and
+  // keeps itself current; a stored note that still names a year by hand gives way to it.
+  const prices = usePriceYears();
+  const yearNote = prices.ready ? estimatorPriceNote(prices.years, prices.target) : null;
+  const notes = [
+    ...(yearNote ? [{ text: yearNote.text, tone: yearNote.pending ? 'amber' : 'purple' }] : []),
+    ...(Array.isArray(c.notes) ? c.notes.filter((n) => n?.text && !namesPriceYear(n.text)) : []),
+  ];
 
   const { data, isLoading, isError, refetch } = useQuery<PricingBundle>({
     queryKey: ['pricing-bundle'],
