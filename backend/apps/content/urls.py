@@ -47,10 +47,10 @@ from .pages import (
 )
 from .pricing_admin import (
     AdminPricingExportView,
-    AdminPricingYearsView,
     AdminPricingImportView,
     AdminPricingTableView,
     AdminPricingView,
+    AdminPricingYearsView,
 )
 from .views import (
     AdminCalendarBulkView,

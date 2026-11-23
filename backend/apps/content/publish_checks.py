@@ -142,7 +142,6 @@ _STRAY_CLOSE_RE = re.compile(r'(?<!\{)\{\s*([' + _LETTERS + r'_ ]+?)\s*\}\}')
 def token_values(today: dt.date | None = None) -> dict[str, str]:
     """What each token prints today (runtime.tsx applyTokens; contact data from the site settings)."""
     from .models import SiteSettings
-
     from .site_years import announced_cycle_start, cycle_label
 
     s = SiteSettings.load()
