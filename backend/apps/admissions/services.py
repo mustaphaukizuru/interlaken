@@ -193,6 +193,13 @@ def _child(reg) -> str:
     return f"{reg.child_first_name} {reg.child_last_name}".strip()
 
 
+def _short(reg) -> str:
+    """The applicant as family emails name them (D13): «Ana P.»."""
+    from apps.portal.emailing import name_initial
+
+    return name_initial(reg.child_first_name, reg.child_last_name) or _child(reg)
+
+
 def email_invite(reg: Registration, invite_url: str, *, to: str = ""):
     from datetime import timedelta
 
@@ -200,15 +207,17 @@ def email_invite(reg: Registration, invite_url: str, *, to: str = ""):
 
     from apps.portal.emailing import EmailContent, long_date
 
+    # The date the link really expires (issue_invite stamps it), not a guess.
+    expires = reg.invite_expires_at or (timezone.now() + timedelta(days=14))
     content = EmailContent(
         category="Admisiones",
         title=f"Le invitamos a llenar la ficha de inscripción de {reg.child_first_name}",
         intro=(f"Estimado/a {reg.parent1_name}: le invitamos a llenar la ficha de inscripción de "
-               f"{_child(reg)} para el ciclo {reg.cycle} en el Colegio Interlaken. La ficha ya "
+               f"{_short(reg)} para el ciclo {reg.cycle} en el Colegio Interlaken. La ficha ya "
                f"trae los datos que nos compartió; le tomará unos 15 minutos y puede guardarla y "
                f"continuar después."),
-        details=[("Alumno", _child(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle),
-                 ("El enlace vence", long_date(timezone.now() + timedelta(days=14)))],
+        details=[("Alumno", _short(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle),
+                 ("El enlace vence", long_date(expires))],
         cta_label="Llenar la ficha",
         cta_url=invite_url,
         note=("El enlace es personal: no lo comparta. Si tiene dudas, responda a este correo "
@@ -216,7 +225,7 @@ def email_invite(reg: Registration, invite_url: str, *, to: str = ""):
         signoff="Equipo de Admisiones",
         reason=ADM_REASON,
     )
-    return send_email(f"Invitación de inscripción: {_child(reg)}", "", [to or reg.parent1_email],
+    return send_email("Invitación de inscripción", "", [to or reg.parent1_email],
                       reply_to=settings.ADMISSIONS_EMAIL, content=content)
 
 
@@ -226,24 +235,25 @@ def email_registration_outcome(reg: Registration):
     from apps.portal.emailing import EmailContent
 
     approved = reg.status == Registration.Status.APPROVED
-    details = [("Alumno", _child(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle)]
+    details = [("Alumno", _short(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle)]
+    # D13: no names in subjects.
     if approved:
-        subject = f"Inscripción aprobada: {_child(reg)}"
+        subject = "Inscripción aprobada"
         content = EmailContent(
             category="Admisiones", tone="success",
             title=f"La inscripción de {reg.child_first_name} fue aprobada",
             intro=(f"Estimado/a {reg.parent1_name}: nos da mucho gusto informarle que la inscripción "
-                   f"de {_child(reg)} fue aprobada. Bienvenidos a la familia Interlaken."),
+                   f"de {_short(reg)} fue aprobada. Bienvenidos a la familia Interlaken."),
             details=details,
             paragraphs=["En breve le compartiremos los siguientes pasos."],
             signoff="Equipo de Admisiones", reason=ADM_REASON,
         )
     else:
-        subject = f"Actualización de su inscripción: {_child(reg)}"
+        subject = "Actualización de su inscripción"
         content = EmailContent(
             category="Admisiones", tone="neutral",
             title="Actualización sobre su solicitud de inscripción",
-            intro=(f"Estimado/a {reg.parent1_name}: revisamos la solicitud de inscripción de {_child(reg)}. "
+            intro=(f"Estimado/a {reg.parent1_name}: revisamos la solicitud de inscripción de {_short(reg)}. "
                    f"Un asesor de admisiones se pondrá en contacto con usted para darle más información."),
             details=details,
             note="Si tiene preguntas, responda a este correo y le atenderemos.",
@@ -312,7 +322,7 @@ def request_missing_documents(
     # After the row commits in a bulk run: the upload link's token must exist first.
     after_commit(partial(
         send_email,
-        f"Documentos pendientes para la inscripción de {reg.child_first_name}",
+        "Documentos pendientes para la inscripción",
         text,
         [reg.parent1_email],
         reply_to=settings.ADMISSIONS_EMAIL,
@@ -353,7 +363,7 @@ def email_rejected_documents(reg: Registration, docs: list[RegistrationDocument]
         signoff="Equipo de Admisiones", reason=ADM_REASON,
     )
     send_email(
-        f"{'Documentos' if plural else 'Documento'} por corregir: {_child(reg)}",
+        f"{'Documentos' if plural else 'Documento'} por corregir",
         "",
         [reg.parent1_email],
         reply_to=settings.ADMISSIONS_EMAIL,

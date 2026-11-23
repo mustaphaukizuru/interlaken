@@ -43,7 +43,7 @@ const FAMILY_ACTIONS: BulkActionDef[] = [
 const ACCEPT: BulkActionDef = { name: 'accept', label: 'Vincular', icon: Link2, planVerb: 'Se vincularán', notifyOption: true };
 const DISMISS: BulkActionDef = { name: 'dismiss', label: 'No son hermanos', icon: XCircle, planVerb: 'Se descartarán' };
 const ROW_ACTION =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px]';
 
 
 /** «Ana · 3° Primaria A» chips, each opening the child's file. */
@@ -53,7 +53,7 @@ function Kids({ students }: { students: FamilyStudent[] }) {
       {students.map((s) => (
         <li key={s.id}>
           <Link to={`/admin/alumnos/${s.id}`} title={`${s.name} · ${gradeLine(s)} · ${s.student_id}`}
-            className="inline-flex min-h-[32px] items-center gap-1 whitespace-nowrap rounded-full bg-cream px-2.5 text-xs text-ink hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+            className="inline-flex min-h-[32px] items-center gap-1 whitespace-nowrap rounded-sm bg-cream px-2.5 text-xs text-ink hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
             <span className="font-semibold">{s.first_name || s.name}</span>
             <span className="text-subtle">· {gradeLine(s)}</span>
           </Link>
@@ -292,7 +292,7 @@ function SuggestionsView() {
 
   return (
     <Card>
-      <div className="mb-4 flex gap-3 rounded-xl bg-amber/10 px-4 py-3 text-sm text-ink">
+      <div className="mb-4 flex gap-3 rounded-md bg-amber/10 px-4 py-3 text-sm text-ink">
         <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
         <p>
           Alumnos activos que comparten tutor, correo personal confirmado, teléfono o ambos apellidos.

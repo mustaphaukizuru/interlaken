@@ -24,7 +24,7 @@ export function CopyButton({ value, label, className = '' }: { value: string; la
       timer.current = setTimeout(() => setCopied(false), 1500);
       toast.success('Copiado');
     } catch {
-      toast.error('No se pudo copiar. Seleccione el texto y cópielo a mano.');
+      toast.error('No se pudo copiar. Cópielo a mano.');
     }
   };
 
@@ -34,7 +34,7 @@ export function CopyButton({ value, label, className = '' }: { value: string; la
       onClick={() => void copy()}
       aria-label={`Copiar ${label}`}
       title={`Copiar ${label}`}
-      className={`inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-subtle transition hover:bg-purple/10 hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${className}`}
+      className={`inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-sm text-subtle transition hover:bg-purple/10 hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${className}`}
     >
       {copied
         ? <Check className="h-3.5 w-3.5 text-green-700" aria-hidden="true" />

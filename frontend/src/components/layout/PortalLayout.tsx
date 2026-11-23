@@ -4,7 +4,9 @@ import { useAppBadge } from '@/hooks/useAppBadge';
 import { useBadges } from '@/hooks/useBadges';
 import { OfflineBanner } from '@/components/portal/OfflineBanner';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { BackToTop } from './BackToTop';
+import { releaseScrollRoot, setScrollRoot } from '@/lib/scrollRoot';
 import Sidebar from './Sidebar';
 import AppHeader from './AppHeader';
 import MobileTabBar from './MobileTabBar';
@@ -60,20 +62,18 @@ function portalTitleFor(pathname: string): string | undefined {
  * Shared mobile-nav state. AppHeader (hamburger, search, notifications, account)
  * is rendered by PortalLayout on every authenticated route; page titles live in
  * content via <PageHeader>. MobileTabBar / Sidebar consume this context too.
+ * (The header is flat now: no depth cue on scroll, so no scroll state here.)
  */
 interface MobileNavCtx {
   open: boolean;
   toggle: () => void;
   close: () => void;
-  /** True once the content column has scrolled — drives the header's depth cue. */
-  scrolled: boolean;
 }
 
 const MobileNavContext = createContext<MobileNavCtx>({
   open: false,
   toggle: () => {},
   close: () => {},
-  scrolled: false,
 });
 
 export function useMobileNav() {
@@ -93,13 +93,16 @@ function PortalShell({ role }: Props) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
-  const [scrolled, setScrolled] = useState(false);
 
-  // Only the content column scrolls (the sidebar + header stay fixed), so reset
-  // it to the top on each navigation — otherwise a new page opens mid-scroll.
+  // Only the content column scrolls (the sidebar + header stay fixed). The
+  // app-wide ScrollManager moves it: top on a new page, the same spot on Back.
   const scrollRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
-  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [pathname]);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    setScrollRoot(el);
+    return () => releaseScrollRoot(el);
+  }, []);
 
   // Announce the current page in the tab title on each portal navigation.
   useEffect(() => {
@@ -128,21 +131,23 @@ function PortalShell({ role }: Props) {
   }, [open, close]);
 
   return (
-    <MobileNavContext.Provider value={{ open, toggle, close, scrolled }}>
+    <MobileNavContext.Provider value={{ open, toggle, close }}>
       {/* The frame is exactly the viewport and never scrolls: `relative` makes it
           the containing block of every absolutely positioned descendant and
           `frame-clip` clips them, so nothing (a table's sr-only <caption>, a
           menu near the bottom) can make the page taller than the screen and
           slide the whole console up, leaving an empty band underneath. */}
-      <div className="frame-clip relative flex h-[100dvh] flex-col bg-cream">
+      {/* Print: the frame grows with its content (one page otherwise) and the
+          chrome hides itself (print:hidden on the header, bars and drawer). */}
+      <div className="frame-clip relative flex h-[100dvh] flex-col bg-cream print:block print:h-auto print:overflow-visible print:bg-white">
         <OfflineBanner />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 print:block">
         <a href="#contenido" className="skip-link">Saltar al contenido</a>
         {/* Off-canvas backdrop (mobile only) */}
         <div
           onClick={close}
           aria-hidden="true"
-          className={`fixed inset-0 z-40 bg-dark/55 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
+          className={`fixed inset-0 z-dropdown bg-dark/55 transition-opacity duration-300 print:hidden lg:hidden ${
             open ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         />
@@ -154,16 +159,15 @@ function PortalShell({ role }: Props) {
         <CommandPalette />
 
         {/* Main — sidebar + header stay fixed; only this content column scrolls */}
-        <main id="contenido" className="frame-clip flex min-w-0 flex-1 flex-col">
+        <main id="contenido" className="frame-clip flex min-w-0 flex-1 flex-col print:block print:overflow-visible">
           <AppHeader />
           {/* `relative`: page content positions against this column, so it
               scrolls with the content instead of stretching the document. */}
           <div
             ref={scrollRef}
-            onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
-            className="relative flex-1 overflow-y-auto overflow-x-hidden"
+            className="relative flex-1 overflow-y-auto overflow-x-hidden print:overflow-visible"
           >
-            <div className="mx-auto w-full max-w-[1320px] 2xl:max-w-[1680px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
+            <div className="mx-auto w-full max-w-[1320px] 2xl:max-w-[1680px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] print:max-w-none print:p-0 lg:pb-6">
               <RouteTransition><Outlet /></RouteTransition>
             </div>
           </div>
@@ -171,6 +175,8 @@ function PortalShell({ role }: Props) {
 
         {/* Staff analytics is a single-route surface — no bottom tab bar. */}
         {role !== 'staff' && <MobileTabBar role={role} />}
+        {/* Above the phone tab bar (64 px + the home-indicator inset). */}
+        <BackToTop className={role !== 'staff' ? 'right-4 bottom-[calc(80px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6' : 'right-4 bottom-4 lg:bottom-6 lg:right-6'} />
         </div>
       </div>
     </MobileNavContext.Provider>

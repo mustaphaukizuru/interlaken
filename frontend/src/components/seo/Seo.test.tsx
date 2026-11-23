@@ -1,10 +1,21 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, render as rtlRender, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement, ReactNode } from 'react';
+import { SITE_DEFAULTS } from '@/lib/siteContact';
 import { Suspense, lazy, useState } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { RouteSeo, Seo, loadRouteMeta, resetSeoForTests } from './Seo';
 import { DEFAULT_TITLE } from '@/lib/siteMeta';
+
+/** RouteSeo reads the site settings (the month the cycle changes, Costos' price years): seed them, no network. */
+function render(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  qc.setQueryData(['site-settings'], SITE_DEFAULTS);
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return rtlRender(ui, { wrapper });
+}
 
 const head = () => ({
   title: document.title,

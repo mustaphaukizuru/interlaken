@@ -132,8 +132,8 @@ export default function PaymentsPage() {
           to="/portal/cafeteria"
           icon={Coffee}
           title="Recargar cafetería"
-          desc="Agrega saldo a la cuenta de cafetería de tus hijos."
-          gradient="from-green to-green-dark"
+          desc="Agregue saldo a la cafetería de sus hijos."
+          gradient="bg-green-50 text-green-dark"
         />
       </div>
 
@@ -183,7 +183,7 @@ export default function PaymentsPage() {
               <Button variant="secondary" size="sm" onClick={clearAll}>Limpiar filtros</Button>
             ) : (
               <Link to="/portal/cafeteria" className="btn-secondary text-sm">
-                <Coffee className="h-4 w-4" /> Recargar cafetería
+                <Coffee size={16} aria-hidden="true" /> Recargar cafetería
               </Link>
             )}
           />
@@ -197,8 +197,8 @@ export default function PaymentsPage() {
                   <div key={p.id} className="py-4 first:pt-0 last:pb-0">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cream">
-                          <Icon className="h-4 w-4 text-muted" />
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm bg-cream">
+                          <Icon size={16} className="text-muted" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-ink">
@@ -219,15 +219,15 @@ export default function PaymentsPage() {
                     </div>
                     {p.status === 'success' && p.topup?.status === 'paid' && (
                       <p className="mt-2 flex items-center gap-1.5 pl-12 text-xs font-medium text-amber">
-                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        <Clock size={16} aria-hidden="true" />
                         Pagada, por aplicar: se sumará al saldo {applyPhrase(p.topup.apply_due_at)}
                       </p>
                     )}
                     {(p.status === 'success' || p.status === 'refunded') && (
                       <div className="mt-2 pl-12">
                         <button type="button" onClick={() => receipt.mutate(p.id)} disabled={receipt.isPending && receipt.variables === p.id}
-                          className="inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-purple hover:underline disabled:opacity-60">
-                          <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Descargar comprobante (PDF)
+                          className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2 text-sm font-semibold text-purple hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60">
+                          <FileText size={16} aria-hidden="true" /> Descargar comprobante (PDF)
                         </button>
                       </div>
                     )}
@@ -261,9 +261,9 @@ function SummaryTiles({ summary, loading }: { summary?: PaymentSummary; loading:
   return (
     <div className="mb-6 grid gap-3 sm:grid-cols-3" aria-busy={loading}>
       {tiles.map((t) => (
-        <div key={t.label} className="rounded-xl2 border border-line bg-white p-4 shadow-card">
+        <div key={t.label} className="rounded-md bg-white p-4 shadow-card">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-subtle">
-            <t.icon size={14} aria-hidden="true" /> {t.label}
+            <t.icon size={16} aria-hidden="true" /> {t.label}
           </div>
           <div className="mt-1 font-head text-2xl font-extrabold text-ink">{loading ? '…' : t.value}</div>
           {t.sub && <div className="text-xs text-muted">{t.sub}</div>}
@@ -273,22 +273,23 @@ function SummaryTiles({ summary, loading }: { summary?: PaymentSummary; loading:
   );
 }
 
+/** One flat row-link (no border, no gradient tile): `gradient` is the icon tile's tint classes. */
 function ActionCard({ to, icon: Icon, title, desc, gradient }: {
   to: string; icon: typeof Coffee; title: string; desc: string; gradient: string;
 }) {
   return (
     <Link
       to={to}
-      className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+      className="group flex min-h-[64px] items-center gap-4 rounded-md bg-white p-4 shadow-card transition-colors hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
     >
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-purple`}>
-        <Icon className="h-6 w-6" />
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-sm ${gradient}`}>
+        <Icon size={24} aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-head text-base font-bold text-ink">{title}</span>
         <span className="mt-0.5 block text-sm text-muted">{desc}</span>
       </span>
-      <ArrowRight className="h-5 w-5 shrink-0 text-subtle transition group-hover:translate-x-1 group-hover:text-purple" />
+      <ArrowRight size={20} aria-hidden="true" className="shrink-0 text-subtle transition-colors group-hover:text-purple" />
     </Link>
   );
 }

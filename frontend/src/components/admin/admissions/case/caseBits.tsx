@@ -48,7 +48,7 @@ export function SentRow({ label, sentAt, buttonLabel, onSend, disabled, hint }: 
   hint?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-cream-2 px-3.5 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-cream-2 px-3.5 py-3">
       <div className="min-w-0">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink">
           {sentAt
@@ -62,7 +62,7 @@ export function SentRow({ label, sentAt, buttonLabel, onSend, disabled, hint }: 
         type="button"
         onClick={onSend}
         disabled={disabled}
-        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border-2 border-purple bg-white px-4 text-sm font-semibold text-purple transition hover:bg-purple hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-sm border-2 border-purple bg-white px-4 text-sm font-semibold text-purple transition hover:bg-purple hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Send size={15} aria-hidden="true" /> {sentAt ? `${buttonLabel} de nuevo` : buttonLabel}
       </button>
@@ -84,7 +84,7 @@ export function InfoRow({ label, children, className }: { label: string; childre
 /** «El expediente está cerrado…» note shown over the controls of a read-only card. */
 export function ReadOnlyNote({ stage }: { stage: string }) {
   return (
-    <p className="rounded-xl bg-cream px-3 py-2 text-sm text-muted">
+    <p className="rounded-md bg-cream px-3 py-2 text-sm text-muted">
       {stage === 'inscrito'
         ? 'El expediente ya está inscrito: esta etapa queda como registro.'
         : 'El expediente está cerrado. Reábralo para modificar esta etapa.'}
@@ -97,7 +97,7 @@ export function GateList({ items }: { items: GateItem[] }) {
   return (
     <ul className="space-y-2" aria-label="Requisitos para inscribir">
       {items.map((g) => (
-        <li key={g.key} className="flex items-start gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+        <li key={g.key} className="flex items-start gap-2.5 rounded-md bg-white px-3 py-2.5 text-sm shadow-card">
           {g.ok
             ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" aria-hidden="true" />
             : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />}

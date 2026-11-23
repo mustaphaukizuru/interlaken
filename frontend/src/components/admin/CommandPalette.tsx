@@ -264,12 +264,12 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
     // close button.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/40 p-4 pt-[8vh] sm:pt-[12vh]"
+      className="fixed inset-0 z-modal flex items-start justify-center bg-ink/40 p-4 pt-[8vh] sm:pt-[12vh]"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         ref={panelRef}
-        className="w-full max-w-lg overflow-hidden rounded-xl2 bg-white shadow-card"
+        className="w-full max-w-lg overflow-hidden rounded-md bg-white shadow-card"
         role="dialog"
         aria-modal="true"
         aria-label="Búsqueda global"
@@ -294,7 +294,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Cerrar búsqueda"
-            className="rounded p-2.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
+            className="rounded-sm p-2.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
           >
             <X size={16} aria-hidden="true" />
           </button>
@@ -305,7 +305,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
             non-empty even before typing. */}
         {q.length < 2 && (
           <p className="px-3 pb-0 pt-4 text-center text-sm text-muted">
-            Escriba al menos 2 caracteres. Consejo: <kbd className="rounded border border-ink/15 px-1">Ctrl</kbd>+<kbd className="rounded border border-ink/15 px-1">K</kbd> abre esta búsqueda.
+            Escriba al menos 2 caracteres. Consejo: <kbd className="rounded-sm border border-ink/15 px-1">Ctrl</kbd>+<kbd className="rounded-sm border border-ink/15 px-1">K</kbd> abre esta búsqueda.
           </p>
         )}
         {/* role="listbox" only when there are options — an empty listbox fails
@@ -339,7 +339,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
                     aria-selected={i === active}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => go(item)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left ${
+                    className={`flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left ${
                       i === active ? 'bg-green/10 text-ink' : 'text-ink/90 hover:bg-ink/5'
                     }`}
                   >

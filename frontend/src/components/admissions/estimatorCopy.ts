@@ -33,8 +33,10 @@ export const ESTIMATOR_COPY: EstimatorCopy = {
   tuitionLabel: 'Colegiatura mensual', tuitionMissing: 'Por confirmar', perMonth: '/ mes',
   insuranceLabel: 'Seguros y credenciales', insuranceSub: 'Anual · obligatorios',
   noCost: 'SIN COSTO',
+  // The first line, which prices each figure uses («Inscripción y colegiatura con
+  // precios 2027; seguros y credenciales con precios 2026 (los de 2027 están
+  // pendientes)»), is written by CostEstimator from the published years.
   notes: [
-    { text: 'Inscripción y colegiatura con precios 2027; seguros y credenciales con precios 2026 (los de 2027 están pendientes).', tone: 'purple' },
     { text: 'La cuota de inscripción y reinscripción se divide en 4 parcialidades de enero a abril.', tone: 'purple' },
     { text: 'Las colegiaturas tienen un recargo del 5% mensual a partir del día 17.', tone: 'amber' },
   ],

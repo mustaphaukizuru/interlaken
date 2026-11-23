@@ -23,24 +23,26 @@ const below = () => import('./home.below');
 const section = sectionsOf('home');
 
 const VIEWPORT = { once: true, margin: '0px 0px -60px 0px' } as const;
+// Motion standard (DESIGN.md §3.5): rise ≤ 12px, ≤ 300ms, stagger 60ms, standard ease.
+// Reduced motion is honoured by SiteMotionProvider (MotionConfig reducedMotion="user").
 const sectionReveal: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] } },
 };
-const staggerGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
-/* Hero entrance: ONE orchestrated run on first mount (~540ms). Opacity/transform
+const staggerGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+/* Hero entrance: ONE orchestrated run on first mount (~480ms). Opacity/transform
  * only, and the hero IMAGE is deliberately not animated so the LCP paint is untouched. */
-const heroGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
+const heroGroup: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const heroItem: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.38, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] } },
 };
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 interface HeroProps {
   showLogo?: boolean; title?: string; titleAccent?: string; subtitle?: string;
   primary?: CmsLink; secondary?: CmsLink; tertiary?: CmsLink;
-  poster?: number | string; posterAlt?: string; video?: string;
+  poster?: number | string; posterAlt?: string; video?: string; videoSound?: boolean;
 }
 function HomeHeroView(p: HeroProps) {
   const t = useTokens();
@@ -60,6 +62,8 @@ function HomeHeroView(p: HeroProps) {
       posterSrcSet={poster.srcSet}
       posterAlt={poster.alt}
       reducedMotion={reducedMotion}
+      // The hero's own video is a silent loop unless the editor says otherwise; the Ajustes video keeps its sound button.
+      sound={p.video?.trim() ? p.videoSound === true : true}
     >
       <div
         className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
@@ -114,7 +118,7 @@ function HomeStatsView({ items }: { items?: StatItem[] }) {
             const Icon = cmsIcon(s.icon);
             return (
               <m.div key={i} variants={sectionReveal} className="flex items-center gap-3 sm:gap-4">
-                <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${color} 13%, transparent)` }}>
+                <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 13%, transparent)` }}>
                   <Icon size={24} color={color} />
                 </div>
                 <div>
@@ -132,6 +136,9 @@ function HomeStatsView({ items }: { items?: StatItem[] }) {
 
 const levelItem = [f.text('name', 'Nombre', { required: true }), f.image('image', 'Foto'), f.color('color'), f.textarea('text', 'Descripción'), f.href('href', 'Enlace'), f.text('linkLabel', 'Texto del enlace', { hint: 'Vacío = «Conocer <nombre>».' })];
 
+// The editor fills the illustration list (f.illustration), so the home chunk does not ship it.
+const artField = f.illustration('illustration', 'Ilustración', { hint: 'Sin elegir, se toma la que corresponde al ícono.' });
+
 export const sections = [
   section({
     type: 'hero', label: 'Inicio · Portada', description: 'Portada con video o foto, logo, título y dos botones.',
@@ -147,6 +154,7 @@ export const sections = [
       f.image('poster', 'Foto de portada', { hint: 'Se ve mientras carga el video, o siempre si no hay video.' }),
       f.text('posterAlt', 'Descripción de la foto (accesibilidad)'),
       f.url('video', 'Video de portada (MP4)', { hint: 'Vacío = el video de Ajustes.' }),
+      f.toggle('videoSound', 'El video tiene sonido', { hint: 'Muestra el botón «Activar sonido». Déjelo apagado para un video en bucle sin audio.' }),
     ],
     defaults: {
       showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
@@ -155,7 +163,8 @@ export const sections = [
       // Same as the header buttons (owner, 2026-11-22: «Portal Cafetería»,
       // no «Colegiaturas»). The optional third button stays empty.
       secondary: { label: 'Portal Cafetería', href: '/login' },
-      poster: '/assets/court-wide.webp', posterAlt: 'Campus Colegio Interlaken', video: '',
+      // Media round 2026-11-22: the court photo animated (slow glide under the canopies, no people added), 10 s silent loop; the poster is its first frame.
+      poster: '/assets/hero-home.webp', posterAlt: 'Campus Colegio Interlaken', video: '/assets/video/hero-home.mp4', videoSound: false,
     },
   }),
   section({
@@ -177,16 +186,25 @@ export const sections = [
       eyebrow: 'Nuestra Comunidad', title: '{{anios}} años formando familias en Tlalnepantla',
       text: 'En Colegio Interlaken combinamos rigor académico, educación bilingüe y un ambiente cálido y seguro. Nuestros egresados destacan por su liderazgo, sus valores y su compromiso con la comunidad.',
       cta: { label: 'Conózcanos', href: '/nosotros' },
-      image1: '/assets/classroom.webp', image2: '/assets/campus-mural.webp', image3: '/assets/hopscotch.webp',
+      image1: '/assets/classroom.webp', image2: '/assets/campus-mural.webp', image3: '/assets/interlaken-image (1).webp',
       badgeValue: '+2,500', badgeLabel: 'Egresados',
     },
   }),
   section({
     type: 'video', label: 'Inicio · Video institucional', description: 'Video con texto y botones. Se oculta solo si no hay video.',
     component: lazySection(below, 'HomeVideo'),
-    fields: [...headingFields({ text: true }), f.url('video', 'Video (YouTube o Vimeo)', { hint: 'Vacío = el video de Ajustes.' }), f.link('primary', 'Botón principal'), f.link('secondary', 'Botón secundario')],
+    fields: [
+      ...headingFields({ text: true }),
+      f.url('video', 'Video (YouTube o Vimeo)', { hint: 'Vacío = el video de Ajustes.' }),
+      f.image('poster', 'Foto de portada del video', { hint: 'Vacío = la miniatura de YouTube.' }),
+      f.toggle('clickToPlay', 'Esperar un clic para reproducir', { hint: 'Apagado: empieza solo, sin sonido.' }),
+      f.link('primary', 'Botón principal'),
+      f.link('secondary', 'Botón secundario'),
+    ],
     defaults: {
-      eyebrow: 'Conócenos', title: 'Interlaken en video', video: '',
+      eyebrow: 'Conócenos', title: 'Interlaken en video', video: '', clickToPlay: false,
+      // The facade photo matches the ad's first real shot (the building), so the cover fades into the video.
+      poster: '/assets/facade-sign.webp',
       text: 'Nuestro video institucional. Y si quiere conocer el colegio en persona, agende una visita: le mostramos instalaciones, salones y patios.',
       primary: { label: 'Agendar una visita', href: '/agendar-visita' }, secondary: { label: 'Ver la galería', href: '/galeria' },
     },
@@ -199,8 +217,8 @@ export const sections = [
       eyebrow: 'Niveles Educativos', title: 'Un camino de excelencia',
       text: 'De preescolar a secundaria, un mismo campus y un mismo compromiso con cada etapa.',
       items: [
-        { name: 'Preescolar', href: '/niveles/preescolar', image: '/assets/court-primaria.webp', color: 'var(--nivel-preescolar)', text: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.', linkLabel: '' },
-        { name: 'Primaria', href: '/niveles/primaria', image: '/assets/facade.webp', color: 'var(--nivel-primaria)', text: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.', linkLabel: '' },
+        { name: 'Preescolar', href: '/niveles/preescolar', image: '/assets/hopscotch.webp', color: 'var(--nivel-preescolar)', text: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.', linkLabel: '' },
+        { name: 'Primaria', href: '/niveles/primaria', image: '/assets/court-primaria.webp', color: 'var(--nivel-primaria)', text: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.', linkLabel: '' },
         { name: 'Secundaria', href: '/niveles/secundaria', image: '/assets/secundaria.webp', color: 'var(--nivel-secundaria)', text: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.', linkLabel: '' },
       ],
       cta: { label: 'Conozca el modelo educativo', href: '/modelo-educativo' },
@@ -213,33 +231,33 @@ export const sections = [
     defaults: {
       eyebrow: 'Nuestros Programas', title: 'Más allá del aula',
       items: [
-        { name: 'Inglés', image: '/assets/classroom.webp', color: 'var(--purple)', icon: 'Languages' },
-        { name: 'Deportes', image: '/assets/court-wide.webp', color: 'var(--green)', icon: 'Trophy' },
-        { name: 'Arte y Música', image: '/assets/campus-mural.webp', color: 'var(--pink)', icon: 'Palette' },
-        { name: 'Ciencia y Robótica', image: '/assets/secundaria.webp', color: 'var(--green)', icon: 'FlaskConical' },
+        { name: 'Inglés', image: '/assets/foto-bilingue.webp', color: 'var(--purple)', icon: 'Languages' },
+        { name: 'Deportes', image: '/assets/foto-deportes.webp', color: 'var(--green)', icon: 'Trophy' },
+        { name: 'Arte y Música', image: '/assets/foto-arte.webp', color: 'var(--pink)', icon: 'Palette' },
+        { name: 'Ciencia y Robótica', image: '/assets/foto-ciencia.webp', color: 'var(--green)', icon: 'FlaskConical' },
       ],
       footnote: 'Programas que complementan la formación académica todos los días.',
     },
   }),
   section({
-    type: 'promos', label: 'Inicio · Tarjetas destacadas', description: 'Par de tarjetas de color con ícono, texto y enlace.',
+    type: 'promos', label: 'Inicio · Tarjetas destacadas', description: 'Par de tarjetas de color con ilustración, texto y enlace.',
     component: lazySection(below, 'HomePromos'),
-    fields: [f.items('items', 'Tarjetas', [f.text('label', 'Etiqueta'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto'), f.link('link', 'Enlace'), f.icon('icon'), f.color('color', 'Color inicial'), f.color('color2', 'Color final')])],
+    fields: [f.items('items', 'Tarjetas', [f.text('label', 'Etiqueta'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto'), f.link('link', 'Enlace'), artField, f.icon('icon', 'Ícono (sin ilustración)'), f.color('color', 'Color inicial'), f.color('color2', 'Color final')])],
     defaults: { items: [
-      { label: 'Modelo Bilingüe', title: 'Inglés desde preescolar, todos los días', text: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.', link: { label: 'Conozca el modelo', href: '/modelo-educativo' }, color: 'var(--purple)', color2: 'var(--purple-mid)', icon: 'Languages' },
-      { label: 'Comunidad y Valores', title: 'Formamos personas íntegras y felices', text: 'Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.', link: { label: 'Nuestra comunidad', href: '/nosotros' }, color: 'var(--pink)', color2: 'var(--pink-hot)', icon: 'Heart' },
+      { label: 'Modelo Bilingüe', title: 'Inglés desde preescolar, todos los días', text: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.', link: { label: 'Conozca el modelo', href: '/modelo-educativo' }, color: 'var(--purple)', color2: 'var(--purple-mid)', icon: 'Languages', illustration: 'bilingue' },
+      { label: 'Comunidad y Valores', title: 'Formamos personas íntegras y felices', text: 'Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.', link: { label: 'Nuestra comunidad', href: '/nosotros' }, color: 'var(--pink)', color2: 'var(--pink-hot)', icon: 'Heart', illustration: 'comunidad' },
     ] },
   }),
   section({
-    type: 'strengths', label: 'Inicio · Por qué Interlaken', description: 'Tarjetas de respaldo con ícono.',
+    type: 'strengths', label: 'Inicio · Por qué Interlaken', description: 'Tarjetas de respaldo con ilustración.',
     component: lazySection(below, 'HomeStrengths'),
-    fields: [...headingFields(), f.items('items', 'Tarjetas', [f.icon('icon'), f.color('color'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto')])],
+    fields: [...headingFields(), f.items('items', 'Tarjetas', [artField, f.icon('icon', 'Ícono (sin ilustración)'), f.color('color'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto')])],
     defaults: {
       eyebrow: 'Por qué Interlaken', title: 'Respaldo que da certeza a su familia',
       items: [
-        { icon: 'Award', color: 'var(--purple)', title: 'Incorporación oficial SEP', text: 'Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública.' },
-        { icon: 'Languages', color: 'var(--green)', title: 'Certificaciones internacionales', text: 'Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente.' },
-        { icon: 'Heart', color: 'var(--pink)', title: '{{anios}} años de trayectoria', text: '{{anios}} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.' },
+        { icon: 'Award', illustration: 'academico', color: 'var(--purple)', title: 'Incorporación oficial SEP', text: 'Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública.' },
+        { icon: 'Languages', illustration: 'mundo', color: 'var(--green)', title: 'Certificaciones internacionales', text: 'Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente.' },
+        { icon: 'Heart', illustration: 'logro', color: 'var(--pink)', title: '{{anios}} años de trayectoria', text: '{{anios}} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.' },
       ],
     },
   }),
@@ -265,7 +283,7 @@ export const sections = [
     fields: [
       ...grouped('Textos', [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.text('button', 'Texto del botón'), f.text('success', 'Mensaje al enviar')]),
       ...grouped('Formulario', [f.text('nameLabel', 'Etiqueta del nombre'), f.text('emailLabel', 'Etiqueta del correo'), f.text('sending', 'Botón mientras envía')]),
-      ...grouped('Avisos', [f.text('sentToast', 'Aviso emergente al enviar'), f.text('errorToast', 'Aviso emergente si falla')]),
+      ...grouped('Avisos', [f.text('sentToast', 'Aviso emergente al enviar'), f.text('errorToast', 'Aviso si falla (bajo el formulario)')]),
       ...grouped('Aviso de privacidad', [f.textarea('privacyText', 'Texto antes del enlace'), f.text('privacyLink', 'Texto del enlace')]),
       ...grouped('Lo que llega a Mensajes', [f.text('subject', 'Asunto en Mensajes'), f.text('message', 'Mensaje en Mensajes')]),
     ],
@@ -273,7 +291,7 @@ export const sections = [
       title: 'Solicite informes', text: 'Déjenos sus datos y un asesor le compartirá costos, fechas y todo lo que necesita saber sobre Interlaken.',
       button: 'Solicitar', success: '¡Solicitud recibida! Le contactaremos pronto.', subject: 'Solicitud de informes',
       nameLabel: 'Nombre completo', emailLabel: 'Correo electrónico', sending: 'Enviando…',
-      sentToast: '¡Gracias! Te contactaremos muy pronto.', errorToast: 'No fue posible enviar tu solicitud. Intenta de nuevo.',
+      sentToast: '¡Gracias! Le contactaremos muy pronto.', errorToast: 'No fue posible enviar su solicitud. Intente de nuevo.',
       privacyText: 'Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el',
       privacyLink: 'Aviso de Privacidad',
       message: '{nombre} solicita informes desde la página de inicio.',

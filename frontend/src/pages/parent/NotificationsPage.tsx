@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check } from 'lucide-react';
+import { Bell, CheckCheck } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -14,10 +14,11 @@ import { NOTIF_META, notifDestination, type Notif } from '@/lib/notifications';
 import { portalApi } from '@/services/api';
 import { toPaged } from '@/lib/pagination';
 import { useStalePageReset, useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useBadges } from '@/hooks/useBadges';
 
 const PAGE_SIZE = 20;
 
-/** /portal/notificaciones — every notification, filterable, paginated (BACKLOG P1-B3). */
+/** /portal/notificaciones — «Avisos»: every notification, filterable, paginated (BACKLOG P1-B3). */
 export default function NotificationsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -35,7 +36,10 @@ export default function NotificationsPage() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['notifications'] });
     qc.invalidateQueries({ queryKey: ['notifications-page'] });
+    qc.invalidateQueries({ queryKey: ['badges'] });
   };
+  // Anything unread: on this page, or anywhere (the server's unread count).
+  const unreadBadge = useBadges().notificaciones ?? 0;
   const markRead = useMutation({ mutationFn: (id: number) => portalApi.markNotificationRead(id), onSuccess: invalidate });
   const markAll = useMutation({
     mutationFn: () => portalApi.markAllNotificationsRead(),
@@ -54,17 +58,22 @@ export default function NotificationsPage() {
   const items = data?.results ?? [];
   const count = data?.count ?? 0;
   const filtered = Boolean(type) || unreadOnly;
+  const anyUnread = unreadBadge > 0 || items.some((n) => !n.is_read);
 
   return (
     <>
       <PageHeader
-        title="Notificaciones"
-        subtitle="Avisos, alertas de cafetería y pagos de tu familia."
-        actions={<Button variant="secondary" loading={busy} onClick={() => markAll.mutate()}><Check size={16} aria-hidden="true" /> Marcar todas como leídas</Button>}
+        title="Avisos"
+        subtitle="Comunicados del colegio, cafetería y pagos de su familia."
+        actions={(
+          <Button variant="secondary" loading={busy} disabled={!anyUnread} onClick={() => markAll.mutate()} className="min-h-[44px]">
+            <CheckCheck size={20} aria-hidden="true" /> Marcar todo como leído
+          </Button>
+        )}
       />
 
-      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filtros">
-        <Chip active={!type} onClick={() => set({ tipo: null, page: null })}>Todas</Chip>
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filtrar avisos">
+        <Chip active={!type} onClick={() => set({ tipo: null, page: null })}>Todos</Chip>
         {(Object.keys(NOTIF_META) as Notif['notif_type'][]).map((k) => (
           <Chip key={k} active={type === k} onClick={() => set({ tipo: k, page: null })}>{NOTIF_META[k].label}</Chip>
         ))}
@@ -77,11 +86,11 @@ export default function NotificationsPage() {
           : !items.length ? (
             <EmptyState
               icon={Bell}
-              title={unreadOnly ? 'Está al día' : filtered ? 'Sin notificaciones de este tipo' : 'Sin notificaciones'}
-              description={unreadOnly ? 'No tiene notificaciones sin leer.' : 'Los avisos del colegio, la cafetería y los pagos aparecerán aquí.'}
+              title={unreadOnly ? 'Está al día' : filtered ? 'Sin avisos de este tipo' : 'Sin avisos'}
+              description={unreadOnly ? 'No tiene avisos sin leer.' : 'Aquí aparecerán los avisos del colegio, la cafetería y los pagos.'}
               action={filtered ? (
-                <Button variant="secondary" size="sm" onClick={() => set({ tipo: null, sin_leer: null, page: null })}>
-                  Ver todas
+                <Button variant="secondary" size="sm" className="min-h-[44px]" onClick={() => set({ tipo: null, sin_leer: null, page: null })}>
+                  Ver todos los avisos
                 </Button>
               ) : undefined}
             />
@@ -91,7 +100,7 @@ export default function NotificationsPage() {
               <NotificationList items={items} onOpen={open} />
               {count > PAGE_SIZE && (
                 <div className="border-t border-line px-4 py-3">
-                  <Pagination page={page} pageSize={PAGE_SIZE} count={count} onChange={setPage} itemLabel="notificaciones" />
+                  <Pagination page={page} pageSize={PAGE_SIZE} count={count} onChange={setPage} itemLabel="avisos" />
                 </div>
               )}
             </>
@@ -107,7 +116,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${active ? 'bg-purple text-white' : 'border border-line bg-white text-muted hover:text-ink'}`}
+      className={`min-h-[44px] rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${active ? 'bg-purple text-white' : 'bg-white text-muted hover:bg-purple-light hover:text-ink'}`}
     >
       {children}
     </button>

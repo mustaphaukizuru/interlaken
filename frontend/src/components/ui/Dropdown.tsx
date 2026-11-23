@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+
+/** Gap kept between an open panel and the screen edges (px). */
+const EDGE = 12;
 
 interface DropdownProps {
   /** Renders the trigger button; receives current open state + a toggle handler. */
@@ -21,6 +24,26 @@ interface DropdownProps {
 export function Dropdown({ trigger, children, align = 'right', width = 320 }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Keep the panel on screen: anchored to its trigger, but shifted sideways
+  // when that edge would cross the viewport (a «+» button that sits left of
+  // the bell on a 375 px phone pushed a 280 px menu 17 px off-screen). Uses the
+  // `translate` property so the open animation's `transform` is untouched.
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!open || !el) return;
+    const place = () => {
+      el.style.translate = '';
+      const r = el.getBoundingClientRect();
+      const vw = document.documentElement.clientWidth;
+      const shift = r.left < EDGE ? EDGE - r.left : r.right > vw - EDGE ? vw - EDGE - r.right : 0;
+      if (shift) el.style.translate = `${Math.round(shift)}px 0`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -51,9 +74,9 @@ export function Dropdown({ trigger, children, align = 'right', width = 320 }: Dr
       {trigger({ open, toggle: () => setOpen((v) => !v) })}
       {open && (
         <div
-          style={{ width: `min(${width}px, calc(100vw - 24px))` }}
-          className={`absolute top-[calc(100%+10px)] z-50 origin-top animate-[dropdown-in_0.16s_ease-out] overflow-hidden rounded-2xl border border-line bg-white shadow-[0_20px_54px_-18px_rgba(16,12,40,0.32)] ${
-            align === 'right' ? 'right-0' : 'left-0'
+          ref={panelRef}
+          style={{ width: `min(${width}px, calc(100vw - ${EDGE * 2}px))` }}
+          className={`absolute top-[calc(100%+10px)] z-dropdown origin-top animate-[dropdown-in_0.16s_ease-out] overflow-hidden rounded-md bg-white shadow-raised ${ align === 'right' ? 'right-0' : 'left-0'
           }`}
         >
           {children({ close: () => setOpen(false) })}

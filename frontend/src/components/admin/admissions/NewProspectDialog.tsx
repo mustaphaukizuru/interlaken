@@ -12,6 +12,7 @@ import { fmtDay } from '@/lib/caseStages';
 import { casesApi, storeCase, type CaseRow, type ProspectInput } from '@/hooks/queries/cases';
 import { ChoiceGroup, ErrorSummary, SelectField, errorsFrom } from './case/formKit';
 import { GRADE_OPTIONS, RELATIONSHIPS, cycleChoices } from './case/caseBits';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 
 const LABELS: Record<string, string> = {
   child_name: 'Nombre del alumno',
@@ -74,17 +75,22 @@ function toInput(f: Form): ProspectInput {
  * the new Expediente.
  */
 export function NewProspectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Nuevo prospecto" maxWidth={620} fullScreenOnPhone>
-      <NewProspectBody onClose={onClose} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Nuevo prospecto" maxWidth={620} fullScreenOnPhone>
+        <NewProspectBody onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function NewProspectBody({ onClose }: { onClose: () => void }) {
+function NewProspectBody({ onClose, onCancel, onDirty }: { onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState<Form>(EMPTY);
+  useReportDirty(valuesDiffer(form, EMPTY), onDirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const [duplicates, setDuplicates] = useState<CaseRow[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -149,14 +155,14 @@ function NewProspectBody({ onClose }: { onClose: () => void }) {
         />
 
         {duplicates && duplicates.length > 0 && (
-          <div className="space-y-2 rounded-xl border border-amber/40 bg-amber/10 p-3" role="alert">
+          <div className="space-y-2 rounded-md border border-amber/40 bg-amber/10 p-3" role="alert">
             <p className="flex items-start gap-2 text-sm font-semibold text-ink">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
               Ya hay {duplicates.length === 1 ? 'un expediente' : `${duplicates.length} expedientes`} con ese celular o correo.
             </p>
             <ul className="space-y-1.5" aria-label="Expedientes parecidos">
               {duplicates.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
+                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-sm bg-white px-3 py-2 text-sm">
                   <span className="min-w-0">
                     <Link to={`/admin/admisiones/${d.id}`} className="font-semibold text-purple underline" onClick={onClose}>{d.child_name}</Link>
                     <span className="block text-xs text-muted">{d.parent_name} · {d.grade_applying} · {fmtDay(d.created_at)}</span>
@@ -171,7 +177,7 @@ function NewProspectBody({ onClose }: { onClose: () => void }) {
         <ErrorSummary errors={errors} labels={LABELS} />
       </div>
       <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-2 border-t border-line bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:px-0 sm:pb-6">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         {duplicates && duplicates.length > 0 ? (
           <Button type="button" loading={busy} onClick={() => void submit(true)}>Crear de todos modos</Button>
         ) : (

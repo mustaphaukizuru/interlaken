@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import type { FieldErrorMap } from '@/lib/apiErrors';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { fmtDay, todayLocal } from '@/lib/caseStages';
 import {
   casesApi, useCaseSideWrite, type CaseDetail, type CasePayment, type PaymentInput, type PaymentMethod,
@@ -52,6 +54,7 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
   const enrolled = detail.stage === 'inscrito';
   const closed = detail.stage === 'cerrado';
   const [adding, setAdding] = useState(false);
+  const paymentGuard = useDirtyCloseGuard(() => setAdding(false));
   const [voiding, setVoiding] = useState<CasePayment | null>(null);
   const gates = detail.inscrito.gates;
   const docsGate = gates.items.find((g) => g.key === 'documents');
@@ -62,7 +65,7 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
   return (
     <StageCard stage="inscrito" title="Inscripción" state={state} open={open} onToggle={onToggle} summary={inscripcionSummary(detail)}>
       {enrolled && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-green-50 px-3.5 py-3 text-sm text-green-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-green-50 px-3.5 py-3 text-sm text-green-700">
           <p className="flex items-center gap-2 font-semibold">
             <GraduationCap size={18} aria-hidden="true" /> Inscrito{detail.inscrito.enrolled_at ? ` el ${fmtDay(detail.inscrito.enrolled_at)}` : ''}
             {student ? ` · matrícula ${student.student_id}` : ''}
@@ -82,18 +85,18 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
         </div>
         <p className="text-xs text-muted">Solo registro: la plataforma no cobra la inscripción.</p>
         {detail.inscrito.payments.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin pagos registrados.</p>
+          <p className="rounded-md border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin pagos registrados.</p>
         ) : (
           <ul className="space-y-2" aria-label="Pagos de inscripción">
             {detail.inscrito.payments.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
+              <li key={p.id} className="flex flex-wrap items-start justify-between gap-2 rounded-md bg-white px-3.5 py-3 shadow-card">
                 <div className="min-w-0">
                   <p className="font-semibold text-ink">{p.summary}</p>
                   <p className="text-xs text-muted">{p.recorded_by ? `Registró ${p.recorded_by}` : ''}{p.note ? `${p.recorded_by ? ' · ' : ''}${p.note}` : ''}</p>
                 </div>
                 {!closed && !enrolled && (
                   <button type="button" onClick={() => setVoiding(p)} aria-label={`Anular el pago: ${p.summary}`}
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
                 )}
@@ -104,7 +107,7 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
       </div>
 
       {!enrolled && (
-        <div className="space-y-3 rounded-xl2 border border-line bg-cream-2 p-4">
+        <div className="space-y-3 rounded-md bg-cream-2 p-4">
           <h3 className="font-semibold text-ink">Para marcar como inscrito</h3>
           <GateList items={gates.items} />
           <div className="flex flex-wrap items-center gap-3">
@@ -120,9 +123,10 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
         </div>
       )}
 
-      <Modal open={adding} onClose={() => setAdding(false)} title="Registrar pago de inscripción" maxWidth={520}>
-        {adding && <PaymentForm detail={detail} onDone={() => setAdding(false)} />}
+      <Modal open={adding} onClose={paymentGuard.requestClose} title="Registrar pago de inscripción" maxWidth={520}>
+        {adding && <PaymentForm detail={detail} onDone={() => setAdding(false)} onCancel={paymentGuard.requestClose} onDirty={paymentGuard.reportDirty} />}
       </Modal>
+      {paymentGuard.dialog}
       <Modal open={!!voiding} onClose={() => setVoiding(null)} title="Anular pago" maxWidth={460}>
         {voiding && <VoidPayment detail={detail} payment={voiding} onDone={() => setVoiding(null)} />}
       </Modal>
@@ -131,10 +135,18 @@ export function InscripcionCard({ detail, state, open, onToggle, isAdmin, enroll
   );
 }
 
-export function PaymentForm({ detail, onDone }: { detail: CaseDetail; onDone: () => void }) {
-  const [form, setForm] = useState<PaymentInput>({ paid_on: todayLocal(), amount: '', method: 'transferencia', reference: '', note: '' });
+export function PaymentForm({ detail, onDone, onCancel, onDirty }: {
+  detail: CaseDetail; onDone: () => void;
+  /** «Cancelar» (default: `onDone`); a guarded dialog asks first when edited. */
+  onCancel?: () => void; onDirty?: (dirty: boolean) => void;
+}) {
+  const [start] = useState<PaymentInput>(() => ({ paid_on: todayLocal(), amount: '', method: 'transferencia', reference: '', note: '' }));
+  const [form, setForm] = useState<PaymentInput>(start);
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const add = useCaseSideWrite(detail.id, (input: PaymentInput) => casesApi.addPayment(detail.id, input));
+  // A payment row per request: a double click must not record it twice.
+  const once = useSingleFlight();
   const set = <K extends keyof PaymentInput>(k: K, v: PaymentInput[K]) => { setForm((f) => ({ ...f, [k]: v })); setErrors({}); };
 
   const submit = () => {
@@ -144,10 +156,10 @@ export function PaymentForm({ detail, onDone }: { detail: CaseDetail; onDone: ()
     const n = Number(form.amount);
     if (!form.amount.trim() || !Number.isFinite(n) || n <= 0) e.amount = 'El monto debe ser mayor que cero.';
     if (Object.keys(e).length) { setErrors(e); return; }
-    add.mutate({ ...form, amount: form.amount.trim(), reference: form.reference.trim(), note: form.note.trim() }, {
+    once(() => add.mutateAsync({ ...form, amount: form.amount.trim(), reference: form.reference.trim(), note: form.note.trim() }, {
       onSuccess: (r) => { toast.success(`Pago registrado: ${r.data.summary}.`); onDone(); },
       onError: (err) => setErrors(errorsFrom(err)),
-    });
+    }));
   };
 
   return (
@@ -166,7 +178,7 @@ export function PaymentForm({ detail, onDone }: { detail: CaseDetail; onDone: ()
         onChange={(e) => set('note', e.target.value)} error={errors.note} />
       <ErrorSummary errors={errors} labels={PAYMENT_LABELS} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="ghost" onClick={onDone}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel ?? onDone}>Cancelar</Button>
         <Button type="submit" loading={add.isPending}>Registrar pago</Button>
       </div>
     </form>

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Clock, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Megaphone } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -24,7 +24,10 @@ function related(n: { notif_type: string; announcement: number | null; message?:
 }
 
 /**
- * /portal/notificaciones/:id — one notification in full.
+ * /portal/notificaciones/:id — one aviso in full.
+ *
+ * Families see what the school wrote and when: one badge (the category), one
+ * «Volver», and no internal delivery metadata (channels, send times).
  *
  * The list clamps the body to two lines, so an aviso longer than that had
  * nowhere to be read: tapping an 'info' notification did nothing at all. This
@@ -69,82 +72,53 @@ export default function NotificationDetailPage() {
   }, [announcementId]);
 
   const meta = data ? (NOTIF_META[data.notif_type] ?? NOTIF_META.info) : NOTIF_META.info;
-  const Icon = meta.icon;
   const link = data ? related(data) : null;
   const created = data ? new Date(data.created_at) : null;
 
   return (
     <>
-      <PageHeader
-        title="Notificación"
-        actions={(
-          <Link to="/portal/notificaciones" className="btn-outline min-h-[44px]">
-            <ArrowLeft size={16} aria-hidden="true" /> Volver a notificaciones
-          </Link>
-        )}
-      />
+      <Link to="/portal/notificaciones" className="-ml-2 mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2 text-sm font-semibold text-purple transition-colors hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 print:hidden">
+        <ArrowLeft size={16} aria-hidden="true" /> Volver a avisos
+      </Link>
+      <PageHeader title="Aviso" breadcrumbs={false} />
 
       {isError ? (
-        <Card><ErrorState onRetry={() => refetch()} description="No se pudo abrir la notificación." /></Card>
+        <Card><ErrorState onRetry={() => refetch()} description="No se pudo abrir la notificación. Intente de nuevo." /></Card>
       ) : isLoading || !data ? (
         <Card><ListSkeleton /></Card>
       ) : (
         <Card className="max-w-3xl">
-          <div className="flex items-start gap-3">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${meta.cls}`}>
-              <Icon size={20} aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="neutral">{data.type_label || meta.label}</Badge>
-                {!data.is_read && <Badge variant="warning">Sin leer</Badge>}
-              </div>
-              <h2 className="mt-2 font-head text-fluid-lg font-bold leading-snug text-ink">{data.title}</h2>
-              {created && (
-                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
-                  <span>{format(created, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}</span>
-                  <span className="text-subtle">· {formatDistanceToNow(created, { addSuffix: true, locale: es })}</span>
-                </p>
-              )}
-            </div>
-          </div>
+          {/* One badge: the category, with its icon (urgent alerts in their status colour). */}
+          <Badge variant={data.notif_type === 'warning' ? 'warning' : 'neutral'} icon={meta.icon}>
+            {data.type_label || meta.label}
+          </Badge>
+          <h2 className="mt-3 font-head text-fluid-lg font-bold leading-snug text-ink">{data.title}</h2>
+          {created && (
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
+              <time dateTime={data.created_at}>{format(created, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}</time>
+              <span className="text-subtle">· {formatDistanceToNow(created, { addSuffix: true, locale: es })}</span>
+            </p>
+          )}
 
           {/* Paragraphs, lists, label/value rows and links from the plain
               text the backend composes (balance alerts list the children one
               per line; staff reports list every pending top-up). */}
-          <NotificationBody message={data.message} className="mt-5 border-t border-line pt-5" />
+          <NotificationBody message={data.message} className="mt-6" />
 
           {data.announcement_title && (
-            <p className="mt-4 rounded-xl border border-line bg-cream-2 px-4 py-3 text-sm text-muted">
-              Comunicado relacionado: <span className="font-semibold text-ink">{data.announcement_title}</span>
+            <p className="mt-5 flex items-start gap-2 rounded-sm bg-cream px-3 py-2.5 text-sm text-muted">
+              <Megaphone size={16} className="mt-0.5 shrink-0 text-subtle" aria-hidden="true" />
+              <span>Comunicado relacionado: <span className="font-semibold text-ink">{data.announcement_title}</span></span>
             </p>
           )}
 
-          <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-4">
-            {link && (
+          {link && (
+            <div className="mt-6">
               <Link to={link.to} className="btn btn-primary min-h-[44px]">
                 {link.label} <ArrowRight size={16} aria-hidden="true" />
               </Link>
-            )}
-            <Link to="/portal/notificaciones" className="btn-outline min-h-[44px]">Volver a la lista</Link>
-          </div>
-
-          <dl className="mt-5 grid gap-2 text-xs text-subtle sm:grid-cols-2">
-            <div className="flex items-center gap-1.5">
-              <Clock size={13} aria-hidden="true" />
-              <dt className="font-semibold">Creada:</dt>
-              <dd>{created ? format(created, 'd MMM yyyy HH:mm', { locale: es }) : '—'}</dd>
             </div>
-            <div className="flex items-center gap-1.5">
-              {data.delivered_at ? <Send size={13} aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}
-              <dt className="font-semibold">Envío:</dt>
-              <dd>
-                {data.delivered_at
-                  ? `Correo y push enviados el ${format(new Date(data.delivered_at), 'd MMM yyyy HH:mm', { locale: es })}`
-                  : 'Solo en el portal (sin envío externo)'}
-              </dd>
-            </div>
-          </dl>
+          )}
         </Card>
       )}
     </>

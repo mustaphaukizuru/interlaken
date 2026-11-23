@@ -10,7 +10,7 @@ import { daysSince } from './format';
 export function DraftAgeBanner({ since, canPublish, onReview, now }: { since: string; canPublish: boolean; onReview: () => void; now?: number }) {
   const days = daysSince(since, now);
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-amber/40 bg-amber/[0.08] p-3 text-sm md:flex-row md:items-center md:justify-between" role="status">
+    <div className="flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] p-3 text-sm md:flex-row md:items-center md:justify-between" role="status">
       <p className="flex items-start gap-2 text-ink">
         <Clock size={17} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />
         <span>

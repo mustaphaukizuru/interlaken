@@ -173,7 +173,7 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
               Encabezados:{' '}
               {headers.map((h, i) => (
                 <span key={h.key}>
-                  <code className={`rounded bg-cream-2 px-1 ${h.required ? 'font-semibold text-ink' : ''}`}>{h.key}</code>
+                  <code className={`rounded-sm bg-cream-2 px-1 ${h.required ? 'font-semibold text-ink' : ''}`}>{h.key}</code>
                   {i < headers.length - 1 ? ', ' : ''}
                 </span>
               ))}
@@ -196,7 +196,7 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            className={`rounded-xl2 border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-purple bg-brand-50' : 'border-line bg-cream-2'}`}
+            className={`rounded-md border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-purple bg-brand-50' : 'border-line bg-cream-2'}`}
           >
             <FileUp size={28} aria-hidden="true" className="mx-auto mb-2 text-purple" />
             <p className="text-sm text-ink">Arrastre aquí su archivo .csv o .xlsx</p>
@@ -214,11 +214,11 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
       {step === 2 && preview && counts && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar por resultado">
-            <button type="button" aria-pressed={filter === null} onClick={() => setFilter(null)} className={`min-h-[36px] rounded-full px-3 text-xs font-medium ${filter === null ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'}`}>
+            <button type="button" aria-pressed={filter === null} onClick={() => setFilter(null)} className={`min-h-[36px] rounded-sm px-3 text-xs font-medium ${filter === null ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'}`}>
               Todas ({preview.total_rows})
             </button>
             {IMPORT_ACTIONS.map((a) => (
-              <button key={a} type="button" aria-pressed={filter === a} onClick={() => setFilter(filter === a ? null : a)} className={`min-h-[36px] rounded-full px-3 text-xs font-medium ${filter === a ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'}`}>
+              <button key={a} type="button" aria-pressed={filter === a} onClick={() => setFilter(filter === a ? null : a)} className={`min-h-[36px] rounded-sm px-3 text-xs font-medium ${filter === a ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'}`}>
                 {IMPORT_ACTION_META[a].label} ({counts[a]})
               </button>
             ))}
@@ -255,7 +255,7 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
       {step === 3 && preview && counts && (
         <div className="space-y-4">
           <div className="flex gap-3">
-            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand-50 text-purple">
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm bg-brand-50 text-purple">
               <Upload className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="text-sm text-muted">
@@ -269,7 +269,7 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
           </div>
           {errors > 0 && (
             <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
-              <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={validOnly} onChange={(e) => setValidOnly(e.target.checked)} />
+              <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40" checked={validOnly} onChange={(e) => setValidOnly(e.target.checked)} />
               Importar solo las filas válidas ({importable})
             </label>
           )}
@@ -285,7 +285,7 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
       {step === 4 && done && (
         <div className="space-y-4">
           <div className="flex gap-3">
-            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${done.counts.error ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-700'}`}>
+            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm ${done.counts.error ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-700'}`}>
               {done.counts.error ? <AlertTriangle className="h-5 w-5" aria-hidden="true" /> : <CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
             </span>
             <div className="text-sm text-muted" role="status">

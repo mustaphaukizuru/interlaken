@@ -86,7 +86,7 @@ export function DateRangeFilter({ value, onChange, idPrefix, className = '' }: P
             type="button"
             aria-pressed={active === p.key}
             onClick={() => onChange(p.range())}
-            className={`min-h-[32px] rounded-full px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+            className={`min-h-[32px] rounded-sm px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
               active === p.key ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'
             }`}
           >
@@ -97,7 +97,7 @@ export function DateRangeFilter({ value, onChange, idPrefix, className = '' }: P
           <button
             type="button"
             onClick={() => onChange({ from: '', to: '' })}
-            className="inline-flex min-h-[32px] items-center gap-1 rounded-full px-2.5 text-[13px] text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="inline-flex min-h-[32px] items-center gap-1 rounded-sm px-2.5 text-[13px] text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             <X size={13} aria-hidden="true" /> Limpiar
           </button>

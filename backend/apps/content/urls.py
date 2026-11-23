@@ -50,6 +50,7 @@ from .pricing_admin import (
     AdminPricingImportView,
     AdminPricingTableView,
     AdminPricingView,
+    AdminPricingYearsView,
 )
 from .views import (
     AdminCalendarBulkView,
@@ -79,6 +80,7 @@ urlpatterns = [
     path('admin/pricing/', AdminPricingView.as_view(), name='admin-pricing'),
     path('admin/pricing/export/', AdminPricingExportView.as_view(), name='admin-pricing-export'),
     path('admin/pricing/import/', AdminPricingImportView.as_view(), name='admin-pricing-import'),
+    path('admin/pricing/years/', AdminPricingYearsView.as_view(), name='admin-pricing-years'),
     path('admin/pricing/<slug:table>/', AdminPricingTableView.as_view(), name='admin-pricing-table'),
     path('calendar/', PublicCalendarView.as_view(), name='school-calendar'),
     path('calendar.ics', PublicCalendarIcsView.as_view(), name='school-calendar-ics'),

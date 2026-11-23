@@ -24,5 +24,11 @@ export interface SiteSettings {
   sep_incorporations?: { level: 'Preescolar' | 'Primaria' | 'Secundaria'; label: string }[];
   /** «Permitir iniciar la ficha sin enlace» (Ajustes): off = only the school's private link opens a ficha. */
   admissions_public_start?: boolean;
+  /** Ajustes: from which month the site announces the next school cycle ({{ciclo}}); 1 = January. */
+  admissions_next_from_month?: number;
+  /** Costos: the year each price group was published for ({fees: 2027, ...}); set in «Costos y precios». */
+  pricing_years?: Partial<Record<string, number>>;
+  /** Ajustes «Fotos de la credencial» (admin settings only): families may upload their child's photo. */
+  families_upload_photos?: boolean;
   updated_at?: string;
 }

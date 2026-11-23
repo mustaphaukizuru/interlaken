@@ -34,7 +34,7 @@ describe('AdminAudit (reference page)', () => {
   it('renders audit rows with actor, action, context and the reason-first change summary', async () => {
     renderWithProviders(<AdminAudit />, { route: '/admin/auditoria' });
     expect(await screen.findByText('ada@interlaken.mx')).toBeInTheDocument();
-    expect(screen.getByText('system')).toBeInTheDocument();
+    expect(screen.getByText('Sistema')).toBeInTheDocument();
     expect(screen.getByText('cafeteria.adjust')).toBeInTheDocument();
     expect(screen.getByText(/Motivo: Pago en caja · amount: 150.00/)).toBeInTheDocument();
     expect(screen.getByText('cafeteria.balanceadjustment#42')).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe('AdminAudit (reference page)', () => {
   it('maps the URL filters and sort onto the list request and renders the rows', async () => {
     renderWithProviders(<AdminAudit />, { route: '/admin/auditoria?actor=ana&accion=update&desde=2026-09-01&hasta=2026-09-24&orden=-date&page=2' });
     expect(await screen.findByText('ana@x.mx')).toBeInTheDocument();
-    expect(screen.getByText('system')).toBeInTheDocument();
+    expect(screen.getByText('Sistema')).toBeInTheDocument();
     expect(screen.getByText('StudentProfile#9')).toBeInTheDocument();
     expect(getAuditLog).toHaveBeenCalledWith({ page: 2, actor: 'ana', action: 'update', from: '2026-09-01', to: '2026-09-24', ordering: '-date' });
     expect(screen.getByRole('columnheader', { name: 'Fecha' })).toHaveAttribute('aria-sort', 'descending');

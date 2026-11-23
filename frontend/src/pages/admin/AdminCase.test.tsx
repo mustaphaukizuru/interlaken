@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { axe } from 'vitest-axe';
@@ -385,6 +385,30 @@ describe('AdminCase (Expediente)', () => {
       await user.click(within(voidDialog).getByRole('button', { name: 'Anular pago' }));
       await waitFor(() => expect(del).toHaveBeenCalledWith('/admissions/admin/cases/7/payments/1/', { data: { reason: 'Duplicado' } }));
     });
+
+    it('records one payment for a double click, and asks before closing a filled-in payment', async () => {
+      const user = userEvent.setup();
+      serve(ready());
+      let resolve: (v: unknown) => void = () => {};
+      post.mockImplementationOnce(() => new Promise((r) => { resolve = r; }) as never);
+      renderCase();
+      await user.click(await screen.findByRole('button', { name: /5\. Inscrito/ }));
+      await user.click(await screen.findByRole('button', { name: /Registrar pago/ }));
+      let dialog = await screen.findByRole('dialog', { name: 'Registrar pago de inscripción' });
+      await user.type(within(dialog).getByLabelText('Monto (MXN)'), '500');
+      await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+      await user.click(within(screen.getByRole('dialog', { name: '¿Descartar los cambios?' })).getByRole('button', { name: 'Seguir editando' }));
+      dialog = screen.getByRole('dialog', { name: 'Registrar pago de inscripción' });
+      const submit = within(dialog).getByRole('button', { name: 'Registrar pago' });
+      fireEvent.click(submit);
+      fireEvent.click(submit);
+      await waitFor(() => expect(post).toHaveBeenCalled());
+      await waitFor(() => expect(submit).toBeDisabled());
+      resolve({ data: { id: 2, summary: '$500.00 · transferencia' } });
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Registrar pago de inscripción' })).toBeNull());
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('dialog', { name: '¿Descartar los cambios?' })).toBeNull();
+    });
   });
 
   describe('DiscountEditor', () => {
@@ -467,6 +491,23 @@ describe('AdminCase (Expediente)', () => {
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/admissions/admin/cases/7/informes/', { parent_phone: '123' }));
     expect(await screen.findAllByText(/Escriba un celular de 10 dígitos/)).toHaveLength(2); // inline + summary
     expect(phone).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('Informes: a link away from the case asks first while «Datos de informes» has unsaved changes', async () => {
+    const user = userEvent.setup();
+    serve(makeCase('informes'));
+    renderCase();
+    const phone = await screen.findByLabelText('Celular');
+    const back = screen.getAllByRole('link').find((a) => a.getAttribute('href') === '/admin/admisiones')!;
+    await user.type(phone, '9');
+    await user.click(back);
+    const ask = screen.getByRole('dialog', { name: '¿Descartar los cambios?' });
+    await user.click(within(ask).getByRole('button', { name: 'Seguir editando' }));
+    expect(phone).toHaveValue('55123456789');
+    // Put back as it was: nothing to lose, the link just works.
+    await user.type(phone, '{Backspace}');
+    await user.click(back);
+    expect(screen.queryByRole('dialog', { name: '¿Descartar los cambios?' })).toBeNull();
   });
 
   it('Informes outcome «No le interesa» needs a reason before closing', async () => {

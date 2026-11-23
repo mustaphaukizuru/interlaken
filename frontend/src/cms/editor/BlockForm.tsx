@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, Copy, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ILLUSTRATION_OPTIONS } from '@/lib/illustrationLabels';
 import type { Block, BlockSpec, FieldSpec } from '../blocks/registry';
 import { blockSpec, withDefaults } from '../blocks/registry';
 import { emptyTable, type TableValue } from '../blocks/table';
@@ -334,7 +335,7 @@ function Field({ spec, value, onChange, path, helpPath, ctx }: FieldProps) {
       const source = from && Array.isArray(ctx.props[from.list]) ? (ctx.props[from.list] as Record<string, unknown>[]) : [];
       const options = from
         ? source.map((o) => ({ value: String(o?.[from.value] ?? ''), label: String(o?.[from.label] || o?.[from.value] || '') })).filter((o) => o.value)
-        : spec.options ?? [];
+        : spec.optionsSet === 'illustrations' ? ILLUSTRATION_OPTIONS : spec.options ?? [];
       const known = options.some((o) => o.value === str);
       control = (
         <div>
@@ -402,13 +403,13 @@ function GalleryField({ spec, value, onChange, path, ctx, hint, error }: { spec:
   const update = (i: number, patch: Partial<Img>) => onChange(list.map((it, j) => (j === i ? { ...it, ...patch } : it)));
   const id = fieldDomId(ctx.blockId, path);
   return (
-    <fieldset className={`min-w-0 space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
+    <fieldset className={`min-w-0 space-y-3 rounded-md border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}{spec.required && <span aria-hidden="true" className="text-coral-600"> *</span>} ({list.length})</legend>
       {list.map((it, i) => {
         const p = `${path}.${i}.image`;
         const { error: e, altError } = ctx.errorFor(p);
         return (
-          <div key={i} data-field-path={`${path}.${i}`} className="space-y-2 rounded-lg bg-cream-2 p-2">
+          <div key={i} data-field-path={`${path}.${i}`} className="space-y-2 rounded-sm bg-cream-2 p-2">
             <div data-field-path={p}>
               <ImageField
                 id={fieldDomId(ctx.blockId, p)}
@@ -460,13 +461,13 @@ function ItemsField({ spec, value, onChange, path, helpPath, ctx, hint, error }:
     return <Field key={sf.key} spec={sf} value={it[sf.key]} path={p} helpPath={`${helpPath}[].${sf.key}`} ctx={ctx} onChange={(v) => { ctx.edited(p); update(i, sf.key, v); }} />;
   };
   return (
-    <fieldset className={`min-w-0 space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
+    <fieldset className={`min-w-0 space-y-3 rounded-md border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}{spec.required && <span aria-hidden="true" className="text-coral-600"> *</span>} ({list.length})</legend>
       {list.map((it, i) => {
         const problems = ctx.issuesUnder(`${path}.${i}.`);
         const title = titleKey ? String(it[titleKey] ?? '').replace(/\*\*/g, '').slice(0, 48) : '';
         return (
-          <details key={i} className="group rounded-lg bg-cream-2 p-3" open={list.length <= 3} data-field-path={`${path}.${i}`}>
+          <details key={i} className="group rounded-sm bg-cream-2 p-3" open={list.length <= 3} data-field-path={`${path}.${i}`}>
             <summary className="flex min-h-[32px] cursor-pointer list-none items-center gap-2 text-xs font-semibold text-subtle">
               <ChevronRight size={14} className="shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate [contain:inline-size]">{i + 1}. {title || <span className="italic">sin título</span>}</span>
@@ -475,7 +476,7 @@ function ItemsField({ spec, value, onChange, path, helpPath, ctx, hint, error }:
             <div className="mt-3 space-y-3">
               {main.map((sf) => renderSub(sf, it, i))}
               {advanced.length > 0 && (
-                <details className="rounded-lg border border-line bg-white p-2" open={advanced.some((sf) => ctx.issuesUnder(`${path}.${i}.${sf.key}`) > 0) || undefined}>
+                <details className="rounded-sm border border-line bg-white p-2" open={advanced.some((sf) => ctx.issuesUnder(`${path}.${i}.${sf.key}`) > 0) || undefined}>
                   <summary className="flex min-h-[36px] cursor-pointer items-center text-xs font-semibold text-subtle">Avanzado</summary>
                   <div className="mt-2 space-y-3">{advanced.map((sf) => renderSub(sf, it, i))}</div>
                 </details>

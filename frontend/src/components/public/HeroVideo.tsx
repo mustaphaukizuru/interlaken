@@ -5,6 +5,24 @@ import { assetSrcSet } from '@/lib/images';
 const SOUND_KEY = 'interlaken:hero-sound';
 
 /**
+ * Portrait phone cuts of the built-in hero loops (2026-11-23). On a portrait
+ * phone the cover crop shows only the centre ~30% of a 16:9 clip, so the phone
+ * gets just that strip (406 x 720, ~0.3 MB instead of ~1 MB): sharper, a third
+ * of the data, and never a larger paint than the poster, which stays the LCP.
+ * A URL from Ajustes (no cut) plays as it is.
+ */
+const PORTRAIT_CUTS: Record<string, string> = {
+  '/assets/video/hero-home.mp4': '/assets/video/hero-home-portrait.mp4',
+};
+
+/** The file to play here: the portrait cut on a portrait phone, else the source. */
+export function videoForScreen(src: string): string {
+  const cut = PORTRAIT_CUTS[src];
+  if (!cut || typeof window.matchMedia !== 'function') return src;
+  return window.matchMedia('(orientation: portrait) and (max-width: 767px)').matches ? cut : src;
+}
+
+/**
  * True when the visitor asked us not to spend their data: Save-Data header,
  * a 2g/3g connection, or reduced motion. Those visitors keep the poster image.
  */
@@ -23,6 +41,8 @@ interface Props {
   posterSrcSet?: string;
   posterAlt: string;
   reducedMotion: boolean;
+  /** The video has an audio track: show the sound toggle. Silent loops pass false. Default true. */
+  sound?: boolean;
   /** Rendered above the media (headline, CTAs). */
   children: React.ReactNode;
   className?: string;
@@ -42,7 +62,7 @@ interface Props {
  *    session. Audio never starts on its own — that is a deliberate, one-tap opt-in.
  * 5. Playback pauses when the hero scrolls away or the tab is hidden (battery).
  */
-export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion, children, className = '' }: Props) {
+export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion, sound = true, children, className = '' }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -102,10 +122,15 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
 
   return (
     <section ref={wrapRef} className={`relative flex items-end overflow-hidden bg-dark text-white ${className}`}>
+      {/* `sizes`: the poster covers a tall box on a portrait phone, so it renders
+          about 1.65 screen heights wide, not 100vw. With 100vw the phone took the
+          480/960 px file, the browser saw an upscaled (small) image and the 1920 px
+          video's first frame became the larger paint: mobile LCP waited for the
+          whole video (Lighthouse 12.5 s). The full poster is ~80 kB. */}
       <img
         src={poster}
         srcSet={posterSrcSet ?? assetSrcSet(poster, { full: true })}
-        sizes="100vw"
+        sizes="(orientation: portrait) 165vh, 100vw"
         alt={posterAlt}
         {...{ fetchpriority: 'high' }}
         decoding="async"
@@ -117,7 +142,7 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
         <video
           ref={videoRef}
           className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 ${ready ? 'opacity-100' : 'opacity-0'}`}
-          src={src}
+          src={videoForScreen(src)}
           poster={poster}
           autoPlay
           muted
@@ -136,25 +161,25 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
       />
 
       {wanted && ready && (
-        <div className="absolute bottom-4 right-4 z-20 flex gap-2 sm:bottom-6 sm:right-6">
+        <div className="absolute bottom-4 right-4 z-10 flex gap-2 sm:bottom-6 sm:right-6">
           <button
             type="button"
             onClick={togglePlay}
             aria-label={paused ? 'Reanudar el video' : 'Pausar el video'}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-11 w-11 items-center justify-center rounded-sm border border-white/25 bg-black/35 text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
           </button>
-          <button
+          {sound && <button
             type="button"
             onClick={toggleSound}
             aria-pressed={!muted}
             aria-label={muted ? 'Activar el sonido del video' : 'Silenciar el video'}
-            className="flex h-11 items-center gap-2 rounded-full border border-white/25 bg-black/35 px-4 text-[13px] font-semibold text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-11 items-center gap-2 rounded-sm border border-white/25 bg-black/35 px-4 text-[13px] font-semibold text-white backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {muted ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
             <span className="hidden xs:inline">{muted ? 'Activar sonido' : 'Sonido activado'}</span>
-          </button>
+          </button>}
         </div>
       )}
 

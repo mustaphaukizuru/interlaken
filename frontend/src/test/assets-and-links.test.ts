@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,7 +50,9 @@ describe('public assets', () => {
       const text = readFileSync(file, 'utf8');
       for (const [, name] of text.matchAll(ASSET_REF)) {
         if (name.includes('${') || name.includes('*')) continue; // covered below
-        if (!assetFiles.includes(name)) {
+        // Subfolders (assets/illustrations/…): check the file itself.
+        const exists = name.includes('/') ? existsSync(path.join(ASSETS_DIR, name)) : assetFiles.includes(name);
+        if (!exists) {
           broken.push(`${path.relative(FRONTEND, file)} -> /assets/${name}`);
         }
       }

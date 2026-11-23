@@ -64,7 +64,7 @@ function EnrollForm({ detail, isAdmin, onCancel, onDone }: {
       ...(override ? { override_documents: true, override_reason: reason.trim() } : {}),
     }, {
       onSuccess: (r) => {
-        if (r.unlinked?.length) toast.success('Alumno inscrito. Revise los tutores que no se vincularon.');
+        if (r.unlinked?.length) toast.success('Inscrito. Revise los tutores sin vincular.');
         else toast.success('Alumno inscrito y cuentas creadas.');
         onDone(r);
       },
@@ -94,9 +94,9 @@ function EnrollForm({ detail, isAdmin, onCancel, onDone }: {
           onChange={(e) => setGroup(e.target.value.toUpperCase())} error={errors.group} />
       </div>
       {docsMissing && isAdmin && (
-        <div className="space-y-2 rounded-xl bg-amber/10 p-3">
+        <div className="space-y-2 rounded-md bg-amber/10 p-3">
           <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm font-medium text-ink">
-            <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+            <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
               checked={override} onChange={(e) => setOverride(e.target.checked)} />
             Inscribir sin los documentos completos (administrador)
           </label>

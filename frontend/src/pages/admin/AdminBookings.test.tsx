@@ -120,6 +120,26 @@ describe('AdminBookings: reservas', () => {
     expect(screen.queryByRole('button', { name: 'Más acciones para la reserva de Carla' })).not.toBeInTheDocument();
   });
 
+  it('«Confirmar» (emails the family) runs once for a double click, and the row stays busy while another row works', async () => {
+    let resolveAna: (v: unknown) => void = () => {};
+    api.bookingAction.mockImplementationOnce(() => new Promise((r) => { resolveAna = r; }) as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    const confirmAna = screen.getByRole('button', { name: 'Confirmar la reserva de Ana' });
+    fireEvent.click(confirmAna);
+    fireEvent.click(confirmAna);
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(1, 'confirm', {}));
+    await waitFor(() => expect(confirmAna).toBeDisabled());
+    // Another row moves meanwhile: Ana's button stays busy.
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar que Beto asistió' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(2, 'attended', {}));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reserva actualizada.'));
+    expect(confirmAna).toBeDisabled();
+    resolveAna({ data: {} });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2));
+    expect(api.bookingAction.mock.calls.filter(([id]) => id === 1)).toHaveLength(1);
+  });
+
   it('below lg every move is a labelled button in the row menu, with the same names', async () => {
     stubViewport(800);
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
@@ -286,6 +306,38 @@ describe('AdminBookings: horarios', () => {
       visit_type: 'open_class', title: 'Puertas Abiertas', capacity: 30, interval_minutes: 120, start_date: '2026-09-01', end_date: '2026-09-01',
     })));
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('asks before switching tabs with «Publicar disponibilidad» half filled in; not after generating', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminBookings />, { route: ROUTE });
+    await screen.findByText('Auditorio');
+    const form = screen.getByRole('button', { name: /Generar horarios/i }).closest('form') as HTMLElement;
+    fireEvent.change(within(form).getByLabelText(/^Desde$/i), { target: { value: '2026-09-01' } });
+
+    await user.click(screen.getByRole('tab', { name: 'Reservas' }));
+    const ask = screen.getByRole('dialog', { name: '¿Descartar los cambios?' });
+    await user.click(within(ask).getByRole('button', { name: 'Seguir editando' }));
+    expect(screen.getByRole('tab', { name: 'Horarios' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(form).getByLabelText(/^Desde$/i)).toHaveValue('2026-09-01');
+
+    // Generated = saved: the tab switch no longer asks.
+    fireEvent.change(within(form).getByLabelText(/^Hasta$/i), { target: { value: '2026-09-02' } });
+    await user.click(screen.getByRole('button', { name: /Generar horarios/i }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    await user.click(screen.getByRole('tab', { name: 'Reservas' }));
+    expect(screen.queryByRole('dialog', { name: '¿Descartar los cambios?' })).toBeNull();
+    await waitFor(() => expect(api.getAdminBookings).toHaveBeenCalled());
+  });
+
+  it('«Descartar cambios» switches the tab', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminBookings />, { route: ROUTE });
+    await screen.findByText('Auditorio');
+    await user.selectOptions(screen.getByLabelText('Tipo de visita a publicar'), 'open_class');
+    await user.click(screen.getByRole('tab', { name: 'Reservas' }));
+    await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+    await waitFor(() => expect(api.getAdminBookings).toHaveBeenCalledWith({ page: 1 }));
   });
 
   it('bulk delete shows the per-row reason why a booked slot is skipped', async () => {

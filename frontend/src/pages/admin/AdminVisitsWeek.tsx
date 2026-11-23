@@ -125,39 +125,41 @@ export default function AdminVisitsWeek() {
       </div>
       {seesAdmissions && (
         <ul className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted" aria-label="Simbología">
-          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-subtle/50 bg-white" aria-hidden="true" /> Visita</li>
-          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-pink/40 bg-pink-light" aria-hidden="true" /> <PencilLine size={12} className="text-pink-dark" aria-hidden="true" /> Examen de admisión</li>
+          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border border-subtle/50 bg-white" aria-hidden="true" /> Visita</li>
+          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border border-pink/40 bg-pink-light" aria-hidden="true" /> <PencilLine size={12} className="text-pink-dark" aria-hidden="true" /> Examen de admisión</li>
           {exams.isError && <li className="text-coral-700" role="status">No se pudieron cargar los exámenes.</li>}
         </ul>
       )}
+      {/* The week wraps instead of scrolling sideways (768–1535 px): seven
+          columns only where seven fit, two or four per row before that. */}
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
-        <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
-          <div className="grid grid-cols-1 gap-2 md:min-w-[980px] md:grid-cols-7" role="list" aria-label="Días de la semana">
+        <div className="pb-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7" role="list" aria-label="Días de la semana">
             {data.days.map((d, i) => {
               const isToday = d.date === today;
               return (
-                <section key={d.date} role="listitem" className={`rounded-xl2 p-2 ${isToday ? 'bg-purple/5 ring-1 ring-purple/30' : 'bg-cream-2'}`} aria-label={`${DAY_NAMES[i]} ${d.date}`}>
+                <section key={d.date} role="listitem" className={`rounded-md p-2 ${isToday ? 'bg-purple/5 ring-1 ring-purple/30' : 'bg-cream-2'}`} aria-label={`${DAY_NAMES[i]} ${d.date}`}>
                   <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">{DAY_NAMES[i]} <span className="text-ink">{Number(d.date.slice(8))}</span></h2>
                   {d.slots.length === 0 && !(examsByDay.get(d.date)?.length) && <p className="text-[11px] text-subtle">Sin horarios</p>}
                   <ul className="space-y-2">
                     {d.slots.map((s) => (
-                      <li key={s.id} className={`rounded-xl border bg-white p-2 text-xs ${s.is_active ? 'border-line' : 'border-dashed border-line opacity-60'}`}>
+                      <li key={s.id} className={`rounded-md border bg-white p-2 text-xs ${s.is_active ? 'border-line' : 'border-dashed border-line opacity-60'}`}>
                         <p className="font-semibold text-ink">{s.start_time}–{s.end_time} <span className="font-normal text-subtle">· {s.visit_type === 'open_class' ? 'Clase abierta' : 'Individual'} · {s.booked}/{s.capacity}</span></p>
                         {s.title && <p className="truncate text-subtle">{s.title}</p>}
                         <ul className="mt-1 space-y-1">
                           {s.bookings.map((b) => (
-                            <li key={b.id} className="rounded-lg bg-cream-2 p-1.5">
+                            <li key={b.id} className="rounded-sm bg-cream-2 p-1.5">
                               <div className="flex items-center justify-between gap-1">
                                 <span className="truncate font-medium text-ink">{b.parent_name}{b.child_name ? ` · ${b.child_name}` : ''}</span>
                                 <Badge variant={BOOKING_STATUS_META[b.status as BookingStatus]?.variant ?? 'neutral'}>{BOOKING_STATUS_META[b.status as BookingStatus]?.label ?? b.status}</Badge>
                               </div>
                               {b.outcome && <p className="text-[11px] text-green-700">Resultado: {OUTCOMES.find(([k]) => k === b.outcome)?.[1] ?? b.outcome}</p>}
                               <div className="mt-1 flex flex-wrap gap-1">
-                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setMoving(b); setTargetSlot(null); }}><MoveRight size={11} className="mr-0.5 inline" aria-hidden="true" />Reprogramar</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" disabled={action.isPending && action.variables?.id === b.id} onClick={() => setNoShowFor(b)}>{action.isPending && action.variables?.id === b.id ? 'Guardando…' : 'No asistió'}</button>}
-                                {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
-                                {b.case && seesAdmissions && <Link to={`/admin/admisiones/${b.case}`} className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-purple hover:bg-white md:min-h-[32px]" aria-label={`Expediente de ${b.child_name || b.parent_name}`}><ExternalLink size={11} className="mr-0.5" aria-hidden="true" />Expediente</Link>}
+                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setMoving(b); setTargetSlot(null); }}><MoveRight size={11} className="mr-0.5 inline" aria-hidden="true" />Reprogramar</button>}
+                                {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
+                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" disabled={action.isPending && action.variables?.id === b.id} onClick={() => setNoShowFor(b)}>{action.isPending && action.variables?.id === b.id ? 'Guardando…' : 'No asistió'}</button>}
+                                {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
+                                {b.case && seesAdmissions && <Link to={`/admin/admisiones/${b.case}`} className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-purple hover:bg-white md:min-h-[32px]" aria-label={`Expediente de ${b.child_name || b.parent_name}`}><ExternalLink size={11} className="mr-0.5" aria-hidden="true" />Expediente</Link>}
                               </div>
                             </li>
                           ))}
@@ -170,7 +172,7 @@ export default function AdminVisitsWeek() {
                       {(examsByDay.get(d.date) ?? []).map((x) => (
                         <li key={x.case}>
                           <Link to={`/admin/admisiones/${x.case}`}
-                            className="block min-h-[44px] rounded-xl border border-pink/30 bg-pink-light p-2 text-xs hover:border-pink/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                            className="block min-h-[44px] rounded-md border border-pink/30 bg-pink-light p-2 text-xs hover:border-pink/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                             <span className="flex items-center gap-1 font-semibold text-pink-dark"><PencilLine size={12} aria-hidden="true" /> {x.time} · Examen</span>
                             <span className="block truncate font-medium text-ink">{x.child_name}</span>
                             <span className="block truncate text-subtle">{x.grade_applying}{x.result ? ` · ${EXAM_RESULT[x.result] ?? x.result}` : ''}</span>

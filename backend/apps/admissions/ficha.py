@@ -631,6 +631,13 @@ def _child(reg) -> str:
     return child_full_name(reg)
 
 
+def _short(reg) -> str:
+    """The applicant as family emails name them (D13): «Ana P.»."""
+    from apps.portal.emailing import name_initial
+
+    return name_initial(reg.child_first_name, reg.child_last_name) or _child(reg)
+
+
 def _who(reg) -> str:
     return reg.contact_name or reg.parent1_name
 
@@ -647,11 +654,11 @@ def email_ficha_started(reg: Registration, invite_url: str) -> None:
         title=f"Recibimos el inicio de la ficha de {reg.child_first_name}",
         intro=(
             f"Estimado/a {_who(reg)}: gracias por su interés en el Colegio Interlaken. "
-            f"Recibimos el inicio de la ficha de inscripción de {_child(reg)}. Sus datos se "
+            f"Recibimos el inicio de la ficha de inscripción de {_short(reg)}. Sus datos se "
             f"guardan en cada paso: puede continuarla aquí cuando guste."
         ),
         details=[
-            ("Alumno", _child(reg)),
+            ("Alumno", _short(reg)),
             ("Grado", reg.grade_applying),
             ("Nivel", level_label(reg.level)),
             ("Ciclo escolar", reg.cycle),
@@ -670,8 +677,9 @@ def email_ficha_started(reg: Registration, invite_url: str) -> None:
         signoff="Equipo de Admisiones",
         reason="Recibe este correo porque inició la ficha de inscripción en interlaken.edu.mx.",
     )
+    # D13: subjects carry no names (they show on lock screens and in shared inboxes).
     send_email(
-        f"Ficha de inscripción iniciada: {_child(reg)}",
+        "Ficha de inscripción iniciada",
         "",
         [reg.contact_email],
         reply_to=settings.ADMISSIONS_EMAIL,
@@ -720,7 +728,7 @@ def notify_office_ficha_started(reg: Registration) -> None:
         reason="Aviso interno del sitio del Colegio Interlaken.",
     )
     send_email(
-        f"Nueva ficha de inscripción iniciada: {_child(reg)}",
+        "Nueva ficha de inscripción iniciada",
         "",
         [recipient],
         reply_to=reg.contact_email,
@@ -737,10 +745,10 @@ def email_resume_link(reg: Registration, url: str, to: str) -> None:
         title=f"Continúe la ficha de inscripción de {reg.child_first_name}",
         intro=(
             f"Estimado/a {_who(reg)}: recibimos su solicitud para continuar la ficha de "
-            f"inscripción de {_child(reg)}. Lo que ya capturó sigue guardado."
+            f"inscripción de {_short(reg)}. Lo que ya capturó sigue guardado."
         ),
         details=[
-            ("Alumno", _child(reg)),
+            ("Alumno", _short(reg)),
             ("Grado", reg.grade_applying),
             ("El enlace vence", long_date(reg.invite_expires_at)),
         ],
@@ -754,7 +762,7 @@ def email_resume_link(reg: Registration, url: str, to: str) -> None:
         reason=ADM_REASON,
     )
     send_email(
-        f"Enlace para continuar la ficha: {_child(reg)}",
+        "Enlace para continuar la ficha",
         "",
         [to],
         reply_to=settings.ADMISSIONS_EMAIL,
@@ -771,11 +779,11 @@ def email_ficha_submitted(reg: Registration) -> None:
         tone="success",
         title=f"Recibimos la ficha de inscripción de {reg.child_first_name}",
         intro=(
-            f"Estimado/a {reg.parent1_name}: recibimos la ficha de inscripción de {_child(reg)}. "
+            f"Estimado/a {reg.parent1_name}: recibimos la ficha de inscripción de {_short(reg)}. "
             f"La revisaremos y le informaremos el resultado en un plazo de 3 a 5 días hábiles."
         ),
         details=[
-            ("Alumno", _child(reg)),
+            ("Alumno", _short(reg)),
             ("Grado", reg.grade_applying),
             ("Ciclo escolar", reg.cycle),
             ("Firmada por", reg.signed_name),
@@ -788,7 +796,7 @@ def email_ficha_submitted(reg: Registration) -> None:
         reason="Recibe este correo porque envió una ficha de inscripción al Colegio Interlaken.",
     )
     send_email(
-        f"Ficha de inscripción recibida: {_child(reg)}",
+        "Ficha de inscripción recibida",
         "",
         [reg.parent1_email],
         reply_to=settings.ADMISSIONS_EMAIL,

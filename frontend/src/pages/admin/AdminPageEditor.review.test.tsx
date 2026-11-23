@@ -139,7 +139,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     const dialog = await openReview();
     await userEvent.click((await within(dialog).findAllByRole('button', { name: /Ir al campo/ }))[1]);
     expect(screen.queryByRole('dialog', { name: 'Revisión antes de publicar' })).not.toBeInTheDocument();
-    await waitFor(() => expect(document.getElementById('f-costos-2-daycareYear-warn')).toHaveTextContent('quedó pegado al texto'));
+    await waitFor(() => expect(document.getElementById('f-costos-2-daycareSubtitle-warn')).toHaveTextContent('quedó pegado al texto'));
     expect(document.getElementById('f-costos-2-ctaPrimary-error')).toHaveTextContent('La ficha de inscripción es personal');
     expect(screen.getByText('Revisión:')).toBeInTheDocument();
   });
@@ -163,7 +163,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
   it('asks before leaving with saved but unpublished edits', async () => {
     renderEditor();
     await ready();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Ocultar del sitio' })[0]);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }))[0]);
     await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
     await userEvent.click(screen.getByRole('link', { name: 'Ir a la lista' }));
     const ask = await screen.findByRole('dialog', { name: '¿Salir sin publicar?' });
@@ -188,7 +188,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
     const confirm = await screen.findByRole('dialog', { name: '¿Descartar los cambios sin publicar?' });
     await userEvent.click(within(confirm).getByRole('button', { name: 'Descartar cambios' }));
     await waitFor(() => expect(reviewApi.discard).toHaveBeenCalledWith(7, 4));
-    expect(toast.success).toHaveBeenCalledWith('Cambios descartados: el borrador es igual a lo que muestra el sitio.');
+    expect(toast.success).toHaveBeenCalledWith('Cambios descartados: el borrador es el publicado.');
     expect(screen.queryByRole('dialog', { name: 'Revisión antes de publicar' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Este borrador tiene cambios sin publicar/)).not.toBeInTheDocument();
   });

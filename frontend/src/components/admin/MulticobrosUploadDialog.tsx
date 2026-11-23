@@ -206,7 +206,7 @@ export default function MulticobrosUploadDialog({ open, onClose }: { open: boole
           {step === 1 && (
             <div className="space-y-4">
               <h4 ref={headingRef} tabIndex={-1} className="font-semibold text-ink focus:outline-none">Elija el reporte del día</h4>
-              <p className="flex items-start gap-2 rounded-lg bg-cream px-3 py-2 text-sm text-ink">
+              <p className="flex items-start gap-2 rounded-sm bg-cream px-3 py-2 text-sm text-ink">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
                 <span>
                   <strong className="font-semibold">Dónde descargarlo:</strong> MultiCobros → Analítica → Reportes →
@@ -220,7 +220,7 @@ export default function MulticobrosUploadDialog({ open, onClose }: { open: boole
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={onDrop}
-                className={`rounded-xl2 border-2 border-dashed px-4 py-8 text-center transition-colors ${dragging ? 'border-purple bg-brand-50' : 'border-line bg-cream-2'}`}
+                className={`rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${dragging ? 'border-purple bg-brand-50' : 'border-line bg-cream-2'}`}
               >
                 <FileUp size={32} aria-hidden="true" className="mx-auto mb-3 text-purple" />
                 <p className="text-sm font-medium text-ink">Arrastre aquí el archivo «MovimientosPayworks_export…»</p>
@@ -239,7 +239,7 @@ export default function MulticobrosUploadDialog({ open, onClose }: { open: boole
                 </label>
               </div>
               {file && (
-                <div className="flex items-center gap-3 rounded-xl border border-line bg-white px-3 py-2">
+                <div className="flex items-center gap-3 rounded-md bg-white px-3 py-2 shadow-card">
                   <FileSpreadsheet className="h-5 w-5 shrink-0 text-purple" aria-hidden="true" />
                   <p className="min-w-0 flex-1 text-sm">
                     <span className="block break-all font-medium text-ink">{file.name}</span>
@@ -250,7 +250,7 @@ export default function MulticobrosUploadDialog({ open, onClose }: { open: boole
                     onClick={clearFile}
                     disabled={!!busy}
                     aria-label={`Quitar el archivo ${file.name}`}
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50"
                   >
                     <X className="h-5 w-5" aria-hidden="true" />
                   </button>
@@ -356,7 +356,7 @@ function StepIndicator({ step }: { step: Step }) {
 /** Pinned to the bottom of the dialog (the screen, on phones), above the safe area. */
 function ActionBar({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-20 -mx-4 mt-4 border-t border-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:-mx-6 sm:px-6 sm:pb-6">
+    <div className="sticky bottom-0 z-10 -mx-4 mt-4 border-t border-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:-mx-6 sm:px-6 sm:pb-6">
       <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
     </div>
   );
@@ -383,7 +383,7 @@ function VerifyActions({ count, busy, onBack, onCommit }: { count: number; busy:
 
 function ProblemBox({ problem }: { problem: McProblem }) {
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-xl border border-coral/40 bg-coral-50 px-4 py-3 text-sm text-ink">
+    <div role="alert" className="flex items-start gap-3 rounded-md border border-coral/40 bg-coral-50 px-4 py-3 text-sm text-ink">
       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-coral-700" aria-hidden="true" />
       <div className="min-w-0 space-y-1">
         <p className="font-semibold">{problem.title}</p>
@@ -425,7 +425,7 @@ function ReviewStep({ report, problem, headingRef, filter, onFilter, reconciled,
       </div>
       <StatButtons cards={cards} filter={filter} onFilter={onFilter} label="Filtrar por resultado" />
       {alarms > 0 && (
-        <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-coral/40 bg-coral-50 px-4 py-3 text-sm text-ink">
+        <div role="alert" className="flex items-start gap-2.5 rounded-md border border-coral/40 bg-coral-50 px-4 py-3 text-sm text-ink">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-coral-700" aria-hidden="true" />
           <p>
             <strong className="font-semibold">{n(alarms, 'pago no coincide', 'pagos no coinciden')} con MultiCobros.</strong>{' '}
@@ -455,7 +455,7 @@ function DoneStep({ report, onClose, headingRef, filter, onFilter, reconciled, o
   ];
   return (
     <div className="flex min-h-0 flex-auto flex-col gap-4">
-      <div role="status" className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+      <div role="status" className={`flex items-start gap-3 rounded-md border px-4 py-3 text-sm ${
         verified ? 'border-green-600/25 bg-green-50 text-green-800' : 'border-line bg-cream text-ink'}`}>
         {verified
           ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
@@ -503,7 +503,7 @@ function StatButtons({ cards, filter, onFilter, label }: { cards: StatCard[]; fi
             type="button"
             aria-pressed={active}
             onClick={() => onFilter(active ? 'all' : key)}
-            className={`relative flex min-h-[72px] items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 focus-visible:ring-offset-2 ${CARD_TONE[tone]} ${
+            className={`relative flex min-h-[72px] items-start gap-2 rounded-sm border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 focus-visible:ring-offset-2 ${CARD_TONE[tone]} ${
               active ? 'ring-2 ring-purple ring-offset-1' : 'hover:border-purple/50'}`}
           >
             <Icon className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -576,7 +576,7 @@ function Rows({ rows, done, filter, onFilter, reconciled, onReconcile }: ListPro
         </p>
       )}
       {matching.length === 0 ? (
-        <div className="rounded-xl2 border border-line bg-cream px-4 py-8 text-center text-sm text-muted">
+        <div className="rounded-md bg-cream px-4 py-8 text-center text-sm text-muted">
           <ListChecks className="mx-auto mb-2 h-6 w-6" aria-hidden="true" /> Nada con este filtro.
         </div>
       ) : (
@@ -584,7 +584,7 @@ function Rows({ rows, done, filter, onFilter, reconciled, onReconcile }: ListPro
           {/* Below 768 px: one card per operation, nothing scrolls sideways. */}
           {!isTable && <ul className="space-y-2" aria-label="Operaciones del reporte">
             {visible.map((r) => (
-              <li key={rowKey(r)} className={`rounded-xl2 border border-line p-3 ${tint(r) || 'bg-white'}`}>
+              <li key={rowKey(r)} className={`rounded-md border border-line p-3 ${tint(r) || 'bg-white'}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">{who(r)}</div>
                   <span className="shrink-0 text-right font-semibold tabular-nums text-ink">{r.amount ? formatMXN(r.amount) : '-'}</span>

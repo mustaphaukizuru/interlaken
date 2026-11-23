@@ -24,9 +24,9 @@ export const sections = [
       bg: 'white', labelClass: 'section-label-pink', eyebrow: 'Aula digital', title: 'Para alumnos y docentes',
       text: 'Classroom, correo institucional y registro de dispositivos.', columns: '3',
       items: [
-        { name: 'Google Classroom', text: 'Aulas virtuales del colegio: tareas, materiales y seguimiento de cada clase.', href: 'https://classroom.google.com/', icon: 'GraduationCap', cta: 'Abrir Classroom' },
-        { name: 'Gmail institucional', text: 'Correo electrónico oficial de alumnos y docentes (@interlaken).', href: 'https://www.gmail.com/', icon: 'Mail', cta: 'Abrir Gmail' },
-        { name: 'Mosyle — registro de iPad', text: 'Inscripción del iPad al sistema del colegio para usarlo en el salón de clases.', href: 'https://enroll.mosyle.com/?account=interlaken', icon: 'Tablet', cta: 'Registrar iPad' },
+        { name: 'Google Classroom', text: 'Aulas virtuales del colegio: tareas, materiales y seguimiento de cada clase.', href: 'https://classroom.google.com/', icon: 'GraduationCap', cta: 'Abrir Classroom', illustration: 'tareas' },
+        { name: 'Gmail institucional', text: 'Correo electrónico oficial de alumnos y docentes (@interlaken).', href: 'https://www.gmail.com/', icon: 'Mail', cta: 'Abrir Gmail', illustration: 'mensaje' },
+        { name: 'Mosyle — registro de iPad', text: 'Inscripción del iPad al sistema del colegio para usarlo en el salón de clases.', href: 'https://enroll.mosyle.com/?account=interlaken', icon: 'Tablet', cta: 'Registrar iPad', illustration: 'tecnologia' },
       ],
       note: '',
     },
@@ -45,7 +45,7 @@ export const templates = [{
         bg: 'cream', labelClass: 'section-label-green', eyebrow: 'Familias', title: 'Para padres',
         text: 'Acompañamiento para la crianza y la vida familiar.', columns: '3',
         items: [
-          { name: 'Educar es Padre', text: 'Cursos y contenidos diseñados para fortalecer la dinámica familiar y acompañar la crianza.', href: 'https://educarespadre.com/', icon: 'HeartHandshake', cta: 'Ir a Educar es Padre' },
+          { name: 'Educar es Padre', text: 'Cursos y contenidos diseñados para fortalecer la dinámica familiar y acompañar la crianza.', href: 'https://educarespadre.com/', icon: 'HeartHandshake', cta: 'Ir a Educar es Padre', illustration: 'comunidad' },
         ],
         note: '¿Necesita recuperar un acceso o una contraseña? Escríbanos por WhatsApp o al correo de su nivel; vea [Contacto](/contacto). Los pagos de colegiaturas y cafetería están en [Colegiaturas y cafetería](/pagos).',
       },

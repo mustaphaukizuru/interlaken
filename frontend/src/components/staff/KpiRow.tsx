@@ -3,7 +3,6 @@ import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { ArrowDownRight, ArrowUpRight, ExternalLink, type LucideIcon,
          CreditCard, FileSearch, Gavel, UserPlus } from 'lucide-react';
 import { fmtInt, fmtMXN, fmtPct, getChartTheme } from '@/lib/chartTheme';
-import { usePrefersDark } from '@/hooks/useMediaQuery';
 import { useAuthStore } from '@/store/authStore';
 import type { AnalyticsPayload } from '@/types/analytics';
 
@@ -20,16 +19,16 @@ const djangoAdmin = (path: string) =>
 
 function Delta({ pct, label }: { pct: number | null; label: string }) {
   if (pct === null) {
-    return <span className="text-[11px] text-subtle dark:text-white/45">{label}</span>;
+    return <span className="text-[11px] text-subtle">{label}</span>;
   }
   const up = pct >= 0;
   return (
     <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${
-      up ? 'text-green-dark dark:text-green-bright' : 'text-coral-dark dark:text-coral-light'
+      up ? 'text-green-dark' : 'text-coral-dark'
     }`}>
       {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
       {fmtPct(pct)}
-      <span className="ml-1 font-normal text-subtle dark:text-white/45">{label}</span>
+      <span className="ml-1 font-normal text-subtle">{label}</span>
     </span>
   );
 }
@@ -80,8 +79,8 @@ function pctChange(current: number, previous: number): number | null {
 }
 
 export default function KpiRow({ data }: { data: AnalyticsPayload }) {
-  const dark = usePrefersDark();
-  const theme = getChartTheme(dark);
+  // Light theme only (the app has no dark mode): never follow the OS setting.
+  const theme = getChartTheme(false);
   // Staff see this row on /staff but cannot open /admin/* (ProtectedRoute
   // bounces them back) nor the Django admin, so their cards are plain tiles.
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
@@ -149,13 +148,13 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
         const body = (
           <>
             <div className="flex items-center gap-2">
-              <Icon size={16} className="text-muted dark:text-white/60" aria-hidden="true" />
-              <span className="flex-1 text-xs font-medium text-muted dark:text-white/60">
+              <Icon size={16} className="text-muted" aria-hidden="true" />
+              <span className="flex-1 text-xs font-medium text-muted">
                 {title}
               </span>
-              {isAdmin && <ExternalLink size={13} className="text-subtle opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/45" aria-hidden="true" />}
+              {isAdmin && <ExternalLink size={16} className="text-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />}
             </div>
-            <div className="mt-2 font-head text-2xl font-bold tabular-nums text-ink dark:text-white">
+            <div className="mt-2 font-head text-2xl font-bold tabular-nums text-ink">
               {value}
             </div>
             <div className="mt-1">
@@ -164,9 +163,11 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
             {spark && <div className="mt-2"><Sparkline points={spark.points} color={spark.color} /></div>}
           </>
         );
-        const cls = 'group block min-w-0 rounded-xl2 border border-line bg-white p-4 shadow-card transition-colors hover:border-purple/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 dark:border-white/10 dark:bg-dark-card dark:shadow-none dark:hover:border-white/25';
+        // Borderless surface; only a real link reacts to hover.
+        const tile = 'block min-w-0 rounded-md bg-white p-4 shadow-card';
+        const cls = `group ${tile} transition-shadow hover:shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50`;
         if (!isAdmin) {
-          return <div key={key} className={cls}>{body}</div>;
+          return <div key={key} className={tile}>{body}</div>;
         }
         return to ? (
           <Link key={key} to={to} className={cls} aria-label={`${title} — abrir vista`}>{body}</Link>

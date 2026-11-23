@@ -128,7 +128,7 @@ export function RegistrationReviewModal({ id, open, onClose }: {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
               Consentimientos
             </p>
-            <div className="space-y-2 rounded-xl border border-line px-3 py-3 text-sm">
+            <div className="space-y-2 rounded-md border border-line px-3 py-3 text-sm">
               <ConsentRow
                 ok={!!data.privacy_accepted_at}
                 label="Aviso de Privacidad"
@@ -214,7 +214,7 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
   });
 
   return (
-    <div className="rounded-xl2 border border-line bg-cream/40 p-4 space-y-3">
+    <div className="rounded-md bg-cream/40 p-4 space-y-3">
       <div>
         <label htmlFor="reg-status" className="label">Estado de la revisión</label>
         <select id="reg-status" className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -243,7 +243,7 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
       </div>
       {emailsFamily ? (
         <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
-          <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+          <input type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
             checked={notify} onChange={(e) => setNotify(e.target.checked)} />
           Notificar a la familia por correo
         </label>

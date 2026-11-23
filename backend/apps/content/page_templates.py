@@ -41,19 +41,20 @@ def has_template(slug: str) -> bool:
     return slug in template_manifest()
 
 
-def expand_tokens(text: str, today: date | None = None) -> str:
-    """``{{ciclo}}`` → the school year (2026 and 2027 joined like CURRENT_CYCLE), ``{{anios}}`` → years since the school was founded."""
-    if not text or '{{' not in text:
-        return text or ''
-    year = (today or date.today()).year
-    values = {'ciclo': f'{year}\u2013{year + 1}', 'anios': str(year - FOUNDED_YEAR)}
-    return _TOKEN_RE.sub(lambda m: values[m.group(1)], text)
+def expand_tokens(text: str, today: date | None = None, *, costos: bool = False) -> str:
+    """``{{ciclo}}``: the school cycle the site announces (Costos: the cycle of its
+    published prices); ``{{anios}}``: years since the school was founded (site_years)."""
+    from .site_years import expand_tokens as expand
+    return expand(text, today, costos=costos)
 
 
-def template_seo(slug: str, today: date | None = None) -> dict[str, str]:
-    """{title, description} the site shows for a designed page without CMS SEO ('' when none)."""
+def template_seo(slug: str, today: date | None = None, *, expand: bool = True) -> dict[str, str]:
+    """{title, description} the site shows for a designed page without CMS SEO ('' when none).
+
+    ``expand=False`` keeps the tokens (the server head expands them on every request)."""
     seo = (template_manifest().get(slug) or {}).get('seo') or {}
-    return {k: expand_tokens(str(seo.get(k) or ''), today) for k in ('title', 'description')}
+    raw = {k: str(seo.get(k) or '') for k in ('title', 'description')}
+    return {k: expand_tokens(v, today, costos=slug == 'costos') for k, v in raw.items()} if expand else raw
 
 
 def full_title(title: str) -> str:

@@ -22,8 +22,8 @@ export const sections = [
     defaults: {
       bg: 'cream', labelClass: 'section-label-green', eyebrow: 'Familias', title: 'Para familias', text: '', columns: '2',
       items: [
-        { name: 'Colegiaturas y boletas', text: 'Pague con tarjeta, sin filas en el banco, y consulte las boletas de calificaciones de sus hijos.', href: 'https://interlaken.servoescolar.mx/', icon: 'CreditCard', cta: 'Ir a colegiaturas y boletas' },
-        { name: 'Cafetería', text: 'Consulte el saldo de cafetería de sus hijos y haga recargas en línea.', href: '/login', icon: 'Coffee', cta: 'Entrar a Cafetería' },
+        { name: 'Colegiaturas y boletas', text: 'Pague con tarjeta, sin filas en el banco, y consulte las boletas de calificaciones de sus hijos.', href: 'https://interlaken.servoescolar.mx/', icon: 'CreditCard', cta: 'Ir a colegiaturas y boletas', illustration: 'pagos' },
+        { name: 'Cafetería', text: 'Consulte el saldo de cafetería de sus hijos y haga recargas en línea.', href: '/login', icon: 'Coffee', cta: 'Entrar a Cafetería', illustration: 'cafeteria' },
       ],
       note: '¿Necesita factura de un pago? Solicítela en [Facturación](/comunidad/facturacion).',
     },

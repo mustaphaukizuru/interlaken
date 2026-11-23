@@ -58,7 +58,7 @@ export default function ComunicadoDetailPage() {
       qc.invalidateQueries({ queryKey: ['announcement', annId] });
       toast.success('Comentario publicado');
     },
-    onError: () => toast.error('No se pudo publicar el comentario. Intenta de nuevo.'),
+    onError: () => toast.error('No se pudo publicar el comentario. Intente de nuevo.'),
   });
 
   const submit = (e: FormEvent) => {
@@ -82,17 +82,17 @@ export default function ComunicadoDetailPage() {
         <div className="card">
           <ErrorState
             title="Comunicado no disponible"
-            description="No se encontró el comunicado o no tienes acceso a él."
+            description="No se encontró el comunicado o no tiene acceso a él."
             onRetry={() => ann.refetch()}
           />
         </div>
       ) : ann.isLoading ? (
-        <div className="skeleton h-40 rounded-xl2" aria-hidden="true" />
+        <div className="skeleton h-40 rounded-md" aria-hidden="true" />
       ) : ann.data ? (
         <div className="space-y-5">
-          <article className="rounded-xl2 border border-line bg-white p-5 shadow-card sm:p-6">
+          <article className="rounded-md bg-white p-5 shadow-card sm:p-6">
             <div className="mb-3 flex items-center gap-2">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-pink to-purple text-white">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-pink to-purple text-white">
                 <Megaphone className="h-5 w-5" />
               </span>
               <span className="badge-purple">{audienceLabel[ann.data.audience] ?? ann.data.audience}</span>
@@ -112,7 +112,7 @@ export default function ComunicadoDetailPage() {
               </ul>
             )}
             {ann.data.requires_ack && (
-              <div className="mt-5 rounded-xl border border-purple/30 bg-purple/5 p-3">
+              <div className="mt-5 rounded-md border border-purple/30 bg-purple/5 p-3">
                 {ann.data.acknowledged ? (
                   <p className="inline-flex items-center gap-2 text-sm font-semibold text-green-700"><CheckCircle2 size={16} aria-hidden="true" /> Enterado, gracias.</p>
                 ) : (
@@ -128,14 +128,14 @@ export default function ComunicadoDetailPage() {
           <SectionCard title={`Comentarios${comments.data ? ` (${comments.data.length})` : ''}`}>
             <div className="p-5">
               <form onSubmit={submit} className="mb-5 flex flex-col gap-2">
-                <label htmlFor="comment-body" className="sr-only">Escribe un comentario</label>
+                <label htmlFor="comment-body" className="sr-only">Escriba un comentario</label>
                 <textarea
                   id="comment-body"
                   value={body}
                   onChange={e => setBody(e.target.value)}
                   rows={3}
                   maxLength={2000}
-                  placeholder="Escribe un comentario o una pregunta…"
+                  placeholder="Escriba un comentario o una pregunta…"
                   className="input-field resize-y"
                 />
                 <div className="flex justify-end">
@@ -151,13 +151,13 @@ export default function ComunicadoDetailPage() {
               </form>
 
               {comments.isLoading ? (
-                <div className="space-y-3">{[0, 1].map(i => <div key={i} className="skeleton h-14 rounded-xl2" />)}</div>
+                <div className="space-y-3">{[0, 1].map(i => <div key={i} className="skeleton h-14 rounded-md" />)}</div>
               ) : !comments.data?.length ? (
                 <SectionEmpty icon={MessageCircle}>Sé el primero en comentar</SectionEmpty>
               ) : (
                 <ul className="space-y-3">
                   {comments.data.map(c => (
-                    <li key={c.id} className="rounded-xl2 border border-line bg-cream-2 px-4 py-3">
+                    <li key={c.id} className="rounded-md bg-cream-2 px-4 py-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[13px] font-semibold text-ink">{c.author_name}</span>
                         <span className="text-[11px] text-subtle">

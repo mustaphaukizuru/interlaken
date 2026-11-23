@@ -22,8 +22,14 @@ export interface PricingImportResult {
   ignored_sheets: string[];
 }
 
+/** Year each Costos group was published for, and the month the site announces the next cycle (Ajustes). */
+export interface PriceYearsPayload { years: Partial<Record<string, number>>; admissions_next_from_month: number }
+
 export const pricingAdminApi = {
   list: () => api.get<{ tables: Record<PricingTableKey, PricingTablePayload> }>('/content/admin/pricing/'),
+  /** «Publicar precios del ciclo»: GET the years; PATCH marks groups as published for a year (audited). */
+  years: () => api.get<PriceYearsPayload>('/content/admin/pricing/years/'),
+  setYears: (years: Partial<Record<string, number>>) => api.patch<PriceYearsPayload>('/content/admin/pricing/years/', { years }),
   save: (tables: Partial<Record<PricingTableKey, { rows: PricingRowData[]; version: string }>>, source: 'editor' | 'import' = 'editor') =>
     api.put<PricingSaveResult>('/content/admin/pricing/', { tables, source }),
   exportXlsx: () => api.get<Blob>('/content/admin/pricing/export/', { responseType: 'blob' }),

@@ -28,7 +28,7 @@ export function ColumnControls({ columns, prefs, className = '' }: Props) {
   const hideable = columns.filter((c) => c.hideable);
   const hiddenCount = hideable.filter((c) => prefs.isHidden(c.id)).length;
   const iconBtn =
-    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px]';
+    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px]';
 
   return (
     <div className={`flex items-center gap-1 ${className}`.trim()} role="group" aria-label="Opciones de la tabla">
@@ -71,10 +71,10 @@ export function ColumnControls({ columns, prefs, className = '' }: Props) {
                 const checked = !c.hideable || !prefs.isHidden(c.id);
                 return (
                   <li key={c.id}>
-                    <label className={`flex min-h-[40px] cursor-pointer items-center gap-2.5 rounded-lg px-2 text-sm text-ink hover:bg-cream-2 ${c.hideable ? '' : 'cursor-default opacity-60'}`}>
+                    <label className={`flex min-h-[40px] cursor-pointer items-center gap-2.5 rounded-sm px-2 text-sm text-ink hover:bg-cream-2 ${c.hideable ? '' : 'cursor-default opacity-60'}`}>
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                        className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                         checked={checked}
                         disabled={!c.hideable}
                         onChange={() => prefs.toggleColumn(c.id)}
@@ -94,7 +94,7 @@ export function ColumnControls({ columns, prefs, className = '' }: Props) {
                     type="button"
                     aria-pressed={prefs.density === d}
                     onClick={() => prefs.setDensity(d)}
-                    className={`min-h-[36px] flex-1 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+                    className={`min-h-[36px] flex-1 rounded-sm px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                       prefs.density === d ? 'bg-purple text-white' : 'bg-cream-2 text-muted hover:text-ink'
                     }`}
                   >
@@ -108,7 +108,7 @@ export function ColumnControls({ columns, prefs, className = '' }: Props) {
                 type="button"
                 onClick={prefs.reset}
                 disabled={!prefs.dirty}
-                className="flex min-h-[40px] w-full items-center gap-2 rounded-lg px-2 text-sm text-muted hover:bg-cream-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-[40px] w-full items-center gap-2 rounded-sm px-2 text-sm text-muted hover:bg-cream-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RotateCcw size={14} aria-hidden="true" /> Restablecer
               </button>

@@ -3,15 +3,18 @@
  * The booking widget (calendar, time slots, form, confirmation) is a locked
  * section that owns its own state; its titles and messages are editable.
  * The open slots are edited in Visitas (availability).
+ *
+ * Media round (owner 2026-11-22): the steps are small illustrated cards, the
+ * empty form side and the WhatsApp box carry an illustration, and a row of
+ * the school's photos closes the page. The booking logic is untouched.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import toast from 'react-hot-toast';
-import { CalendarDays, Clock, MapPin, CheckCircle, MessageCircle } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Clock, MapPin, CheckCircle, MessageCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { bookingsApi } from '@/services/api';
@@ -24,12 +27,19 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
+import { Illustration, wash } from '@/components/ui/Illustration';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
+import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import type { AvailabilitySlot } from '@/types';
-import { useCmsImage, useTokens, type CmsLink } from '../runtime';
+import { imageSrc, imageSrcSet, useCmsImage, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('visita');
+
+/** The one chosen in the editor; «none» hides it; nothing chosen (saved before the field existed) keeps the built-in one. */
+const artOf = (chosen: unknown, fallback?: IllustrationName): IllustrationName | undefined =>
+  chosen === 'none' ? undefined : isIllustration(chosen) ? chosen : fallback;
+const ART_HINT = 'Sin elegir, se muestra la de siempre. «Sin ilustración» la oculta.';
 
 /* ── Portada ────────────────────────────────────────────────────────────── */
 interface HeroProps { label?: string; title?: string; subtitle?: string; image?: number | string }
@@ -49,29 +59,51 @@ function VisitHeroView(p: HeroProps) {
 
 /* ── Cómo funciona ──────────────────────────────────────────────────────── */
 // Cómo funciona: fecha → confirmación → examen de valoración (the ficha comes after admission)
-function VisitStepsView(p: { items?: { text?: string }[]; link?: CmsLink }) {
+interface VisitStep { text?: string; illustration?: string }
+/** Each step's illustration when none is chosen, by its place: calendar, confirmation e-mail, exam. */
+const VISIT_STEP_ART: IllustrationName[] = ['agenda', 'mensaje', 'examen'];
+const VISIT_STEP_TINT = ['var(--green)', 'var(--purple)', 'var(--pink)'];
+
+/** Three small illustrated cards: short, so the calendar stays near the top. */
+function VisitStepsView(p: { items?: VisitStep[]; link?: CmsLink }) {
   const t = useTokens();
   const link = asLink(p.link);
   return (
     <section className="border-b border-line bg-cream-2">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 gap-3 px-4 py-5 text-sm sm:grid-cols-3 sm:px-6">
-        {asList<{ text?: string }>(p.items).map((s, i) => (
-          <div key={i} className="flex items-start gap-2.5 text-ink">
-            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-strong text-xs font-bold text-white">{i + 1}</span>
-            <span>{t(s.text)}</span>
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          {asList<VisitStep>(p.items).map((s, i) => {
+            const art = artOf(s.illustration, VISIT_STEP_ART[i]);
+            return (
+              <li key={i} className="flex items-center gap-4 rounded-md bg-white p-3 pr-4 shadow-card">
+                <span className="relative flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-sm" style={{ background: wash(VISIT_STEP_TINT[i % VISIT_STEP_TINT.length], 12) }}>
+                  {art && <Illustration name={art} size={64} fluid className="w-[54px]" />}
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full bg-green-strong text-xs font-bold text-white ${art ? 'absolute -left-1.5 -top-1.5' : ''}`}>{i + 1}</span>
+                </span>
+                <span className="text-base leading-snug text-ink">{t(s.text)}</span>
+              </li>
+            );
+          })}
+        </ol>
+        {link.href && (
+          <div className="mt-3">
+            <CmsAnchor link={{ ...link, label: t(link.label) }} className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-green-dark hover:underline" />
           </div>
-        ))}
+        )}
       </div>
-      {link.href && (
-        <div className="max-w-6xl mx-auto px-4 pb-5 sm:px-6">
-          <CmsAnchor link={{ ...link, label: t(link.label) }} className="text-sm font-semibold text-green-dark hover:underline" />
-        </div>
-      )}
     </section>
   );
 }
 
 /* ── Reserva (bloqueado) ────────────────────────────────────────────────── */
+interface VisitPhoto { image?: number | string; caption?: string }
+/** The school's photos under the booking (each caption is the photo's alt text). */
+const VISIT_PHOTOS: VisitPhoto[] = [
+  { image: '/assets/facade-sign.webp', caption: 'Fachada del Colegio Interlaken con su letrero' },
+  { image: '/assets/court-primaria.webp', caption: 'Patio de Primaria con cancha techada y murales de colores' },
+  { image: '/assets/classroom.webp', caption: 'Pasillo de los salones de clase' },
+];
+
 // Rules stay in code; each message is the prop that words it (errName...).
 const schema = z.object({
   parent_name:  z.string().min(3, 'errName'),
@@ -92,6 +124,8 @@ interface BookingProps {
   emptyTitle?: string; emptyText?: string; errorTitle?: string; errorText?: string;
   whatsappTitle?: string; whatsappText?: string; whatsappLabel?: string; whatsappMessage?: string;
   contactLabel?: string;
+  hintIllustration?: string; whatsappIllustration?: string;
+  photosTitle?: string; photos?: VisitPhoto[];
   [copy: string]: unknown;
 }
 function VisitBookingView(p: BookingProps) {
@@ -110,6 +144,11 @@ function VisitBookingView(p: BookingProps) {
   const leadToken = searchParams.get('lead')?.trim() ?? '';
   const whatsappText = t(p.whatsappMessage);
   const whatsappLabel = t(p.whatsappLabel) || 'Reservar por WhatsApp';
+  const hintArt = artOf(p.hintIllustration, 'visita');
+  const waArt = artOf(p.whatsappIllustration, 'informes');
+  const altOf = useMediaAlt();
+  // Saved before the field existed: the built-in photos; an emptied list hides the row.
+  const photos = (p.photos === undefined ? VISIT_PHOTOS : asList<VisitPhoto>(p.photos)).filter((ph) => ph.image);
 
   const { data: slots, isLoading, isError, refetch } = useQuery<AvailabilitySlot[]>({
     queryKey: ['availability', 'individual'],
@@ -149,8 +188,15 @@ function VisitBookingView(p: BookingProps) {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
+  // The outcome shows on the page: the confirmation replaces the form, a
+  // failure sits above the button (react-hook-form focuses the first invalid field).
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (confirmed || bookingError) resultRef.current?.focus(); }, [confirmed, bookingError]);
+
   const onSubmit = async (values: FormData) => {
     if (!selectedSlot) return;
+    setBookingError(null);
     try {
       await bookingsApi.createBooking({
         slot: selectedSlot.id,
@@ -168,7 +214,7 @@ function VisitBookingView(p: BookingProps) {
       setSelectedDate(null);
       reset();
     } catch (err: any) {
-      toast.error(
+      setBookingError(
         err?.response?.data?.detail ??
           (c('bookingError') || 'No fue posible completar la reserva. Intente de nuevo.'),
       );
@@ -178,9 +224,9 @@ function VisitBookingView(p: BookingProps) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {confirmed ? (
-        <div className="text-center py-12 sm:py-16" role="status">
-          <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-brand-600" />
+        <div ref={resultRef} tabIndex={-1} className="text-center py-12 sm:py-16 focus:outline-none" role="status">
+          <div className="w-16 h-16 bg-success-bg rounded-sm flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-success" aria-hidden="true" />
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-2">{t(p.confirmedTitle) || '¡Visita confirmada!'}</h2>
           <p className="text-muted mb-1">
@@ -208,42 +254,47 @@ function VisitBookingView(p: BookingProps) {
               {p.pickTitle && <h2 className="font-semibold text-fluid-lg text-ink mb-4">{t(p.pickTitle)}</h2>}
               {isLoading ? (
                 <div className="space-y-3" aria-busy="true" aria-label="Cargando horarios">
-                  <div className="skeleton h-10 w-48 rounded-lg" />
-                  <div className="skeleton h-[280px] rounded-xl2" />
+                  <div className="skeleton h-10 w-48 rounded-sm" />
+                  <div className="skeleton h-[280px] rounded-md" />
                   <div className="flex gap-2">
-                    <div className="skeleton h-11 w-20 rounded-xl" />
-                    <div className="skeleton h-11 w-20 rounded-xl" />
-                    <div className="skeleton h-11 w-20 rounded-xl" />
+                    <div className="skeleton h-11 w-20 rounded-md" />
+                    <div className="skeleton h-11 w-20 rounded-md" />
+                    <div className="skeleton h-11 w-20 rounded-md" />
                   </div>
                 </div>
               ) : isError ? (
-                <ErrorState
-                  title={t(p.errorTitle) || 'No fue posible cargar los horarios'}
-                  description={t(p.errorText) || undefined}
-                  onRetry={() => refetch()}
-                />
+                // On a white card like the calendar and the form side, so both columns match.
+                <div className="rounded-md bg-white px-4 shadow-card">
+                  <ErrorState
+                    title={t(p.errorTitle) || 'No fue posible cargar los horarios'}
+                    description={t(p.errorText) || undefined}
+                    onRetry={() => refetch()}
+                  />
+                </div>
               ) : !calendarDays.length ? (
-                <EmptyState
-                  icon={CalendarDays}
-                  title={t(p.emptyTitle) || 'Sin horarios disponibles'}
-                  description={t(p.emptyText)}
-                  action={
-                    whatsapp_number ? (
-                      <a
-                        href={waHref(whatsapp_number, whatsappText)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-green inline-flex min-h-[44px] items-center"
-                      >
-                        <MessageCircle className="h-4 w-4" /> {whatsappLabel}
-                      </a>
-                    ) : (
-                      <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
-                        {t(p.contactLabel) || 'Contactar al colegio'}
-                      </Link>
-                    )
-                  }
-                />
+                <div className="rounded-md bg-white px-4 shadow-card">
+                  <EmptyState
+                    icon={CalendarDays}
+                    title={t(p.emptyTitle) || 'Sin horarios disponibles'}
+                    description={t(p.emptyText)}
+                    action={
+                      whatsapp_number ? (
+                        <a
+                          href={waHref(whatsapp_number, whatsappText)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-green inline-flex min-h-[44px] items-center"
+                        >
+                          <MessageCircle className="h-4 w-4" aria-hidden="true" /> {whatsappLabel}
+                        </a>
+                      ) : (
+                        <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
+                          {t(p.contactLabel) || 'Contactar al colegio'}
+                        </Link>
+                      )
+                    }
+                  />
+                </div>
               ) : (
                 <div className="space-y-4">
                   <MonthCalendar
@@ -255,7 +306,7 @@ function VisitBookingView(p: BookingProps) {
                   />
 
                   {selectedDate && (
-                    <div className="rounded-xl2 border border-line bg-white p-4 shadow-card">
+                    <div className="rounded-md bg-white p-4 shadow-card">
                       <p className="mb-3 flex items-center gap-2 text-sm font-semibold capitalize text-ink">
                         <CalendarDays className="h-4 w-4 text-purple" aria-hidden="true" />
                         {format(parseISO(selectedDate), "EEEE d 'de' MMMM", { locale: es })}
@@ -266,13 +317,13 @@ function VisitBookingView(p: BookingProps) {
                             key={slot.id}
                             type="button"
                             onClick={() => setSelectedSlot(slot)}
-                            className={`flex min-h-[44px] items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
+                            className={`flex min-h-[44px] items-center gap-1.5 rounded-sm border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
                               selectedSlot?.id === slot.id
                                 ? 'border-purple bg-purple text-white shadow-purple'
                                 : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50'
                             }`}
                           >
-                            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Clock className="h-4 w-4" aria-hidden="true" />
                             {slot.start_time.slice(0, 5)}
                           </button>
                         ))}
@@ -287,37 +338,45 @@ function VisitBookingView(p: BookingProps) {
             <div>
               {p.formTitle && <h2 className="font-semibold text-fluid-lg text-ink mb-4">{t(p.formTitle)}</h2>}
               {!selectedSlot ? (
-                <div className="card bg-cream border-dashed border-2 border-line text-center py-10 text-subtle text-sm">
-                  {t(p.pickHint)}
+                <div className="flex flex-col items-center gap-4 rounded-md bg-white px-6 py-10 text-center text-base text-muted shadow-card">
+                  {hintArt && <Illustration name={hintArt} size={150} fluid className="w-[120px] sm:w-[150px]" />}
+                  <p>{t(p.pickHint)}</p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4">
-                  <div className="bg-brand-50 rounded-xl p-3 text-sm text-brand-700">
+                <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4" noValidate>
+                  <div className="bg-brand-50 rounded-md p-3 text-sm text-brand-700">
                     <div className="flex items-center gap-2">
-                      <CalendarDays className="w-4 h-4 flex-shrink-0" />
+                      <CalendarDays className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                       <strong className="capitalize">
                         {format(parseISO(selectedSlot.date), "d 'de' MMMM, yyyy", { locale: es })}
                       </strong>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Clock className="w-4 h-4 flex-shrink-0" />
+                      <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                       {selectedSlot.start_time.slice(0, 5)} - {selectedSlot.end_time.slice(0, 5)} h
                     </div>
                     {selectedSlot.location && (
                       <div className="flex items-center gap-2 mt-1">
-                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <MapPin className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                         {selectedSlot.location}
                       </div>
                     )}
                   </div>
 
-                  <Input label={c('nameLabel')} error={err(errors.parent_name)} className={inputClass} {...register('parent_name')} />
-                  <Input label={c('emailLabel')} type="email" inputMode="email" autoComplete="email" error={err(errors.parent_email)} className={inputClass} {...register('parent_email')} />
-                  <Input label={c('phoneLabel')} type="tel" inputMode="tel" autoComplete="tel" error={err(errors.parent_phone)} className={inputClass} {...register('parent_phone')} />
-                  <Input label={c('childLabel')} className={inputClass} {...register('child_name')} />
-                  <Input label={c('gradeLabel')} className={inputClass} {...register('child_grade')} />
+                  {/* Own data autofills; the child's fields don't (they are another person). */}
+                  <Input id="visit-name" label={c('nameLabel')} autoComplete="name" aria-required="true" error={err(errors.parent_name)} className={inputClass} {...register('parent_name')} />
+                  <Input id="visit-email" label={c('emailLabel')} type="email" inputMode="email" autoComplete="email" aria-required="true" error={err(errors.parent_email)} className={inputClass} {...register('parent_email')} />
+                  <Input id="visit-phone" label={c('phoneLabel')} type="tel" inputMode="tel" autoComplete="tel" aria-required="true" error={err(errors.parent_phone)} className={inputClass} {...register('parent_phone')} />
+                  <Input id="visit-child" label={c('childLabel')} autoComplete="off" className={inputClass} {...register('child_name')} />
+                  <Input id="visit-grade" label={c('gradeLabel')} autoComplete="off" className={inputClass} {...register('child_grade')} />
 
                   <PrivacyNote />
+                  {bookingError ? (
+                    <div ref={resultRef} tabIndex={-1} role="alert" className="flex items-start gap-2 rounded-sm bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger focus:outline-none">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span>{bookingError}</span>
+                    </div>
+                  ) : null}
 
                   <Button type="submit" loading={isSubmitting} className="w-full justify-center min-h-[44px]">
                     {t(p.submitLabel) || 'Confirmar visita'}
@@ -329,23 +388,54 @@ function VisitBookingView(p: BookingProps) {
 
           {/* WhatsApp fallback */}
           {whatsapp_number && (
-          <div className="mt-8 sm:mt-10 rounded-2xl border border-line bg-cream p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-muted text-center sm:text-left">
-              {p.whatsappTitle && <p className="font-semibold text-ink">{t(p.whatsappTitle)}</p>}
-              {p.whatsappText && <p>{t(p.whatsappText)}</p>}
+          <div className="mt-8 sm:mt-10 rounded-md bg-white p-5 shadow-card sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+              {waArt && (
+                <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-sm" style={{ background: wash('var(--green)', 12) }}>
+                  <Illustration name={waArt} size={64} fluid className="w-[56px]" />
+                </span>
+              )}
+              <div className="text-base text-muted">
+                {p.whatsappTitle && <p className="font-head font-semibold text-ink">{t(p.whatsappTitle)}</p>}
+                {p.whatsappText && <p>{t(p.whatsappText)}</p>}
+              </div>
             </div>
             <a
               href={waHref(whatsapp_number, whatsappText)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-sm text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-4 h-4" aria-hidden="true" />
               {whatsappLabel}
             </a>
           </div>
           )}
         </>
+      )}
+
+      {/* The school's own photos: what the family will see on the visit. */}
+      {photos.length > 0 && (
+        <div className="mt-10 sm:mt-12">
+          {p.photosTitle && <h2 className="mb-4 font-head text-fluid-lg font-semibold text-ink">{t(p.photosTitle)}</h2>}
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            {photos.map((ph, i) => (
+              <li key={i} className={i === 0 ? 'col-span-2 sm:col-span-1' : ''}>
+                <img
+                  src={imageSrc(ph.image, 'md')}
+                  srcSet={imageSrcSet(ph.image)}
+                  sizes={i === 0 ? '(min-width: 640px) 280px, 100vw' : '(min-width: 640px) 280px, 50vw'}
+                  alt={altOf(ph.image, t(ph.caption))}
+                  width={480}
+                  height={360}
+                  loading="lazy"
+                  decoding="async"
+                  className={`w-full rounded-md bg-cream-2 object-cover shadow-card ${i === 0 ? 'aspect-[16/9] sm:aspect-[4/3]' : 'aspect-[4/3]'}`}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
@@ -363,21 +453,24 @@ export const sections = [
     },
   }),
   section({
-    type: 'steps', label: 'Agendar visita · Cómo funciona', description: 'Franja con los pasos numerados y un enlace al proceso de admisión.',
+    type: 'steps', label: 'Agendar visita · Cómo funciona', description: 'Franja con los pasos numerados, cada uno con su ilustración, y un enlace al proceso de admisión.',
     component: VisitStepsView,
-    fields: [f.items('items', 'Pasos', [f.text('text', 'Paso', { required: true })]), f.link('link', 'Enlace bajo los pasos')],
+    fields: [
+      f.items('items', 'Pasos', [f.text('text', 'Paso', { required: true }), f.illustration('illustration', 'Ilustración', { hint: ART_HINT })]),
+      f.link('link', 'Enlace bajo los pasos'),
+    ],
     defaults: {
       items: [
-        { text: 'Elija fecha y horario disponibles aquí mismo' },
-        { text: 'Reciba la confirmación de su visita por correo' },
-        { text: 'Después de la visita agendamos el examen de valoración de su hijo/a' },
+        { text: 'Elija fecha y horario disponibles aquí mismo', illustration: 'agenda' },
+        { text: 'Reciba la confirmación de su visita por correo', illustration: 'mensaje' },
+        { text: 'Después de la visita agendamos el examen de valoración de su hijo/a', illustration: 'examen' },
       ],
       link: { label: 'Conozca el proceso de admisión →', href: '/admisiones' },
     },
   }),
   section({
     type: 'booking', label: 'Agendar visita · Calendario y reserva', locked: true,
-    description: 'Calendario con los horarios abiertos, formulario y confirmación; los horarios se editan en Visitas y el WhatsApp en Ajustes.',
+    description: 'Calendario con los horarios abiertos, formulario, confirmación y fotos del colegio al final; los horarios se editan en Visitas y el WhatsApp en Ajustes.',
     component: VisitBookingView,
     fields: [
       ...grouped('Calendario', [
@@ -391,6 +484,7 @@ export const sections = [
       ...grouped('Formulario', [
         f.text('formTitle', 'Título del formulario'),
         f.text('pickHint', 'Aviso antes de elegir horario'),
+        f.illustration('hintIllustration', 'Ilustración del aviso', { hint: ART_HINT }),
         f.text('nameLabel', 'Nombre: etiqueta'), f.text('emailLabel', 'Correo: etiqueta'), f.text('phoneLabel', 'Teléfono: etiqueta'),
         f.text('childLabel', 'Alumno: etiqueta'), f.text('gradeLabel', 'Grado: etiqueta'),
         f.text('submitLabel', 'Texto del botón de envío'),
@@ -410,6 +504,11 @@ export const sections = [
         f.text('whatsappLabel', 'Botón de WhatsApp'),
         f.text('whatsappMessage', 'Mensaje inicial de WhatsApp'),
         f.text('contactLabel', 'Botón de contacto (si no hay WhatsApp)'),
+        f.illustration('whatsappIllustration', 'Recuadro de WhatsApp: ilustración', { hint: ART_HINT }),
+      ]),
+      ...grouped('Fotos del colegio', [
+        f.text('photosTitle', 'Título sobre las fotos', { hint: 'Opcional. Vacío = las fotos sin título.' }),
+        f.images('photos', 'Fotos al final de la página', { hint: 'Fotos del colegio; la descripción de cada una es su texto alternativo.' }),
       ]),
     ],
     defaults: {
@@ -426,6 +525,9 @@ export const sections = [
       childLabel: 'Nombre del alumno (opcional)', gradeLabel: 'Grado de interés (opcional)',
       errName: 'Nombre requerido', errEmail: 'Correo inválido', errPhone: 'Teléfono inválido',
       bookingError: 'No fue posible completar la reserva. Intente de nuevo.',
+      hintIllustration: 'visita', whatsappIllustration: 'informes',
+      photosTitle: '',
+      photos: VISIT_PHOTOS,
     },
   }),
 ];

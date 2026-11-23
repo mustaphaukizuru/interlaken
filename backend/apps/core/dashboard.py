@@ -24,7 +24,9 @@ def dashboard_callback(request, context):
         status=PreRegistration.Status.PENDING).count()
     regs_in_review = Registration.objects.filter(
         status__in=[Registration.Status.SUBMITTED, Registration.Status.REVIEWING]).count()
-    docs_in_review = RegistrationDocument.objects.filter(is_verified=False).count()
+    # Pending only: a rejected document waits for the family, not for staff.
+    docs_in_review = RegistrationDocument.objects.filter(
+        status=RegistrationDocument.Review.PENDING).count()
     # Aware bounds instead of ``completed_at__date=`` so the (status, completed_at)
     # index answers the count (Data Ops C1).
     payments_today = Payment.objects.filter(
@@ -53,7 +55,7 @@ def dashboard_callback(request, context):
             'value': docs_in_review,
             'icon': 'folder_open',
             'link': reverse('admin:admissions_registrationdocument_changelist')
-                    + '?is_verified__exact=0',
+                    + '?status__exact=pending',
         },
         {
             'title': 'Pagos exitosos hoy',

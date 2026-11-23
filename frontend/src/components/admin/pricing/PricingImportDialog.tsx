@@ -81,7 +81,7 @@ function ImportFlow({ saved, unsaved, onExport, onLoad }: Omit<Props, 'open' | '
             const errs = result.tables[t.key]!.errors;
             if (errs.length) {
               return (
-                <section key={t.key} aria-labelledby={`imp-${t.key}`} className="rounded-xl border border-coral-600/30 bg-coral-50/40">
+                <section key={t.key} aria-labelledby={`imp-${t.key}`} className="rounded-md border border-coral-600/30 bg-coral-50/40">
                   <h3 id={`imp-${t.key}`} className="border-b border-coral-600/20 px-4 py-2.5 font-head text-sm font-bold text-ink">{t.title} <span className="font-normal text-subtle">(hoja «{result.tables[t.key]!.sheet}»)</span></h3>
                   <ul className="space-y-1 px-4 py-3 text-[13px]">
                     {errs.map((e, i) => (
@@ -95,7 +95,7 @@ function ImportFlow({ saved, unsaved, onExport, onLoad }: Omit<Props, 'open' | '
               );
             }
             if (!changes[t.key].length) {
-              return <p key={t.key} className="flex items-center gap-2 rounded-xl border border-line px-4 py-2.5 text-sm text-muted"><CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden="true" />{t.title}: sin cambios.</p>;
+              return <p key={t.key} className="flex items-center gap-2 rounded-md border border-line px-4 py-2.5 text-sm text-muted"><CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden="true" />{t.title}: sin cambios.</p>;
             }
             return <ChangeList key={t.key} def={t} changes={changes[t.key]} />;
           })}
@@ -107,7 +107,7 @@ function ImportFlow({ saved, unsaved, onExport, onLoad }: Omit<Props, 'open' | '
           )}
         </div>
         {replaced.length > 0 && errorCount === 0 && (
-          <p className="flex gap-2 rounded-xl bg-amber/10 px-3 py-2 text-sm text-ink">
+          <p className="flex gap-2 rounded-md bg-amber/10 px-3 py-2 text-sm text-ink">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
             Reemplaza lo que editó sin guardar en {replaced.map((t) => t.title).join(', ')}.
           </p>
@@ -141,7 +141,7 @@ function ImportFlow({ saved, unsaved, onExport, onLoad }: Omit<Props, 'open' | '
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`rounded-xl2 border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-green bg-green-50' : 'border-line bg-cream-2'}`}
+        className={`rounded-md border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-green bg-green-50' : 'border-line bg-cream-2'}`}
       >
         <FileUp size={28} aria-hidden="true" className="mx-auto mb-2 text-green-700" />
         <p className="text-sm text-ink">Arrastre aquí el archivo .xlsx</p>

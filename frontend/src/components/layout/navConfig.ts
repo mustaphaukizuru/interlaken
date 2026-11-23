@@ -29,7 +29,7 @@ const FAMILY_GROUPS: NavGroup[] = [
     heading: 'Familia',
     items: [
       { icon: LayoutDashboard, label: 'Inicio',         to: '/portal', end: true },
-      { icon: Bell,            label: 'Notificaciones', to: '/portal/notificaciones', badgeKey: 'notificaciones' },
+      { icon: Bell,            label: 'Avisos',         to: '/portal/notificaciones', badgeKey: 'notificaciones' },
     ],
   },
   {
@@ -159,3 +159,26 @@ export const mobileNavByRole: Record<Role, NavEntry[]> = {
   // Same shell, same destinations as parents (see navGroupsByRole.student).
   student: FAMILY_MOBILE,
 };
+
+/**
+ * The account menu, shared by the header (AccountMenu) and the sidebar's user
+ * card so both offer the same entries in the same order (Phase 4.7). Sign-out
+ * is rendered after these by each menu. Console logins also get a way back
+ * to their console home and, for admins, Ajustes.
+ */
+export function accountEntries(role: Role | string | undefined, home: string): NavEntry[] {
+  const console = role === 'admin' || role === 'staff';
+  return [
+    ...(console && home !== '/portal' ? [{ icon: LayoutDashboard, label: 'Mi panel', to: home }] : []),
+    { icon: UserCircle, label: 'Mi perfil', to: '/portal/perfil' },
+    // The notification preferences (the list itself is «Avisos» in the menu).
+    { icon: Bell, label: 'Preferencias de avisos', to: '/portal/perfil?tab=avisos' },
+    { icon: FileLock2, label: 'Privacidad', to: '/portal/privacidad' },
+    ...(role === 'admin' ? [{ icon: Settings, label: 'Ajustes', to: '/admin/ajustes' }] : []),
+  ];
+}
+
+/** Header icon button (hamburger, bell): transparent 44 × 44 with a hover
+ *  tint; no box, no border, no glow (Phase 4.7, flat header). */
+export const HEADER_ICON_BUTTON =
+  'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted transition-colors hover:bg-ink/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';

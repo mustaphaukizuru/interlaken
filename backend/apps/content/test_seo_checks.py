@@ -56,8 +56,9 @@ def test_template_seo_defaults():
 def test_published_head_keeps_the_template_seo_when_the_page_has_none(admin_user):
     Page.objects.create(slug='costos', title='Costos', draft_blocks=DESIGNED, seo={}).publish(admin_user)
     head = published_head('/admisiones/costos')
-    assert head['title'] == template_seo('costos')['title'] and head['description'].startswith('Costos del Colegio Interlaken')
-    out = spa.apply_head('<html><head><title>x</title></head></html>', head)
+    # The cached head keeps {{ciclo}}; the server fills it on each request (site_years).
+    assert head['title'] == template_seo('costos', expand=False)['title'] and head['description'].startswith('Costos del Colegio Interlaken')
+    out = spa.apply_head('<html><head><title>x</title></head></html>', spa._with_years(head, '/admisiones/costos'))
     assert f'<title>{template_seo("costos")["title"]} · Colegio Interlaken</title>' in out
     Page.objects.create(slug='inicio', title='Inicio', draft_blocks=[{'id': 'h', 'type': 'home.hero', 'props': {'title': 'Hola'}}]).publish(admin_user)
     home = spa.apply_head('<html><head><title>x</title></head></html>', published_head('/'))

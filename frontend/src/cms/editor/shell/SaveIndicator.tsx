@@ -33,7 +33,7 @@ export function SaveIndicator({ status, lastSavedAt, serverSavedAt, onRetry, com
       <span className={`${base} font-semibold text-coral-700`} role="alert">
         <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
         <span className="truncate">{compact ? 'No se guardó' : 'No se guardó el borrador'}</span>
-        <button type="button" onClick={onRetry} className="inline-flex min-h-[44px] items-center gap-1 rounded-full px-2 font-semibold text-purple underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+        <button type="button" onClick={onRetry} className="inline-flex min-h-[44px] items-center gap-1 rounded-sm px-2 font-semibold text-purple underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
           <RotateCw size={13} aria-hidden="true" /> Reintentar
         </button>
       </span>

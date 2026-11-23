@@ -54,6 +54,7 @@ ADMIN_ONLY = {
     'apps.content.pricing_admin.AdminPricingImportView',
     'apps.content.pricing_admin.AdminPricingTableView',
     'apps.content.pricing_admin.AdminPricingView',
+    'apps.content.pricing_admin.AdminPricingYearsView',
     'apps.content.views.AdminSiteSettingsView',
     'apps.content.views.AdminTestimonialDetailView',
     'apps.content.views.AdminTestimonialsBulkView',
@@ -211,8 +212,10 @@ def test_medical_data_stays_masked_for_staff(api_client):
 def test_badges_only_count_the_areas_held(api_client):
     api_client.force_authenticate(user=puesto('cafeteria'))
     keys = set(api_client.get('/api/v1/core/badges/').data)
-    # «Por verificar» belongs to the cafetería area too (2026-11-18).
-    assert keys == {'notificaciones', 'cafeteria', 'cafeteria_verificar'}
+    # «Por verificar» belongs to the cafetería area too (2026-11-18), and so do
+    # the dashboard's «Pendientes» counters of that area (UX Phase 7).
+    assert keys == {'notificaciones', 'cafeteria', 'cafeteria_verificar', 'cafeteria_caja',
+                    'cafeteria_aplicar', 'pagos_fallidos', 'saldo_bajo', 'loyverse_alertas'}
 
 
 def test_me_reports_the_effective_areas(api_client):

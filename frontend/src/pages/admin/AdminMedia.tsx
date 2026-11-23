@@ -17,6 +17,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { MEDIA_ENTITY, useMediaBulk, useMediaExport, useMediaList } from '@/hooks/queries/AdminContentQueries';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { mediaAdminApi } from '@/services/AdminContentApi';
@@ -72,6 +73,7 @@ export default function AdminMedia() {
   const selection = useRowSelection(count, JSON.stringify(filters));
 
   const [selected, setSelected] = useState<MediaAsset | null>(null);
+  const assetGuard = useDirtyCloseGuard(() => setSelected(null));
   const [toDelete, setToDelete] = useState<MediaAsset | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const [tagPrompt, setTagPrompt] = useState(false);
@@ -138,7 +140,7 @@ export default function AdminMedia() {
   const columns: Column<MediaAsset>[] = [
     {
       id: 'preview', header: 'Vista', hideable: false, minWidth: 72,
-      cell: (a) => <img src={a.urls.thumb ?? a.urls.original} alt={a.alt || ''} loading="lazy" className="h-12 w-12 rounded-lg object-cover ring-1 ring-line" />,
+      cell: (a) => <img src={a.urls.thumb ?? a.urls.original} alt={a.alt || ''} loading="lazy" className="h-12 w-12 rounded-sm object-cover ring-1 ring-line" />,
     },
     { id: 'filename', header: 'Archivo', sortKey: 'filename', hideable: false, minWidth: 180, className: 'font-medium text-ink break-all', cell: (a) => a.filename },
     {
@@ -175,7 +177,7 @@ export default function AdminMedia() {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         data-testid="media-dropzone"
-        className={`mb-4 rounded-xl2 border-2 border-dashed px-4 py-5 text-center text-sm transition-colors ${dragging ? 'border-purple bg-brand-50 text-ink' : 'border-line bg-cream-2 text-muted'}`}
+        className={`mb-4 rounded-md border-2 border-dashed px-4 py-5 text-center text-sm transition-colors ${dragging ? 'border-purple bg-brand-50 text-ink' : 'border-line bg-cream-2 text-muted'}`}
       >
         <UploadCloud className="mx-auto mb-1 h-6 w-6 text-subtle" aria-hidden="true" />
         Arrastre aquí sus imágenes (JPG, PNG, WebP o GIF, hasta 10 MB cada una) o use «Subir imágenes».
@@ -185,7 +187,7 @@ export default function AdminMedia() {
         <Card className="mb-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="font-head text-base font-bold text-ink">Resultado de la carga</h2>
-            <button type="button" onClick={() => setResults([])} aria-label="Cerrar resultado de la carga" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink"><X size={16} aria-hidden="true" /></button>
+            <button type="button" onClick={() => setResults([])} aria-label="Cerrar resultado de la carga" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink"><X size={16} aria-hidden="true" /></button>
           </div>
           <ul className="space-y-1 text-sm" aria-live="polite" aria-label="Archivos subidos">
             {results.map((r, i) => (
@@ -270,9 +272,11 @@ export default function AdminMedia() {
         </form>
       </Modal>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Detalles de la imagen" maxWidth={640}>
-        {selected && <AssetForm key={selected.id} asset={selected} onClose={() => setSelected(null)} onSaved={invalidate} onDelete={() => setToDelete(selected)} />}
+      <Modal open={!!selected} onClose={assetGuard.requestClose} title="Detalles de la imagen" maxWidth={640}>
+        {selected && <AssetForm key={selected.id} asset={selected} onClose={() => setSelected(null)} onCancel={assetGuard.requestClose}
+          onDirty={assetGuard.reportDirty} onSaved={invalidate} onDelete={() => setToDelete(selected)} />}
       </Modal>
+      {assetGuard.dialog}
       <ConfirmDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)}
         title="Eliminar imagen" message={`Se borrará "${toDelete?.filename ?? ''}" y sus variantes.${toDelete?.referenced ? ' Está en uso: las páginas o comunicados que la usan mostrarán un hueco.' : ''}`} confirmLabel="Eliminar" loading={remove.isPending} />
       <BulkConfirmDialog
@@ -291,10 +295,13 @@ export default function AdminMedia() {
   );
 }
 
-function AssetForm({ asset, onClose, onSaved, onDelete }: { asset: MediaAsset; onClose: () => void; onSaved: () => void; onDelete: () => void }) {
+function AssetForm({ asset, onClose, onCancel, onDirty, onSaved, onDelete }: {
+  asset: MediaAsset; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void; onDelete: () => void;
+}) {
   const [alt, setAlt] = useState(asset.alt);
   const [caption, setCaption] = useState(asset.caption);
   const [tags, setTags] = useState(asset.tags);
+  useReportDirty(alt !== asset.alt || caption !== asset.caption || tags !== asset.tags, onDirty);
   const [copied, setCopied] = useState<string | null>(null);
   const save = useMutation({
     mutationFn: () => contentApi.adminUpdateMedia(asset.id, { alt: alt.trim(), caption: caption.trim(), tags: tags.trim() }),
@@ -307,7 +314,7 @@ function AssetForm({ asset, onClose, onSaved, onDelete }: { asset: MediaAsset; o
   return (
     <div className="grid gap-5 sm:grid-cols-[200px_1fr]">
       <div>
-        <img src={asset.urls.md ?? asset.urls.original} alt={asset.alt || ''} className="w-full rounded-xl ring-1 ring-line" />
+        <img src={asset.urls.md ?? asset.urls.original} alt={asset.alt || ''} className="w-full rounded-md ring-1 ring-line" />
         <p className="mt-2 text-xs text-subtle">{asset.width}×{asset.height} · {formatBytes(asset.size)} · {asset.content_type}</p>
         <ul className="mt-2 space-y-1 text-xs">
           {Object.entries(asset.urls).map(([k, u]) => (
@@ -326,7 +333,7 @@ function AssetForm({ asset, onClose, onSaved, onDelete }: { asset: MediaAsset; o
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           <Button variant="ghost" onClick={onDelete} className="min-h-[44px] text-coral"><Trash2 className="h-4 w-4" aria-hidden="true" /> Eliminar</Button>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+            <Button variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
             <Button loading={save.isPending} onClick={() => save.mutate()} className="min-h-[44px]">Guardar</Button>
           </div>
         </div>

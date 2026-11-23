@@ -1,16 +1,21 @@
 import { Link } from 'react-router-dom';
-import { LogOut, Settings, LayoutDashboard, ChevronDown, User as UserIcon } from 'lucide-react';
+import { LogOut, ChevronDown } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { homePath } from '@/lib/areas';
+import { accountEntries } from './navConfig';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',
 };
 
-/** Header avatar + account dropdown: identity, quick links, sign out. */
+/** 44 px menu row, shared look for links and the sign-out button. */
+export const ACCOUNT_ROW =
+  'flex min-h-[44px] w-full items-center gap-3 rounded-sm px-3 text-left text-sm font-medium transition-colors focus-visible:outline-none';
+
+/** Header avatar + account dropdown: identity, the shared account entries, sign out. */
 export function AccountMenu() {
   const { user } = useAuthStore();
   const role = user?.role ?? 'parent';
@@ -32,23 +37,23 @@ export function AccountMenu() {
           aria-label="Cuenta"
           aria-expanded={open}
           aria-haspopup="true"
-          className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-line bg-white py-1.5 pl-3.5 pr-2.5 shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="flex h-11 min-w-[44px] shrink-0 items-center justify-center gap-2.5 rounded-sm px-1.5 transition-colors hover:bg-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:pl-3"
         >
-          <div className="hidden text-right leading-tight sm:block">
-            <div className="text-[13px] font-semibold text-ink">
+          <span className="hidden text-right leading-tight lg:block">
+            <span className="block text-[13px] font-semibold text-ink">
               {user?.first_name} {user?.last_name}
-            </div>
-            <div className="text-[12px] text-subtle">{roleText}</div>
-          </div>
-          <Avatar user={user} size={36} rounded="rounded-[10px]" />
-          <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
+            </span>
+            <span className="block text-xs text-subtle">{roleText}</span>
+          </span>
+          <Avatar user={user} size={32} />
+          <ChevronDown size={16} aria-hidden="true" className={`hidden text-subtle transition-transform lg:block ${open ? 'rotate-180' : ''}`} />
         </button>
       )}
     >
       {({ close }) => (
         <>
           <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
-            <Avatar user={user} size={44} rounded="rounded-xl" />
+            <Avatar user={user} size={44} />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">
                 {user?.first_name} {user?.last_name}
@@ -57,37 +62,19 @@ export function AccountMenu() {
             </div>
           </div>
           <div className="p-1.5">
-            <Link
-              to={home}
-              onClick={close}
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
-            >
-              <LayoutDashboard size={16} className="text-muted" /> Mi panel
-            </Link>
-            <Link
-              to="/portal/perfil"
-              onClick={close}
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
-            >
-              <UserIcon size={16} className="text-muted" /> Mi información
-            </Link>
-            {role === 'admin' && (
-              <Link
-                to="/admin/ajustes"
-                onClick={close}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream focus-visible:bg-cream focus-visible:outline-none"
-              >
-                <Settings size={16} className="text-muted" /> Ajustes
+            {accountEntries(role, home).map(({ icon: Icon, label, to }) => (
+              <Link key={to} to={to} onClick={close} className={`${ACCOUNT_ROW} text-ink hover:bg-cream focus-visible:bg-cream`}>
+                <Icon size={20} className="text-muted" aria-hidden="true" /> {label}
               </Link>
-            )}
+            ))}
           </div>
           <div className="border-t border-line p-1.5">
             <button
               type="button"
               onClick={() => { close(); void authApi.logout(); }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-coral transition-colors hover:bg-coral/10 focus-visible:bg-coral/10 focus-visible:outline-none"
+              className={`${ACCOUNT_ROW} font-semibold text-danger hover:bg-danger-bg focus-visible:bg-danger-bg`}
             >
-              <LogOut size={16} /> Cerrar sesión
+              <LogOut size={20} aria-hidden="true" /> Cerrar sesión
             </button>
           </div>
         </>

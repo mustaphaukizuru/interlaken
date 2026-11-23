@@ -10,6 +10,7 @@ import { portalApi, type StaffUser } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { AREA_LABEL, AREAS, PUESTOS } from '@/lib/areaCatalog';
 import type { AreaKey } from '@/lib/areas';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 
 export interface StaffAccess {
   staff_title: string;
@@ -61,13 +62,13 @@ export function StaffAccessFields({ value, onChange, idPrefix = 'acc' }: {
         <legend className="label">Áreas de la consola</legend>
         <div className="grid gap-1.5">
           {AREAS.map((a) => (
-            <label key={a.key} htmlFor={`${idPrefix}-area-${a.key}`} className="grid min-h-[44px] cursor-pointer grid-cols-[auto,1fr] items-start gap-x-2.5 rounded-lg border border-line px-3 py-2 hover:border-purple/40">
+            <label key={a.key} htmlFor={`${idPrefix}-area-${a.key}`} className="grid min-h-[44px] cursor-pointer grid-cols-[auto,1fr] items-start gap-x-2.5 rounded-sm border border-line px-3 py-2 hover:border-purple/40">
               <input
                 id={`${idPrefix}-area-${a.key}`}
                 type="checkbox"
                 aria-labelledby={`${idPrefix}-area-${a.key}-name`}
                 aria-describedby={`${idPrefix}-area-${a.key}-desc`}
-                className="row-span-2 mt-1 h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                className="row-span-2 mt-1 h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                 checked={value.staff_areas.includes(a.key)}
                 onChange={(e) => toggle(a.key, e.target.checked)}
               />
@@ -105,21 +106,29 @@ export function StaffAccessSummary({ user }: { user: Pick<StaffUser, 'role' | 's
 export function StaffAccessModal({ user, onClose, onSaved }: {
   user: StaffUser | null; onClose: () => void; onSaved: () => void;
 }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={!!user} onClose={onClose} title="Puesto y áreas de la consola" maxWidth={560}>
-      {user && <AccessForm key={user.id} user={user} onClose={onClose} onSaved={onSaved} />}
-    </Modal>
+    <>
+      <Modal open={!!user} onClose={guard.requestClose} title="Puesto y áreas de la consola" maxWidth={560}>
+        {user && <AccessForm key={user.id} user={user} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} onSaved={onSaved} />}
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function AccessForm({ user, onClose, onSaved }: { user: StaffUser; onClose: () => void; onSaved: () => void }) {
-  const [value, setValue] = useState<StaffAccess>({
+function AccessForm({ user, onClose, onCancel, onDirty, onSaved }: {
+  user: StaffUser; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
+  const [start] = useState<StaffAccess>(() => ({
     staff_title: user.staff_title ?? '',
     staff_areas: (user.staff_areas ?? []) as AreaKey[],
-  });
+  }));
+  const [value, setValue] = useState<StaffAccess>(start);
+  useReportDirty(value.staff_title !== start.staff_title || !sameAreas(value.staff_areas, start.staff_areas), onDirty);
   const save = useMutation({
     mutationFn: () => portalApi.updateStaff(user.id, value),
-    onSuccess: () => { toast.success('Acceso actualizado. Aplica desde la siguiente acción de la persona.'); onSaved(); onClose(); },
+    onSuccess: () => { toast.success('Acceso actualizado.'); onSaved(); onClose(); },
     onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo guardar el acceso.')),
   });
   return (
@@ -130,7 +139,7 @@ function AccessForm({ user, onClose, onSaved }: { user: StaffUser; onClose: () =
       </p>
       <StaffAccessFields value={value} onChange={setValue} idPrefix={`acc-${user.id}`} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={save.isPending} className="min-h-[44px]">Guardar acceso</Button>
       </div>
     </form>

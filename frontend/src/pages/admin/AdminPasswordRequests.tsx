@@ -21,6 +21,7 @@ import { mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTempla
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { adminKeys } from '@/hooks/queries/keys';
 import {
   PASSWORD_REQUESTS_ENTITY, usePasswordRequestsBulk, usePasswordRequestsExport, usePasswordRequestsList,
@@ -40,7 +41,7 @@ const BULK_ACTIONS: BulkActionDef[] = [
   { name: 'reject', label: 'Rechazar', danger: true, requiresNote: true, icon: XCircle, planVerb: 'Se rechazarán' },
 ];
 const ROW_ACTION =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
 
 /**
  * /admin/contrasenas — password request inbox (BACKLOG P1-A4) on the Data Ops UI
@@ -247,19 +248,26 @@ export default function AdminPasswordRequests() {
 }
 
 function LogRequestModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Registrar solicitud" maxWidth={480}>
-      <LogRequestForm key={String(open)} onClose={onClose} onSaved={onSaved} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Registrar solicitud" maxWidth={480}>
+        <LogRequestForm key={String(open)} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} onSaved={onSaved} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function LogRequestForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function LogRequestForm({ onClose, onCancel, onDirty, onSaved }: {
+  onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('whatsapp');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  useReportDirty(!!(email || name || note) || channel !== 'whatsapp', onDirty);
   const create = useMutation({
     mutationFn: () => portalApi.createPasswordRequest({ requested_email: email.trim(), requester_name: name.trim(), channel, note: note.trim() }),
     onSuccess: ({ data }) => {
@@ -285,7 +293,7 @@ function LogRequestForm({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       </div>
       <Input label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={create.isPending} className="min-h-[44px]">Registrar</Button>
       </div>
     </form>
@@ -311,7 +319,7 @@ function DeliveryModal({ resolved, onClose }: { resolved: PasswordRequestResolve
           Envíe el acceso a <strong>{resolved.user_name || resolved.user_email}</strong> por el mismo medio en que lo pidió.
           La contraseña <strong>no se volverá a mostrar</strong>.
         </p>
-        <div className="rounded-2xl bg-cream/70 p-4 text-center">
+        <div className="rounded-md bg-cream/70 p-4 text-center">
           <code className="block select-all break-all font-mono text-xl font-bold tracking-wide text-ink">{resolved.temporary_password}</code>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">

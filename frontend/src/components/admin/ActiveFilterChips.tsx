@@ -26,7 +26,7 @@ export function ActiveFilterChips({ chips, onClearAll }: {
           type="button"
           onClick={chip.onClear}
           aria-label={`Quitar filtro: ${chip.label}`}
-          className="inline-flex min-h-[32px] items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="inline-flex min-h-[32px] items-center gap-1 rounded-sm border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           {chip.label}
           <X size={12} aria-hidden="true" />
@@ -36,7 +36,7 @@ export function ActiveFilterChips({ chips, onClearAll }: {
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded"
+          className="text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-sm"
         >
           Limpiar todo
         </button>

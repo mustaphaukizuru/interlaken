@@ -18,6 +18,12 @@ vi.mock('@/services/api', () => ({
 import { PublicLayout } from './PublicLayout';
 
 describe('PublicLayout menu', () => {
+  it('the bar is sticky, solid and above the page (z-header; 2026-11-22: without it photos covered it)', () => {
+    renderWithProviders(<PublicLayout />);
+    const header = screen.getByRole('banner');
+    for (const cls of ['sticky', 'top-0', 'z-header', 'bg-white']) expect(header).toHaveClass(cls);
+  });
+
   it('shows «Portal Cafetería» and «Agendar visita», and no «Colegiaturas» or «Pagos» button', () => {
     renderWithProviders(<PublicLayout />);
     const header = screen.getByRole('banner');

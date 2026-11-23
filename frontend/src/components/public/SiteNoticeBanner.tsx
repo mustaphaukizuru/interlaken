@@ -33,16 +33,18 @@ export function SiteNoticeBanner() {
   };
   const isExternal = n.link.startsWith('http');
   return (
-    <div role="status" aria-live="polite" className="bg-amber text-ink">
+    // Warning status pair (AA: ink body 16:1, amber title/icon/link 4.6:1 on
+    // warning-bg). The old solid amber + ink pair was ~3.6:1.
+    <div role="status" aria-live="polite" className="bg-warning-bg text-ink print:hidden">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-1.5 text-sm sm:gap-3 sm:px-6">
-        <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <Megaphone className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
         <p className="line-clamp-2 min-w-0 flex-1 sm:line-clamp-1">
-          <strong className="font-semibold">{n.title}.</strong> {n.body}
+          <strong className="font-semibold text-warning">{n.title}.</strong> {n.body}
         </p>
         {n.link && (isExternal
-          ? <a href={n.link} className="shrink-0 whitespace-nowrap font-semibold underline underline-offset-2" target="_blank" rel="noopener noreferrer">Ver más</a>
-          : <Link to={n.link} className="shrink-0 whitespace-nowrap font-semibold underline underline-offset-2">Ver más</Link>)}
-        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"><X className="h-4 w-4" aria-hidden="true" /></button>
+          ? <a href={n.link} className="shrink-0 whitespace-nowrap font-semibold text-warning underline underline-offset-2" target="_blank" rel="noopener noreferrer">Ver más</a>
+          : <Link to={n.link} className="shrink-0 whitespace-nowrap font-semibold text-warning underline underline-offset-2">Ver más</Link>)}
+        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="grid h-11 w-11 shrink-0 place-items-center rounded-sm text-warning hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
     </div>
   );

@@ -81,7 +81,7 @@ export function BulkTopUpDialog() {
           </div>
           {errors.detail && <p className="text-sm text-coral-600" role="alert">{errors.detail}</p>}
           {preview && (
-            <div className="rounded-xl border border-line bg-cream-2 p-3 text-sm">
+            <div className="rounded-md bg-cream-2 p-3 text-sm">
               <p className="font-semibold text-ink">{preview.count} alumnos · total {formatMXN(preview.total)}</p>
               <p className="mt-1 text-xs text-muted">{preview.students.slice(0, 8).map((s) => s.name).join(', ')}{preview.count > 8 ? '…' : ''}</p>
             </div>

@@ -156,7 +156,7 @@ export function SiteTextsEditor() {
   const save = useMutation({
     mutationFn: (patch: Record<string, unknown>) => contentApi.adminUpdateSettings({ chrome: mergeChrome(stored, SITE_TEXT_KEYS, patch) }),
     onSuccess: (res) => {
-      toast.success('Textos del sitio guardados. El sitio los muestra en unos minutos.');
+      toast.success('Textos del sitio guardados.');
       setError(''); setTexts(null); setLinks(null); setFieldError({});
       const chrome = (res?.data as { chrome?: Record<string, unknown> } | undefined)?.chrome;
       if (chrome) qc.setQueryData<{ chrome?: Record<string, unknown> }>(['admin-site-settings'], (prev) => (prev ? { ...prev, chrome } : prev));
@@ -203,7 +203,7 @@ export function SiteTextsEditor() {
           const changed = g.fields.filter((fd) => current(fd).trim() !== fd.builtIn).length + (g.links && !sameLinks(linkList, LEGAL_LINKS_DEFAULT) ? 1 : 0);
           const hasError = g.fields.some((fd) => fieldError[fd.key]) || (g.links && linkList.some((_, i) => fieldError[`link-${i}`]));
           return (
-            <details key={g.id} className="group rounded-xl border border-line bg-white open:shadow-card" open={hasError || undefined}>
+            <details key={g.id} className="group rounded-md bg-white open:shadow-card shadow-card" open={hasError || undefined}>
               <summary className="flex min-h-[52px] cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-ink">{g.title}</span>
@@ -243,7 +243,7 @@ export function SiteTextsEditor() {
                   <fieldset className="space-y-2">
                     <legend className="text-sm font-semibold text-ink">Enlaces legales de la franja inferior (máximo 4)</legend>
                     {linkList.map((l, i) => (
-                      <div key={i} className="grid items-start gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-[1fr_1.4fr_auto]">
+                      <div key={i} className="grid items-start gap-2 rounded-sm bg-cream-2 p-2 sm:grid-cols-[1fr_1.4fr_auto]">
                         <Input id={`legal-label-${i}`} label="Texto del enlace" value={l.label} maxLength={60} onChange={(e) => setLink(i, { label: e.target.value })} />
                         <HrefInput id={`legal-href-${i}`} label="Destino" kinds={['page', 'web']} value={l.href} error={fieldError[`link-${i}`]} onChange={(href) => setLink(i, { href })} />
                         <Button type="button" variant="ghost" className="min-h-[44px] sm:mt-6" aria-label={`Quitar el enlace ${l.label || i + 1}`} onClick={() => setLinks(linkList.filter((_, j) => j !== i))}><Trash2 size={14} aria-hidden="true" /></Button>

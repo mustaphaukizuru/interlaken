@@ -230,7 +230,7 @@ export default function AdminContactInbox() {
               <dt className="text-subtle">Recibido</dt>
               <dd className="text-ink">{when(open.created_at)}</dd>
             </dl>
-            <p className="whitespace-pre-line rounded-lg bg-cream-2 p-3 text-ink">{open.message}</p>
+            <p className="whitespace-pre-line rounded-sm bg-cream-2 p-3 text-ink">{open.message}</p>
             <div className="flex flex-wrap justify-end gap-2">
               <a href={replyHref(open)} className="btn-outline min-h-[44px] text-sm">
                 <Mail className="h-4 w-4" aria-hidden="true" /> Responder por correo

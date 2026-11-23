@@ -18,8 +18,10 @@ def current_school_cycle() -> str:
 
     Used as the model default (Data Ops Phase 4): the hard-coded '2025-2026'
     default went stale on 1 January and stamped every new registration with
-    last year's cycle."""
-    year = timezone.localdate().year
+    last year's cycle. Follows the month chosen in Ajustes («El sitio anuncia el
+    siguiente ciclo desde», content.site_years), like the public texts."""
+    from apps.content.site_years import announced_cycle_start, year_settings
+    year = announced_cycle_start(timezone.localdate(), year_settings()[0])
     return f'{year}-{year + 1}'
 
 

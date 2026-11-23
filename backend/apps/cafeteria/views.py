@@ -22,6 +22,7 @@ from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.avatar import avatar_url
 from apps.accounts.family import can_access_student, family_students
 from apps.accounts.models import StudentProfile, User
 from apps.core.audit import record
@@ -465,6 +466,47 @@ def _family_students_qs(user, *, mine=False):
     return StudentProfile.objects.none()
 
 
+class StudentPhotoView(APIView):
+    """POST/DELETE /api/v1/cafeteria/cards/<student_pk>/photo/: a parent sets or
+    removes their child's credential photo (multipart ``file``; square-cropped
+    to 256 px WebP like any profile photo). Only while Ajustes «Las familias
+    pueden subir la foto de la credencial» is on, only for the caller's own
+    children (students, not staff accounts). Audited."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _target(self, request, student_pk):
+        from apps.content.models import SiteSettings
+        if request.user.role != User.Role.PARENT or not SiteSettings.load().families_upload_photos:
+            return None, Response(error_body('El colegio no tiene activada esta opción.'), status=403)
+        student = family_students(request.user).filter(
+            pk=student_pk, tipo=StudentProfile.Tipo.ALUMNO).select_related('user').first()
+        if student is None:
+            return None, Response(error_body('Alumno no encontrado.'), status=404)
+        return student, None
+
+    def post(self, request, student_pk):
+        from apps.accounts.avatar import store_avatar
+        student, refusal = self._target(request, student_pk)
+        if refusal is not None:
+            return refusal
+        error = store_avatar(student.user, request.FILES.get('file'))
+        if error is not None:
+            return error
+        record('update', student.user, {'avatar_file': ['', 'subida por la familia']}, actor=request.user,
+               context='Credencial: foto subida por la familia')
+        return Response({'photo': avatar_url(student.user)})
+
+    def delete(self, request, student_pk):
+        from apps.accounts.avatar import remove_avatar
+        student, refusal = self._target(request, student_pk)
+        if refusal is not None:
+            return refusal
+        remove_avatar(student.user)
+        record('update', student.user, {'avatar_file': ['foto', '']}, actor=request.user,
+               context='Credencial: foto quitada por la familia')
+        return Response({'photo': avatar_url(student.user)})
+
+
 class MyCardsView(APIView):
     """GET /api/v1/cafeteria/cards/ — digital cafetería card(s) for the caller's
     children: identity + the Loyverse code the POS scans (for the on-screen
@@ -501,6 +543,16 @@ class MyCardsView(APIView):
         # Paid card top-ups still to load into the POS, so the card can show
         # where the balance is heading (one or two queries for any family).
         pending = build_pending_topups_map(students)
+        # «Subir foto» (Ajustes switch, off by default): a parent, for their own
+        # children only (never a sibling's login, staff or a console lookup).
+        photo_ids = set()
+        if request.user.role == User.Role.PARENT and not student_id:
+            from apps.content.models import SiteSettings
+            # One plain read (never get_or_create): the same single query on every
+            # request, whatever the number of children (test_consumption budget).
+            if SiteSettings.objects.filter(pk=1).values_list('families_upload_photos', flat=True).first():
+                photo_ids = set(family_students(request.user).filter(
+                    tipo=StudentProfile.Tipo.ALUMNO).values_list('pk', flat=True))
         cards = []
         for s in students:
             balance = balances.get(s.pk) or CafeteriaBalance(student=s)
@@ -519,7 +571,12 @@ class MyCardsView(APIView):
                     'tipo': s.tipo,
                     'puesto': s.puesto,
                     'puesto_label': s.get_puesto_display(),
+                    # The credential's photo: the account's uploaded photo,
+                    # else the Google picture of its school Gmail, else ''
+                    # (an empty frame on the card).
+                    'photo': avatar_url(s.user),
                 },
+                'can_upload_photo': s.pk in photo_ids,
                 'code': code,                       # QR/barcode payload
                 'linked': bool(s.loyverse_id),
                 'balance': str(balance.balance),
@@ -1492,9 +1549,12 @@ class AdminAdjustBalanceView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, student_pk):
+        from .services import AdjustmentAlreadyApplied
+
         student = get_object_or_404(StudentProfile, pk=student_pk)
         serializer = AdjustmentInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        request_id = serializer.validated_data['request_id']
 
         try:
             adj = adjust_balance(
@@ -1502,7 +1562,13 @@ class AdminAdjustBalanceView(APIView):
                 serializer.validated_data['amount'],
                 serializer.validated_data['reason'],
                 admin=request.user,
+                # Same request twice (double click, retry): the second one is
+                # refused under the wallet lock instead of moving money again.
+                reference=f'adjust-tx-req-{request_id}' if request_id else '',
             )
+        except AdjustmentAlreadyApplied:
+            return Response(error_body('Este ajuste ya se aplicó; no se volvió a aplicar.',
+                                       code='already_applied'), status=409)
         except ValueError as e:
             return Response(error_body(str(e)), status=400)
 

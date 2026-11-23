@@ -591,7 +591,8 @@ def published_head(path: str) -> dict | None:
             og = seo.get('og_image')
             # A designed page without SEO of its own keeps the template's (the yearly «Costos» title),
             # exactly as the browser does (TemplatePage), so crawlers see the same head.
-            defaults = template_seo(slug)
+            # Tokens stay ({{ciclo}}): the server head expands them on each request, so a cached head never goes stale.
+            defaults = template_seo(slug, expand=False)
             head = {
                 'title': (seo.get('title') or '').strip() or defaults['title'],
                 'description': (seo.get('description') or '').strip() or defaults['description'],

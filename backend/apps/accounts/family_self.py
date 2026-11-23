@@ -138,25 +138,30 @@ def _check_child(user, child: StudentProfile | None):
 
 
 def _code_email(child: StudentProfile, requester, code: str):
-    from apps.portal.emailing import EmailContent, long_date
+    from apps.portal.emailing import EmailContent, long_date, person_initial
 
     first = child.user.first_name or child.user.full_name
+    # D13: the body names the child by first name and initial; the subject and
+    # the inbox preview carry neither the name nor the code.
+    # person_initial: first given name + first surname's initial, as in every
+    # other family email («Ana P.», never «Ana M.» from a middle name).
+    short = person_initial(child.user) or first
     expires = long_date(timezone.now() + CODE_TTL, with_time=True)
     pretty = f'{code[:3]} {code[3:]}'
     content = EmailContent(
         category='Portal de Familias',
         title=f'Código para agregar a {first} a su cuenta',
         intro=(f'Desde la cuenta {mask_email(requester.email)} del Portal de Familias se pidió agregar a '
-               f'{child.user.full_name} como hermano o hermana. Si fue usted, escriba este código en el portal.'),
-        preheader=f'Su código es {pretty}. Vence en 15 minutos.',
+               f'{short} como hermano o hermana. Si fue usted, escriba este código en el portal.'),
+        preheader='El código vence en 15 minutos. Escríbalo en el Portal de Familias.',
         highlight=('Código', pretty),
-        details=[('Alumno', f'{child.user.full_name} ({child.grade}{" " + child.group if child.group else ""})'),
+        details=[('Alumno', f'{short} ({child.grade}{" " + child.group if child.group else ""})'),
                  ('El código vence', expires)],
         note=(f'Si usted no lo pidió, ignore este correo: sin el código nadie puede ver los datos de {first}. '
               'Nunca comparta este código por teléfono ni por WhatsApp.'),
         reason='Recibe este correo porque es el correo escolar o de avisos de este alumno en el Colegio Interlaken.',
     )
-    return f'Código para agregar a {first}: {pretty}', content
+    return 'Su código para vincular a sus hijos', content
 
 
 class MyFamilyView(APIView):

@@ -142,7 +142,7 @@ describe('AdminCafeteriaStudent money actions', () => {
     await user.click(within(dialog).getByRole('button', { name: /Abonar \$15/i }));
 
     await waitFor(() => {
-      expect(adjustBalance).toHaveBeenCalledWith(7, 15, 'Abono de prueba');
+      expect(adjustBalance).toHaveBeenCalledWith(7, 15, 'Abono de prueba', expect.any(String));
     });
     expect(toastSuccess).toHaveBeenCalledWith('Ajuste aplicado.');
 
@@ -157,8 +157,65 @@ describe('AdminCafeteriaStudent money actions', () => {
     await user.click(within(dialog2).getByRole('button', { name: /Descontar \$5/i }));
 
     await waitFor(() => {
-      expect(adjustBalance).toHaveBeenCalledWith(7, -5, 'Descuento de prueba');
+      expect(adjustBalance).toHaveBeenCalledWith(7, -5, 'Descuento de prueba', expect.any(String));
     });
+  });
+
+  it('previews the resulting balance and shows server errors next to the field', async () => {
+    const user = userEvent.setup();
+    adjustBalance.mockRejectedValueOnce({ isAxiosError: true, response: { status: 400, data: { amount: ['El saldo no puede quedar negativo.'] } } });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Luis López' });
+    await user.click(screen.getByRole('button', { name: /Ajustar saldo/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^Descontar$/i }));
+    fireEvent.change(within(dialog).getByLabelText(/Monto/i), { target: { value: '150' } });
+    // Display only: $120.00 − $150.00.
+    expect(within(dialog).getByText(/Saldo:/)).toHaveTextContent('Saldo: $120.00 → -$30.00');
+    fireEvent.change(within(dialog).getByLabelText(/^Motivo$/i), { target: { value: 'Corrección' } });
+    await user.click(within(dialog).getByRole('button', { name: /Descontar \$150/i }));
+    await waitFor(() => expect(adjustBalance).toHaveBeenCalledWith(7, -150, 'Corrección', expect.any(String)));
+    expect(await within(dialog).findByText('El saldo no puede quedar negativo.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Monto/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+
+  it('sends one adjustment for a double submit and stays disabled while it runs', async () => {
+    const user = userEvent.setup();
+    let resolve: (v: unknown) => void = () => {};
+    adjustBalance.mockImplementationOnce(() => new Promise((r) => { resolve = r; }) as never);
+    renderPage();
+    await screen.findByRole('heading', { name: 'Luis López' });
+    await user.click(screen.getByRole('button', { name: /Ajustar saldo/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/Monto/i), { target: { value: '15' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Motivo$/i), { target: { value: 'Abono' } });
+    const submit = within(dialog).getByRole('button', { name: /Abonar \$15/i });
+    // Two submits in the same tick (double click / Enter twice): one request.
+    fireEvent.submit(submit.closest('form')!);
+    fireEvent.submit(submit.closest('form')!);
+    await waitFor(() => expect(adjustBalance).toHaveBeenCalled());
+    await waitFor(() => expect(submit).toBeDisabled());
+    expect(adjustBalance).toHaveBeenCalledTimes(1);
+    const [, , , requestId] = adjustBalance.mock.calls[0];
+    expect(requestId).toMatch(/^[A-Za-z0-9-]{8,64}$/);
+    resolve({ data: {} });
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Ajuste aplicado.'));
+    expect(adjustBalance).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats «already applied» (same request id) as done, not as an error', async () => {
+    const user = userEvent.setup();
+    adjustBalance.mockRejectedValueOnce({ isAxiosError: true, response: { status: 409, data: { detail: 'Este ajuste ya se aplicó.', code: 'already_applied' } } });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Luis López' });
+    await user.click(screen.getByRole('button', { name: /Ajustar saldo/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/Monto/i), { target: { value: '15' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Motivo$/i), { target: { value: 'Abono' } });
+    await user.click(within(dialog).getByRole('button', { name: /Abonar \$15/i }));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('El ajuste ya estaba aplicado.'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('keeps refund confirm disabled until DEVOLVER is typed', async () => {
@@ -216,7 +273,7 @@ describe('AdminCafeteriaStudent «Consumo registrado» (owner, 2026-11-08)', () 
 
     const consumo = (await screen.findByText('Consumo registrado')).parentElement as HTMLElement;
     expect(within(consumo).getByText('$907.00')).toBeInTheDocument();
-    expect(within(consumo).getByText('Compras desde el 3 de sep 2024')).toBeInTheDocument();
+    expect(within(consumo).getByText('Compras desde el 3 sep 2024')).toBeInTheDocument();
     expect(screen.queryByText('Gasto total')).toBeNull();
     const cash = screen.getByText('Efectivo/tarjeta en caja').parentElement as HTMLElement;
     expect(within(cash).getByText('$0.00')).toBeInTheDocument();

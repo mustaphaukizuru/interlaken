@@ -15,25 +15,8 @@ import { parseSort, serializeSort, type SortState } from '@/components/ui/Sortab
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useAuditExport, useAuditList, type AuditListParams } from '@/hooks/queries/audit';
 import { auditObjectLink, splitChanges } from '@/lib/auditDiff';
+import { ACTION_LABEL, ACTION_VARIANT, actionLabel, actorLabel } from '@/components/admin/auditLabels';
 import type { AuditLogEntry } from '@/types';
-
-const ACTION_LABEL: Record<string, string> = {
-  create: 'Creación',
-  update: 'Modificación',
-  delete: 'Eliminación',
-  permission: 'Permisos',
-  export: 'Exportación',
-  import: 'Importación',
-};
-
-const ACTION_VARIANT: Record<string, 'success' | 'info' | 'error' | 'warning'> = {
-  create: 'success',
-  update: 'info',
-  delete: 'error',
-  permission: 'warning',
-  export: 'info',
-  import: 'info',
-};
 
 const ACTION_OPTIONS = Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }));
 
@@ -69,14 +52,14 @@ const COLUMNS: Column<AuditLogEntry>[] = [
   },
   {
     id: 'actor', header: 'Actor', sortKey: 'actor', minWidth: 140, className: 'text-muted',
-    cell: (e) => <span className="block max-w-[180px] truncate" title={e.actor_label}>{e.actor_label || 'system'}</span>,
+    cell: (e) => <span className="block max-w-[180px] truncate" title={actorLabel(e.actor_label)}>{actorLabel(e.actor_label)}</span>,
   },
   {
     id: 'action', header: 'Acción', sortKey: 'action', minWidth: 140,
     cell: (e) => (
       <div className="flex flex-wrap items-center gap-1">
         <Badge variant={ACTION_VARIANT[e.action] ?? 'neutral'}>
-          {e.action_display || ACTION_LABEL[e.action] || e.action}
+          {actionLabel(e.action, e.action_display)}
         </Badge>
         {e.context && <span className="text-xs text-subtle">{e.context}</span>}
       </div>
@@ -210,9 +193,9 @@ function AuditEntryDrawer({ entry, onClose, onHistory }: { entry: AuditLogEntry 
             <dt className="text-subtle">Fecha</dt>
             <dd className="text-ink">{format(new Date(entry.created_at), "d 'de' MMMM yyyy, HH:mm:ss", { locale: es })}</dd>
             <dt className="text-subtle">Actor</dt>
-            <dd className="break-all text-ink">{entry.actor_label || 'system'}</dd>
+            <dd className="break-all text-ink">{actorLabel(entry.actor_label)}</dd>
             <dt className="text-subtle">Acción</dt>
-            <dd><Badge variant={ACTION_VARIANT[entry.action] ?? 'neutral'}>{entry.action_display || ACTION_LABEL[entry.action] || entry.action}</Badge></dd>
+            <dd><Badge variant={ACTION_VARIANT[entry.action] ?? 'neutral'}>{actionLabel(entry.action, entry.action_display)}</Badge></dd>
             <dt className="text-subtle">Contexto</dt>
             <dd className="break-all text-ink">{entry.context || '—'}</dd>
             <dt className="text-subtle">Objeto</dt>
@@ -244,7 +227,7 @@ function AuditEntryDrawer({ entry, onClose, onHistory }: { entry: AuditLogEntry 
           )}
 
           {details.length > 0 && (
-            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 rounded-lg bg-cream-2 p-3 text-xs" aria-label="Detalles">
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 rounded-sm bg-cream-2 p-3 text-xs" aria-label="Detalles">
               {details.map((d) => (
                 <div key={d.field} className="contents">
                   <dt className="font-mono text-subtle">{d.field}</dt>

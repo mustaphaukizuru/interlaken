@@ -4,11 +4,13 @@ import {
   ArrowRight, CircleDollarSign, Clock, GraduationCap, Hourglass, Info,
   ShieldCheck, Sparkles, Wallet,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
 import { formatPrice } from '@/lib/format';
 import { useTokens, type CmsLink } from '@/cms/runtime';
+import { pendingLabel, priceYearLabel, usePriceYears, type PriceGroup } from '@/lib/priceYears';
 import { CmsAnchor, INFORMES_CTA, VISIT_CTA } from '@/cms/sections/kit';
 
 interface EnrollmentFee {
@@ -53,10 +55,6 @@ export interface PricingCopy {
   insuranceLabel: string; insuranceTitle: string; insuranceSubtitle: string;
   extrasLabel: string; extrasTitle: string; extrasSubtitle: string;
   daycareLabel: string; daycareTitle: string; daycareSubtitle: string;
-  /** Small badge next to each card title saying which year's prices it shows («Precios 2027»); empty hides it. */
-  feesYear: string; tuitionYear: string; insuranceYear: string; extrasYear: string; daycareYear: string;
-  /** Amber «pending» status next to the year badge for a card whose next-year prices are not set yet; empty hides it. */
-  feesPending: string; tuitionPending: string; insurancePending: string; extrasPending: string; daycarePending: string;
   policiesTitle: string;
   /** Policies that mention one of these words (comma separated, accents ignored) stand out. */
   policyHighlight: string;
@@ -65,7 +63,11 @@ export interface PricingCopy {
   ctaTitle: string; ctaText: string; ctaPrimary: CmsLink; ctaSecondary: CmsLink;
 }
 
-/** Today's copy; `{{ciclo}}` keeps the school cycle current. */
+/**
+ * Today's copy; `{{ciclo}}` is the cycle of the published prices (lib/priceYears).
+ * Each card's «Precios 2027» and «Precios 2028: pendientes» are not copy: they
+ * come from the year the administration published each group for.
+ */
 export const PRICING_COPY: PricingCopy = {
   emptyTitle: 'Costos próximamente',
   emptyText: 'El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo {{ciclo}}. Mientras tanto, nuestro equipo de admisiones puede orientarle.',
@@ -85,13 +87,6 @@ export const PRICING_COPY: PricingCopy = {
   insuranceLabel: 'Anual · obligatorio', insuranceTitle: 'Seguros y credenciales', insuranceSubtitle: 'Contratación obligatoria para todos los alumnos',
   extrasLabel: 'Anualidad', extrasTitle: 'Extraescolares', extrasSubtitle: '10 parcialidades de septiembre a junio · se definen en agosto',
   daycareLabel: 'Horario extendido', daycareTitle: 'Estancia', daycareSubtitle: 'Costo diario, con tarifa mensual opcional',
-  // The school's 2026-11 price sheet: inscripción and colegiaturas carry next
-  // year's prices; seguros, extraescolares and estancia still this year's.
-  feesYear: 'Precios 2027', tuitionYear: 'Precios 2027',
-  insuranceYear: 'Precios 2026', extrasYear: 'Precios 2026', daycareYear: 'Precios 2026',
-  // Seguros, extraescolares and estancia have no 2027 prices yet (price sheet: crossed out).
-  feesPending: '', tuitionPending: '',
-  insurancePending: 'Precios 2027: pendientes', extrasPending: 'Precios 2027: pendientes', daycarePending: 'Precios 2027: pendientes',
   policiesTitle: 'Políticas de pago',
   policyHighlight: 'recargo, devolución',
   errorTitle: 'No fue posible cargar los costos',
@@ -122,41 +117,38 @@ const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
 export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, pending, children }: {
   tone: 'green' | 'purple' | 'coral' | 'pink';
   icon: any; label: string; title: string; subtitle?: string;
-  /** Short pill next to the title, e.g. «Precios 2027». */
+  /** Short note next to the title, e.g. «Precios 2027» (plain text: badges are for status only). */
   badge?: string;
-  /** Amber status pill after the badge, e.g. «Precios 2027: pendientes». */
+  /** The card's one status badge (warning), e.g. «Precios 2027: pendientes». */
   pending?: string;
   children: React.ReactNode;
 }) {
   const tones = {
-    green:  { border: 'border-green/25',  bg: 'bg-green/5',        chip: 'bg-green/15 text-green-dark',  label: 'text-green-dark' },
-    purple: { border: 'border-purple/20', bg: 'bg-purple-light/60', chip: 'bg-purple/15 text-purple',     label: 'text-purple' },
-    coral:  { border: 'border-coral/25',  bg: 'bg-coral/5',        chip: 'bg-coral/15 text-coral-dark',  label: 'text-coral-dark' },
-    pink:   { border: 'border-pink/25',   bg: 'bg-pink-light/60',  chip: 'bg-pink/15 text-pink-dark',    label: 'text-pink-dark' },
+    green:  { bg: 'bg-green/5',        chip: 'bg-green/15 text-green-dark',  label: 'text-green-dark' },
+    purple: { bg: 'bg-purple-light/60', chip: 'bg-purple/15 text-purple',     label: 'text-purple' },
+    coral:  { bg: 'bg-coral/5',        chip: 'bg-coral/15 text-coral-dark',  label: 'text-coral-dark' },
+    pink:   { bg: 'bg-pink-light/60',  chip: 'bg-pink/15 text-pink-dark',    label: 'text-pink-dark' },
   }[tone];
   return (
-    <div className={`overflow-hidden rounded-xl2 border ${tones.border} bg-white shadow-card`}>
-      <div className={`flex items-start gap-3 border-b border-ink/10 ${tones.bg} px-5 py-4`}>
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones.chip}`}>
+    // Borderless surface: the tinted header and the shadow separate it.
+    <div className="overflow-hidden rounded-md bg-white shadow-card">
+      <div className={`flex items-start gap-3 ${tones.bg} px-5 py-4`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-sm ${tones.chip}`}>
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className={`text-[11px] font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
+          <p className={`text-xs font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
           {/* Without a badge the heading renders exactly as before (the generic «Tabla» block uses this card too). */}
           {badge || pending ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
-              {badge && <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tones.chip}`}>{badge}</span>}
-              {pending && (
-                <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber/10 px-2.5 py-0.5 text-[11px] font-bold text-amber">
-                  <Hourglass className="h-3 w-3" aria-hidden="true" />{pending}
-                </span>
-              )}
+              {badge && <span className={`whitespace-nowrap text-xs font-semibold ${tones.label}`}>{badge}</span>}
+              {pending && <Badge variant="warning" icon={Hourglass} className="whitespace-nowrap">{pending}</Badge>}
             </div>
           ) : (
             <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
           )}
-          {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
         </div>
       </div>
       {children}
@@ -188,7 +180,13 @@ function Row({ left, sub, right, rightMuted, rightNote }: {
 
 /** Pricing body (tabs, tables, policies); also rendered by the CMS `pricing_table` block. */
 export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) {
-  const t = useTokens();
+  const prices = usePriceYears();
+  const t = useTokens({ ciclo: prices.cycle });
+  /** «Precios 2027» beside a card's title, and «Precios 2028: pendientes» while its new prices are missing. */
+  const yearOf = (group: PriceGroup) => {
+    const { year, pending } = prices.status(group);
+    return { badge: year != null ? priceYearLabel(year) : undefined, pending: pending ? pendingLabel(prices.target) : undefined };
+  };
   const c: PricingCopy = { ...PRICING_COPY, ...(copy ?? {}) };
   const structure = Array.isArray(c.structure) ? c.structure : [];
   const link = (l: CmsLink | undefined): CmsLink => ({ label: t(l?.label), href: l?.href });
@@ -228,7 +226,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
             ) : isLoading ? (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Cargando costos">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className={`skeleton h-[280px] rounded-xl2 ${i > 1 ? 'hidden md:block' : ''}`} aria-hidden="true" />
+                  <div key={i} className={`skeleton h-[280px] rounded-md ${i > 1 ? 'hidden md:block' : ''}`} aria-hidden="true" />
                 ))}
               </div>
             ) : (
@@ -268,8 +266,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   tone="green" icon={GraduationCap} label={t(c.feesLabel)}
                   title={t(c.feesTitle)}
                   subtitle={t(c.feesSubtitle)}
-                  badge={t(c.feesYear) || undefined}
-                  pending={t(c.feesPending) || undefined}
+                  {...yearOf('fees')}
                 >
                   <div className="flex gap-2 border-b border-ink/5 px-5 py-3" role="group" aria-label="Modalidad de inscripción">
                     {([['nuevo_ingreso', t(c.newTag)], ['reinscripcion', t(c.returningTag)]] as const).map(([key, tag]) => (
@@ -278,7 +275,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                         type="button"
                         aria-pressed={modality === key}
                         onClick={() => setModality(key)}
-                        className={`min-h-[44px] flex-1 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
+                        className={`min-h-[44px] flex-1 rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
                           modality === key ? 'bg-purple text-white' : 'bg-cream text-muted hover:text-ink'
                         }`}
                       >
@@ -322,8 +319,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                 <PriceCard
                   tone="purple" icon={Wallet} label={t(c.tuitionLabel)} title={t(c.tuitionTitle)}
                   subtitle={t(c.tuitionSubtitle)}
-                  badge={t(c.tuitionYear) || undefined}
-                  pending={t(c.tuitionPending) || undefined}
+                  {...yearOf('tuition')}
                 >
                   <ul>
                     {tuition.map((r) => (
@@ -337,8 +333,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="coral" icon={ShieldCheck} label={t(c.insuranceLabel)}
                     title={t(c.insuranceTitle)}
                     subtitle={t(c.insuranceSubtitle)}
-                    badge={t(c.insuranceYear) || undefined}
-                    pending={t(c.insurancePending) || undefined}
+                    {...yearOf('insurance')}
                   >
                     <ul>
                       {seguros.map((s) => (
@@ -356,8 +351,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="pink" icon={Sparkles} label={t(c.extrasLabel)}
                     title={t(c.extrasTitle)}
                     subtitle={t(c.extrasSubtitle)}
-                    badge={t(c.extrasYear) || undefined}
-                    pending={t(c.extrasPending) || undefined}
+                    {...yearOf('extras')}
                   >
                     <ul>
                       {extras.map((e) => (
@@ -372,8 +366,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="purple" icon={Clock} label={t(c.daycareLabel)}
                     title={t(c.daycareTitle)}
                     subtitle={t(c.daycareSubtitle)}
-                    badge={t(c.daycareYear) || undefined}
-                    pending={t(c.daycarePending) || undefined}
+                    {...yearOf('daycare')}
                   >
                     <ul>
                       {estancia.map((d) => (
@@ -396,7 +389,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
 
               {/* Políticas — letra chica visible, recargos/devoluciones destacados */}
               {policies.length > 0 && (
-                <div className="rounded-xl2 border border-ink/10 bg-white p-5 shadow-card">
+                <div className="rounded-md bg-white p-5 shadow-card">
                   {c.policiesTitle && <h2 className="font-head text-lg font-bold text-ink">{t(c.policiesTitle)}</h2>}
                   <ul className="mt-3 space-y-2.5">
                     {policies.map((p) => {
@@ -420,7 +413,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
 
           {/* Always shown (also with the error) so the page below never jumps. */}
           {(c.noteText || c.noteStrong || c.noteLinkLead || c.noteLink?.href) && (
-            <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
+            <div className="mt-6 flex items-start gap-3 rounded-md bg-white p-5 text-sm text-muted shadow-card">
               <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
               <p>
                 {t(c.noteText)}{' '}
@@ -433,7 +426,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
 
           {/* Page CTA — Costos keeps in-page CTAs; sticky Agendar bar stays global */}
           {(c.ctaTitle || c.ctaText || c.ctaPrimary?.href || c.ctaSecondary?.href) && (
-            <div className="mt-10 flex flex-col items-center gap-3 rounded-xl2 bg-dark px-6 py-8 text-center text-white sm:py-10">
+            <div className="mt-10 flex flex-col items-center gap-3 rounded-md bg-dark px-6 py-8 text-center text-white sm:py-10">
               <CircleDollarSign className="h-8 w-8 text-green" aria-hidden="true" />
               {c.ctaTitle && <h2 className="font-head text-fluid-xl font-bold">{t(c.ctaTitle)}</h2>}
               {c.ctaText && <p className="max-w-xl text-sm text-white/70">{t(c.ctaText)}</p>}

@@ -18,7 +18,7 @@ export function CardholderStep({ value, onChange, remember, onRemember, states, 
   const list = states?.length ? states : MX_STATES;
   return (
     <div className="space-y-3">
-      <p className="flex items-start gap-2 rounded-xl border border-line bg-cream/60 px-3 py-2.5 text-xs leading-relaxed text-muted">
+      <p className="flex items-start gap-2 rounded-md bg-cream/60 px-3 py-2.5 text-xs leading-relaxed text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
         Banorte pide los datos del titular de la tarjeta para validar el pago. Escríbalos como aparecen en
         el estado de cuenta de la tarjeta.
@@ -56,7 +56,7 @@ export function CardholderStep({ value, onChange, remember, onRemember, states, 
         </div>
       </div>
       <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink" htmlFor="ch-remember">
-        <input id="ch-remember" type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
+        <input id="ch-remember" type="checkbox" className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
         Guardar estos datos para mis próximas recargas
       </label>
     </div>

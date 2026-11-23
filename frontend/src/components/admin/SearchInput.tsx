@@ -47,7 +47,7 @@ export function SearchInput({ paramKey = 'q', placeholder, label, className = ''
           type="button"
           onClick={() => setInput('')}
           aria-label="Limpiar búsqueda"
-          className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           <X size={16} aria-hidden="true" />
         </button>

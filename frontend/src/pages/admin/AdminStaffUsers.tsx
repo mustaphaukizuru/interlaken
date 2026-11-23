@@ -25,6 +25,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { adminKeys } from '@/hooks/queries/keys';
 import { STAFF_ENTITY, staffImportApi, useStaffBulk, useStaffExport, useStaffList, type StaffListParams } from '@/hooks/queries/staff';
 import { useAuthStore } from '@/store/authStore';
@@ -43,7 +44,7 @@ const IMPORT_HEADERS = [{ key: 'correo', required: true }, { key: 'nombre', requ
 const DEACTIVATE: BulkActionDef = { name: 'deactivate', label: 'Desactivar', danger: true, icon: UserX, planVerb: 'Se desactivarán' };
 const REACTIVATE: BulkActionDef = { name: 'reactivate', label: 'Reactivar', icon: UserCheck, planVerb: 'Se reactivarán' };
 const ROW_ACTION_BASE =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
 const ROW_ACTION = `${ROW_ACTION_BASE} text-purple hover:bg-cream-2`;
 // One color class each: with both, Tailwind's own order (not the class string) picks the winner.
 const ROW_ACTION_DANGER = `${ROW_ACTION_BASE} text-coral-700 hover:bg-coral-50`;
@@ -121,7 +122,7 @@ export default function AdminStaffUsers() {
           <button
             type="button"
             onClick={() => setToView(u)}
-            className="rounded text-left font-medium text-ink hover:text-purple hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="rounded-sm text-left font-medium text-ink hover:text-purple hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
             aria-label={`Ver la cuenta y la actividad de ${u.full_name || u.email}`}
           >
             {u.full_name || u.email}
@@ -348,18 +349,31 @@ export default function AdminStaffUsers() {
 }
 
 function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () => void; onInvited: (r: { user: StaffUser; password: string }) => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Invitar al personal" maxWidth={480}>
-      <InviteForm key={String(open)} onClose={onClose} onInvited={onInvited} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Invitar al personal" maxWidth={480}>
+        <InviteForm key={String(open)} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} onInvited={onInvited} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (r: { user: StaffUser; password: string }) => void }) {
-  const [form, setForm] = useState({ email: '', first_name: '', last_name: '', role: 'staff' as StaffUser['role'] });
-  // A new staff account starts as Secretaría; the admin changes it here.
-  const [access, setAccess] = useState<StaffAccess>({ staff_title: PUESTOS[0].label, staff_areas: [...PUESTOS[0].areas] });
+const INVITE_START = { email: '', first_name: '', last_name: '', role: 'staff' as StaffUser['role'] };
+// A new staff account starts as Secretaría; the admin changes it here.
+const ACCESS_START: StaffAccess = { staff_title: PUESTOS[0].label, staff_areas: [...PUESTOS[0].areas] };
+
+function InviteForm({ onClose, onCancel, onDirty, onInvited }: {
+  onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
+  onInvited: (r: { user: StaffUser; password: string }) => void;
+}) {
+  const [form, setForm] = useState(INVITE_START);
+  const [access, setAccess] = useState<StaffAccess>(ACCESS_START);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  // Areas in any order are the same access.
+  const sorted = (a: StaffAccess) => ({ ...a, staff_areas: [...a.staff_areas].sort() });
+  useReportDirty(valuesDiffer(form, INVITE_START) || valuesDiffer(sorted(access), sorted(ACCESS_START)), onDirty);
   const invite = useMutation({
     mutationFn: () => portalApi.inviteStaff(form.role === 'staff' ? { ...form, ...access } : form),
     onSuccess: ({ data }) => { onInvited({ user: data, password: data.temporary_password }); onClose(); },
@@ -383,7 +397,7 @@ function InviteForm({ onClose, onInvited }: { onClose: () => void; onInvited: (r
       {form.role === 'staff' && <StaffAccessFields value={access} onChange={setAccess} idPrefix="invite" />}
       {errors.staff_areas && <p className="text-xs text-coral">{errors.staff_areas}</p>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={invite.isPending} className="min-h-[44px]"><UserCog className="h-4 w-4" aria-hidden="true" /> Crear cuenta</Button>
       </div>
     </form>
@@ -399,7 +413,7 @@ function RevealModal({ data, onClose }: { data: { user: StaffUser; password: str
   return (
     <Modal open onClose={onClose} title="Contraseña temporal" maxWidth={460}>
       <p className="text-sm text-muted">Entregue este acceso a <strong>{data.user.email}</strong>. No se volverá a mostrar.</p>
-      <div className="rounded-2xl bg-cream/70 p-4 text-center"><code className="select-all break-all font-mono text-xl font-bold text-ink">{data.password}</code></div>
+      <div className="rounded-md bg-cream/70 p-4 text-center"><code className="select-all break-all font-mono text-xl font-bold text-ink">{data.password}</code></div>
       <Button variant="secondary" className="w-full" onClick={copy}>{copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />} Copiar</Button>
       <Button className="w-full" onClick={onClose}>Listo</Button>
     </Modal>
@@ -408,16 +422,24 @@ function RevealModal({ data, onClose }: { data: { user: StaffUser; password: str
 
 /** Name and email; the email is also the address the person signs in with through Google. */
 function EditStaffModal({ user, onClose, onSaved }: { user: StaffUser | null; onClose: () => void; onSaved: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={!!user} onClose={onClose} title="Editar cuenta" maxWidth={480}>
-      {user && <EditStaffForm key={user.id} user={user} onClose={onClose} onSaved={onSaved} />}
-    </Modal>
+    <>
+      <Modal open={!!user} onClose={guard.requestClose} title="Editar cuenta" maxWidth={480}>
+        {user && <EditStaffForm key={user.id} user={user} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} onSaved={onSaved} />}
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function EditStaffForm({ user, onClose, onSaved }: { user: StaffUser; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ first_name: user.first_name, last_name: user.last_name, email: user.email });
+function EditStaffForm({ user, onClose, onCancel, onDirty, onSaved }: {
+  user: StaffUser; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
+  const [start] = useState(() => ({ first_name: user.first_name, last_name: user.last_name, email: user.email }));
+  const [form, setForm] = useState(start);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const save = useMutation({
     mutationFn: () => portalApi.updateStaff(user.id, form),
     onSuccess: () => { onSaved(); toast.success('Cuenta actualizada.'); onClose(); },
@@ -445,7 +467,7 @@ function EditStaffForm({ user, onClose, onSaved }: { user: StaffUser; onClose: (
       </div>
       <Input label="Correo" type="email" inputMode="email" autoComplete="off" required hint="También es el correo con el que entra con «Continuar con Google»." {...field('email')} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={save.isPending} className="min-h-[44px]">Guardar cambios</Button>
       </div>
     </form>
@@ -465,7 +487,7 @@ function StaffActivityModal({ user, onClose }: { user: StaffUser | null; onClose
   return (
     <Modal open={!!user} onClose={onClose} title={u?.full_name || u?.email || 'Cuenta'} maxWidth={560}>
       {u && (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-cream-2 p-4 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md bg-cream-2 p-4 text-sm">
           <div className="col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Correo</dt><dd className="mt-0.5 break-all text-ink">{u.email}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Rol</dt><dd className="mt-0.5 text-ink">{ROLE[u.role] ?? u.role}{u.staff_title ? ` · ${u.staff_title}` : ''}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Estado</dt><dd className="mt-0.5 text-ink">{u.archived_at ? 'Archivada' : u.is_active ? 'Activa' : 'Inactiva'}</dd></div>

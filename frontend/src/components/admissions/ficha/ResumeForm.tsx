@@ -41,7 +41,7 @@ export function ResumeForm({ copy, startOpen = false, className }: { copy: Ficha
       {!startOpen ? (
         <button
           type="button"
-          className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded"
+          className="inline-flex min-h-[44px] items-center text-base font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded-sm"
           aria-expanded={open}
           aria-controls={`${id}-panel`}
           onClick={() => setOpen((v) => !v)}
@@ -49,19 +49,20 @@ export function ResumeForm({ copy, startOpen = false, className }: { copy: Ficha
           {copy.t('resumeToggle')}
         </button>
       ) : null}
-      {open ? <div id={`${id}-panel`} className={clsx(!startOpen && 'mt-3 rounded-xl2 border border-line bg-cream-2 p-4')}>
+      {open ? <div id={`${id}-panel`} className={clsx(!startOpen && 'mt-3')}>
         {done ? (
-          <p role="status" className="flex items-start gap-2 text-[15px] text-ink">
-            <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-dark" aria-hidden="true" />
+          <p role="status" className="flex items-start gap-2 rounded-sm bg-success-bg px-3 py-2.5 text-base text-ink">
+            <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
             <span>{copy.t('resumeDone')}</span>
           </p>
         ) : (
           <form noValidate onSubmit={submit} className="space-y-3">
-            <p className="text-[15px] text-muted">{copy.t('resumeText')}</p>
+            <p className="text-base text-muted">{copy.t('resumeText')}</p>
             <div>
               <label htmlFor={emailId} className="mb-1.5 block text-sm font-semibold text-ink">{copy.t('resumeEmail')}</label>
               <input
                 id={emailId}
+                name="email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -73,7 +74,7 @@ export function ResumeForm({ copy, startOpen = false, className }: { copy: Ficha
                 aria-describedby={error ? `${emailId}-error` : undefined}
                 onChange={(e) => { setEmail(e.target.value); setError(null); }}
               />
-              {error ? <p id={`${emailId}-error`} className="mt-1.5 text-sm font-medium text-coral-700">{error}</p> : null}
+              {error ? <p id={`${emailId}-error`} className="mt-1.5 text-sm font-medium text-danger">{error}</p> : null}
             </div>
             <Button type="submit" variant="secondary" loading={busy} disabled={!email.trim()} className="w-full sm:w-auto">
               {copy.t('resumeSubmit')}

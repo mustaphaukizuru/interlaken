@@ -5,6 +5,9 @@
  * nothing, the button does (e-mail scanners pre-open links); the token is
  * never sent to another site (referrer meta). The editor preview shows the
  * page as a parent sees it before confirming, with sample data.
+ *
+ * Media round (owner 2026-11-22): before confirming, the card opens on the
+ * envelope illustration; the outcomes keep their status badges.
  */
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -14,6 +17,8 @@ import { Helmet } from 'react-helmet-async';
 // (AlertTriangle, RefreshCw, <Button>) split them out of it and grew every page's download.
 import { CheckCircle2, CircleAlert, Clock, Info, MailCheck, RotateCw } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { Illustration } from '@/components/ui/Illustration';
+import { isIllustration } from '@/lib/illustrations';
 import { api, type NotifyEmailLink } from '@/services/api';
 import { useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
@@ -59,7 +64,7 @@ function Shell({ c, children }: { c: Copy; children: ReactNode }) {
               <Logo variant="stacked" size={88} theme="light" eager />
             </Link>
           </div>
-          <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-8 sm:py-9">
+          <div className="rounded-md bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-8 sm:py-9">
             {children}
           </div>
           <p className="mt-6 text-center text-xs leading-relaxed text-subtle">
@@ -78,7 +83,7 @@ function Badge({ tone, children }: { tone: 'brand' | 'success' | 'warning' | 'da
     warning: 'bg-amber/15 text-amber',
     danger: 'bg-coral/10 text-coral-dark',
   };
-  return <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${tones[tone]}`} aria-hidden="true">{children}</span>;
+  return <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-md ${tones[tone]}`} aria-hidden="true">{children}</span>;
 }
 
 /** The facts the link confirms, as label/value rows. */
@@ -92,7 +97,7 @@ function Facts({ link, c }: { link: NotifyEmailLink; c: Copy }) {
   rows.push([c('factReceives'), c('factReceivesValue')]);
   if (link.expires_at) rows.push([c('factExpires'), fmtExpiry(link.expires_at)]);
   return (
-    <dl className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-cream-2/60 text-sm">
+    <dl className="mt-6 divide-y divide-line overflow-hidden rounded-md bg-cream-2/60 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="grid gap-0.5 px-4 py-3 sm:grid-cols-[120px_1fr] sm:gap-3">
           <dt className="text-subtle">{k}</dt>
@@ -145,12 +150,16 @@ function Outcome({ link, c, portal }: { link: NotifyEmailLink; c: Copy; portal: 
   );
 }
 
-function Ready({ link, c, pending, failed, onConfirm }: { link: NotifyEmailLink; c: Copy; pending: boolean; failed: boolean; onConfirm: () => void }) {
+function Ready({ link, c, art, pending, failed, onConfirm }: { link: NotifyEmailLink; c: Copy; art: unknown; pending: boolean; failed: boolean; onConfirm: () => void }) {
   const whose = link.account?.is_student ? fill(c('whoseStudent'), { nombre: link.account.name }) : c('whoseAccount');
+  // «none» shows the old badge; content saved before the field existed shows the envelope.
+  const illustration = art === 'none' ? undefined : isIllustration(art) ? art : 'mensaje';
   return (
     <>
       <div className="text-center">
-        <Badge tone="brand"><MailCheck size={28} /></Badge>
+        {illustration
+          ? <Illustration name={illustration} size={128} priority className="mx-auto -mt-2" />
+          : <Badge tone="brand"><MailCheck size={28} /></Badge>}
         <h1 className="mt-5 font-head text-fluid-xl font-extrabold text-ink">{c('readyTitle')}</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-muted">
           <WithEmail text={fill(c('readyText'), { quien: whose })} email={link.email} />
@@ -158,7 +167,7 @@ function Ready({ link, c, pending, failed, onConfirm }: { link: NotifyEmailLink;
       </div>
       <Facts link={link} c={c} />
       {link.separate_account && (
-        <p className="mt-4 flex gap-2.5 rounded-xl border border-purple/20 bg-purple/[0.05] px-4 py-3 text-[13px] leading-relaxed text-ink">
+        <p className="mt-4 flex gap-2.5 rounded-md border border-purple/20 bg-purple/[0.05] px-4 py-3 text-[13px] leading-relaxed text-ink">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
           <span>{c('separateAccount')}</span>
         </p>
@@ -209,7 +218,7 @@ function ConfirmEmailView(p: Props) {
     mutationFn: () => notifyEmailLinkApi.confirm(token).then((r) => r.data),
   });
 
-  if (preview) return <Shell c={c}><Ready link={SAMPLE} c={c} pending={false} failed={false} onConfirm={() => {}} /></Shell>;
+  if (preview) return <Shell c={c}><Ready link={SAMPLE} c={c} art={p.illustration} pending={false} failed={false} onConfirm={() => {}} /></Shell>;
   if (!token) return <Shell c={c}><Outcome link={{ state: 'invalid' }} c={c} portal={portalLink} /></Shell>;
   if (query.isLoading) {
     return (
@@ -243,7 +252,7 @@ function ConfirmEmailView(p: Props) {
 
   return (
     <Shell c={c}>
-      <Ready link={link} c={c} pending={confirm.isPending} failed={confirm.isError && !linkOf(confirm.error)} onConfirm={() => confirm.mutate()} />
+      <Ready link={link} c={c} art={p.illustration} pending={confirm.isPending} failed={confirm.isError && !linkOf(confirm.error)} onConfirm={() => confirm.mutate()} />
     </Shell>
   );
 }
@@ -257,6 +266,7 @@ export const sections = [
       ...grouped('Antes de confirmar', [
         f.text('readyTitle', 'Título'),
         f.textarea('readyText', 'Texto'),
+        f.illustration('illustration', 'Ilustración', { hint: 'Arriba del título. Sin elegir, el sobre con avión de papel.' }),
         f.text('whoseAccount', '{quien} para la cuenta de un tutor'),
         f.text('whoseStudent', '{quien} para un alumno'),
         f.text('factStudent', 'Dato: alumno'), f.text('factAccount', 'Dato: cuenta'), f.text('factEmail', 'Dato: correo'),
@@ -284,7 +294,7 @@ export const sections = [
       ]),
     ],
     defaults: {
-      readyTitle: 'Confirme su correo para avisos',
+      readyTitle: 'Confirme su correo para avisos', illustration: 'mensaje',
       readyText: 'Los avisos {quien} llegarán también a {correo}.',
       whoseAccount: 'de su cuenta', whoseStudent: 'de {nombre}',
       factStudent: 'Alumno', factAccount: 'Cuenta', factEmail: 'Correo', factReceives: 'Recibirá',

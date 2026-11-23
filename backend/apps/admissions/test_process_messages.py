@@ -383,7 +383,7 @@ def test_accepted_result_carries_the_ficha_link_by_email(admin_client):
     # The email: the result, the link as its button, the plain part verbatim.
     assert len(mail.outbox) == 1
     msg = mail.outbox[0]
-    assert msg.subject == "Resultado del examen de admisión de Lucía Prueba Ejemplo"
+    assert msg.subject == "Resultado del examen de admisión"  # D13: no name in the subject
     assert r.data["link"] in msg.body
     html = msg.alternatives[0][0]
     assert "Llenar la ficha de inscripción" in html and "enlace personal (vence el" in html

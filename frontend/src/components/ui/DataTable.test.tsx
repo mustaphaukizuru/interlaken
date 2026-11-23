@@ -1,11 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useState } from 'react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Inbox } from 'lucide-react';
 import { DataTable, type Column, type DataTableSelection } from './DataTable';
+import { Modal } from './Modal';
 import type { SortState } from './SortableTh';
 import { stubViewport } from '@/test/viewport';
 import { defaultsKey, prefsKey } from '@/hooks/useTablePrefs';
+import { DIALOG_WAIT_MS, FLASH_MS } from '@/hooks/useReturnHighlight';
+import { lastOpenedScope, peekOpened, rememberOpened } from '@/lib/lastOpened';
 
 interface Row { id: number; name: string; amount: number }
 
@@ -241,5 +245,203 @@ describe('DataTable · a new default-hidden column reaches saved prefs', () => {
     render(<DataTable<Row> tableId="t-new" columnControls columns={cols} rows={ROWS} rowKey={(r) => r.id} />);
     expect(screen.queryByRole('columnheader', { name: 'Notas' })).not.toBeInTheDocument();
     expect(screen.getByRole('table')).toHaveClass('admin-table--dense');
+  });
+
+  it('tells «no results» (with «Limpiar filtros») apart from a first-use empty table', async () => {
+    const onClear = vi.fn();
+    const empty = { icon: Inbox, title: 'Aún no hay pagos' };
+    const { rerender } = render(<DataTable<Row> columns={COLUMNS} rows={[]} rowKey={(r) => r.id} empty={empty} />);
+    expect(screen.getByText('Aún no hay pagos')).toBeInTheDocument();
+    rerender(<DataTable<Row> columns={COLUMNS} rows={[]} rowKey={(r) => r.id} empty={empty} noResults={{ onClear }} />);
+    expect(screen.queryByText('Aún no hay pagos')).not.toBeInTheDocument();
+    expect(screen.getByText('Sin resultados')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves low-priority columns out of the stacked phone rows only', () => {
+    const cols: Column<Row>[] = [
+      { id: 'name', header: 'Nombre', cell: (r) => r.name },
+      { id: 'amount', header: 'Monto', priority: 'low', cell: (r) => r.amount },
+    ];
+    stubViewport(390);
+    const { unmount } = render(<DataTable<Row> columns={cols} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(screen.getByText('Ana')).toBeInTheDocument();
+    expect(screen.queryByText('20')).not.toBeInTheDocument();
+    unmount();
+    stubViewport(1280);
+    render(<DataTable<Row> columns={cols} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(screen.getByText('20')).toBeInTheDocument();
+  });
+
+  it('counts pages with es-MX grouping', () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `N${i}`, amount: i }));
+    render(<DataTable<Row> columns={COLUMNS} rows={many} rowKey={(r) => r.id} page={2} count={1234} onPage={() => {}} itemLabel="pagos" />);
+    expect(screen.getByRole('navigation', { name: 'Paginación' })).toHaveTextContent('21–40 de 1,234 pagos');
+  });
+});
+
+describe('DataTable · back to the same row', () => {
+  const scope = (id: string) => lastOpenedScope(id);
+  const rowOf = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+  const flashed = () => document.querySelectorAll('[data-last-opened]');
+
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    vi.useRealTimers();
+    sessionStorage.clear();
+  });
+
+  it('points at the remembered row once, then forgets it', () => {
+    rememberOpened(scope('t-back'), 2);
+    const view = () => <DataTable<Row> tableId="t-back" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />;
+    const { unmount } = render(view());
+    expect(rowOf('Beto')).toHaveAttribute('data-last-opened', 'true');
+    expect(rowOf('Beto').className).toMatch(/flash[AB]/);
+    expect(rowOf('Ana')).not.toHaveAttribute('data-last-opened');
+    // Spent: the memory is gone and a second visit points at nothing.
+    expect(peekOpened(scope('t-back'))).toBeNull();
+    unmount();
+    render(view());
+    expect(flashed()).toHaveLength(0);
+  });
+
+  it('points at nothing when no row was opened, nor at a row of another table', () => {
+    rememberOpened(scope('another-table'), 1);
+    render(<DataTable<Row> tableId="t-none" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(flashed()).toHaveLength(0);
+    expect(peekOpened(scope('another-table'))).toBe('1');
+  });
+
+  it('waits for rows that load late', () => {
+    rememberOpened(scope('t-late'), 2);
+    const { rerender } = render(<DataTable<Row> tableId="t-late" columns={COLUMNS} rows={undefined} rowKey={(r) => r.id} isLoading />);
+    expect(flashed()).toHaveLength(0);
+    rerender(<DataTable<Row> tableId="t-late" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(rowOf('Beto')).toHaveAttribute('data-last-opened', 'true');
+  });
+
+  it('drops a row the loaded page does not have, so it does not flash on a later page', () => {
+    rememberOpened(scope('t-gone'), 3);
+    const { rerender } = render(<DataTable<Row> tableId="t-gone" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(flashed()).toHaveLength(0);
+    rerender(<DataTable<Row> tableId="t-gone" columns={COLUMNS} rows={[{ id: 3, name: 'Caro', amount: 5 }]} rowKey={(r) => r.id} />);
+    expect(rowOf('Caro')).not.toHaveAttribute('data-last-opened');
+  });
+
+  it('lets the tint go after about 2 s', () => {
+    vi.useFakeTimers();
+    rememberOpened(scope('t-fade'), 1);
+    render(<DataTable<Row> tableId="t-fade" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(rowOf('Ana')).toHaveAttribute('data-last-opened', 'true');
+    act(() => { vi.advanceTimersByTime(FLASH_MS); });
+    expect(rowOf('Ana')).not.toHaveAttribute('data-last-opened');
+    expect(rowOf('Ana').className).not.toMatch(/flash[AB]/);
+  });
+
+  it('remembers the row a link opened and points at it when the list comes back', async () => {
+    const cols: Column<Row>[] = [
+      ...COLUMNS.slice(0, 1),
+      { id: 'open', header: 'Ficha', cell: (r) => <a href={`#ficha-${r.id}`} onClick={(e) => e.preventDefault()}>Ver ficha de {r.name}</a> },
+    ];
+    const view = () => <DataTable<Row> tableId="t-route" columns={cols} rows={ROWS} rowKey={(r) => r.id} />;
+    const { unmount } = render(view());
+    await userEvent.click(screen.getByRole('link', { name: 'Ver ficha de Beto' }));
+    expect(peekOpened(scope('t-route'))).toBe('2');
+    // The detail route replaces the list; the memory waits for the way back.
+    unmount();
+    expect(peekOpened(scope('t-route'))).toBe('2');
+    render(view());
+    expect(rowOf('Beto')).toHaveAttribute('data-last-opened', 'true');
+  });
+
+  it('remembers a row opened by row click or by Enter on the row', async () => {
+    const onRowClick = vi.fn();
+    render(<DataTable<Row> tableId="t-rowclick" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} onRowClick={onRowClick} />);
+    await userEvent.click(screen.getByText('Beto'));
+    expect(peekOpened(scope('t-rowclick'))).toBe('2');
+    rowOf('Ana').focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onRowClick).toHaveBeenLastCalledWith(ROWS[0]);
+    expect(peekOpened(scope('t-rowclick'))).toBe('1');
+  });
+
+  it('forgets a click that opened nothing, and never counts the selection checkbox', () => {
+    vi.useFakeTimers();
+    render(
+      <DataTable<Row>
+        tableId="t-inplace"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        rowLabel={(r) => r.name}
+        selection={{ selected: new Set(), onChange: vi.fn() }}
+        rowActions={(r) => <button type="button">Marcar {r.name}</button>}
+      />,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Ana' }));
+    expect(peekOpened(scope('t-inplace'))).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar Ana' }));
+    expect(peekOpened(scope('t-inplace'))).toBe('1');
+    act(() => { vi.advanceTimersByTime(DIALOG_WAIT_MS); });
+    expect(peekOpened(scope('t-inplace'))).toBeNull();
+    expect(flashed()).toHaveLength(0);
+  });
+
+  it('points at the row when the dialog opened from it closes', async () => {
+    function Page() {
+      const [editing, setEditing] = useState<Row | null>(null);
+      return (
+        <>
+          <DataTable<Row>
+            tableId="t-dialog"
+            columns={COLUMNS}
+            rows={ROWS}
+            rowKey={(r) => r.id}
+            rowActions={(r) => <button type="button" onClick={() => setEditing(r)}>Editar {r.name}</button>}
+          />
+          <Modal open={!!editing} onClose={() => setEditing(null)} title="Editar">
+            <p>Editando a {editing?.name}</p>
+          </Modal>
+        </>
+      );
+    }
+    render(<Page />);
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Beto' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(flashed()).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => expect(rowOf('Beto')).toHaveAttribute('data-last-opened', 'true'));
+    expect(rowOf('Ana')).not.toHaveAttribute('data-last-opened');
+    expect(peekOpened(scope('t-dialog'))).toBeNull();
+  });
+
+  it('points at the row when the side panel beside the list closes (openKey)', () => {
+    const view = (openKey: number | null) => (
+      <DataTable<Row> tableId="t-panel" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} openKey={openKey} />
+    );
+    const { rerender } = render(view(1));
+    expect(flashed()).toHaveLength(0);
+    rerender(view(2));
+    expect(flashed()).toHaveLength(0);
+    rerender(view(null));
+    expect(rowOf('Beto')).toHaveAttribute('data-last-opened', 'true');
+  });
+
+  it('restarts the fade when the same row is pointed at again', () => {
+    const view = (openKey: number | null) => (
+      <DataTable<Row> tableId="t-again" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} openKey={openKey} />
+    );
+    const { rerender } = render(view(1));
+    rerender(view(null));
+    const first = rowOf('Ana').className.match(/flash[AB]/)?.[0];
+    rerender(view(1));
+    rerender(view(null));
+    const second = rowOf('Ana').className.match(/flash[AB]/)?.[0];
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
   });
 });

@@ -22,7 +22,7 @@ export interface FieldGroupProps {
 export function FieldGroup({ id, title, open, onToggle, filled, total, required, requiredFilled, errors, children }: FieldGroupProps) {
   const regionId = `${id}-panel`;
   return (
-    <section className={`rounded-xl border bg-white ${errors ? 'border-coral-300' : 'border-line'}`} data-field-group={title}>
+    <section className={`rounded-md border bg-white ${errors ? 'border-coral-300' : 'border-line'}`} data-field-group={title}>
       <h3 className="m-0">
         <button
           type="button"
@@ -30,7 +30,7 @@ export function FieldGroup({ id, title, open, onToggle, filled, total, required,
           aria-expanded={open}
           aria-controls={regionId}
           onClick={onToggle}
-          className="flex min-h-[48px] w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-cream-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple"
+          className="flex min-h-[48px] w-full items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-cream-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple"
         >
           <ChevronDown size={16} className={`shrink-0 text-subtle transition-transform duration-150 ${open ? '' : '-rotate-90'}`} aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate [contain:inline-size] text-sm font-bold text-ink">{title}</span>

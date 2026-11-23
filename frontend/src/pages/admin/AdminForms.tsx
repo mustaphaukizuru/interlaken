@@ -18,6 +18,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import {
   FORMS_ENTITY, SUBMISSIONS_ENTITY, useFormsBulk, useFormsExport, useFormsList, useSubmissionsBulk, useSubmissionsExport, useSubmissionsList,
 } from '@/hooks/queries/AdminContentQueries';
@@ -224,8 +225,11 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
     onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.fields || f.slug || f.detail || 'Revise los campos.'); },
   });
   const submit = (e: FormEvent) => { e.preventDefault(); setErrors({}); save.mutate(); };
+  // Closing with edits asks first; a successful save closes through onSaved.
+  const guard = useDirtyCloseGuard(onClose, valuesDiffer(form, initial));
   return (
-    <Modal open onClose={onClose} title={form.id ? 'Editar formulario' : 'Nuevo formulario'} maxWidth={760}>
+    <>
+    <Modal open onClose={guard.requestClose} title={form.id ? 'Editar formulario' : 'Nuevo formulario'} maxWidth={760}>
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Título" value={form.title ?? ''} onChange={(e) => setF({ title: e.target.value })} required error={errors.title} />
@@ -242,7 +246,7 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
           <legend className="label">Campos</legend>
           {errors.fields && <p className="text-sm text-coral-600" role="alert">{errors.fields}</p>}
           {fields.map((f, i) => (
-            <div key={i} className="space-y-2 rounded-xl border border-line bg-cream-2 p-3">
+            <div key={i} className="space-y-2 rounded-md bg-cream-2 p-3">
               <div className="grid gap-2 sm:grid-cols-[1fr_1fr_140px_auto]">
                 <Input label="Etiqueta" value={f.label} onChange={(e) => setField(i, { label: e.target.value, key: f.key || slugify(e.target.value).replace(/-/g, '_') })} />
                 <Input label="Clave" value={f.key} onChange={(e) => setField(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })} hint="minúsculas, sin espacios" />
@@ -253,9 +257,9 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
                   </select>
                 </div>
                 <div className="flex items-end gap-1 pb-1">
-                  <button type="button" aria-label="Subir" disabled={i === 0} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => move(i, -1)}><ArrowUp size={14} /></button>
-                  <button type="button" aria-label="Bajar" disabled={i === fields.length - 1} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => move(i, 1)}><ArrowDown size={14} /></button>
-                  <button type="button" aria-label="Quitar campo" className="rounded p-1 text-subtle hover:text-coral-600" onClick={() => setF({ fields: fields.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
+                  <button type="button" aria-label="Subir" disabled={i === 0} className="rounded-sm p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => move(i, -1)}><ArrowUp size={14} /></button>
+                  <button type="button" aria-label="Bajar" disabled={i === fields.length - 1} className="rounded-sm p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => move(i, 1)}><ArrowDown size={14} /></button>
+                  <button type="button" aria-label="Quitar campo" className="rounded-sm p-1 text-subtle hover:text-coral-600" onClick={() => setF({ fields: fields.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -278,9 +282,11 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
           <Button type="button" size="sm" variant="secondary" onClick={() => setF({ fields: [...fields, { key: '', label: '', type: 'text' }] })}><Plus size={14} aria-hidden="true" /> Agregar campo</Button>
         </fieldset>
 
-        <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" loading={save.isPending}>Guardar</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={guard.requestClose}>Cancelar</Button><Button type="submit" loading={save.isPending}>Guardar</Button></div>
       </form>
     </Modal>
+    {guard.dialog}
+    </>
   );
 }
 

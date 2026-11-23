@@ -11,7 +11,7 @@ export const changesLabel = (n: number) => `${n} ${n === 1 ? 'cambio' : 'cambios
  */
 export function ChangeList({ def, changes }: { def: TableDef; changes: RowChange[] }) {
   return (
-    <section aria-labelledby={`chg-${def.key}`} className="rounded-xl border border-line">
+    <section aria-labelledby={`chg-${def.key}`} className="rounded-md border border-line">
       <h3 id={`chg-${def.key}`} className="flex items-baseline justify-between gap-3 border-b border-line bg-cream-2 px-4 py-2.5 font-head text-sm font-bold text-ink">
         {def.title}
         <span className="text-xs font-semibold text-subtle">{changesLabel(changes.length)}</span>

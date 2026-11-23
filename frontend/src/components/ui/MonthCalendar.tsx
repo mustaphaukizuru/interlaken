@@ -59,7 +59,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
   const canGoPrev = startOfMonth(viewMonth) > startOfMonth(today);
 
   return (
-    <div className="rounded-xl2 border border-line bg-white p-4 shadow-card sm:p-5">
+    <div className="rounded-md bg-white p-4 shadow-card sm:p-5">
       {/* Header: month + prev/next */}
       <div className="mb-4 flex items-center justify-between">
         <button
@@ -67,7 +67,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
           onClick={() => canGoPrev && setNavMonth(subMonths(viewMonth, 1))}
           disabled={!canGoPrev}
           aria-label="Mes anterior"
-          className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30"
+          className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-sm text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30"
         >
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -78,7 +78,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
           type="button"
           onClick={() => setNavMonth(addMonths(viewMonth, 1))}
           aria-label="Mes siguiente"
-          className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-sm text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -111,7 +111,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
               <div
                 key={iso}
                 aria-hidden="true"
-                className={`flex aspect-square items-center justify-center rounded-xl text-sm ${
+                className={`flex aspect-square items-center justify-center rounded-md text-sm ${
                   isToday(day) ? 'font-bold text-ink ring-1 ring-inset ring-line' : 'text-subtle/50'
                 }`}
               >
@@ -132,7 +132,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
               }`}
               // aspect-square yields ~40px cells at 360px wide (under the 44px touch
               // minimum), so phones get min-h instead; squares return from sm: up.
-              className={`group relative flex min-h-[44px] sm:aspect-square sm:min-h-0 flex-col items-center justify-center rounded-xl text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 focus-visible:ring-offset-1 motion-reduce:transition-none ${
+              className={`group relative flex min-h-[44px] sm:aspect-square sm:min-h-0 flex-col items-center justify-center rounded-sm text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 focus-visible:ring-offset-1 motion-reduce:transition-none ${
                 selected
                   ? 'bg-purple text-white shadow-purple'
                   : 'bg-brand-50 text-brand-700 hover:-translate-y-0.5 hover:bg-brand-100 hover:shadow-sm motion-reduce:hover:translate-y-0'
@@ -156,10 +156,10 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
       {/* Legend */}
       <div className="mt-4 flex items-center gap-4 border-t border-line pt-3 text-[11px] text-subtle">
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-[5px] bg-brand-50 ring-1 ring-inset ring-brand-200" /> Disponible
+          <span className="h-3 w-3 rounded-sm bg-brand-50 ring-1 ring-inset ring-brand-200" /> Disponible
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-[5px] bg-purple" /> Seleccionado
+          <span className="h-3 w-3 rounded-sm bg-purple" /> Seleccionado
         </span>
       </div>
     </div>

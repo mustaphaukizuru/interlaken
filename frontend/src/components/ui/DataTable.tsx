@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, SearchX } from 'lucide-react';
 import { SortableTh, type SortState } from '@/components/ui/SortableTh';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { ColumnControls } from '@/components/admin/ColumnControls';
 import { ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useTablePrefs } from '@/hooks/useTablePrefs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useReturnHighlight } from '@/hooks/useReturnHighlight';
 import type { DataTableSelection, RowKey } from '@/hooks/useRowSelection';
 
 export type { DataTableSelection, RowKey } from '@/hooks/useRowSelection';
@@ -39,6 +41,9 @@ export interface Column<Row> {
   minWidth?: number;
   /** Cut a text cell to this many px with an ellipsis; the full text shows as a tooltip. */
   truncate?: number;
+  /** `low`: left out of the stacked phone rows (below md); the table shows it.
+   *  Default: shown everywhere. */
+  priority?: 'high' | 'low';
 }
 
 /** What a cell renders when it has nothing to show: one muted dash, everywhere. */
@@ -73,6 +78,10 @@ interface Props<Row> {
   isError?: boolean;
   onRetry?: () => void;
   empty?: { icon: LucideIcon; title: string; description?: string; action?: ReactNode };
+  /** Pass while filters or a search are active: an empty result then reads
+   *  «Sin resultados» with a «Limpiar filtros» action instead of the
+   *  first-use `empty` state (which says there is nothing at all). */
+  noResults?: { onClear?: () => void; title?: string; description?: string };
   /** Row-level className, e.g. to dim cancelled rows. */
   rowClassName?: (row: Row) => string;
   /** Extra classes on the scroll wrapper: `hidden md:block` for a desktop-only
@@ -104,6 +113,10 @@ interface Props<Row> {
   rowLabel?: (row: Row) => string;
   /** Screen-reader caption for the table. */
   caption?: string;
+  /** Key of the record shown beside the table (a side panel that is not a
+   *  dialog); when it goes back to null, its row is pointed at again. Detail
+   *  routes and dialogs opened from a row are noticed without it. */
+  openKey?: RowKey | null;
 }
 
 const MIN_WIDTH = 56;
@@ -124,9 +137,9 @@ const MIN_WIDTH = 56;
  */
 export function DataTable<Row>({
   columns, rows, rowKey, sort, onSort, page, count = 0, onPage, pageSize = ADMIN_PAGE_SIZE, itemLabel = 'resultados',
-  isLoading, isError, onRetry, empty, rowClassName, wrapClassName = '',
+  isLoading, isError, onRetry, empty, noResults, rowClassName, wrapClassName = '',
   tableId, selection, toolbar, bulkBar, columnControls = false, pinFirstColumn = false, pinActions = false, resizable = false,
-  onRowClick, stickyHeader = true, rowActions, rowLabel, caption,
+  onRowClick, stickyHeader = true, rowActions, rowLabel, caption, openKey,
 }: Props<Row>) {
   const cols = useMemo(
     () => columns.map((c) => ({ ...c, id: c.id ?? c.header, hideable: c.hideable ?? true })),
@@ -134,8 +147,12 @@ export function DataTable<Row>({
   );
   const defaultHidden = useMemo(() => cols.filter((c) => c.defaultHidden).map((c) => c.id), [cols]);
   const prefs = useTablePrefs(tableId, { defaultHidden });
-  const visible = useMemo(() => cols.filter((c) => !c.hideable || !prefs.isHidden(c.id)), [cols, prefs]);
   const isMd = useMediaQuery('(min-width: 768px)');
+  // Low-priority columns stay out of the stacked phone rows (below md).
+  const visible = useMemo(
+    () => cols.filter((c) => (!c.hideable || !prefs.isHidden(c.id)) && (isMd || c.priority !== 'low')),
+    [cols, prefs, isMd],
+  );
   const isLg = useMediaQuery('(min-width: 1024px)');
   const canResize = resizable && isMd;
 
@@ -202,6 +219,26 @@ export function DataTable<Row>({
   const showSelectAllMatching =
     !!selection?.onSelectAllMatching && allOnPage && !selection.allMatching && matching > selection.selected.size;
 
+  // ── «volver a la misma fila» ──
+  // The row a person opened (detail route, dialog, side panel) is tinted for
+  // about 2 s when they come back, and scrolled into view only if hidden.
+  const tableRef = useRef<HTMLTableElement>(null);
+  const back = useReturnHighlight({
+    listId: tableId ?? caption,
+    keys: rows && !isError ? pageKeys : undefined,
+    settled: !isLoading,
+    openKey,
+    rootRef: tableRef,
+  });
+  // A link, a button or the row itself may open the record: remember the row.
+  // Form controls (the selection checkbox, inline edits) open nothing.
+  const noteRowOpen = (key: RowKey) => (e: MouseEvent<HTMLTableRowElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('input,select,textarea,label')) return;
+    if (!onRowClick && !target.closest('a[href],button,[role="menuitem"]')) return;
+    back.noteOpen(key);
+  };
+
   // ── row click ──
   const rowClick = (row: Row) => (e: MouseEvent<HTMLTableRowElement>) => {
     if (!onRowClick) return;
@@ -213,6 +250,7 @@ export function DataTable<Row>({
     if (!onRowClick || e.target !== e.currentTarget) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      back.noteOpen(rowKey(row));
       onRowClick(row);
     }
   };
@@ -224,7 +262,18 @@ export function DataTable<Row>({
   let body: ReactNode;
   if (isError) body = <ErrorState onRetry={onRetry} />;
   else if (isLoading && !rows) body = <TableSkeleton />;
-  else if (!rows || rows.length === 0) {
+  else if ((!rows || rows.length === 0) && noResults) {
+    body = (
+      <EmptyState
+        icon={SearchX}
+        title={noResults.title ?? 'Sin resultados'}
+        description={noResults.description ?? 'Nada coincide con la búsqueda o los filtros.'}
+        action={noResults.onClear ? (
+          <Button variant="secondary" size="sm" onClick={noResults.onClear}>Limpiar filtros</Button>
+        ) : undefined}
+      />
+    );
+  } else if (!rows || rows.length === 0) {
     body = empty ? <EmptyState icon={empty.icon} title={empty.title} description={empty.description} action={empty.action} /> : null;
   } else {
     const sortable = sort && onSort;
@@ -235,6 +284,7 @@ export function DataTable<Row>({
         aria-busy={isLoading || undefined}
       >
         <table
+          ref={tableRef}
           className={[
             'admin-table',
             prefs.density === 'dense' ? 'admin-table--dense' : '',
@@ -256,7 +306,7 @@ export function DataTable<Row>({
                   <input
                     ref={headRef}
                     type="checkbox"
-                    className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                    className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                     aria-label={allOnPage ? 'Quitar la selección de esta página' : 'Seleccionar todas las filas de esta página'}
                     checked={allOnPage}
                     onChange={togglePage}
@@ -312,14 +362,17 @@ export function DataTable<Row>({
             {rows.map((row) => {
               const key = rowKey(row);
               const isSelected = !!selection && (selection.allMatching || selection.selected.has(key));
+              const flash = back.flashProps(key);
               return (
                 // Row click is a pointer shortcut; the same target is always
                 // reachable through a link/button in a cell, and the row itself
                 // takes Enter/Space when focused.
                 <tr
                   key={key}
-                  className={`${rowClassName?.(row) ?? ''} ${isSelected ? 'admin-table__row--selected' : ''}`.trim() || undefined}
+                  className={[rowClassName?.(row), isSelected ? 'admin-table__row--selected' : '', flash?.className].filter(Boolean).join(' ') || undefined}
+                  data-last-opened={flash?.['data-last-opened']}
                   aria-selected={selection ? isSelected : undefined}
+                  onClickCapture={noteRowOpen(key)}
                   onClick={onRowClick ? rowClick(row) : undefined}
                   onKeyDown={onRowClick ? rowKeyDown(row) : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
@@ -328,7 +381,7 @@ export function DataTable<Row>({
                     <td className="admin-table__select" data-label="Seleccionar">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+                        className="h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
                         aria-label={`Seleccionar ${labelOf(row)}`}
                         checked={isSelected}
                         onChange={() => toggleRow(key)}
@@ -366,7 +419,7 @@ export function DataTable<Row>({
                               aria-expanded={open}
                               aria-haspopup="true"
                               aria-label={`Acciones de ${labelOf(row)}`}
-                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 md:min-h-[36px] md:min-w-[36px]"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 md:min-h-[36px] md:min-w-[36px]"
                             >
                               <MoreHorizontal size={18} aria-hidden="true" />
                             </button>
@@ -404,7 +457,7 @@ export function DataTable<Row>({
       {/* The bulk bar carries the select-all-matching affordance itself; the
           inline banner is for tables that render selection without a bar. */}
       {selection && !bulkBar && (showSelectAllMatching || selection.allMatching) && (
-        <p className="mb-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700" role="status">
+        <p className="mb-2 rounded-sm bg-brand-50 px-3 py-2 text-sm text-brand-700" role="status">
           {selection.allMatching ? (
             <>
               Las <strong>{matching.toLocaleString('es-MX')}</strong> filas que coinciden con los filtros están seleccionadas.{' '}

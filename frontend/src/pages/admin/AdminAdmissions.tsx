@@ -97,7 +97,7 @@ export default function AdminAdmissions() {
       tabIndex={view === value ? 0 : -1}
       onClick={() => switchTo(value)}
       onKeyDown={onTabKey}
-      className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+      className={`inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
         view === value ? 'bg-purple text-white' : 'bg-white text-muted ring-1 ring-line hover:text-ink'
       }`}
     >
@@ -419,12 +419,12 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
         rowActions={(r) => (
           <>
             <button type="button" onClick={() => onReview(r.id)} aria-label={`Revisar expediente de ${r.child_name}`}
-              className="inline-flex min-h-[44px] items-center rounded-lg bg-cream px-3 text-xs font-semibold text-ink hover:bg-line sm:min-h-[36px]">
+              className="inline-flex min-h-[44px] items-center rounded-sm bg-cream px-3 text-xs font-semibold text-ink hover:bg-line sm:min-h-[36px]">
               Revisar
             </button>
             {r.pre_registration ? (
               <Link to={`/admin/admisiones/${r.pre_registration}`} aria-label={`Abrir el expediente de admisión de ${r.child_name}`}
-                className="inline-flex min-h-[44px] items-center gap-1 rounded-lg px-3 text-xs font-semibold text-purple hover:bg-purple/5 sm:min-h-[36px]">
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-sm px-3 text-xs font-semibold text-purple hover:bg-purple/5 sm:min-h-[36px]">
                 <FolderOpenDot size={14} aria-hidden="true" /> Expediente
               </Link>
             ) : null}

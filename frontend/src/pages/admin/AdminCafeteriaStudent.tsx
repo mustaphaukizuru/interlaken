@@ -1,4 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatMXN } from '@/lib/format';
+import { shortDate, shortDateTime } from '@/lib/tableFormat';
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -6,15 +8,12 @@ import {
   Plus, Minus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { cafeteriaApi } from '@/services/api';
@@ -25,7 +24,10 @@ import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
 import { isCardTopUp } from '@/lib/status/cafeteria';
 import { useAdjustmentsList, useTransactionsList, CAF_MONEY_VIEWS } from '@/hooks/queries/cafeteria';
 import { invalidateEntity } from '@/hooks/queries/keys';
-import { apiErrorMessage } from '@/lib/apiErrors';
+import { useUrlPage } from '@/hooks/useUrlFilters';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
+import { newRequestId } from '@/lib/requestId';
+import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
 import type { AdminTransaction } from '@/services/cafeteriaAdmin';
 import type { ExportFormat } from '@/services/dataOps';
 
@@ -43,9 +45,22 @@ const txLabel = (type: string) => {
   return 'Compra';
 };
 
-const fmtDate = (d: string) => format(new Date(d), "d 'de' MMM yyyy, HH:mm", { locale: es });
-// A calendar date (YYYY-MM-DD) is that local day, not UTC midnight.
-const fmtDay = (ymd: string) => format(parseISO(ymd), "d 'de' MMM yyyy", { locale: es });
+// One date format for the console (lib/tableFormat; a YYYY-MM-DD date is read
+// as that local day, not UTC midnight).
+const fmtDate = (d: string) => shortDateTime(d);
+const fmtDay = (ymd: string) => shortDate(ymd);
+
+/** «Saldo: $120.00 → $135.00» while a valid amount is typed; nothing otherwise. */
+function AdjustPreview({ balance, delta }: { balance: string; delta: number }) {
+  const before = parseFloat(balance);
+  if (!Number.isFinite(delta) || delta === 0 || !Number.isFinite(before)) return null;
+  const after = before + delta;
+  return (
+    <p className="rounded-sm bg-cream px-3 py-2 text-sm text-ink" aria-live="polite">
+      Saldo: <span className="tabular-nums">{formatMXN(before)}</span> → <strong className={`tabular-nums ${after < 0 ? 'text-danger' : ''}`}>{formatMXN(after)}</strong>
+    </p>
+  );
+}
 
 export default function AdminCafeteriaStudent() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -56,11 +71,19 @@ export default function AdminCafeteriaStudent() {
   const [adjustSign, setAdjustSign] = useState<1 | -1>(1);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
+  // Server answers shown next to their field, not as a toast (UX Phase 7).
+  const [adjustErrors, setAdjustErrors] = useState<{ amount?: string; reason?: string; form?: string }>({});
+  // One idempotency key per dialog opening: the same adjustment sent twice
+  // (double click, retry) moves the balance once.
+  const [adjustRequestId, setAdjustRequestId] = useState('');
+  const openAdjust = (sign: 1 | -1) => { setAdjustSign(sign); setAdjustErrors({}); setAdjustRequestId(newRequestId()); setShowAdjust(true); };
+  const once = useSingleFlight();
 
   const [refundTx, setRefundTx] = useState<AdminTransaction | null>(null);
   // Ledger and adjustment trail are paged server-side (they grow without bound).
-  const [txPage, setTxPage] = useState(1);
-  const [adjPage, setAdjPage] = useState(1);
+  // In the URL (?mpage=, ?apage=): a refresh or a shared link keeps the place.
+  const [txPage, setTxPage] = useUrlPage('mpage');
+  const [adjPage, setAdjPage] = useUrlPage('apage');
   const [refundReason, setRefundReason] = useState('');
   // A card top-up is refunded to the card in MultiCobros; here only the wallet.
   const [bankDone, setBankDone] = useState(false);
@@ -79,17 +102,33 @@ export default function AdminCafeteriaStudent() {
     void invalidateEntity(queryClient, CAF_MONEY_VIEWS[0], CAF_MONEY_VIEWS);
   };
 
+  const adjustDone = () => {
+    setShowAdjust(false);
+    setAdjustAmount('');
+    setAdjustReason('');
+    setAdjustErrors({});
+    invalidate();
+  };
   const adjustMutation = useMutation({
     mutationFn: () =>
-      cafeteriaApi.adjustBalance(id, adjustSign * parseFloat(adjustAmount), adjustReason),
+      cafeteriaApi.adjustBalance(id, adjustSign * parseFloat(adjustAmount), adjustReason, adjustRequestId),
     onSuccess: () => {
       toast.success('Ajuste aplicado.');
-      setShowAdjust(false);
-      setAdjustAmount('');
-      setAdjustReason('');
-      invalidate();
+      adjustDone();
     },
-    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo aplicar el ajuste.')),
+    onError: (e: unknown) => {
+      // The same request already landed (a retry after a lost answer): it
+      // was applied once, so this is a success, not an error.
+      if ((e as { response?: { data?: { code?: string } } })?.response?.data?.code === 'already_applied') {
+        toast.success('El ajuste ya estaba aplicado.');
+        adjustDone();
+        return;
+      }
+      const f = fieldErrorsOrNull(e);
+      setAdjustErrors(f && (f.amount || f.reason)
+        ? { amount: f.amount, reason: f.reason, form: f.detail ?? f.non_field_errors }
+        : { form: apiErrorMessage(e, 'No se pudo aplicar el ajuste.') });
+    },
   });
 
   const refundMutation = useMutation({
@@ -108,7 +147,17 @@ export default function AdminCafeteriaStudent() {
   const fetchStatement = async (fmt: ExportFormat) =>
     (await cafeteriaApi.exportStudent(id, fmt === 'pdf' ? 'pdf' : 'csv')).data as Blob;
 
-  if (isLoading) return <LoadingSpinner />;
+  // The page's own shape while it loads, not a full-page spinner.
+  if (isLoading) return (
+    <div className="space-y-6" aria-busy="true">
+      <span className="sr-only" role="status">Cargando…</span>
+      <div className="skeleton h-10 w-64 max-w-full rounded-sm" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-28 rounded-md" />)}
+      </div>
+      <div className="skeleton h-64 rounded-md" />
+    </div>
+  );
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
@@ -140,7 +189,7 @@ export default function AdminCafeteriaStudent() {
             filenamePrefix={`estado_cafeteria_${balance.student.student_id}`}
             fetch={(fmt) => fetchStatement(fmt)}
           />
-          <Button size="sm" onClick={() => { setAdjustSign(1); setShowAdjust(true); }}>
+          <Button size="sm" onClick={() => openAdjust(1)}>
             <SlidersHorizontal className="w-3.5 h-3.5" /> Ajustar saldo
           </Button>
         </div>
@@ -149,7 +198,7 @@ export default function AdminCafeteriaStudent() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Saldo actual</p>
-          <p className="mt-1 text-2xl font-bold text-ink">${parseFloat(balance.balance).toFixed(2)}</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{formatMXN(balance.balance)}</p>
           <Badge variant={isLow ? 'warning' : 'success'} className="mt-2">
             {isLow ? 'Saldo bajo' : 'Normal'}
           </Badge>
@@ -158,7 +207,7 @@ export default function AdminCafeteriaStudent() {
             Not Loyverse's total_spent, which only counts cash/card. */}
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Consumo registrado</p>
-          <p className="mt-1 text-2xl font-bold text-ink">${parseFloat(consumption.total).toFixed(2)}</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{formatMXN(consumption.total)}</p>
           <p className="mt-1 text-xs text-subtle">
             {consumption.since ? `Compras desde el ${fmtDay(consumption.since)}` : 'Sin compras registradas'}
           </p>
@@ -185,10 +234,10 @@ export default function AdminCafeteriaStudent() {
 
       {/* Paid card top-ups not in the balance yet (scheduled POS load). */}
       {!!balance.pending_topups?.length && (
-        <div role="note" className="flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.07] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+        <div role="note" className="flex flex-col gap-2 rounded-md bg-warning-bg px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
           <p>
             <strong>Recargas pagadas por aplicar:</strong>{' '}
-            {balance.pending_topups.map((t) => `$${parseFloat(t.amount).toFixed(2)} (folio ${t.folio ?? '—'})`).join(', ')}.
+            {balance.pending_topups.map((t) => `${formatMXN(t.amount)} (folio ${t.folio ?? '—'})`).join(', ')}.
             {' '}Aún no están en el saldo. En «Por aplicar» se ve qué falta: verificarlas en MultiCobros (la app las carga sola en Loyverse) o, si dice «Cargar a mano», cargarlas en el POS.
           </p>
           <Link to="/admin/cafeteria?tab=pos" className="shrink-0 text-sm font-semibold text-purple hover:underline">
@@ -210,7 +259,7 @@ export default function AdminCafeteriaStudent() {
             {[
               { label: 'Visitas', value: loyverse.total_visits.toLocaleString('es-MX') },
               // Loyverse's total_spent: wallet purchases are points and never count here.
-              { label: 'Efectivo/tarjeta en caja', value: `$${parseFloat(loyverse.total_spent).toFixed(2)}` },
+              { label: 'Efectivo/tarjeta en caja', value: formatMXN(loyverse.total_spent) },
               { label: 'Puntos', value: parseFloat(loyverse.total_points).toFixed(2) },
               { label: 'Grado (Loyverse)', value: loyverse.address_code || '—' },
               { label: 'Primera visita', value: loyverse.first_visit ? fmtDate(loyverse.first_visit) : '—' },
@@ -247,10 +296,10 @@ export default function AdminCafeteriaStudent() {
               { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
               { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
               { header: 'Descripción', className: 'text-muted', cell: (t) => <span className="block min-w-0 max-w-xs truncate" title={t.description}>{t.description || '—'}</span> },
-              { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => `$${parseFloat(t.amount).toFixed(2)}` },
+              { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => formatMXN(t.amount) },
               { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.applied === false ? (t.transaction_type === 'refund'
                 ? <span className="text-xs" title="Devolución del POS que el saldo ya tenía: saldo inicial, devolución hecha en la consola o recarga detectada en Loyverse antes de este recibo">ya en el saldo</span>
-                : <span className="text-xs" title="Compra anterior al alta: ya estaba incluida en el saldo inicial">incl. saldo inicial</span>) : t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
+                : <span className="text-xs" title="Compra anterior al alta: ya estaba incluida en el saldo inicial">incl. saldo inicial</span>) : t.balance_after !== null ? formatMXN(t.balance_after) : '—') },
               {
                 header: 'Acción', align: 'right',
                 cell: (t) => refundable(t) && (
@@ -287,13 +336,13 @@ export default function AdminCafeteriaStudent() {
                 header: 'Monto', align: 'right',
                 cell: (a) => (
                   <span className={`font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
-                    {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
+                    {parseFloat(a.amount) < 0 ? '−' : '+'}{formatMXN(Math.abs(parseFloat(a.amount)))}
                   </span>
                 ),
               },
               { header: 'Motivo', className: 'text-muted', cell: (a) => <span className="block min-w-0 max-w-xs truncate" title={a.reason}>{a.reason}</span> },
               { header: 'Admin', className: 'text-muted', cell: (a) => a.admin_name || '—' },
-              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (a) => (a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—') },
+              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (a) => (a.balance_after !== null ? formatMXN(a.balance_after) : '—') },
             ]}
           />
         )}
@@ -302,7 +351,7 @@ export default function AdminCafeteriaStudent() {
       {/* Adjust modal */}
       <Modal open={showAdjust} onClose={() => setShowAdjust(false)} title="Ajuste manual de saldo">
         <form
-          onSubmit={(e) => { e.preventDefault(); adjustMutation.mutate(); }}
+          onSubmit={(e) => { e.preventDefault(); once(() => adjustMutation.mutateAsync()); }}
           className="space-y-4"
         >
           <div className="flex gap-2">
@@ -312,6 +361,7 @@ export default function AdminCafeteriaStudent() {
               size="sm"
               className="flex-1"
               onClick={() => setAdjustSign(1)}
+              aria-pressed={adjustSign === 1}
             >
               <Plus className="w-3.5 h-3.5" /> Abonar
             </Button>
@@ -321,6 +371,7 @@ export default function AdminCafeteriaStudent() {
               size="sm"
               className="flex-1"
               onClick={() => setAdjustSign(-1)}
+              aria-pressed={adjustSign === -1}
             >
               <Minus className="w-3.5 h-3.5" /> Descontar
             </Button>
@@ -332,16 +383,23 @@ export default function AdminCafeteriaStudent() {
             step="0.01"
             required
             value={adjustAmount}
-            onChange={(e) => setAdjustAmount(e.target.value)}
+            onChange={(e) => { setAdjustAmount(e.target.value); setAdjustErrors((x) => ({ ...x, amount: undefined, form: undefined })); }}
+            error={adjustErrors.amount}
           />
           <Input
             label="Motivo"
             required
             maxLength={500}
             value={adjustReason}
-            onChange={(e) => setAdjustReason(e.target.value)}
+            onChange={(e) => { setAdjustReason(e.target.value); setAdjustErrors((x) => ({ ...x, reason: undefined, form: undefined })); }}
             placeholder="Ej. Reembolso de cortesía, corrección…"
+            error={adjustErrors.reason}
           />
+          {/* Read-only preview of the result (display only: the server computes the real one). */}
+          <AdjustPreview balance={balance.balance} delta={adjustSign * parseFloat(adjustAmount)} />
+          {adjustErrors.form && (
+            <p role="alert" className="rounded-sm bg-danger-bg px-3 py-2 text-sm text-danger">{adjustErrors.form}</p>
+          )}
           <p className="text-xs text-muted">
             Este movimiento queda registrado en la auditoría y se notifica a los tutores. La app no
             cambia los puntos en Loyverse: haga el mismo ajuste en el POS para que el alumno pueda usarlo.
@@ -377,7 +435,7 @@ export default function AdminCafeteriaStudent() {
           refundTx && (
             <>
               Se revertirá la {txLabel(refundTx.transaction_type).toLowerCase()} de{' '}
-              <span className="font-semibold text-ink">${parseFloat(refundTx.amount).toFixed(2)}</span> del{' '}
+              <span className="font-semibold text-ink">{formatMXN(refundTx.amount)}</span> del{' '}
               {fmtDate(refundTx.date)}. Se ajustará el saldo y se notificará a los tutores.
               Esta acción no se puede deshacer.
             </>

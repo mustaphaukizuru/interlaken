@@ -6,7 +6,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({
-  portalApi: { getDashboard: vi.fn() },
+  portalApi: { getDashboard: vi.fn(), getNotifications: vi.fn(), markNotificationRead: vi.fn() },
+  cafeteriaApi: { getSpendingTrend: vi.fn() },
 }));
 
 vi.mock('@/components/portal/PushOptIn', () => ({
@@ -35,11 +36,14 @@ vi.mock('@/components/portal/CafeteriaCategoriesCard', () => ({
 }));
 
 import ParentDashboard, { greetingForHour } from './ParentDashboard';
-import { portalApi } from '@/services/api';
+import { HeaderChildSwitcher } from '@/components/portal/HeaderChildSwitcher';
+import { cafeteriaApi, portalApi } from '@/services/api';
 import { useAuthStore, type User } from '@/store/authStore';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 
 const getDashboard = vi.mocked(portalApi.getDashboard);
+const getNotifications = vi.mocked(portalApi.getNotifications);
+const getSpendingTrend = vi.mocked(cafeteriaApi.getSpendingTrend);
 
 const SAMPLE_USER: User = {
   id: 3,
@@ -79,17 +83,30 @@ const LINKED_DATA = {
   unread_notifications: 3,
 };
 
-function renderPage() {
+/** The page, optionally under the shell's header switcher (same QueryClient). */
+function renderPage({ withHeader = false }: { withHeader?: boolean } = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
+        {withHeader && <header><HeaderChildSwitcher /></header>}
         <ParentDashboard />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+/** The selected child's wallet card. */
+const hero = () => screen.getByTestId('wallet-hero');
+/** The «Hoy» list. */
+const hoy = () => within(screen.getByRole('list', { name: 'Pendientes de hoy' }));
+
+/** Mock defaults every test starts from: no avisos, no spending. */
+function apiDefaults() {
+  getNotifications.mockResolvedValue({ data: [] } as never);
+  getSpendingTrend.mockResolvedValue({ data: { days: 30, total: 0, average: 0, series: [] } } as never);
 }
 
 /** Assert `a` comes before `b` in DOM order (mobile reading order). */
@@ -108,6 +125,7 @@ describe('ParentDashboard', () => {
     useSelectedChildStore.setState({ childId: null });
     trendProps.length = 0;
     categoriesProps.length = 0;
+    apiDefaults();
   });
 
   afterEach(() => {
@@ -153,51 +171,56 @@ describe('ParentDashboard', () => {
     expect(screen.queryByRole('link', { name: /Agregar otro hijo/ })).toBeNull();
   });
 
-  it('per-child quick top-ups open the wizard for that child (?hijo=)', async () => {
-    getDashboard.mockResolvedValue({
-      data: {
-        ...LINKED_DATA,
-        cafeteria_balances: [
-          { student: 11, student_name: 'Luis López', balance: '20.00', low: true, last_synced: '2026-08-01T00:00:00Z' },
-          { student: 12, student_name: 'Sofía López', balance: '180.00', low: false, last_synced: '2026-08-01T00:00:00Z' },
-        ],
-      },
-    } as never);
+  it('every top-up entry opens the wizard for its own child (?hijo=)', async () => {
+    getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
 
     renderPage();
 
-    const tiles = within(await screen.findByRole('list', { name: 'Saldo por alumno' }));
-    expect(tiles.getByRole('link', { name: 'Recargar $100 a Sofía López' }))
-      .toHaveAttribute('href', '/portal/cafeteria?recarga=100&hijo=12');
-    expect(tiles.getByRole('link', { name: 'Recargar $200 a Luis López' }))
+    // The selected child (Luis): the hero's quick amounts.
+    expect(await within(await screen.findByTestId('wallet-hero')).findByRole('link', { name: 'Recargar $200 a Luis López' }))
       .toHaveAttribute('href', '/portal/cafeteria?recarga=200&hijo=11');
+    // The other child: one «Recargar» on her row.
+    const others = within(screen.getByRole('list', { name: 'Otros alumnos' }));
+    expect(others.getByRole('link', { name: 'Recargar a Sofía López' }))
+      .toHaveAttribute('href', '/portal/cafeteria?hijo=12');
+    expect(others.getByText('$180.00')).toBeInTheDocument();
+    // Luis's low balance: its own «Recargar» in «Hoy».
+    expect(hoy().getByRole('link', { name: 'Recargar a Luis López' }))
+      .toHaveAttribute('href', '/portal/cafeteria?hijo=11');
   });
 
-  it('never adds siblings up: the big card is the selected child, and switching changes it', async () => {
+  it('never adds siblings up: the hero is the selected child, and the header switcher re-scopes it', async () => {
     getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
-    renderPage();
+    renderPage({ withHeader: true });
 
     // Luis (first) by default: his own balance, never 20 + 180.
-    const hero = () => screen.getByText(/^Saldo de /).closest('.card') as HTMLElement;
     expect(await screen.findByText('Saldo de Luis')).toBeInTheDocument();
     expect(within(hero()).getByText('$20.00')).toBeInTheDocument();
     expect(screen.queryByText('$200.00')).toBeNull();
     expect(screen.queryByText(/Suma de/)).toBeNull();
     expect(within(hero()).getByRole('link', { name: 'Recargar $500 a Luis López' }))
       .toHaveAttribute('href', '/portal/cafeteria?recarga=500&hijo=11');
-    expect(within(hero()).getByRole('link', { name: /Otro monto/ }))
+    expect(within(hero()).getByRole('link', { name: 'Elegir otro monto' }))
       .toHaveAttribute('href', '/portal/cafeteria?hijo=11');
+    // The page itself has no picker any more: the header has the only one.
+    expect(screen.queryByRole('group', { name: /Seleccionar alumno/i })).toBeNull();
 
-    // Picking Sofía moves the card, its top-ups and the charts to her alone.
-    const switcher = screen.getByRole('group', { name: /Seleccionar alumno/i });
+    // Picking Sofía in the header moves the card, its top-ups and the charts to her alone.
+    await userEvent.click(screen.getByRole('button', { name: /Alumno: Luis López/ }));
+    const switcher = await screen.findByRole('group', { name: /Seleccionar alumno/i });
     await userEvent.click(within(switcher).getByRole('button', { name: /Sofía López/ }));
     expect(await screen.findByText('Saldo de Sofía')).toBeInTheDocument();
+    expect(useSelectedChildStore.getState().childId).toBe(12);
     expect(within(hero()).getByText('$180.00')).toBeInTheDocument();
+    expect(within(hero()).queryByText('$20.00')).toBeNull();
     expect(within(hero()).getByRole('link', { name: 'Recargar $500 a Sofía López' }))
       .toHaveAttribute('href', '/portal/cafeteria?recarga=500&hijo=12');
+    // Luis is now one of «the other children», with his own balance.
+    expect(within(screen.getByRole('list', { name: 'Otros alumnos' })).getByText('$20.00')).toBeInTheDocument();
     await waitFor(() => expect(trendProps[trendProps.length - 1]).toBe(12));
     expect(categoriesProps[categoriesProps.length - 1]).toBe(12);
     expect(trendProps).not.toContain('all');
+    expect(screen.getByRole('button', { name: /Alumno: Sofía López/ })).toBeInTheDocument();
   });
 
   it('a child without an active wallet gets its own note, not a sibling\'s balance', async () => {
@@ -234,10 +257,13 @@ describe('ParentDashboard', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('link', { name: /Recargar cafetería/i })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Elegir otro monto' })).toHaveAttribute(
       'href',
       '/portal/cafeteria',
     );
+    expect(screen.getByRole('link', { name: 'Recargar $100 a Luis López' }))
+      .toHaveAttribute('href', '/portal/cafeteria?recarga=100');
+    expect(screen.getByRole('link', { name: /Mostrar credencial/ })).toHaveAttribute('href', '/portal/credencial');
     expect(screen.queryByText(/Cuenta sin alumno vinculado/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Saldo Cafetería/i)).toBeInTheDocument();
     expect(screen.getByText(/Luis López/i)).toBeInTheDocument();
@@ -249,13 +275,16 @@ describe('ParentDashboard', () => {
     renderPage();
 
     const saldo = await screen.findByText('Saldo de Luis');
-    // The alert names the child that is low (Luis), not the family.
-    const alert = screen.getByText('Saldo bajo de Luis López.');
+    // «Hoy» names the child that is low (Luis), not the family.
+    const alert = hoy().getByText('Saldo bajo de Luis');
     expect(screen.queryByText(/Saldo bajo de Sofía/)).toBeNull();
-    const switcher = screen.getByRole('group', { name: /Seleccionar alumno/i });
-    // (1) alert → (2) switcher → (3) saldo + top-up.
-    expectBefore(alert, switcher);
-    expectBefore(switcher, saldo);
+    const others = screen.getByRole('list', { name: 'Otros alumnos' });
+    // (1) Hoy → (2) the selected child's wallet → (3) the other children.
+    expectBefore(alert, saldo);
+    expectBefore(saldo, others);
+    // No duplicate quick-action cards (the tab bar has Cafetería and Credencial).
+    expect(screen.queryByText('Credencial digital')).toBeNull();
+    expect(screen.queryByText('Recargar cafetería')).toBeNull();
 
     // Bitácora 10 (14/10/2026): no comunicados and no payments on the family dashboard.
     expect(screen.queryByText('Avisos Escolares')).toBeNull();
@@ -269,11 +298,11 @@ describe('ParentDashboard', () => {
     getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
 
     renderPage();
-    const hero = (await screen.findByText('Saldo de Luis')).closest('.card') as HTMLElement;
+    await screen.findByText('Saldo de Luis');
 
     for (const amt of [100, 200, 500]) {
       expect(
-        within(hero).getByRole('link', { name: `Recargar $${amt} a Luis López` }),
+        within(hero()).getByRole('link', { name: `Recargar $${amt} a Luis López` }),
       ).toHaveAttribute('href', `/portal/cafeteria?recarga=${amt}&hijo=11`);
     }
   });
@@ -307,17 +336,14 @@ describe('ParentDashboard', () => {
     expect(greetingForHour(20)).toBe('Buenas noches');
   });
 
-  it('refresh button invalidates the dashboard query and shows freshness', async () => {
+  it('shows freshness without a boxed refresh button (the page refreshes itself)', async () => {
     getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
 
     renderPage();
     await screen.findByText('Saldo de Luis');
     expect(getDashboard).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Actualizado hace/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
-
-    await waitFor(() => expect(getDashboard).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('button', { name: 'Actualizar' })).toBeNull();
   });
 
   it('shows per-card skeletons mirroring the layout while loading', () => {
@@ -327,8 +353,8 @@ describe('ParentDashboard', () => {
 
     const shell = screen.getByLabelText('Cargando panel');
     expect(shell).toHaveAttribute('aria-busy', 'true');
-    // Hero + stat, 2 quick actions, 2 section cards.
-    expect(shell.querySelectorAll('.skeleton')).toHaveLength(6);
+    // Hoy, wallet + figures, 2 section cards.
+    expect(shell.querySelectorAll('.skeleton')).toHaveLength(5);
   });
 
   it('explains the cafetería wallet for linked families without activity', async () => {
@@ -367,12 +393,11 @@ describe('ParentDashboard: paid top-ups on their way (owner, 2026-11-19)', () =>
     children: [LINKED_DATA.children[0]],
     cafeteria_balances: [{ ...LINKED_DATA.cafeteria_balances[0], low: false, ...balance }],
   });
-  const hero = () => screen.getByText('Recarga rápida').closest('.card') as HTMLElement;
-
   beforeEach(() => {
     vi.clearAllMocks();
     useAuthStore.setState({ user: { ...SAMPLE_USER }, accessToken: 'test', isAuthenticated: true });
     useSelectedChildStore.setState({ childId: null });
+    apiDefaults();
   });
 
   it('the hero keeps the real balance and shows where it is heading', async () => {
@@ -399,7 +424,7 @@ describe('ParentDashboard: paid top-ups on their way (owner, 2026-11-19)', () =>
     expect(within(hero()).getByText('El lunes 7 de enero a las 7:30 a.m.: $250.00 · recarga de $100.00 pagada')).toBeVisible();
   });
 
-  it('two children: only the tile and hero of the one with a paid top-up change', async () => {
+  it('two children: only the hero, row and «Hoy» line of the one with a paid top-up change', async () => {
     getDashboard.mockResolvedValue({ data: {
       ...LINKED_DATA,
       cafeteria_balances: [
@@ -408,17 +433,19 @@ describe('ParentDashboard: paid top-ups on their way (owner, 2026-11-19)', () =>
       ],
     } } as never);
     renderPage();
-    const tiles = within(await screen.findByRole('list', { name: 'Saldo por alumno' }));
-    const [luis, sofia] = tiles.getAllByRole('listitem');
-    expect(within(luis).getByText('$20.00')).toBeInTheDocument();
-    expect(within(luis).getByText('$220.00')).toBeInTheDocument();
-    expect(within(luis).getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(await within(await screen.findByTestId('wallet-hero')).findByText('Saldo en caja de Luis')).toBeInTheDocument();
+    expect(within(hero()).getByText('$20.00')).toBeInTheDocument();
+    expect(within(hero()).getByText('$220.00')).toBeInTheDocument();
+    expect(within(hero()).getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    const [sofia] = within(screen.getByRole('list', { name: 'Otros alumnos' })).getAllByRole('listitem');
     expect(within(sofia).getByText('$180.00')).toBeInTheDocument();
     expect(sofia.querySelector('.sr-only')).toBeNull();
     expect(within(sofia).queryByText(/pagada/)).toBeNull();
-    // Tiles keep the quick top-ups at the bottom, aligned across the row.
-    expect(luis.className).toMatch(/flex-col/);
-    expect(within(hero()).getByText('Saldo en caja de Luis')).toBeInTheDocument();
+    // «Hoy» says it once, for Luis only, with where to follow it.
+    expect(hoy().getByText('Recarga pagada de Luis')).toBeInTheDocument();
+    expect(hoy().getByText('$200.00 · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(hoy().queryByText(/de Sofía/)).toBeNull();
+    expect(hoy().getByRole('link', { name: 'Ver movimientos de Luis López' })).toHaveAttribute('href', '/portal/cafeteria?hijo=11');
   });
 
   it('an older API with only the total still shows the projection, without a date', async () => {
@@ -435,5 +462,103 @@ describe('ParentDashboard: paid top-ups on their way (owner, 2026-11-19)', () =>
     expect(within(hero()).getByText('$150.00')).toBeInTheDocument();
     expect(screen.queryByText('Saldo en caja')).toBeNull();
     expect(hero().querySelector('.sr-only')).toBeNull();
+  });
+});
+
+describe('ParentDashboard «Hoy» (Phase 6 pilot)', () => {
+  const notif = (over: Record<string, unknown>) => ({
+    id: 1, notif_type: 'info', title: 'Junta de padres', message: 'El viernes.', is_read: false,
+    created_at: '2026-08-10T00:00:00Z', ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: { ...SAMPLE_USER }, accessToken: 'test', isAuthenticated: true });
+    useSelectedChildStore.setState({ childId: null });
+    apiDefaults();
+  });
+
+  it('nothing pending: one calm «Todo en orden» row', async () => {
+    getDashboard.mockResolvedValue({ data: {
+      ...LINKED_DATA,
+      cafeteria_balances: LINKED_DATA.cafeteria_balances.map((b) => ({ ...b, low: false })),
+      unread_notifications: 0,
+    } } as never);
+    renderPage();
+    expect(await screen.findByText('Todo en orden')).toBeInTheDocument();
+    expect(hoy().getAllByRole('listitem')).toHaveLength(1);
+    expect(hoy().queryByRole('link')).toBeNull();
+  });
+
+  it('urgent avisos come before other unread ones, which fold into one row', async () => {
+    getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [] } } as never);
+    getNotifications.mockResolvedValue({ data: [
+      notif({ id: 1, title: 'Junta de padres' }),
+      notif({ id: 2, title: 'Festival de invierno' }),
+      notif({ id: 3, notif_type: 'warning', title: 'Suspensión de clases mañana' }),
+      notif({ id: 4, title: 'Ya leído', is_read: true }),
+    ] } as never);
+    renderPage();
+    const urgent = await screen.findByText('Suspensión de clases mañana');
+    const rows = hoy().getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText('Suspensión de clases mañana')).toBe(urgent);
+    expect(within(rows[0]).getByRole('link', { name: 'Leer el aviso: Suspensión de clases mañana' }))
+      .toHaveAttribute('href', '/portal/notificaciones/3');
+    expect(within(rows[1]).getByText('2 avisos sin leer')).toBeInTheDocument();
+    expect(within(rows[1]).getByRole('link', { name: /Ver avisos/ })).toHaveAttribute('href', '/portal/notificaciones?sin_leer=1');
+    expect(screen.queryByText('Ya leído')).toBeNull();
+  });
+
+  it('a single unread aviso gets its own row; opening it marks it read', async () => {
+    getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [] } } as never);
+    vi.mocked(portalApi.markNotificationRead).mockResolvedValue({ data: {} } as never);
+    getNotifications.mockResolvedValue({ data: [notif({ id: 9, title: 'Junta de padres' })] } as never);
+    renderPage();
+    const link = await screen.findByRole('link', { name: 'Leer el aviso: Junta de padres' });
+    await userEvent.click(link);
+    await waitFor(() => expect(portalApi.markNotificationRead).toHaveBeenCalledWith(9));
+  });
+
+  it('never more than four rows, urgent avisos first, and no duplicate «saldo bajo» aviso', async () => {
+    getDashboard.mockResolvedValue({ data: {
+      ...LINKED_DATA,
+      cafeteria_balances: LINKED_DATA.cafeteria_balances.map((b) => ({ ...b, low: true })),
+    } } as never);
+    getNotifications.mockResolvedValue({ data: [
+      notif({ id: 1, notif_type: 'warning', title: 'Saldo bajo de Luis' }),
+      notif({ id: 2, notif_type: 'warning', title: 'Suspensión de clases' }),
+      notif({ id: 3, notif_type: 'warning', title: 'Simulacro' }),
+      notif({ id: 4, notif_type: 'warning', title: 'Vacunación' }),
+    ] } as never);
+    renderPage();
+    await screen.findByText('Suspensión de clases');
+    const rows = hoy().getAllByRole('listitem');
+    expect(rows).toHaveLength(4);
+    // Urgent school alerts are never the rows cut (code review 2026-11-22).
+    expect(within(rows[0]).getByText('Suspensión de clases')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Simulacro')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('Vacunación')).toBeInTheDocument();
+    expect(within(rows[3]).getByText('Saldo bajo de Luis')).toBeInTheDocument();
+    expect(within(rows[3]).getByRole('link', { name: 'Recargar a Luis López' })).toHaveAttribute('href', expect.stringContaining('/portal/cafeteria?hijo='));
+    // The «saldo bajo» alert is the low-balance row, not a second one.
+    expect(hoy().getAllByText(/Saldo bajo de Luis/)).toHaveLength(1);
+  });
+
+  it('one unread aviso counted by the dashboard only: «1 aviso sin leer», singular', async () => {
+    getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [], unread_notifications: 1 } } as never);
+    getNotifications.mockRejectedValue(new Error('offline'));
+    renderPage();
+    expect(await screen.findByText('1 aviso sin leer')).toBeInTheDocument();
+  });
+
+  it('shows the selected child’s figures from the spending query', async () => {
+    getSpendingTrend.mockResolvedValue({ data: { days: 30, total: 450, average: 15, series: [] } } as never);
+    getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
+    renderPage();
+    expect(await screen.findByText('$450.00')).toBeInTheDocument();
+    expect(screen.getByText('Consumo en 30 días')).toBeInTheDocument();
+    expect(screen.getByText('$15.00')).toBeInTheDocument();
+    expect(getSpendingTrend).toHaveBeenCalledWith(30, 11);
   });
 });

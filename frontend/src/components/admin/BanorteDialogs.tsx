@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { formatMXN } from '@/lib/format';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,7 +31,8 @@ export interface ReconcilePrefill {
   amount: string;
 }
 
-const mxn = (v: string | number | null | undefined) => `$${parseFloat(String(v ?? 0)).toFixed(2)}`;
+/** One money format everywhere (es-MX grouping): display only. */
+const mxn = formatMXN;
 const when = (d?: string | null) => (d ? format(new Date(d), "d MMM yyyy, HH:mm", { locale: es }) : '-');
 
 /** Where staff look an operation up (same words as docs/BANORTE-INTEGRATION.md). */
@@ -41,7 +43,7 @@ function OperationFacts({ row }: { row: BanorteRow }) {
   const b = row.banorte;
   if (!b) return null;
   return (
-    <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 rounded-lg bg-cream px-3 py-2 text-xs leading-5 text-ink">
+    <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 rounded-sm bg-cream px-3 py-2 text-xs leading-5 text-ink">
       <dt className="text-muted">Alumno</dt><dd>{row.student_name}</dd>
       <dt className="text-muted">Monto</dt><dd className="font-semibold">{mxn(row.amount)}</dd>
       <dt className="text-muted">Fecha</dt><dd>{when(b.created_at ?? row.created_at)}</dd>
@@ -155,7 +157,7 @@ function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void 
       <div className="space-y-4">
         <div
           role="status"
-          className={`flex items-start gap-3 rounded-lg border px-3 py-3 ${outcome.applied ? 'border-green-600/30 bg-green-50' : 'border-amber/40 bg-amber/10'}`}
+          className={`flex items-start gap-3 rounded-sm border px-3 py-3 ${outcome.applied ? 'border-green-600/30 bg-green-50' : 'border-amber/40 bg-amber/10'}`}
         >
           <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${outcome.applied ? 'text-green-700' : 'text-amber'}`} aria-hidden="true" />
           <div className="min-w-0">
@@ -252,7 +254,7 @@ export function ReconcileBanorteForm({ row, onClose, prefill, onDone }: {
       </p>
       <OperationFacts row={row} />
       {prefill && (
-        <p className="rounded-lg border border-brand-600/20 bg-brand-50 px-3 py-2 text-xs text-ink">
+        <p className="rounded-sm border border-brand-600/20 bg-brand-50 px-3 py-2 text-xs text-ink">
           Los datos vienen del reporte de MultiCobros que subió. Revíselos antes de conciliar.
         </p>
       )}

@@ -50,11 +50,25 @@ export function resolveChrome(c: Partial<SiteChrome> | null | undefined): SiteCh
   };
 }
 
+/** A year typed by hand after «©» (the end of a range such as «© 1981-2026»); null when there is none. */
+const FIXED_YEAR = /(©\s*(?:(?:19|20)\d\d\s*[-–]\s*)?)((?:19|20)\d\d)(?!\d)/;
+export function fixedCopyrightYear(text: string): string | null {
+  return FIXED_YEAR.exec(text ?? '')?.[2] ?? null;
+}
+/** The same line with that year as «Año en curso» ({{anio}}). */
+export function copyrightWithToken(text: string): string {
+  return (text ?? '').replace(FIXED_YEAR, (_m, pre: string) => `${pre}{{anio}}`);
+}
+
 /**
  * The copyright line with {{anio}} as the current year, split into text parts
- * (the year its own text node, as the hand-written footer rendered it).
+ * (the year its own text node, as the hand-written footer rendered it). Safety
+ * net (owner, 2026-11-22): a past year typed by hand after «©» shows as the
+ * current one too, so the footer never says last year.
  */
 export function withYear(text: string): string[] {
+  const year = Number(fixedCopyrightYear(text));
+  if (year && year < new Date().getFullYear()) text = copyrightWithToken(text);
   return text.split(/(\{\{\s*anio\s*\}\})/g).map((part) => (/^\{\{\s*anio\s*\}\}$/.test(part) ? String(new Date().getFullYear()) : part)).filter(Boolean);
 }
 

@@ -160,7 +160,7 @@ export default function AdminArco() {
         )}
       />
       {overdue > 0 && (
-        <p className="mb-4 flex items-center gap-2 rounded-xl border border-coral-200 bg-coral-50 px-4 py-2 text-sm text-coral-700" role="alert">
+        <p className="mb-4 flex items-center gap-2 rounded-md border border-coral-200 bg-coral-50 px-4 py-2 text-sm text-coral-700" role="alert">
           <AlertTriangle size={16} aria-hidden="true" /> {overdue} {overdue === 1 ? 'solicitud vencida' : 'solicitudes vencidas'}: responda hoy y documente la causa del retraso.
         </p>
       )}
@@ -270,7 +270,7 @@ function IntakeModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
   const [errors, setErrors] = useState<Record<string, string>>({});
   const create = useMutation({
     mutationFn: () => legalApi.adminIntakeArco(form),
-    onSuccess: () => { toast.success('Solicitud registrada; se envió acuse con la fecha límite.'); setForm({ requester_email: '', requester_name: '', request_type: 'access', channel: 'email', details: '' }); onSaved(); },
+    onSuccess: () => { toast.success('Solicitud registrada; se envió el acuse.'); setForm({ requester_email: '', requester_name: '', request_type: 'access', channel: 'email', details: '' }); onSaved(); },
     onError: (e) => setErrors(apiFieldErrors(e)),
   });
   const submit = (e: FormEvent) => { e.preventDefault(); setErrors({}); create.mutate(); };

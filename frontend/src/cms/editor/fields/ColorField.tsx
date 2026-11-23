@@ -138,7 +138,7 @@ export function ColorField({ id, label, required, hint, error, warning, onBlur, 
             data-value="__custom"
             tabIndex={focusIndex === radios.length - 1 ? 0 : -1}
             onClick={() => choose('__custom')}
-            className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple ${selected === '__custom' ? 'border-ink text-ink' : 'border-line text-muted hover:border-purple/50'}`}
+            className={`inline-flex min-h-[44px] items-center gap-2 rounded-sm border px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple ${selected === '__custom' ? 'border-ink text-ink' : 'border-line text-muted hover:border-purple/50'}`}
           >
             <span className="h-5 w-5 rounded-full ring-1 ring-line" style={{ background: 'conic-gradient(#e01a4e, #f1c82f, #47a028, #401a8e, #e01a4e)' }} aria-hidden="true" />
             Personalizado
@@ -149,7 +149,7 @@ export function ColorField({ id, label, required, hint, error, warning, onBlur, 
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <label className="text-xs text-muted" htmlFor={`${id}-picker`}>
             <span className="mb-1 block">Elegir en la paleta</span>
-            <input id={`${id}-picker`} type="color" value={HEX_RE.test(custom) && custom.length === 7 ? custom : '#47a028'} onChange={(e) => { setCustom(e.target.value); onChange(e.target.value); }} className="h-11 w-16 cursor-pointer rounded-lg border border-line bg-white p-1" />
+            <input id={`${id}-picker`} type="color" value={HEX_RE.test(custom) && custom.length === 7 ? custom : '#47a028'} onChange={(e) => { setCustom(e.target.value); onChange(e.target.value); }} className="h-11 w-16 cursor-pointer rounded-sm border border-line bg-white p-1" />
           </label>
           <label className="text-xs text-muted" htmlFor={`${id}-hex`}>
             <span className="mb-1 block">O escriba el código</span>

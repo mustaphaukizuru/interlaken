@@ -4,7 +4,20 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path';
+import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { ROUTE_META, routeHead } from './src/lib/routeMeta';
+
+/**
+ * The offline page's art (public/offline.html shows it when there is no
+ * network), precached on its own: the illustrations folder stays
+ * runtime-cached like the photos. Listed at its root URL (whitenoise serves
+ * public/ at /), so the globPatterns / modifyURLPrefix '/static/' rewrite does
+ * not apply; the revision is the file's hash, so a new drawing re-caches.
+ */
+const OFFLINE_ART = '/assets/illustrations/sin-conexion-320.webp';
+const offlineArtRevision = () =>
+  createHash('md5').update(readFileSync(path.resolve(__dirname, 'public', OFFLINE_ART.slice(1)))).digest('hex');
 
 /**
  * seo-routes.json: the per-URL head (title, description, canonical, robots,
@@ -71,6 +84,8 @@ export default defineConfig(({ command }) => ({
         // Precache the app shell (+ offline.html); campus photos (.webp) are
         // runtime-cached on demand (see runtimeCaching) to keep the install light.
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}', 'icon-*.png', 'favicon.ico', 'apple-touch-icon.png', 'og-image.png'],
+        // Exactly one image beyond the shell: the offline page's illustration (see OFFLINE_ART).
+        additionalManifestEntries: command === 'build' ? [{ url: OFFLINE_ART, revision: offlineArtRevision() }] : [],
         // Keep the precache to the true app shell (~1 MB instead of ~1.8 MB):
         // the biggest role-gated lazy chunks — recharts (AreaChart +
         // useChartEntrance + charts UI), the whole admin console, staff

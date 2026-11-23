@@ -11,6 +11,7 @@ import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { invalidateStudents, studentDetailKey } from '@/hooks/queries/studentKeys';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import { PUESTO_OPTIONS } from '@/lib/people';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import type { LoyverseLinkOutcome, PersonTipo, StudentProfile } from '@/types';
 
 interface Props {
@@ -80,8 +81,11 @@ export function StudentFormModal({ open, onClose, student, onSaved, defaultTipo 
     enabled: needsFile,
   });
   const source = needsFile ? file.data : student;
+  // Closing with unsaved changes asks first; a successful save closes directly.
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={640}>
+    <>
+    <Modal open={open} onClose={guard.requestClose} title={title} maxWidth={640}>
       {needsFile && !source ? (
         file.isError ? (
           <div role="alert" className="space-y-4 py-2">
@@ -96,10 +100,12 @@ export function StudentFormModal({ open, onClose, student, onSaved, defaultTipo 
         )
       ) : (
         /* Keyed so each open starts from the current student (no effect-driven reset). */
-        <StudentForm key={`${open}-${source?.id ?? 'new'}`} student={source} onClose={onClose} onSaved={onSaved} qc={qc}
-          defaultTipo={defaultTipo} onTipo={setTipo} />
+        <StudentForm key={`${open}-${source?.id ?? 'new'}`} student={source} onClose={onClose} onCancel={guard.requestClose}
+          onDirty={guard.reportDirty} onSaved={onSaved} qc={qc} defaultTipo={defaultTipo} onTipo={setTipo} />
       )}
     </Modal>
+    {guard.dialog}
+    </>
   );
 }
 
@@ -111,20 +117,24 @@ interface ExistingStudent { id: number; name: string; student_id: string; status
 const existingOf = (err: unknown): ExistingStudent | null =>
   (err as { response?: { data?: { existing?: ExistingStudent } } })?.response?.data?.existing ?? null;
 
-function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
-  student?: StudentProfile | null; onClose: () => void; onSaved?: (s: StudentProfile) => void;
+function StudentForm({ student, onClose, onCancel, onDirty, onSaved, qc, defaultTipo, onTipo }: {
+  student?: StudentProfile | null; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
+  onSaved?: (s: StudentProfile) => void;
   qc: ReturnType<typeof useQueryClient>; defaultTipo: PersonTipo; onTipo: (t: PersonTipo) => void;
 }) {
   const editing = !!student;
   // Masked for this account (staff, by role): the values are «●●●», never real.
   const medicalLocked = !!student?.medical_masked;
-  const [form, setForm] = useState<StudentWrite>(() => initial(student, defaultTipo));
+  const [start] = useState<StudentWrite>(() => initial(student, defaultTipo));
+  const [form, setForm] = useState<StudentWrite>(start);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [existing, setExisting] = useState<ExistingStudent | null>(null);
   const [restoring, setRestoring] = useState(false);
   // A7: what saving did with Loyverse, shown before the modal closes.
   const [linked, setLinked] = useState<{ saved: StudentProfile; link: LoyverseLinkOutcome } | null>(null);
   const staff = form.tipo === 'personal';
+  // Saved (the Loyverse result is showing) means nothing is left to lose.
+  useReportDirty(!linked && valuesDiffer(form, start), onDirty);
 
   const set = <K extends keyof StudentWrite>(k: K, v: StudentWrite[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -190,7 +200,7 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
       toast.success(`${existing.name} volvió a la lista como «Baja definitiva».`);
       onClose();
     } catch {
-      toast.error('No se pudo restaurar. Inténtelo desde la pestaña Archivados.');
+      toast.error('No se pudo restaurar. Use la pestaña Archivados.');
     } finally {
       setRestoring(false);
     }
@@ -213,13 +223,13 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
       <form onSubmit={submit} className="space-y-4" noValidate>
         <fieldset>
           <legend className="label">Tipo de registro</legend>
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-cream-2 p-1">
+          <div className="grid grid-cols-2 gap-1 rounded-md bg-cream-2 p-1">
             {([['alumno', 'Alumno'], ['personal', 'Personal del colegio']] as const).map(([value, label]) => {
               const on = (form.tipo ?? 'alumno') === value;
               return (
                 <label
                   key={value}
-                  className={`flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-3 text-center text-sm font-semibold transition-colors focus-within:ring-2 focus-within:ring-purple/40 ${
+                  className={`flex min-h-[44px] cursor-pointer items-center justify-center rounded-sm px-3 text-center text-sm font-semibold transition-colors focus-within:ring-2 focus-within:ring-purple/40 ${
                     on ? 'bg-white text-purple shadow-sm ring-1 ring-purple/15' : 'text-muted hover:text-ink'
                   }`}
                 >
@@ -283,14 +293,14 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
             ? 'Su cuenta de Google del colegio: con ella entra al portal a «Mi cafetería», y Loyverse lo busca primero por este correo. Si ya entra a la consola con este correo, la conserva.'
             : 'Escriba el correo escolar (ci…@interlaken.com.mx): con él la familia entra con Google y recibe los avisos. Vacío = una dirección interna sin buzón.'}
         />
-        <fieldset className="space-y-4 rounded-xl border border-line p-4">
+        <fieldset className="space-y-4 rounded-md border border-line p-4">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Datos personales</legend>
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Fecha de nacimiento" type="date" value={form.birth_date ?? ''} onChange={(e) => set('birth_date', e.target.value)} error={errors.birth_date} />
             <Input label="CURP" value={form.curp ?? ''} onChange={(e) => set('curp', e.target.value.toUpperCase())} error={errors.curp} maxLength={18} autoComplete="off" />
           </div>
         </fieldset>
-        <fieldset className="space-y-4 rounded-xl border border-line p-4">
+        <fieldset className="space-y-4 rounded-md border border-line p-4">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Contacto de emergencia</legend>
           <div className="grid gap-4 sm:grid-cols-3">
             <Input label="Nombre" value={form.emergency_name ?? ''} onChange={(e) => set('emergency_name', e.target.value)} />
@@ -298,7 +308,7 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
             <Input label="Parentesco" value={form.emergency_rel ?? ''} onChange={(e) => set('emergency_rel', e.target.value)} />
           </div>
         </fieldset>
-        <fieldset className="space-y-4 rounded-xl border border-coral/30 bg-coral-50/40 p-4">
+        <fieldset className="space-y-4 rounded-md border border-coral/30 bg-coral-50/40 p-4">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-coral-600">Datos médicos (confidencial)</legend>
           {medicalLocked ? (
             <p className="flex items-start gap-2.5 text-sm text-muted">
@@ -333,7 +343,7 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
           </p>
         </div>
         {!editing && existing && (
-          <div role="alert" className="space-y-3 rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink">
+          <div role="alert" className="space-y-3 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink">
             <p className="flex items-start gap-2.5">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
               <span>
@@ -355,7 +365,7 @@ function StudentForm({ student, onClose, onSaved, qc, defaultTipo, onTipo }: {
         )}
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+          <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
           <Button type="submit" loading={mutation.isPending} className="min-h-[44px]">
             {editing ? 'Guardar cambios' : staff ? 'Crear personal' : 'Crear alumno'}
           </Button>
@@ -378,7 +388,7 @@ function LinkResult({ saved, link, editing, onClose }: {
       <p className="text-sm text-ink">
         <strong>{saved.user?.full_name}</strong> · {noun} {editing ? 'actualizado' : 'creado'}.
       </p>
-      <div role="status" className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm ${tone}`}>
+      <div role="status" className={`flex items-start gap-2.5 rounded-md border px-4 py-3 text-sm ${tone}`}>
         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ok ? 'text-green-700' : 'text-amber'}`} aria-hidden="true" />
         <div>
           <p className="font-semibold">{link.message}</p>

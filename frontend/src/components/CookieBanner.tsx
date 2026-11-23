@@ -8,11 +8,21 @@ import { Link } from 'react-router-dom';
 import { useSiteTexts } from '@/hooks/useSiteSettings';
 
 export const COOKIE_DEFAULTS = {
-  cookie_text: 'Usamos cookies para medir el uso del sitio y mejorar tu experiencia. No se activa ninguna analítica hasta que aceptes.',
+  cookie_text: 'Usamos cookies para medir el uso del sitio y mejorar su experiencia. No se activa ninguna analítica hasta que usted acepte.',
   cookie_link: 'Más información',
   cookie_decline: 'Rechazar',
   cookie_accept: 'Aceptar',
 } as const;
+
+/**
+ * Lift above the public sticky «Agendar visita» bar only where that bar is
+ * on screen (phones, on pages that show it: PublicLayout marks it with
+ * `data-sticky-cta`). Elsewhere the banner sits on the bottom edge.
+ */
+const CLEAR_STICKY_CTA = 'max-md:[body:has([data-sticky-cta])_&]:mb-[76px]';
+// The portal's phone tab bar (MobileTabBar, data-bottom-bar) shows below lg:
+// the banner lifts above it too instead of hiding the tabs (code review 2026-11-22).
+const CLEAR_TAB_BAR = 'max-lg:[body:has([data-bottom-bar])_&]:mb-[76px]';
 
 export default function CookieBanner({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
   const text = useSiteTexts(COOKIE_DEFAULTS);
@@ -20,13 +30,12 @@ export default function CookieBanner({ onAccept, onDecline }: { onAccept: () => 
     <div
       role="region"
       aria-label="Aviso de cookies"
-      // mb-[76px] keeps the banner above the mobile tab bar / sticky CTA on small screens.
-      className="fixed bottom-0 inset-x-0 z-[100] mb-[76px] lg:mb-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+      className={`fixed bottom-0 inset-x-0 z-drawer ${CLEAR_STICKY_CTA} ${CLEAR_TAB_BAR} p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] print:hidden`}
     >
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl border border-line p-5 sm:flex sm:items-center sm:gap-5">
+      <div className="max-w-3xl mx-auto bg-white rounded-md shadow-raised p-5 sm:flex sm:items-center sm:gap-5">
         <div className="flex items-start gap-3 flex-1">
-          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
-            <Cookie className="w-5 h-5 text-brand-600" />
+          <div className="w-10 h-10 rounded-sm bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <Cookie className="w-5 h-5 text-brand-600" aria-hidden="true" />
           </div>
           <p className="text-sm text-muted leading-relaxed">
             {text.cookie_text}{' '}

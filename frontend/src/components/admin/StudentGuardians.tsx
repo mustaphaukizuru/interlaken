@@ -104,7 +104,7 @@ export function StudentGuardians({ studentId }: Props) {
       } else if (body.guardian?.is_self) {
         toast.success('Cuenta familiar del alumno vinculada.');
       } else if (body.created_user) {
-        toast.success('Tutor creado y vinculado. Para darle acceso use «Restablecer contraseña» en su fila.');
+        toast.success('Tutor vinculado. Dé acceso con «Restablecer contraseña».');
       } else {
         toast.success('Tutor vinculado al alumno.');
       }
@@ -146,7 +146,7 @@ export function StudentGuardians({ studentId }: Props) {
       }
     >
       {!selfLinked && studentEmail && !isLoading && !isError && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-cream/60 px-4 py-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-cream/60 px-4 py-3">
           <p className="min-w-0 text-sm text-ink">
             En Interlaken la familia entra con el correo escolar del alumno.
             <span className="mt-0.5 block truncate text-xs text-subtle">{studentEmail}</span>
@@ -187,7 +187,7 @@ export function StudentGuardians({ studentId }: Props) {
 
       {open && (
         <form
-          className="mb-5 grid gap-3 rounded-2xl bg-cream/60 p-4 sm:grid-cols-2"
+          className="mb-5 grid gap-3 rounded-md bg-cream/60 p-4 sm:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (!email.trim()) {

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { portalApi, type GuardianWrite } from '@/services/api';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 
 export interface GuardianEditTarget {
   id: number;
@@ -28,23 +29,32 @@ const RELATIONSHIPS = ['Padre', 'Madre', 'Padre/Madre', 'Tutor', 'Abuelo/a', 'Ot
 
 /** Edit a linked guardian's identity and contact data (BACKLOG P1-A3). */
 export function GuardianEditModal({ studentId, guardian, onClose }: Props) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={!!guardian} onClose={onClose} title="Editar tutor" maxWidth={520}>
-      {guardian && <GuardianForm key={guardian.id} studentId={studentId} guardian={guardian} onClose={onClose} />}
-    </Modal>
+    <>
+      <Modal open={!!guardian} onClose={guard.requestClose} title="Editar tutor" maxWidth={520}>
+        {guardian && <GuardianForm key={guardian.id} studentId={studentId} guardian={guardian} onClose={onClose}
+          onCancel={guard.requestClose} onDirty={guard.reportDirty} />}
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function GuardianForm({ studentId, guardian, onClose }: { studentId: number; guardian: GuardianEditTarget; onClose: () => void }) {
+function GuardianForm({ studentId, guardian, onClose, onCancel, onDirty }: {
+  studentId: number; guardian: GuardianEditTarget; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
+}) {
   const qc = useQueryClient();
-  const [form, setForm] = useState<GuardianWrite>({
+  const [start] = useState<GuardianWrite>(() => ({
     first_name: guardian.first_name ?? '',
     last_name: guardian.last_name ?? '',
     email: guardian.email,
     whatsapp: guardian.whatsapp ?? '',
     phone: guardian.phone ?? '',
     relationship: guardian.relationship ?? 'Padre/Madre',
-  });
+  }));
+  const [form, setForm] = useState<GuardianWrite>(start);
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const [errors, setErrors] = useState<Partial<Record<keyof GuardianWrite | 'detail' | 'error', string>>>({});
   const set = <K extends keyof GuardianWrite>(k: K, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -106,7 +116,7 @@ function GuardianForm({ studentId, guardian, onClose }: { studentId: number; gua
         </div>
       )}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={mutation.isPending} className="min-h-[44px]">Guardar cambios</Button>
       </div>
     </form>

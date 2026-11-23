@@ -44,7 +44,7 @@ import { fillText, numberedTitle, stepNumber, type FichaCopy, type TextKey } fro
 import { FichaDone } from './FichaDone';
 import { Field } from './fields';
 import { FichaFormProvider } from './context';
-import { ErrorSummary, Panel, SaveStatus, StepHeading, type SaveState, type SummaryItem } from './parts';
+import { ErrorSummary, Panel, SaveStatus, StepHeading, useFocusFirstInvalid, useUnsavedWarning, type SaveState } from './parts';
 import { PrivateFicha } from './PrivateFicha';
 import { StaffBanner } from './StaffBanner';
 import { useStaffView } from './staffView';
@@ -63,8 +63,15 @@ import type { Completeness, FichaPayload, FichaStep, FieldErrors, StartResponse,
 
 type Phase = 'booting' | 'start' | 'closed' | 'link-error' | 'expired' | 'wizard' | 'later' | 'done' | 'sent';
 
-/** Whether the page's hero shows (only next to the public start). */
-export type FichaView = 'start' | 'other';
+/**
+ * What the page shows around the wizard: `start` = the hero and the trust
+ * line (the public start form is on screen), `closed` = the hero only (the
+ * private-ficha panel, or the start still loading: the visitor may not be
+ * able to start, so «Unos 15 minutos…» waits), `other` = neither (steps,
+ * review, confirmation, links), so a phone sees the form first and the
+ * screen's own heading is the page's h1.
+ */
+export type FichaView = 'start' | 'closed' | 'other';
 
 const FIRMA = 'firma';
 const CONTACTO = 'contacto';
@@ -169,8 +176,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   // A remembered staff login not confirmed yet: neither the form nor the panel.
   const deciding = privateStart && !link && staffView === 'unknown';
   const staffBanner = staffMode ? <StaffBanner /> : null;
-  const view: FichaView = phase === 'start' || phase === 'closed' ? 'start' : 'other';
+  const view: FichaView = phase === 'closed' || closed || (phase === 'start' && (!schema || deciding))
+    ? 'closed'
+    : phase === 'start' ? 'start' : 'other';
   useLayoutEffect(() => { onView?.(view); }, [view, onView]);
+  /** The screen's heading: h1 whenever the hero (and its h1) is not on screen. */
+  const level = view === 'other' ? 1 : 2;
 
   /** The wizard's steps, in the schema's order: alumno … emergencia, then firma. */
   const order = useMemo(
@@ -203,7 +214,11 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     if (key) setStepKey(key);
     if (next) setPhase(next);
   }, []);
-  const focusSummary = () => { setTimeout(() => summaryRef.current?.focus(), 0); };
+  // After a failed save or a missing field: the first field with a problem
+  // takes the focus (its message is read with it), else the error line.
+  const requestFocus = useFocusFirstInvalid();
+  const focusFields = (key: string, names: string[]) => requestFocus(names.map((n) => fieldId(key, n)), summaryRef);
+  const focusSummary = () => requestFocus([], summaryRef);
 
   const expire = () => {
     clearSession();
@@ -341,11 +356,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
         setErrors((prev) => ({ ...prev, [key]: own }));
         setSaveState('idle');
         if (!Object.keys(own).length) setDetail(apiErrorMessage(err, copy.t('saveError')));
+        focusFields(key, Object.keys(own));
       } else {
         setSaveState('error');
         setDetail(status === 403 ? apiErrorMessage(err, copy.t('saveError')) : copy.t('saveError'));
+        focusSummary();
       }
-      focusSummary();
       return null;
     }
   };
@@ -370,7 +386,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     const names = saved.completeness.sections[stepKey]?.missing ?? [];
     const missing = names.length ? messagesFor(schema, step, names, all, copy.t('errRequired')) : {};
     setErrors((prev) => ({ ...prev, [stepKey]: missing }));
-    if (Object.keys(missing).length) { focusSummary(); return; }
+    if (Object.keys(missing).length) { focusFields(stepKey, Object.keys(missing)); return; }
     if (stepKey === CONTACTO || toReview) { go(FIRMA); return; }
     const target = order[order.indexOf(stepKey) + 1] ?? FIRMA;
     setReached((r) => Math.max(r, order.indexOf(target)));
@@ -426,7 +442,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     if (Object.keys(missing).length) {
       setErrors((prev) => ({ ...prev, [FIRMA]: missing }));
       setSubmitProblems([]);
-      focusSummary();
+      focusFields(FIRMA, Object.keys(missing));
       return;
     }
     setBusy(true);
@@ -446,7 +462,10 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           mapped[section] = Object.fromEntries(Object.entries(fields).map(([f, msgs]) => [f, Array.isArray(msgs) ? String(msgs[0]) : String(msgs)]));
         }
         setErrors((prev) => ({ ...prev, ...mapped }));
-        setSubmitProblems(Object.keys(mapped).filter((k) => k !== FIRMA));
+        const elsewhere = Object.keys(mapped).filter((k) => k !== FIRMA);
+        setSubmitProblems(elsewhere);
+        if (!elsewhere.length) focusFields(FIRMA, Object.keys(mapped[FIRMA] ?? {}));
+        else focusSummary();
         setCompleteness((prev) => prev && ({
           ...prev,
           complete: false,
@@ -455,18 +474,26 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
       } else {
         setSubmitProblems([]);
         setDetail(apiErrorMessage(err, copy.t('submitError')));
+        focusSummary();
       }
-      focusSummary();
     } finally {
       setBusy(false);
     }
   };
 
+  // Leaving the page (reload, closing the tab, another site) with edits of
+  // this step not saved yet asks first. Nothing saves on its own.
+  useUnsavedWarning(phase === 'wizard', () => {
+    const onStep = stepOf(stepKey);
+    const saved = baseline.current[stepKey];
+    return !!onStep && saved !== undefined && snapshot(onStep, values[stepKey]) !== saved;
+  });
+
   // ── rendering ──────────────────────────────────────────────────────────
   if (schemaQ.isError) {
     return (
       <Shell topRef={topRef} banner={staffBanner}>
-        <Panel icon={<AlertTriangle className="h-7 w-7" />} tone="warn" title={copy.t('loadError')}>
+        <Panel icon={<AlertTriangle className="h-8 w-8" />} tone="warn" title={copy.t('loadError')} level={level}>
           <Button className="mt-4" variant="secondary" onClick={() => void schemaQ.refetch()}>{copy.t('retryLabel')}</Button>
         </Panel>
       </Shell>
@@ -505,11 +532,11 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   if (phase === 'link-error' || phase === 'expired') {
     return (
       <Shell topRef={topRef} banner={staffBanner}>
-        <Panel icon={<Link2Off className="h-7 w-7" />} tone="warn" headingRef={headingRef}
-          title={phase === 'expired' ? copy.t('expiredTitle') : copy.t('inviteErrorTitle')}>
+        <Panel icon={<Link2Off className="h-8 w-8" />} tone="warn" headingRef={headingRef} level={level}
+          title={phase === 'expired' ? copy.t('expiredTitle') : copy.t('inviteErrorTitle')}
+          after={<ResumeForm copy={copy} startOpen />}>
           <p>{phase === 'expired' ? copy.t('sessionExpired') : copy.t('inviteErrorText')}</p>
         </Panel>
-        <div className="card mt-4 p-4 sm:p-6"><ResumeForm copy={copy} startOpen /></div>
       </Shell>
     );
   }
@@ -517,7 +544,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   if (phase === 'sent') {
     return (
       <Shell topRef={topRef} banner={staffBanner}>
-        <Panel icon={<MailCheck className="h-7 w-7" />} tone="success" title={copy.t('sentTitle')} headingRef={headingRef}>
+        <Panel icon={<MailCheck className="h-8 w-8" />} tone="success" title={copy.t('sentTitle')} headingRef={headingRef} level={level}>
           <p>{copy.t('sentText')}</p>
         </Panel>
       </Shell>
@@ -527,7 +554,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   if (phase === 'later' && later) {
     return (
       <Shell topRef={topRef} banner={staffBanner}>
-        <Panel icon={<Send className="h-7 w-7" />} tone={later.state === 'error' ? 'warn' : 'success'} title={copy.t('laterTitle')} headingRef={headingRef}>
+        <Panel icon={<Send className="h-8 w-8" />} tone={later.state === 'error' ? 'warn' : 'success'} title={copy.t('laterTitle')} headingRef={headingRef} level={level}>
           <p aria-live="polite">
             {later.state === 'error' ? copy.t('laterError') : later.state === 'sent' ? fillText(copy.t('laterText'), { correo: later.email }) : copy.t('saving')}
           </p>
@@ -568,9 +595,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     reachable: i <= reached || (key !== FIRMA && !!sections[key]?.complete),
   }));
   const stepErrors = errors[stepKey] ?? {};
-  const summaryItems: SummaryItem[] = Object.entries(stepErrors).map(([name, message]) => ({
-    id: fieldId(stepKey, name), label: stepField(step, name)?.label ?? name, message,
-  }));
+  const problemCount = Object.keys(stepErrors).length;
   // The review follows the numbered steps; who fills the ficha (unnumbered) comes last.
   const patchKeys = schema.patch_sections ?? [];
   const reviewSections = [...order.filter((k) => patchKeys.includes(k)), ...patchKeys.filter((k) => !order.includes(k))]
@@ -586,6 +611,10 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const onFormBlur = (e: FocusEvent<HTMLFormElement>) => { if (!typingIn(e.relatedTarget)) setTyping(false); };
   const intro = copy.t(INTRO_KEY[stepKey] ?? 'reviewIntro') || step.description;
   const primaryLabel = isFirma ? copy.t('submitLabel') : stepKey === CONTACTO || toReview ? copy.t('reviewReturn') : copy.t('nextLabel');
+  // The line over the step: the sections to correct (review), else «Datos por revisar: n», else the server's message.
+  const sectionsToFix = isFirma && submitProblems.length > 0;
+  const problemLine = sectionsToFix ? copy.t('incompleteTitle') : problemCount ? fillText(copy.t('errorSummary'), { n: problemCount }) : detail;
+  const problemDetail = sectionsToFix ? (detail ?? copy.t('incompleteText')) : problemCount ? detail : undefined;
 
   let body: ReactNode;
   switch (stepKey) {
@@ -605,8 +634,8 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   return (
     <Shell topRef={topRef} banner={staffBanner}>
       {invitedBanner ? (
-        <div className="mb-4 flex items-start gap-3 rounded-xl2 border border-green/30 bg-green-light px-4 py-3 text-[15px] text-ink" role="status">
-          <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-dark" aria-hidden="true" />
+        <div className="mb-4 flex items-start gap-3 rounded-md bg-success-bg px-4 py-3 text-base text-ink" role="status">
+          <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
           <p><strong>{copy.t('invitedTitle')}</strong> {copy.t('invitedText')}</p>
         </div>
       ) : null}
@@ -614,20 +643,15 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
         {stepKey !== CONTACTO ? (
           <StepBar key={stepKey} items={items} current={stepKey} copy={copy} onPick={(k) => void leaveTo(k)} intro={intro} headingRef={headingRef} />
         ) : (
-          <StepHeading ref={headingRef} title={titleOf(stepKey)} intro={intro} />
+          <StepHeading ref={headingRef} title={titleOf(stepKey)} intro={intro} level={1} />
         )}
-        <ErrorSummary
-          ref={summaryRef}
-          title={isFirma && submitProblems.length ? copy.t('incompleteTitle') : copy.t('errorSummary')}
-          items={summaryItems}
-          detail={detail ?? (isFirma && submitProblems.length ? copy.t('incompleteText') : undefined)}
-        >
-          {isFirma && submitProblems.length ? (
-            <ul className="mt-3 space-y-2 sm:pl-7">
+        <ErrorSummary ref={summaryRef} line={problemLine} detail={problemDetail}>
+          {sectionsToFix ? (
+            <ul className="mt-2 divide-y divide-coral-200 sm:pl-7">
               {submitProblems.map((k) => (
-                <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 rounded-xl bg-white/70 py-1 pl-3 pr-1 text-sm text-coral-800">
+                <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 py-0.5 text-sm">
                   <span className="min-w-0 font-semibold">{sectionLabel(k)}</span>
-                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-full px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-sm px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
                     aria-label={`${copy.t('fixLabel')}: ${sectionLabel(k)}`}
                     onClick={() => go(k, { review: true })}>
                     {copy.t('fixLabel')}
@@ -649,7 +673,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
               data-ficha-actions=""
               data-sticky={barDocked ? undefined : ''}
               className={clsx(
-                'z-20 -mx-4 mt-8 flex items-center gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+                'z-sticky -mx-4 mt-8 flex items-center gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]',
                 'shadow-[0_-12px_24px_-18px_rgba(64,26,142,0.45)] backdrop-blur',
                 barDocked ? 'static' : 'sticky bottom-0',
                 'sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-6 sm:shadow-none sm:backdrop-blur-none',
@@ -669,7 +693,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
             </div>
             <div className="mt-2 flex flex-col items-center gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
               <button type="button" onClick={() => void saveForLater()} disabled={busy}
-                className="-mx-2 inline-flex min-h-[44px] items-center rounded-full px-2 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50">
+                className="-mx-2 inline-flex min-h-[44px] items-center rounded-sm px-2 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50">
                 {copy.t('laterLabel')}
               </button>
               <SaveStatus state={saveState} labels={{ saving: copy.t('saving'), saved: copy.t('saved'), error: copy.t('saveError') }} />

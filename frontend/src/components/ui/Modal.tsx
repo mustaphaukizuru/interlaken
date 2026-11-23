@@ -109,7 +109,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 384, fullScre
     // document keydown handler above) or the close button.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
+      className="fixed inset-0 z-modal flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -121,8 +121,8 @@ export function Modal({ open, onClose, title, children, maxWidth = 384, fullScre
         aria-labelledby={titleId}
         tabIndex={-1}
         className={fullScreenOnPhone
-          ? 'card flex w-full flex-col space-y-4 overflow-y-auto focus:outline-none max-sm:h-[100dvh] max-sm:!max-w-none max-sm:rounded-none max-sm:border-0 max-sm:px-4 max-sm:pb-0 max-sm:pt-[max(1rem,env(safe-area-inset-top))] sm:max-h-[92dvh] sm:rounded-2xl sm:pb-0'
-          : 'card w-full max-h-[92dvh] space-y-4 overflow-y-auto rounded-b-none rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] focus:outline-none max-sm:!max-w-none sm:rounded-2xl sm:pb-6'}
+          ? 'card flex w-full flex-col space-y-4 overflow-y-auto focus:outline-none max-sm:h-[100dvh] max-sm:!max-w-none max-sm:rounded-none max-sm:border-0 max-sm:px-4 max-sm:pb-0 max-sm:pt-[max(1rem,env(safe-area-inset-top))] sm:max-h-[92dvh] sm:rounded-md sm:pb-0'
+          : 'card w-full max-h-[92dvh] space-y-4 overflow-y-auto rounded-b-none rounded-t-md pb-[max(1.5rem,env(safe-area-inset-bottom))] focus:outline-none max-sm:!max-w-none sm:rounded-md sm:pb-6'}
         style={{ maxWidth }}
       >
         {/* Sheet grab handle (phones only): signals 'this slides down / tap outside to close'. */}
@@ -133,7 +133,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 384, fullScre
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="-mr-1.5 -mt-1.5 rounded-lg p-2.5 text-subtle hover:bg-cream hover:text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
+            className="-mr-1.5 -mt-1.5 rounded-sm p-2.5 text-subtle hover:bg-cream hover:text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
           >
             <X className="h-5 w-5" />
           </button>

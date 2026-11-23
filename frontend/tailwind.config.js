@@ -8,6 +8,10 @@ export default {
       colors: {
         // Nivel educativo palette (school instruction 2026-08-21)
         nivel: { preescolar: '#8ac6a4', primaria: '#f4436c', secundaria: '#f1c82f' },
+        // The printed student ID (school template, 2026-11-22): navy band and
+        // a deeper ink for type on the level colour (4.7:1 on Primaria pink,
+        // where the template navy only reaches 3.2:1).
+        credencial: { navy: '#013e52', ink: '#001f2c' },
         // `brand` remapped to the Interlaken purple scale so every existing
         // `brand-*` utility across the app rebrands automatically.
         brand: {
@@ -80,6 +84,11 @@ export default {
         'nav-plataformas': '#47a028',
         'nav-galeria':     '#6b8c2e',
         'nav-contacto':    '#8b1a2e',
+        // Status pairs (index.css): text-success / bg-success-bg …, status only.
+        success: { DEFAULT: 'var(--success-fg)', bg: 'var(--success-bg)' },
+        warning: { DEFAULT: 'var(--warning-fg)', bg: 'var(--warning-bg)' },
+        danger:  { DEFAULT: 'var(--danger-fg)',  bg: 'var(--danger-bg)' },
+        info:    { DEFAULT: 'var(--info-fg)',    bg: 'var(--info-bg)' },
       },
       fontFamily: {
         head: ['Poppins', 'sans-serif'],
@@ -89,7 +98,7 @@ export default {
       // Fluid type scale — clamp() so display type shrinks gracefully on mobile.
       fontSize: {
         'fluid-sm':   'clamp(0.8125rem, 0.78rem + 0.16vw, 0.875rem)',
-        'fluid-base': 'clamp(0.9375rem, 0.9rem + 0.19vw, 1rem)',
+        'fluid-base': 'clamp(1rem, 0.96rem + 0.19vw, 1.0625rem)', // 16px floor on phones (no body text under 16px)
         'fluid-lg':   'clamp(1.0625rem, 1rem + 0.31vw, 1.25rem)',
         'fluid-xl':   'clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem)',
         'fluid-2xl':  'clamp(1.5rem, 1.3rem + 1vw, 2rem)',
@@ -97,8 +106,36 @@ export default {
         'fluid-4xl':  'clamp(2.25rem, 1.7rem + 2.7vw, 3.5rem)',
         'fluid-5xl':  'clamp(2.75rem, 1.9rem + 4.2vw, 4.75rem)',
       },
-      borderRadius: { xl2: '18px', xl3: '24px', xl4: '32px' },
+      // Shape (D1, 2026-11-21): two radii only, from the CSS tokens. `rounded-sm`
+      // = controls (8px), `rounded-md` = surfaces (12px), `rounded-full` = badges,
+      // avatars, switch thumbs and dots. The other names are DEPRECATED aliases
+      // kept so stray classes (e.g. in stored CMS content) still land on the
+      // scale; `npm run check:ui` keeps them out of src/.
+      borderRadius: {
+        DEFAULT: 'var(--radius-sm)',
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-sm)',
+        xl: 'var(--radius-md)',
+        '2xl': 'var(--radius-md)',
+        '3xl': 'var(--radius-md)',
+        xl2: 'var(--radius-md)',
+        xl3: 'var(--radius-md)',
+        xl4: 'var(--radius-md)',
+      },
+      // Layers (index.css --z-*): page < sticky < dropdown < drawer < modal < toast.
+      zIndex: {
+        raised: 'var(--z-raised)',
+        sticky: 'var(--z-sticky)',
+        header: 'var(--z-header)',
+        dropdown: 'var(--z-dropdown)',
+        drawer: 'var(--z-drawer)',
+        modal: 'var(--z-modal)',
+        toast: 'var(--z-toast)',
+        overlay: 'var(--z-overlay)',
+      },
       boxShadow: {
+        raised: 'var(--shadow-raised)',
         card:   '0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10)',
         purple: '0 12px 28px -10px rgba(64,26,142,0.38)',
         pink:   '0 12px 28px -10px rgba(224,26,78,0.3)',

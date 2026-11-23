@@ -18,7 +18,7 @@ export function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClos
   const generic = BLOCKS.filter(match);
   const card = (b: { type: string; label: string; description: string }) => (
     <li key={b.type}>
-      <button type="button" onClick={() => onPick(b.type)} className="w-full rounded-xl border border-line p-3 text-left hover:border-purple hover:bg-purple/5">
+      <button type="button" onClick={() => onPick(b.type)} className="w-full rounded-sm border border-line p-3 text-left hover:border-purple hover:bg-purple/5">
         <span className="block font-semibold text-ink">{b.label}</span>
         <span className="block text-xs text-muted">{b.description}</span>
       </button>

@@ -154,42 +154,88 @@ class PreRegistrationListCreateView(PreRegistrationListConfig, generics.ListCrea
         self._notify_admin(instance)
 
     def _send_confirmation(self, obj):
-        from apps.portal.emailing import EmailContent
-
-        child = f'{obj.child_first_name} {obj.child_last_name}'.strip()
-        content = EmailContent(
-            category='Admisiones', tone='success',
-            title=f'Recibimos el pre-registro de {obj.child_first_name}',
-            intro=(f'Estimado/a {obj.parent_name}: gracias por su interés en el Colegio Interlaken. '
-                   f'Recibimos su pre-registro y en breve nos pondremos en contacto con usted.'),
-            details=[('Alumno', child), ('Nivel', obj.get_level_display()),
-                     ('Grado', obj.grade_applying),
-                     ('Visita al colegio', 'Solicitada' if obj.wants_visit else 'No solicitada')],
-            note='Si algún dato no es correcto, responda a este correo y lo corregimos.',
-            signoff='Equipo de Admisiones',
-            reason='Recibe este correo porque llenó el formulario de pre-registro en interlaken.edu.mx.',
-        )
-        send_email(f'Pre-registro recibido: {child}', '', [obj.parent_email],
+        subject, content = pre_registration_received_email(obj)
+        send_email(subject, '', [obj.parent_email],
                    reply_to=settings.ADMISSIONS_EMAIL, content=content)
 
     def _notify_admin(self, obj):
         # Deliver to the school's contact inbox (NOT EMAIL_HOST_USER, which is the
         # SMTP auth user and is empty by default), mirroring the contact form.
-        from apps.portal.emailing import EmailContent, portal_url
-
         recipient = settings.ADMISSIONS_EMAIL or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
-        child = f'{obj.child_first_name} {obj.child_last_name}'.strip()
-        content = EmailContent(
-            category='Admisiones · aviso interno',
-            title=f'Nuevo pre-registro: {child}',
-            intro='Llegó un pre-registro desde el sitio. Responda a este correo para escribirle directamente a la familia.',
-            details=[('Nivel', obj.get_level_display()), ('Grado', obj.grade_applying), ('Padre/Tutor', obj.parent_name),
-                     ('Correo', obj.parent_email), ('Teléfono', obj.parent_phone),
-                     ('Desea visita', 'Sí' if obj.wants_visit else 'No')],
-            cta_label='Abrir en Admisiones', cta_url=portal_url('/admin/admisiones'), link_fallback=False,
-            reason='Aviso interno del sitio del Colegio Interlaken.',
-        )
-        send_email(f'Nuevo pre-registro: {child}', '', [recipient], reply_to=obj.parent_email, content=content)
+        subject, content = pre_registration_office_email(obj)
+        send_email(subject, '', [recipient], reply_to=obj.parent_email, content=content)
+
+
+# ── email builders: pure ``(subject, EmailContent)``, previewed by render_emails ──
+# D13: subjects carry no person's name; family bodies name the child «Ana P.».
+def pre_registration_received_email(obj):
+    from apps.portal.emailing import EmailContent, name_initial
+
+    content = EmailContent(
+        category='Admisiones', tone='success',
+        title=f'Recibimos el pre-registro de {obj.child_first_name}',
+        intro=(f'Estimado/a {obj.parent_name}: gracias por su interés en el Colegio Interlaken. '
+               f'Recibimos su pre-registro y en breve nos pondremos en contacto con usted.'),
+        details=[('Alumno', name_initial(obj.child_first_name, obj.child_last_name)),
+                 ('Nivel', obj.get_level_display()),
+                 ('Grado', obj.grade_applying),
+                 ('Visita al colegio', 'Solicitada' if obj.wants_visit else 'No solicitada')],
+        note='Si algún dato no es correcto, responda a este correo y lo corregimos.',
+        signoff='Equipo de Admisiones',
+        reason='Recibe este correo porque llenó el formulario de pre-registro en interlaken.edu.mx.',
+    )
+    return 'Pre-registro recibido', content
+
+
+def pre_registration_office_email(obj):
+    from apps.portal.emailing import EmailContent, portal_url
+
+    child = f'{obj.child_first_name} {obj.child_last_name}'.strip()
+    content = EmailContent(
+        category='Admisiones · aviso interno',
+        title=f'Nuevo pre-registro: {child}',
+        intro='Llegó un pre-registro desde el sitio. Responda a este correo para escribirle directamente a la familia.',
+        details=[('Nivel', obj.get_level_display()), ('Grado', obj.grade_applying), ('Padre/Tutor', obj.parent_name),
+                 ('Correo', obj.parent_email), ('Teléfono', obj.parent_phone),
+                 ('Desea visita', 'Sí' if obj.wants_visit else 'No')],
+        cta_label='Abrir en Admisiones', cta_url=portal_url('/admin/admisiones'), link_fallback=False,
+        reason='Aviso interno del sitio del Colegio Interlaken.',
+    )
+    return 'Nuevo pre-registro', content
+
+
+def documents_request_email(reg, url: str, missing):
+    from apps.portal.emailing import EmailContent, name_initial
+
+    content = EmailContent(
+        category='Admisiones', tone='warning',
+        title=f'Documentos para la inscripción de {reg.child_first_name}',
+        intro=(f'Estimado/a {reg.parent1_name}: para continuar la inscripción de '
+               f'{name_initial(reg.child_first_name, reg.child_last_name)}, suba los siguientes documentos:'),
+        items=list(missing),
+        cta_label='Subir documentos', cta_url=url,
+        note='El enlace es personal, de un solo uso y válido por tiempo limitado.',
+        signoff='Equipo de Admisiones',
+        reason='Recibe este correo porque inició un proceso de admisión en el Colegio Interlaken.',
+    )
+    return 'Documentos de inscripción', content
+
+
+def registration_received_email(reg):
+    from apps.portal.emailing import EmailContent, name_initial
+
+    child = name_initial(reg.child_first_name, reg.child_last_name)
+    content = EmailContent(
+        category='Admisiones', tone='success',
+        title=f'Recibimos la inscripción de {reg.child_first_name}',
+        intro=(f'Estimado/a {reg.parent1_name}: recibimos la documentación de inscripción de {child}. '
+               f'La revisaremos y le informaremos el resultado en un plazo de 3 a 5 días hábiles.'),
+        details=[('Alumno', child), ('Grado', reg.grade_applying), ('Ciclo escolar', reg.cycle)],
+        note='No necesita hacer nada más por ahora. Si tiene dudas, responda a este correo.',
+        signoff='Equipo de Admisiones',
+        reason='Recibe este correo porque envió una inscripción al Colegio Interlaken.',
+    )
+    return 'Inscripción recibida', content
 
 
 class PreRegistrationDetailView(generics.UpdateAPIView):
@@ -437,20 +483,8 @@ class DocumentsLinkView(APIView):
 
         # The documents of the student's level still missing or to correct (Fase 4).
         missing = checklist(reg)['missing']
-        from apps.portal.emailing import EmailContent
-
-        content = EmailContent(
-            category='Admisiones', tone='warning',
-            title=f'Documentos para la inscripción de {reg.child_first_name}',
-            intro=(f'Estimado/a {reg.parent1_name}: para continuar la inscripción de '
-                   f'{reg.child_first_name} {reg.child_last_name}, suba los siguientes documentos:'),
-            items=missing,
-            cta_label='Subir documentos', cta_url=url,
-            note='El enlace es personal, de un solo uso y válido por tiempo limitado.',
-            signoff='Equipo de Admisiones',
-            reason='Recibe este correo porque inició un proceso de admisión en el Colegio Interlaken.',
-        )
-        send_email(f'Documentos de inscripción: {reg.child_first_name} {reg.child_last_name}', '',
+        subject, content = documents_request_email(reg, url, missing)
+        send_email(subject, '',
                    [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL, content=content)
         return Response({'url': url, 'missing': missing})
 
@@ -608,20 +642,8 @@ class RegistrationSubmitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST)
 
         reg.submit()
-        from apps.portal.emailing import EmailContent
-
-        child = f'{reg.child_first_name} {reg.child_last_name}'.strip()
-        content = EmailContent(
-            category='Admisiones', tone='success',
-            title=f'Recibimos la inscripción de {reg.child_first_name}',
-            intro=(f'Estimado/a {reg.parent1_name}: recibimos la documentación de inscripción de {child}. '
-                   f'La revisaremos y le informaremos el resultado en un plazo de 3 a 5 días hábiles.'),
-            details=[('Alumno', child), ('Grado', reg.grade_applying), ('Ciclo escolar', reg.cycle)],
-            note='No necesita hacer nada más por ahora. Si tiene dudas, responda a este correo.',
-            signoff='Equipo de Admisiones',
-            reason='Recibe este correo porque envió una inscripción al Colegio Interlaken.',
-        )
-        send_email(f'Inscripción recibida: {child}', '', [reg.parent1_email],
+        subject, content = registration_received_email(reg)
+        send_email(subject, '', [reg.parent1_email],
                    reply_to=settings.ADMISSIONS_EMAIL, content=content)
         return Response({'status': 'submitted', 'message': 'Inscripción enviada exitosamente.'})
 

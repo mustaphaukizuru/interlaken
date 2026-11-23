@@ -9,7 +9,7 @@ import { ErrorSummary, SaveStatus, TextareaField, errorsFrom } from './formKit';
 import { InfoRow } from './caseBits';
 import { CaseHistory } from './CaseHistory';
 
-const LINK = 'inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-semibold text-purple hover:bg-purple/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
+const LINK = 'inline-flex min-h-[44px] items-center gap-2 rounded-sm px-2 text-sm font-semibold text-purple hover:bg-purple/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40';
 
 /** WhatsApp greeting the office starts from (the family's first name). */
 export function greeting(d: CaseDetail): string {

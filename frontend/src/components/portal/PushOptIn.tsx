@@ -36,12 +36,12 @@ export function PushOptIn() {
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="flex min-h-[44px] w-full items-center gap-2 rounded-xl2 border border-green/30 bg-green/5 px-4 py-2.5 text-left text-sm text-ink hover:bg-green/10 disabled:opacity-60"
+      className="flex min-h-[44px] w-full items-center gap-2 rounded-md bg-green-50 px-4 py-2.5 text-left text-sm text-ink transition-colors hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60 print:hidden"
     >
-      <BellRing size={16} className="shrink-0 text-green-dark" aria-hidden="true" />
+      <BellRing size={20} className="shrink-0 text-green-dark" aria-hidden="true" />
       <span>
-        <span className="font-medium">Active las notificaciones</span>{' '}
-        — reciba avisos de cafetería, pagos y comunicados en este dispositivo.
+        <span className="font-medium">Active los avisos en este dispositivo</span>{' '}
+        <span className="text-muted">(cafetería, pagos y comunicados).</span>
       </span>
     </button>
   );

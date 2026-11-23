@@ -38,7 +38,7 @@ def portal_badges(user) -> dict:
     queues; families get their unread notifications. Cheap COUNT queries only.
 
     Cached 30 s per user: the SPA polls this on every navigation and the admin
-    branch is eight COUNTs (audit 2026-08)."""
+    branch is a few COUNTs (audit 2026-08)."""
     from django.core.cache import cache
 
     key = BADGE_CACHE_KEY.format(pk=getattr(user, 'pk', 0))
@@ -50,8 +50,82 @@ def portal_badges(user) -> dict:
     return out
 
 
+def _minutes_since(when, now) -> int | None:
+    """Whole minutes since ``when`` (None when unknown)."""
+    if not when:
+        return None
+    return max(0, int((now - when).total_seconds() // 60))
+
+
+def _queue(qs, field: str, now) -> tuple[int, int | None]:
+    """One aggregate per queue: how many, and how long the oldest has waited.
+
+    ``qs`` may be a ``distinct()`` queryset (the MultiCobros helpers join
+    payments), so the aggregate runs over its primary keys."""
+    from django.db.models import Count, Min
+
+    agg = qs.model.objects.filter(pk__in=qs.values('pk')).aggregate(n=Count('pk'), oldest=Min(field))
+    n = agg['n'] or 0
+    return n, (_minutes_since(agg['oldest'], now) if n else None)
+
+
+# Failed card payments that need a person. A family that cancelled, let the
+# Banorte window expire or retried is not one (payments.models._STAGE_REASONS).
+FAILED_PAYMENT_DAYS = 7
+_NOT_A_PROBLEM_STAGES = ('cancel', 'expire', 'supersede')
+
+
+def failed_payments_count(now=None) -> int:
+    """Card payments that FAILED in the last ``FAILED_PAYMENT_DAYS`` days for a
+    reason a person may have to look at (declined, bank timeout, not found in
+    MultiCobros, configuration). Attempts stuck pending are not counted here:
+    the row links to the FAILED list, which cannot show them (code review
+    2026-11-22); the Pagos page reports them on its own (``stuck_pending``)."""
+    from datetime import timedelta
+
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from apps.payments.models import Payment
+
+    now = now or timezone.now()
+    since = now - timedelta(days=FAILED_PAYMENT_DAYS)
+    # has_key first: a row without a stage (a bank decline) must not vanish
+    # into the SQL NULL of the key lookup.
+    failed = (Payment.objects.filter(status=Payment.Status.FAILED, created_at__gte=since)
+              .exclude(Q(gateway_raw__has_key='stage') & Q(gateway_raw__stage__in=_NOT_A_PROBLEM_STAGES))
+              .count())
+    return failed
+
+
+def loyverse_sync_alerts(now=None) -> int:
+    """How many of the two cron checks of ``check_sync_fresh`` fail right now:
+    the 5-minute purchase poll (no run for more than 30 min) and the daily
+    roster sync (none for more than 30 h). Database only: it never probes
+    Loyverse. Zero where no Loyverse token is configured (local, demo)."""
+    from django.conf import settings
+    from django.utils import timezone
+
+    if not getattr(settings, 'LOYVERSE_API_TOKEN', ''):
+        return 0
+    from apps.cafeteria.management.commands.check_sync_fresh import (
+        MAX_AGE_MINUTES,
+        MAX_ROSTER_AGE_HOURS,
+    )
+    from apps.cafeteria.models import LoyverseSyncState
+
+    now = now or timezone.now()
+    state = LoyverseSyncState.objects.filter(pk=1).first()
+    poll = _minutes_since(state.last_poll_at if state else None, now)
+    roster = _minutes_since(state.last_roster_sync_at if state else None, now)
+    return (int(poll is None or poll > MAX_AGE_MINUTES)
+            + int(roster is None or roster > MAX_ROSTER_AGE_HOURS * 60))
+
+
 def _compute_badges(user) -> dict:
-    from apps.accounts.models import PasswordRequest, User
+    from django.utils import timezone
+
+    from apps.accounts.models import PasswordRequest, StudentProfile, User
     from apps.core.areas import user_areas
     from apps.portal.models import Notification
 
@@ -61,16 +135,23 @@ def _compute_badges(user) -> dict:
     areas = user_areas(user)
     if not areas:
         return out
-    from apps.admissions.models import PreRegistration, Registration
+    from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
     from apps.bookings.models import Booking
     from apps.cafeteria.models import TopUpRequest
+    from apps.cafeteria.services import low_balance_queryset
     from apps.content.forms import FormSubmission
+    from apps.core.models import ContactMessage
+    from apps.legal.filters import OPEN_STATUSES, overdue_q
     from apps.legal.models import ArcoRequest
     from apps.payments.multicobros import (
         online_topups_awaiting_staff,
         paid_topups_awaiting_verification,
     )
 
+    now = timezone.now()
+    office_cash = TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
+                                              method=TopUpRequest.Method.OFFICE)
+    # The sidebar counters (keys and meaning unchanged since P1-E3).
     counters = {
         'admisiones': ('admisiones', lambda: (
             PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
@@ -78,13 +159,7 @@ def _compute_badges(user) -> dict:
         'visitas': ('visitas', lambda: Booking.objects.filter(status=Booking.Status.PENDING).count()),
         # Cash requests to apply, plus real card top-ups still to load into
         # the POS and apply, or to verify in MultiCobros.
-        'cafeteria': ('cafeteria', lambda: (
-            TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
-                                        method=TopUpRequest.Method.OFFICE).count()
-            + online_topups_awaiting_staff().count())),
-        # «Por verificar»: the part of the above only a MultiCobros check can
-        # move (paid by card, approval not verified), shown apart next to Cafetería.
-        'cafeteria_verificar': ('cafeteria', lambda: paid_topups_awaiting_verification().count()),
+        'cafeteria': ('cafeteria', lambda: office_cash.count() + online_topups_awaiting_staff().count()),
         'contrasenas': ('accesos', lambda: PasswordRequest.objects.filter(
             status=PasswordRequest.Status.OPEN).count()),
         'mensajes': ('mensajes', lambda: unhandled_contact_messages(None)),
@@ -93,6 +168,60 @@ def _compute_badges(user) -> dict:
     for badge, (area, count) in counters.items():
         if area in areas:
             out[badge] = count()
+
+    # The dashboard's «Pendientes» list (UX Phase 7): one count per queue and,
+    # where the queue has a meaningful start, how long its oldest item has
+    # waited (``<key>_edad``, minutes; only while the queue is not empty).
+    # Same area rule as above; read-only COUNT/MIN queries.
+    def queue(key, qs, field):
+        n, age = _queue(qs, field, now)
+        out[key] = n
+        if age is not None:
+            out[f'{key}_edad'] = age
+
+    if 'admisiones' in areas:
+        queue('preregistros', PreRegistration.objects.filter(status=PreRegistration.Status.PENDING), 'created_at')
+        queue('inscripciones', Registration.objects.filter(status=Registration.Status.SUBMITTED), 'created_at')
+        # Uploaded and not reviewed yet (pending only: a rejected one waits for
+        # the family), on registrations the office is working on.
+        queue('documentos', RegistrationDocument.objects.filter(
+            status=RegistrationDocument.Review.PENDING,
+            registration__status__in=(Registration.Status.SUBMITTED, Registration.Status.REVIEWING)),
+            'uploaded_at')
+    if 'visitas' in areas:
+        out['visitas_hoy'] = (Booking.objects.filter(slot__date=timezone.localdate())
+                              .exclude(status=Booking.Status.CANCELLED).count())
+    if 'cafeteria' in areas:
+        # «Por verificar»: the part of «cafeteria» only a MultiCobros check can
+        # move (paid by card, approval not verified), shown apart next to Cafetería.
+        to_verify = paid_topups_awaiting_verification()
+        queue('cafeteria_verificar', to_verify, 'processed_at')
+        queue('cafeteria_caja', office_cash, 'created_at')
+        # Card top-ups staff still have to load into the POS (the «Por aplicar»
+        # list): paid ones, and ones already credited here but not in Loyverse
+        # yet. Those still waiting for a MultiCobros check are counted once,
+        # under «Por verificar» (code review 2026-11-22: no top-up in two rows).
+        queue('cafeteria_aplicar', online_topups_awaiting_staff().exclude(
+            pk__in=to_verify.values('pk')), 'processed_at')
+        out['pagos_fallidos'] = failed_payments_count(now)
+        out['saldo_bajo'] = low_balance_queryset().filter(student__tipo=StudentProfile.Tipo.ALUMNO).count()
+        out['loyverse_alertas'] = loyverse_sync_alerts(now)
+    if 'alumnos' in areas:
+        # Still active here, but their Loyverse customer is gone (leavers).
+        out['sin_loyverse'] = StudentProfile.objects.filter(
+            is_active=True, tipo=StudentProfile.Tipo.ALUMNO, loyverse_missing_since__isnull=False).count()
+    if 'accesos' in areas:
+        queue('contrasenas', PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN), 'created_at')
+    if 'mensajes' in areas:
+        queue('mensajes', ContactMessage.objects.filter(is_handled=False), 'created_at')
     if getattr(user, 'role', None) == User.Role.ADMIN:
-        out['arco'] = ArcoRequest.objects.filter(status__in=('received', 'in_review')).count()
+        queue('arco', ArcoRequest.objects.filter(status__in=OPEN_STATUSES), 'created_at')
+        out['arco_vencidas'] = ArcoRequest.objects.filter(overdue_q()).count()
+        # Costos sections without the next cycle's prices (from a month before the
+        # site moves to it; «Costos y precios» is admin-only). No query: cached settings.
+        from apps.content.site_years import missing_price_groups
+        year, missing = missing_price_groups()
+        out['precios'] = len(missing)
+        if missing:
+            out['precios_anio'] = year
     return out

@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { CheckCircle2, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Send } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
@@ -15,6 +15,10 @@ type Field = 'student' | 'razon_social' | 'rfc' | 'cp' | 'regimen' | 'email' | '
 type Form = Record<Field, string>;
 const FIELDS: Field[] = ['student', 'razon_social', 'rfc', 'cp', 'regimen', 'email', 'phone'];
 const EMPTY: Form = { student: '', razon_social: '', rfc: '', cp: '', regimen: '', email: '', phone: '' };
+/** Each field's element id, in the order the form shows them (the first with an error takes the focus). */
+const DOM_ID: Record<Field, string> = {
+  student: 'fx-student', razon_social: 'fx-razon', rfc: 'fx-rfc', cp: 'fx-cp', regimen: 'fx-regimen', email: 'fx-email', phone: 'fx-phone',
+};
 
 export const REGIMENES = [
   'Régimen de sueldos y salarios e ingresos asimilados a salarios',
@@ -70,6 +74,18 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<Field | 'general', string>>>({});
   const [done, setDone] = useState(false);
+  // Bumped whenever new errors arrive: the first field with one (else the general message) takes the focus.
+  const [focusTick, setFocusTick] = useState(0);
+  const generalRef = useRef<HTMLParagraphElement>(null);
+  const doneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusTick) return;
+    const first = FIELDS.find((k) => errors[k]);
+    (first ? document.getElementById(DOM_ID[first]) : generalRef.current)?.focus();
+    // Only on a new set of errors.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTick]);
+  useEffect(() => { if (done) doneRef.current?.focus(); }, [done]);
   const set = (k: Field) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
     setErrors((er) => ({ ...er, [k]: undefined }));
@@ -87,6 +103,7 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
       }
       if (Object.keys(next).length === 0) next.general = fillIn(c.errGeneral, { facturas: billingEmail });
       setErrors(next);
+      setFocusTick((n) => n + 1);
     },
   });
   const submit = (e: FormEvent) => {
@@ -97,16 +114,16 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
     if (rfc && (rfc.length < 12 || rfc.length > 13)) next.rfc = c.errRfc;
     if (form.cp && !/^\d{5}$/.test(form.cp.trim())) next.cp = c.errCp;
     if (form.phone && digits(form.phone).length !== 10) next.phone = c.errPhone;
-    if (Object.keys(next).length) { setErrors(next); return; }
+    if (Object.keys(next).length) { setErrors(next); setFocusTick((n) => n + 1); return; }
     send.mutate();
   };
 
   if (done) {
     return (
-      <div className="rounded-xl2 border border-green/30 bg-green/5 p-6 text-center" role="status">
-        <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-dark" aria-hidden="true" />
+      <div ref={doneRef} tabIndex={-1} className="rounded-md bg-success-bg p-6 text-center focus:outline-none" role="status">
+        <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-success" aria-hidden="true" />
         <p className="font-head text-lg font-bold text-ink">{c.doneTitle}</p>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-base text-muted">
           {fillIn(c.doneText, { correo: form.email, facturas: billingEmail })}
         </p>
       </div>
@@ -115,17 +132,18 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4" aria-label="Solicitud de facturación">
-      <p className="text-xs text-muted">{c.requiredNote}</p>
-      <Input id="fx-student" label={c.studentLabel} value={form.student} onChange={set('student')} error={errors.student} autoComplete="off" required />
-      <Input id="fx-razon" label={c.razonLabel} value={form.razon_social} onChange={set('razon_social')} error={errors.razon_social} hint={c.razonHint} required />
+      <p className="text-sm text-muted">{c.requiredNote}</p>
+      <Input id="fx-student" name="student" label={c.studentLabel} value={form.student} onChange={set('student')} error={errors.student} autoComplete="off" className="text-base" required />
+      <Input id="fx-razon" name="razon_social" label={c.razonLabel} value={form.razon_social} onChange={set('razon_social')} error={errors.razon_social} hint={c.razonHint} autoComplete="organization" className="text-base" required />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input id="fx-rfc" label={c.rfcLabel} value={form.rfc} onChange={set('rfc')} error={errors.rfc} maxLength={13} autoComplete="off" autoCapitalize="characters" required />
-        <Input id="fx-cp" label={c.cpLabel} inputMode="numeric" value={form.cp} onChange={set('cp')} error={errors.cp} maxLength={5} autoComplete="postal-code" required />
+        <Input id="fx-rfc" name="rfc" label={c.rfcLabel} value={form.rfc} onChange={set('rfc')} error={errors.rfc} maxLength={13} autoComplete="off" autoCapitalize="characters" className="text-base" required />
+        <Input id="fx-cp" name="cp" label={c.cpLabel} inputMode="numeric" value={form.cp} onChange={set('cp')} error={errors.cp} maxLength={5} autoComplete="postal-code" className="text-base" required />
       </div>
       <div>
         <label className="label" htmlFor="fx-regimen">{c.regimenLabel}</label>
         <select
           id="fx-regimen"
+          name="regimen"
           className="input-field min-h-[44px] text-base"
           value={form.regimen}
           onChange={set('regimen')}
@@ -136,11 +154,16 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
           <option value="">{c.regimenPlaceholder}</option>
           {REGIMENES.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
-        {errors.regimen && <p id="fx-regimen-error" className="mt-1.5 text-xs text-coral-600">{errors.regimen}</p>}
+        {errors.regimen && <p id="fx-regimen-error" className="mt-1.5 text-sm font-medium text-danger">{errors.regimen}</p>}
       </div>
-      <Input id="fx-email" label={c.emailLabel} type="email" inputMode="email" autoComplete="email" placeholder={c.emailPlaceholder} value={form.email} onChange={set('email')} error={errors.email} required />
-      <Input id="fx-phone" label={c.phoneLabel} type="tel" inputMode="tel" autoComplete="tel" placeholder={c.phonePlaceholder} value={form.phone} onChange={set('phone')} error={errors.phone} required />
-      {errors.general && <p className="text-sm text-coral-600" role="alert">{errors.general}</p>}
+      <Input id="fx-email" name="email" label={c.emailLabel} type="email" inputMode="email" autoComplete="email" placeholder={c.emailPlaceholder} value={form.email} onChange={set('email')} error={errors.email} className="text-base" required />
+      <Input id="fx-phone" name="phone" label={c.phoneLabel} type="tel" inputMode="tel" autoComplete="tel" placeholder={c.phonePlaceholder} value={form.phone} onChange={set('phone')} error={errors.phone} className="text-base" required />
+      {errors.general && (
+        <p ref={generalRef} tabIndex={-1} className="flex items-start gap-2 rounded-sm bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger focus:outline-none" role="alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{errors.general}</span>
+        </p>
+      )}
       <PrivacyNote />
       <Button type="submit" variant="cta" size="lg" loading={send.isPending} className="w-full justify-center">
         <Send className="h-4 w-4" aria-hidden="true" /> {c.submitLabel}

@@ -198,13 +198,13 @@ function DocumentsView(p: Props) {
           <h1 className="mt-2 font-head text-fluid-3xl font-black tracking-[-0.02em] text-ink">{c('title')}</h1>
           <p className="sr-only" aria-live="polite" role="status">{live}</p>
           {invalid ? (
-            <div className="mt-6 rounded-xl2 border border-coral/30 bg-coral-50 p-5 text-sm text-ink" role="alert">
-              <AlertTriangle className="mb-2 h-5 w-5 text-coral-600" aria-hidden="true" />
+            <div className="mt-6 rounded-md bg-danger-bg p-5 text-base text-ink" role="alert">
+              <AlertTriangle className="mb-2 h-5 w-5 text-danger" aria-hidden="true" />
               {c('invalidText')}{email && ' '}
               {email && <a href={`mailto:${email}`} className="font-semibold text-purple underline">{email}</a>}{email && '.'}
             </div>
           ) : loadFailed ? (
-            <div className="mt-6 rounded-xl2 border border-line bg-white p-5 text-sm text-ink" role="alert">
+            <div className="mt-6 rounded-md bg-white p-5 text-base text-ink shadow-card" role="alert">
               <p className="font-semibold">{c('loadError')}</p>
               <button type="button" onClick={() => refetch()} className="btn-outline mt-3">
                 <RefreshCw className="h-4 w-4" aria-hidden="true" /> {c('retryLabel')}
@@ -214,25 +214,25 @@ function DocumentsView(p: Props) {
             <div className="mt-10 flex justify-center" aria-busy="true"><LoadingSpinner /></div>
           ) : (
             <>
-              <p className="mt-2 text-[15px] text-muted">
+              <p className="mt-2 text-base text-muted">
                 {c('childLabel')} <span className="font-semibold text-ink">{data.child_name}</span>
                 {data.level_label && <> · {c('levelLabel')} <span className="font-semibold text-ink">{data.level_label}</span></>}
               </p>
-              <p className="mt-2 text-[15px] text-muted">{c('intro', { mb: maxMb })}</p>
+              <p className="mt-2 text-base text-muted">{c('intro', { mb: maxMb })}</p>
 
               {data.items.length > 0 && (
                 <Progress done={data.counts.done} total={data.counts.total} complete={data.complete}
                   label={c('progressLabel', { listos: data.counts.done, total: data.counts.total })} />
               )}
               {data.complete && data.items.length > 0 && (
-                <div className="mt-4 flex items-start gap-3 rounded-xl2 border border-green/30 bg-green-50 p-4 text-sm text-ink" role="status">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
+                <div className="mt-4 flex items-start gap-3 rounded-md bg-success-bg p-4 text-base text-ink" role="status">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
                   <div><p className="font-semibold">{c('completeTitle')}</p><p className="text-muted">{c('completeText')}</p></div>
                 </div>
               )}
 
               {data.items.length === 0 ? (
-                <p className="mt-6 rounded-xl2 border border-dashed border-line bg-white p-5 text-center text-sm text-muted">{c('emptyText')}</p>
+                <p className="mt-6 rounded-md bg-white p-5 text-center text-base text-muted">{c('emptyText')}</p>
               ) : (
                 <ul className="mt-6 space-y-3">
                   {data.items.map((doc) => (
@@ -284,10 +284,10 @@ function DocCard({ doc, c, camera, fichaSubmitted, jobs, error, disabled, onPick
   const busy = disabled || uploading;
 
   return (
-    <li className="rounded-xl2 border border-line bg-white p-4 shadow-card">
+    <li className="rounded-md bg-white p-4 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold text-ink">{doc.name}</h2>
+          <h2 className="text-base font-semibold text-ink">{doc.name}</h2>
           {doc.description && <p className="mt-0.5 text-sm text-muted">{doc.description}</p>}
           {ficha && <p className="mt-0.5 text-sm text-muted">{c('fichaText')}</p>}
           {doc.physical_note && (
@@ -301,13 +301,13 @@ function DocCard({ doc, c, camera, fichaSubmitted, jobs, error, disabled, onPick
       </div>
 
       {!doc.multiple_files && doc.status === 'rechazado' && doc.reasons.length > 0 && (
-        <p className="mt-2 rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700">{c('reasonLabel')} {doc.reasons.join(' ')}</p>
+        <p className="mt-2 rounded-sm bg-danger-bg px-3 py-2 text-sm text-danger">{c('reasonLabel')} {doc.reasons.join(' ')}</p>
       )}
 
       {doc.files.length > 0 && (
         <ul className="mt-3 space-y-1.5" aria-label={doc.name}>
           {doc.files.map((file) => (
-            <li key={file.id} className="rounded-lg bg-cream-2 px-3 py-2 text-sm">
+            <li key={file.id} className="rounded-sm bg-cream-2 px-3 py-2 text-sm">
               <div className="flex min-w-0 items-center gap-2">
                 <FileText className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-ink">{file.filename}</span>
@@ -351,11 +351,11 @@ function DocCard({ doc, c, camera, fichaSubmitted, jobs, error, disabled, onPick
         </ul>
       )}
 
-      {error && <p id={errorId} className="mt-2 text-sm text-coral-700" role="alert">{error}</p>}
+      {error && <p id={errorId} className="mt-2 text-sm font-medium text-danger" role="alert">{error}</p>}
 
       {doc.can_upload && !ficha && (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {doc.multiple_files && <p className="w-full text-xs text-subtle">{c('multipleHint')}</p>}
+          {doc.multiple_files && <p className="w-full text-sm text-subtle">{c('multipleHint')}</p>}
           {camera && (
             <FilePick label={c('cameraLabel')} icon="camera" accept="image/*" capture multiple={false} disabled={busy}
               describedBy={describedBy} onPick={(files) => onPick(files)} primary />
@@ -376,7 +376,7 @@ function FilePick({ label, accept, capture, multiple, disabled, describedBy, onP
   return (
     <label
       className={clsx(
-        'inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-purple px-4 text-sm font-semibold transition focus-within:ring-2 focus-within:ring-purple/40 focus-within:ring-offset-2',
+        'inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-sm border-2 border-purple px-4 text-sm font-semibold transition focus-within:ring-2 focus-within:ring-purple/40 focus-within:ring-offset-2',
         primary ? 'bg-purple text-white hover:bg-purple-mid' : 'bg-white text-purple hover:bg-purple hover:text-white',
         disabled && 'pointer-events-none opacity-50',
       )}

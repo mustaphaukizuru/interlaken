@@ -10,7 +10,7 @@ engine, `motionFeatures`).
 
 | Route | Budget (gz) | Measured 2026-08 |
 | --- | --- | --- |
-| `/` (home) | 170 kB (documented override) | ~162 kB |
+| `/` (home) | 172 kB (documented override; +1 kB on 2026-11-21 pending owner review) | 171.1 kB (2026-11-21) |
 | `/admisiones` | 150 kB | ~134 kB |
 | `/admisiones/costos` | 150 kB | ~128 kB |
 

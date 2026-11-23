@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Coffee, CreditCard, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
-  Search, X, Download, Wallet, SlidersHorizontal,
+  Search, X, Download, Wallet, SlidersHorizontal, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -37,6 +37,7 @@ import { PortalExportButtons } from '@/components/portal/PortalExportButtons';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import {
   applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatCents, isScheduled, pendingCoversLowBalance, projectBalance, sentence,
@@ -357,6 +358,9 @@ export default function CafeteriaPage() {
     }
   };
 
+  // «Ir a pagar» starts a card payment: one request at a time, even for a
+  // double click before the button shows it is busy.
+  const once = useSingleFlight();
   const topupMutation = useMutation({
     mutationFn: () => cafeteriaApi.requestTopUp(selectedStudent!, topupAmountNum, topupMethod, {
       billing: { ...cardholder }, remember_billing: rememberCardholder,
@@ -426,6 +430,7 @@ export default function CafeteriaPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = async () => {
+    if (refreshing) return;
     setRefreshing(true);
     try {
       const { data } = await cafeteriaApi.refreshFromLoyverse();
@@ -511,20 +516,21 @@ export default function CafeteriaPage() {
               : 'Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo aparece aquí al confirmar el pago; el colegio lo carga en el POS para compras en cafetería.'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start print:hidden">
           {statementStudent && (
             <Button variant="secondary" size="sm" onClick={downloadStatement} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
-              <Download className="w-3 h-3" /> Estado de cuenta (PDF)
+              <Download size={16} aria-hidden="true" /> Descargar estado de cuenta
             </Button>
           )}
           {mine && (
-            <Link to="/portal/mi-cafeteria/credencial" className="btn-outline min-h-[44px] text-sm sm:min-h-[36px]">
-              Mi credencial
+            <Link to="/portal/mi-cafeteria/credencial" className="btn-outline min-h-[44px] text-sm">
+              Ver mi credencial
             </Link>
           )}
           <LiveBadge
             updatedAt={balancesUpdatedAt}
             isFetching={balancesFetching || refreshing}
+            busy={refreshing}
             onRefresh={refresh}
             className="min-h-[44px] px-1"
           />
@@ -534,7 +540,7 @@ export default function CafeteriaPage() {
       {balancesLoading ? (
         <div className="space-y-4" aria-busy="true" aria-label="Cargando cafetería">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[0, 1].map((i) => <div key={i} className="skeleton h-[260px] rounded-xl2" />)}
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[260px] rounded-md" />)}
           </div>
           <Card><ListSkeleton rows={4} /></Card>
         </div>
@@ -544,7 +550,7 @@ export default function CafeteriaPage() {
         <ChildSwitcher
           students={switcherStudents}
           selected={filterStudent === 'all' ? null : filterStudent}
-          className="mb-1"
+          className="mb-1 print:hidden"
         />
       )}
 
@@ -567,7 +573,7 @@ export default function CafeteriaPage() {
               className={`flex flex-col ${isSelected ? 'ring-2 ring-purple/35' : ''}`}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-green-50 text-green-700">
                   <Coffee className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -603,12 +609,14 @@ export default function CafeteriaPage() {
               <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} applyTime={policy?.apply_time} />
 
               {left ? (
-                <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
-                  Este alumno ya no está activo en el colegio. Para aclarar su saldo, contacta al colegio.
+                <p className="mt-3 flex items-start gap-2 rounded-sm bg-warning-bg px-3 py-2 text-xs leading-snug text-ink">
+                  <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
+                  <span>Este alumno ya no está activo en el colegio. Para aclarar su saldo, contacte al colegio.</span>
                 </p>
               ) : notLinked && (
-                <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
-                  Este alumno aún no está vinculado a cafetería/Loyverse. Contacta al colegio para activar el servicio.
+                <p className="mt-3 flex items-start gap-2 rounded-sm bg-warning-bg px-3 py-2 text-xs leading-snug text-ink">
+                  <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
+                  <span>Este alumno aún no está vinculado a cafetería/Loyverse. Contacte al colegio para activar el servicio.</span>
                 </p>
               )}
 
@@ -619,9 +627,9 @@ export default function CafeteriaPage() {
                   onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
                   loading={paying}
                   disabled={paying}
-                  className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
+                  className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40 print:hidden"
                 >
-                  <Plus className="w-3.5 h-3.5" /> {paying ? 'Abriendo pago seguro…' : 'Recargar'}
+                  <Plus size={16} aria-hidden="true" /> {paying ? 'Abriendo pago seguro…' : 'Recargar'}
                 </Button>
               )}
 
@@ -631,7 +639,7 @@ export default function CafeteriaPage() {
                   setThresholdStudent(b);
                   setThresholdValue(parseFloat(b.low_balance_threshold ?? '20').toFixed(0));
                 }}
-                className="mt-2 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                className="mt-1 inline-flex min-h-[44px] items-center self-start rounded-sm text-left text-xs font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 print:hidden"
               >
                 Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '20').toFixed(0)}</span> · Cambiar
               </button>
@@ -647,9 +655,9 @@ export default function CafeteriaPage() {
                     <button
                       type="button"
                       onClick={() => openBudget(b)}
-                      className="mt-2 flex items-center gap-1 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                      className="flex min-h-[44px] items-center gap-1.5 self-start rounded-sm text-left text-xs font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 print:hidden"
                     >
-                      <Wallet className="h-3 w-3" /> Establecer presupuesto
+                      <Wallet size={16} aria-hidden="true" /> Establecer presupuesto
                     </button>
                   );
                 }
@@ -664,7 +672,7 @@ export default function CafeteriaPage() {
                       const over = limit > 0 && spent > limit;
                       return (
                         <div key={label}>
-                          <div className="mb-1 flex items-baseline justify-between text-[11.5px]">
+                          <div className="mb-1 flex items-baseline justify-between text-xs">
                             <span className="font-medium text-subtle">Presupuesto {label}</span>
                             <span className={over ? 'font-semibold text-coral' : 'text-muted'}>
                               ${spent.toFixed(0)} / ${limit.toFixed(0)}
@@ -689,7 +697,7 @@ export default function CafeteriaPage() {
                     <button
                       type="button"
                       onClick={() => openBudget(b)}
-                      className="self-start rounded text-left text-[11px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                      className="inline-flex min-h-[44px] items-center self-start rounded-sm text-left text-xs font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 print:hidden"
                     >
                       Cambiar presupuesto
                     </button>
@@ -713,7 +721,7 @@ export default function CafeteriaPage() {
           <EmptyState
             icon={Coffee}
             title="Sin servicio de cafetería"
-            description="El colegio debe vincular a tu hijo(a) con el servicio de cafetería (Loyverse) para ver saldo y movimientos aquí. Contacta a la administración escolar si crees que ya debería estar activo."
+            description="El colegio aún no activa la cafetería de su hijo(a)."
             action={
               <Link to="/contacto" className="btn-secondary text-sm">
                 Contactar al colegio
@@ -726,7 +734,9 @@ export default function CafeteriaPage() {
       {/* Top-up modal — 3-step wizard (BACKLOG P1-D1) */}
       <Modal
         open={showTopup}
-        onClose={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }}
+        // While «Ir a pagar» runs the Banorte window is about to open: closing
+        // now would leave a payment started behind a closed dialog.
+        onClose={() => { if (topupMutation.isPending) return; setShowTopup(false); setTopupAmount(''); setTopupStep(1); }}
         title="Recargar cafetería"
         maxWidth={520}
       >
@@ -792,7 +802,7 @@ export default function CafeteriaPage() {
                     key={amt}
                     type="button"
                     onClick={() => setTopupAmount(String(amt))}
-                    className={`min-h-[40px] rounded-full border px-4 text-sm font-semibold transition ${
+                    className={`min-h-[44px] rounded-sm border px-4 text-sm font-semibold transition ${
                       topupAmount === String(amt)
                         ? 'border-purple bg-purple text-white'
                         : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
@@ -812,7 +822,7 @@ export default function CafeteriaPage() {
                 recargas are made directly at the cafetería POS. */}
             <p className="label">Método de pago</p>
             <div
-              className={`flex min-h-[56px] items-start gap-3 rounded-xl border p-3 ${
+              className={`flex min-h-[56px] items-start gap-3 rounded-md border p-3 ${
                 onlineAvailable ? 'border-purple bg-purple/[0.04]' : 'border-line bg-cream/60 opacity-70'}`}
             >
               <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-purple" aria-hidden="true" />
@@ -838,18 +848,18 @@ export default function CafeteriaPage() {
               </span>
             </div>
             {onlineAvailable && availability?.test_mode && (
-              <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
+              <p className="rounded-md border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
                 <strong>Modo de prueba Banorte:</strong> no se realiza ningún cargo real.
               </p>
             )}
             {onlineAvailable && availability?.certification && (
-              <p className="rounded-xl border border-coral/40 bg-coral-50 px-3 py-2 text-xs text-ink">
+              <p className="rounded-md border border-coral/40 bg-coral-50 px-3 py-2 text-xs text-ink">
                 <strong>Certificación Banorte: cargo real a la tarjeta.</strong> Solo cuentas de prueba
                 ven esta opción; el pago puede devolverse desde MultiCobros.
               </p>
             )}
             {onlineAvailable && scheduled && (
-              <p role="note" className="rounded-xl border border-amber/40 bg-amber/[0.07] px-3 py-2.5 text-xs leading-relaxed text-ink">
+              <p role="note" className="rounded-md border border-amber/40 bg-amber/[0.07] px-3 py-2.5 text-xs leading-relaxed text-ink">
                 {applyNotice(policy)}
               </p>
             )}
@@ -869,7 +879,7 @@ export default function CafeteriaPage() {
         )}
 
         {topupStep === 4 && (
-          <dl className="divide-y divide-line rounded-xl border border-line text-sm">
+          <dl className="divide-y divide-line rounded-md border border-line text-sm">
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>
@@ -887,7 +897,7 @@ export default function CafeteriaPage() {
 
         <div className="sticky bottom-0 -mx-1 flex flex-col gap-2 bg-white pt-2 sm:flex-row">
           {topupStep > 1 ? (
-            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as Step)} className="min-h-[44px] flex-1">Atrás</Button>
+            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as Step)} disabled={topupMutation.isPending} className="min-h-[44px] flex-1">Atrás</Button>
           ) : (
             <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }} className="min-h-[44px] flex-1">Cancelar</Button>
           )}
@@ -907,7 +917,7 @@ export default function CafeteriaPage() {
             <Button
               variant="primary"
               loading={topupMutation.isPending}
-              onClick={() => topupMutation.mutate()}
+              onClick={() => once(() => topupMutation.mutateAsync())}
               disabled={!topupAmountValid || !selectedStudent || !onlineAvailable || !cardholderReady}
               className="min-h-[44px] flex-1"
             >
@@ -1017,8 +1027,8 @@ export default function CafeteriaPage() {
       {/* Transactions — only when the family actually has cafeteria accounts */}
       {!balancesLoading && balances && balances.length > 0 && (
       <Card title="Historial de movimientos">
-        {/* Filters */}
-        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
+        {/* Filters (screen only: the printout is the list itself) */}
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 print:hidden lg:flex lg:flex-wrap">
           {(balances?.length ?? 0) > 1 && (
             <select
               className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
@@ -1052,7 +1062,7 @@ export default function CafeteriaPage() {
               onClick={clearFilters}
               className="min-h-[44px] text-muted lg:w-auto"
             >
-              <X className="h-3.5 w-3.5" /> Limpiar filtros
+              <X size={16} aria-hidden="true" /> Limpiar filtros
             </Button>
           )}
         </div>
@@ -1061,13 +1071,13 @@ export default function CafeteriaPage() {
             on a phone it used to cost two native date pickers. */}
         <DateRangeFilter
           idPrefix="mov"
-          className="mb-4"
+          className="mb-4 print:hidden"
           value={{ from: filterFrom, to: filterTo }}
           onChange={(r) => set({ desde: r.from || null, hasta: r.to || null, page: null })}
         />
 
         {/* Sort (server-side, whole history) + download of exactly this view. */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-3 print:hidden sm:flex-row sm:items-center sm:justify-between">
           <SortChips
             options={TX_SORT_OPTIONS}
             sort={sort}
@@ -1089,7 +1099,7 @@ export default function CafeteriaPage() {
             <EmptyState
               icon={Search}
               title="Sin resultados"
-              description="Ningún movimiento coincide con los filtros seleccionados. Ajusta o limpia los filtros para ver más."
+              description="Ningún movimiento coincide con los filtros. Ajústelos o límpielos."
               action={<Button variant="secondary" size="sm" onClick={clearFilters}>Limpiar filtros</Button>}
             />
           ) : (
@@ -1105,7 +1115,7 @@ export default function CafeteriaPage() {
                     document.getElementById('saldos-cafeteria')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                   }
                 >
-                  <Plus className="h-3.5 w-3.5" /> Recargar saldo
+                  <Plus size={16} aria-hidden="true" /> Recargar saldo
                 </Button>
               ) : undefined}
             />
@@ -1118,7 +1128,7 @@ export default function CafeteriaPage() {
             </p>
             <div className="divide-y divide-cream">
             {transactions.map((tx) => (
-              <div key={tx.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div key={tx.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 print:break-inside-avoid sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="mt-0.5 flex-shrink-0">{txIcon(tx.transaction_type)}</span>
                   <div className="min-w-0">
@@ -1158,8 +1168,10 @@ export default function CafeteriaPage() {
               </div>
             ))}
             </div>
-            <Pagination page={page} pageSize={TX_PAGE_SIZE} count={txCount}
-                        onChange={setPage} itemLabel="movimientos" />
+            <div className="print:hidden">
+              <Pagination page={page} pageSize={TX_PAGE_SIZE} count={txCount}
+                          onChange={setPage} itemLabel="movimientos" />
+            </div>
           </>
         )}
       </Card>

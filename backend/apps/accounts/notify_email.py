@@ -149,7 +149,8 @@ def confirmation_email(user, token: str):
               'Si usted no lo pidió, ignore este mensaje; sin su confirmación no recibirá ningún aviso.'),
         reason='Recibe este correo porque esta dirección se escribió en el Portal de Familias del Colegio Interlaken.',
     )
-    return f"Confirme su correo para los avisos {whose}", content
+    # D13: no name in the subject (the body says whose avisos they are).
+    return 'Confirme su correo para recibir avisos', content
 
 
 def guardian_receives(user, email: str) -> bool:

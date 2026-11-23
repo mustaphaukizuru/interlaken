@@ -57,10 +57,10 @@ export function ChildSwitcher({ students, allowAll = false, selected, className 
   }
 
   const chip = (active: boolean) =>
-    `min-h-[44px] rounded-xl border px-3.5 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+    `min-h-[44px] rounded-sm px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
       active
-        ? 'border-purple/40 bg-purple text-white shadow-[0_6px_14px_-8px_rgba(64,26,142,0.55)]'
-        : 'border-line bg-white text-ink hover:border-purple/25 hover:bg-cream'
+        ? 'bg-purple text-white'
+        : 'bg-white text-ink hover:bg-purple-light'
     }`;
 
   return (
@@ -190,7 +190,7 @@ function ChildPicker({ students, allowAll, childId, onPick, className }: {
         aria-expanded={open}
         onClick={() => (open ? close() : openPicker())}
         onKeyDown={onButtonKey}
-        className="flex min-h-[48px] w-full items-center gap-3 rounded-xl border border-line bg-white px-3.5 py-2 text-left shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        className="flex min-h-[48px] w-full items-center gap-3 rounded-sm border border-line bg-white px-3.5 py-2 text-left shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
       >
         <span className="min-w-0 flex-1">
           <span className="sr-only">Alumno: </span>
@@ -203,7 +203,7 @@ function ChildPicker({ students, allowAll, childId, onPick, className }: {
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 overflow-hidden rounded-2xl border border-line bg-white shadow-[0_20px_54px_-18px_rgba(16,12,40,0.32)]">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-dropdown overflow-hidden rounded-md bg-white shadow-raised">
           <div className="relative border-b border-line p-2">
             <Search size={16} className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-subtle" aria-hidden="true" />
             <label htmlFor={`${uid}-q`} className="sr-only">Buscar alumno por nombre, grado o grupo</label>
@@ -240,7 +240,7 @@ function ChildPicker({ students, allowAll, childId, onPick, className }: {
                   onPointerDown={(e) => e.preventDefault()}
                   onClick={() => pick(o)}
                   onMouseMove={() => active !== i && setActive(i)}
-                  className={`mx-1 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg px-3 py-2 ${i === active ? 'bg-cream' : ''}`}
+                  className={`mx-1 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-sm px-3 py-2 ${i === active ? 'bg-cream' : ''}`}
                 >
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-sm ${isSelected ? 'font-semibold text-purple' : 'font-medium text-ink'}`}>{o.name}</span>

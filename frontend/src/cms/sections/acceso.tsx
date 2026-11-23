@@ -14,6 +14,8 @@ import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
 import { homePath } from '@/lib/areas';
+import { Illustration } from '@/components/ui/Illustration';
+import { isIllustration } from '@/lib/illustrations';
 import type { User } from '@/types';
 import { imageSrc, useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
@@ -38,6 +40,8 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
   const problems = asLink(p.problemsLink);
   const signup = asLink(p.signupLink);
   const t = useTokens();
+  // «none» hides it; content saved before the field existed shows the padlock.
+  const art = p.illustration === 'none' ? undefined : isIllustration(p.illustration) ? p.illustration : 'acceso';
   return (
     <div className="flex min-h-screen flex-col">
       <div className="accent-bar" />
@@ -62,6 +66,16 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
             </Link>
           </div>
           <div className="relative">
+            {art && (
+              <div className="relative mb-8 flex h-44 w-44 items-center justify-center" aria-hidden="true">
+                <span className="absolute inset-0 rounded-full bg-white/[0.06] ring-1 ring-white/10 backdrop-blur-sm" />
+                <span
+                  className="absolute inset-3 rounded-full"
+                  style={{ background: 'radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--pink) 30%, transparent) 0%, transparent 70%)' }}
+                />
+                <Illustration name={art} size={144} className="relative drop-shadow-[0_16px_24px_rgba(8,5,22,0.5)]" />
+              </div>
+            )}
             {p.label && <div className="section-label-pink inline-flex">{c('label')}</div>}
             <h1 className="mt-3 font-head text-[44px] font-black leading-[1.08] tracking-[-1px] text-white">
               {c('title')}{p.titleAccent && <br />}
@@ -93,15 +107,15 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
               </Link>
             </div>
 
-            <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
+            <div className="rounded-md bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
               <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">{c('heading')}</h2>
-              <p className="mb-6 mt-1 text-center text-[13px] text-muted">{c('subheading')}</p>
+              <p className="mb-6 mt-1 text-center text-sm text-muted">{c('subheading')}</p>
 
               {s.bootstrapping && (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="mb-[18px] rounded-xl border border-purple/25 bg-purple/[0.06] px-3.5 py-3 text-center text-[13px] text-ink"
+                  className="mb-[18px] rounded-sm bg-info-bg px-3.5 py-3 text-center text-sm text-ink"
                 >
                   {c('googleBusy')}
                 </div>
@@ -111,7 +125,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                 <div
                   id="login-error"
                   role="alert"
-                  className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark"
+                  className="mb-[18px] rounded-sm bg-danger-bg px-3.5 py-2.5 text-sm font-medium text-danger"
                 >
                   {s.alert}
                 </div>
@@ -121,7 +135,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                 type="button"
                 disabled={s.bootstrapping}
                 onClick={a.onGoogle}
-                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
+                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-sm border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
               >
                 <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -176,7 +190,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
                     onClick={a.onTogglePassword}
                     disabled={s.bootstrapping}
                     aria-label={s.showPassword ? c('hidePassword') : c('showPassword')}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-sm text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
                   >
                     {s.showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
@@ -214,7 +228,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
 
             <p className="mt-5 text-center text-[12.5px] text-subtle">
               {c('signupText')}{' '}
-              <CmsAnchor link={signup} className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">{t(signup.label)}</CmsAnchor>
+              <CmsAnchor link={signup} className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded-sm">{t(signup.label)}</CmsAnchor>
             </p>
           </div>
         </main>
@@ -348,7 +362,7 @@ function LoginLogic({ c, p }: { c: Copy; p: LoginProps }) {
 }
 
 /* ── The section ─────────────────────────────────────────────────────────── */
-interface LoginProps { image?: number | string; stats?: unknown; problemsLink?: CmsLink; signupLink?: CmsLink; label?: string; titleAccent?: string; text?: string; [copy: string]: unknown }
+interface LoginProps { image?: number | string; stats?: unknown; problemsLink?: CmsLink; signupLink?: CmsLink; label?: string; titleAccent?: string; text?: string; illustration?: string; [copy: string]: unknown }
 
 const PREVIEW: ViewState = { email: '', password: '', totp: '', showPassword: false, needsTotp: false, submitting: false, bootstrapping: false, alert: null, formError: false };
 const NOOP: ViewActions = { onEmail: () => {}, onPassword: () => {}, onTotp: () => {}, onTogglePassword: () => {}, onSubmit: (e) => e.preventDefault(), onGoogle: () => {} };
@@ -373,6 +387,7 @@ export const sections = [
         f.text('titleAccent', 'Título (segunda línea, en degradado)'),
         f.textarea('text', 'Texto'),
         f.image('image', 'Foto de fondo'),
+        f.illustration('illustration', 'Ilustración', { hint: 'Sobre el título del panel. Sin elegir, el candado con llave.' }),
         f.items('stats', 'Cifras', [f.text('value', 'Cifra'), f.text('label', 'Texto')]),
       ]),
       ...grouped('Tarjeta de acceso', [
@@ -407,7 +422,7 @@ export const sections = [
     defaults: {
       label: 'Portal Escolar', title: 'Formando Líderes', titleAccent: 'con Excelencia',
       text: 'Acceda al portal de Colegio Interlaken para consultar cafetería y pagos en línea.',
-      image: '/assets/facade.webp',
+      image: '/assets/facade.webp', illustration: 'acceso',
       stats: [{ value: '{{anios}}', label: 'Años' }, { value: '1,200+', label: 'Alumnos' }, { value: '95%', label: 'Aprovechamiento' }],
       heading: 'Iniciar Sesión', subheading: 'Acceso para familias y personal del colegio',
       googleButton: 'Continuar con Google', googleBusy: 'Completando acceso con Google…', divider: 'O CON CORREO',

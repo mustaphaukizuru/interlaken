@@ -161,7 +161,7 @@ export function PendingProjectionNote({ balance, pending, expandable = false, cl
             aria-expanded={open}
             aria-controls={listId}
             aria-label={open ? 'Ocultar detalle de las recargas pagadas' : 'Ver detalle de las recargas pagadas'}
-            className="-ml-2 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-lg px-2 text-[12.5px] font-semibold text-purple transition-colors hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="-ml-2 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-sm px-2 text-[12.5px] font-semibold text-purple transition-colors hover:bg-purple/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             {open ? 'Ocultar detalle' : 'Ver detalle'}
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />

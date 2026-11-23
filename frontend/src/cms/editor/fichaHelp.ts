@@ -29,7 +29,7 @@ export const FICHA_HELP: Record<string, string> = {
   saving: 'Se ve junto al botón mientras se guarda el paso.',
   saved: 'Se ve junto al botón cuando el paso quedó guardado.',
   saveError: 'Se ve si un paso no se pudo guardar, por ejemplo sin internet.',
-  errorSummary: 'Encabezado del recuadro rojo que lista, arriba del paso, los datos por revisar.',
+  errorSummary: 'Una sola línea arriba del paso cuando faltan datos; {n} es cuántos. Cada dato muestra su propio aviso debajo.',
   errRequired: 'Mensaje en rojo bajo un dato obligatorio que quedó vacío.',
   loadError: 'Se ve si la ficha no se pudo abrir (sin internet o el servidor no respondió).',
   retryLabel: button('para volver a intentar abrir la ficha'),

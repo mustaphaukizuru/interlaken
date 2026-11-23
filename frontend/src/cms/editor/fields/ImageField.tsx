@@ -80,11 +80,11 @@ export function ImageField({ id, label, required, hint, error, warning, onBlur, 
       onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
       onDrop={onDrop}
-      className={`rounded-xl border p-3 transition-colors ${dragging ? 'border-purple bg-purple/5' : error ? 'border-coral-400' : 'border-line'}`}
+      className={`rounded-md border p-3 transition-colors ${dragging ? 'border-purple bg-purple/5' : error ? 'border-coral-400' : 'border-line'}`}
     >
       <p className="label">{label}<RequiredMark required={required} /></p>
       <div className="flex items-start gap-3">
-        <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-cream-2 ring-1 ring-line">
+        <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-sm bg-cream-2 ring-1 ring-line">
           {src && asset !== null ? (
             <img src={src} alt="" className="h-full w-full object-cover" onLoad={(e) => { if (!isLibrary) setNatural({ ref: value, w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }} />
           ) : (
@@ -234,7 +234,7 @@ function LibraryBody({ multiple, current, onPick, onClose }: { multiple: boolean
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); void uploadFiles(Array.from(e.dataTransfer.files ?? [])); }}
-        className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center ${dragging ? 'border-purple bg-purple/5' : 'border-line bg-cream-2/50'}`}
+        className={`flex flex-col items-center gap-2 rounded-md border-2 border-dashed p-4 text-center ${dragging ? 'border-purple bg-purple/5' : 'border-line bg-cream-2/50'}`}
       >
         <UploadCloud size={24} className="text-purple" aria-hidden="true" />
         <p className="text-sm text-ink">Arrastre {multiple ? 'fotos' : 'una foto'} aquí o</p>
@@ -251,7 +251,7 @@ function LibraryBody({ multiple, current, onPick, onClose }: { multiple: boolean
         <ErrorState title="No se pudo cargar la biblioteca" onRetry={() => refetch()} />
       ) : isLoading ? (
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Cargando imágenes">
-          {[0, 1, 2, 3, 4].map((i) => <li key={i} className="skeleton aspect-square rounded-lg" />)}
+          {[0, 1, 2, 3, 4].map((i) => <li key={i} className="skeleton aspect-square rounded-sm" />)}
         </ul>
       ) : assets.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">{q ? 'Ninguna imagen coincide con la búsqueda.' : 'La biblioteca está vacía: suba la primera foto arriba.'}</p>
@@ -261,7 +261,7 @@ function LibraryBody({ multiple, current, onPick, onClose }: { multiple: boolean
             const on = multiple ? chosen.includes(a.id) : current === a.id;
             return (
               <li key={a.id}>
-                <button type="button" onClick={() => toggle(a.id)} aria-pressed={on} aria-label={`${a.alt || a.filename}${a.width ? `, ${a.width} × ${a.height} px` : ''}${a.alt ? '' : ', sin descripción'}`} className={`block aspect-square w-full overflow-hidden rounded-lg ring-2 ${on ? 'ring-purple' : 'ring-transparent hover:ring-purple/40'}`}>
+                <button type="button" onClick={() => toggle(a.id)} aria-pressed={on} aria-label={`${a.alt || a.filename}${a.width ? `, ${a.width} × ${a.height} px` : ''}${a.alt ? '' : ', sin descripción'}`} className={`block aspect-square w-full overflow-hidden rounded-sm ring-2 ${on ? 'ring-purple' : 'ring-transparent hover:ring-purple/40'}`}>
                   <img src={a.urls.thumb ?? a.urls.original} alt="" className="h-full w-full object-cover" loading="lazy" />
                 </button>
                 <span className="mt-0.5 block truncate text-[10px] text-subtle">{a.width ? `${a.width} px` : ''}{!a.alt && <span className="text-coral-600"> · sin descripción</span>}</span>

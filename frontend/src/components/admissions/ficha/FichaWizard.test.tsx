@@ -86,10 +86,13 @@ describe('FichaWizard · public start', () => {
 
     expect(await screen.findByRole('heading', { name: 'Antes de empezar' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Comenzar la ficha/ }));
+    // One line on top; each field keeps its message and the first one takes the focus.
     const summary = await screen.findByRole('alert');
-    expect(within(summary).getByText('Revise estos datos para continuar:')).toBeInTheDocument();
-    expect(within(summary).getByRole('link', { name: 'Nombre completo' })).toBeInTheDocument();
-    await waitFor(() => expect(summary).toHaveFocus());
+    expect(summary).toHaveTextContent(/^Datos por revisar: \d+$/);
+    expect(within(summary).queryByRole('link')).not.toBeInTheDocument();
+    const first = screen.getByLabelText('Nombre completo');
+    expect(first).toHaveAttribute('aria-invalid', 'true');
+    await waitFor(() => expect(first).toHaveFocus());
     expect(post).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText('Nombre completo'), CONTACT.contact_name);
@@ -120,10 +123,10 @@ describe('FichaWizard · public start', () => {
     post.mockResolvedValue({ data: { detail: 'Si hay una ficha…' } } as never);
     renderWizard();
     await user.click(await screen.findByRole('button', { name: '¿Ya recibió su enlace y venció? Reciba uno nuevo' }));
-    await user.type(screen.getByLabelText('Correo electrónico', { selector: 'input[autocomplete="email"]:not([name])' }), 'nadie@ejemplo.test');
+    await user.type(screen.getByLabelText('Correo electrónico', { selector: 'input[name="email"]' }), 'nadie@ejemplo.test');
     await user.click(screen.getByRole('button', { name: 'Enviar enlace' }));
     expect(post).toHaveBeenCalledWith('/admissions/register/resume/', { email: 'nadie@ejemplo.test' });
-    expect(await screen.findByText(/Si hay una ficha en proceso con ese correo/)).toBeInTheDocument();
+    expect(await screen.findByText(/Si ese correo tiene una ficha, le enviamos un enlace/)).toBeInTheDocument();
   });
 
   it('switches to «La ficha de inscripción es personal» when the server refuses the start (403)', async () => {
@@ -152,13 +155,13 @@ describe('FichaWizard · private ficha (no link)', () => {
     renderWizard();
     const heading = await screen.findByRole('heading', { level: 2, name: 'La ficha de inscripción es personal' });
     expect(heading).toBeInTheDocument();
-    expect(screen.getByText(/El colegio envía la ficha de inscripción por correo o WhatsApp a cada familia cuando su hijo\/a es admitido\./)).toBeInTheDocument();
+    expect(screen.getByText('Ábrala con el enlace que el colegio le envió por correo o WhatsApp.')).toBeInTheDocument();
     // The three steps that lead to the ficha, in order.
     const steps = within(screen.getByRole('list', { name: 'Así es el proceso de admisión' })).getAllByRole('listitem');
     expect(steps.map((li) => li.textContent)).toEqual([
       '1Agende una visita o solicite informes.',
       '2Su hijo/a presenta el examen de valoración.',
-      '3Si su hijo/a es admitido, el colegio le envía su ficha de inscripción por correo o WhatsApp.',
+      '3Si su hijo/a es admitido, le enviamos su ficha de inscripción.',
     ]);
     expect(screen.getByRole('link', { name: 'Agendar visita' })).toHaveAttribute('href', '/agendar-visita');
     const wa = screen.getByRole('link', { name: /Escribir por WhatsApp/ });
@@ -174,7 +177,7 @@ describe('FichaWizard · private ficha (no link)', () => {
     await user.type(screen.getByLabelText('Correo electrónico'), 'marta.ficha@ejemplo.test');
     await user.click(screen.getByRole('button', { name: 'Enviar enlace' }));
     expect(post).toHaveBeenCalledWith('/admissions/register/resume/', { email: 'marta.ficha@ejemplo.test' });
-    expect(await screen.findByText(/Si hay una ficha en proceso con ese correo/)).toBeInTheDocument();
+    expect(await screen.findByText(/Si ese correo tiene una ficha, le enviamos un enlace/)).toBeInTheDocument();
   });
 
   it('a valid link still opens the ficha when the public start is off', async () => {
@@ -247,15 +250,18 @@ describe('FichaWizard · staff link and saving', () => {
     expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Guardado');
   });
 
-  it('shows the server format errors next to the field and in the summary', async () => {
+  it('shows the server format errors next to the field, one line on top, and focuses the field', async () => {
     const user = userEvent.setup();
     invited();
     await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' });
     patch.mockImplementation(() => fail(400, { child_curp: ['El último dígito de la CURP no corresponde a los demás.'] }) as never);
     await user.click(screen.getByRole('button', { name: /Guardar y continuar$/ }));
     const summary = await screen.findByRole('alert');
-    expect(within(summary).getByRole('link', { name: 'CURP' })).toHaveAttribute('href', `#ficha-alumno-child_curp`);
-    expect(screen.getByLabelText('CURP')).toHaveAttribute('aria-invalid', 'true');
+    expect(summary).toHaveTextContent('Datos por revisar: 1');
+    const curp = screen.getByLabelText('CURP');
+    expect(curp).toHaveAttribute('aria-invalid', 'true');
+    expect(curp).toHaveAccessibleDescription(/El último dígito de la CURP no corresponde/);
+    await waitFor(() => expect(curp).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
   });
 
@@ -270,8 +276,10 @@ describe('FichaWizard · staff link and saving', () => {
     } }) as never);
     await user.click(screen.getByRole('button', { name: /Guardar y continuar$/ }));
     const summary = await screen.findByRole('alert');
-    expect(within(summary).getByRole('link', { name: 'Fecha de nacimiento' })).toBeInTheDocument();
-    expect(within(summary).getByText(/Este dato es obligatorio/)).toBeInTheDocument();
+    expect(summary).toHaveTextContent('Datos por revisar: 1');
+    const dob = screen.getByLabelText('Fecha de nacimiento');
+    expect(dob).toHaveAccessibleDescription(/Este dato es obligatorio/);
+    await waitFor(() => expect(dob).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
   });
 
@@ -445,5 +453,110 @@ describe('FichaWizard · the school staff (Vista del personal)', () => {
     renderWizard(`/pre-registro?rid=${RID}&token=un-token-de-prueba`);
     expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Vista del personal' })).not.toBeInTheDocument();
+  });
+});
+
+describe('FichaWizard · headings, autofill and leaving with unsaved edits (UX 2026-11-21)', () => {
+  const reopen = (ficha: FichaPayload, s: FichaSchema = schema) => {
+    serve(ficha, s);
+    sessionStorage.setItem('interlaken:ficha-session', JSON.stringify({ id: RID, token: 'S6', expires: '2099-01-01T00:00:00Z' }));
+  };
+  /** Fires the browser's beforeunload: true when the page asks «¿Salir del sitio?». */
+  const leaving = () => {
+    const e = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(e);
+    return e.defaultPrevented;
+  };
+
+  it('tells the page which surroundings belong on screen: hero only without a link, nothing on the steps', async () => {
+    const onView = vi.fn();
+    serve(null, { ...schema, public_start_enabled: false });
+    const { unmount } = renderWithProviders(<FichaWizard copy={defaultCopy} onView={onView} />, { route: '/pre-registro' });
+    await screen.findByRole('heading', { level: 2, name: 'La ficha de inscripción es personal' });
+    // The «Unos 15 minutos…» line never shows to a visitor who cannot start.
+    expect(onView.mock.calls.map(([v]) => v)).not.toContain('start');
+    expect(onView).toHaveBeenLastCalledWith('closed');
+    unmount();
+
+    onView.mockClear();
+    reopen(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
+    renderWithProviders(<FichaWizard copy={defaultCopy} onView={onView} />, { route: '/pre-registro' });
+    // The hero steps aside, so the step title is the page's h1.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
+    expect(onView).toHaveBeenLastCalledWith('other');
+  });
+
+  it('the public start keeps the hero and the trust line', async () => {
+    const onView = vi.fn();
+    serve(null);
+    renderWithProviders(<FichaWizard copy={defaultCopy} onView={onView} />, { route: '/pre-registro' });
+    expect(await screen.findByRole('heading', { level: 2, name: 'Antes de empezar' })).toBeInTheDocument();
+    expect(onView).toHaveBeenLastCalledWith('start');
+  });
+
+  it('warns before leaving only while the step has edits that are not saved', async () => {
+    const user = userEvent.setup();
+    reopen(payload({ contacto: CONTACT, alumno: ALUMNO_START }));
+    renderWizard();
+    await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' });
+    expect(leaving()).toBe(false);
+    await user.type(screen.getByLabelText('Nombre(s)'), ' María');
+    expect(leaving()).toBe(true);
+
+    patch.mockImplementation((_url: string, body: unknown) => Promise.resolve({ data: {
+      section: 'alumno', data: body as Values, completeness: completeness(['contacto', 'alumno']),
+      status: 'draft', ficha_version: 2, updated_at: '2026-11-21T10:05:00Z',
+    } }) as never);
+    await user.click(screen.getByRole('button', { name: /Guardar y continuar$/ }));
+    await screen.findByRole('heading', { name: 'Paso 2 de 7: Domicilio' });
+    expect(leaving()).toBe(false);
+  });
+
+  it('offers the filler\'s own data only: the madre\'s email and phone are not autofilled; the address is', async () => {
+    reopen(payload({ contacto: CONTACT }, ['contacto', 'alumno']));
+    const { container } = renderWizard();
+    await screen.findByRole('heading', { name: 'Paso 2 de 7: Domicilio' });
+    expect(container.querySelector('select[name="address_state"]')).toHaveAttribute('autocomplete', 'address-level1');
+    expect(container.querySelector('input[name="address_municipality"]')).toHaveAttribute('autocomplete', 'address-level2');
+    expect(container.querySelector('input[name="address_neighborhood"]')).toHaveAttribute('autocomplete', 'address-level3');
+  });
+
+  it('a guardian\'s email and celular default to autocomplete off', async () => {
+    reopen(payload({ contacto: { ...CONTACT, contact_relationship: 'Tutor' } }, ['contacto', 'alumno', 'domicilio', 'salud']));
+    const { container } = renderWizard();
+    await screen.findByRole('heading', { name: 'Paso 4 de 7: Información del padre' });
+    expect(container.querySelector('input[name="email"]')).toHaveAttribute('autocomplete', 'off');
+    expect(container.querySelector('input[name="mobile"]')).toHaveAttribute('autocomplete', 'off');
+    // A required radio group that is not a text box still says it is required.
+    expect(screen.getAllByRole('radiogroup').some((g) => g.getAttribute('aria-required') === 'true')).toBe(true);
+  });
+
+  it('the privacy acceptance says it is required; the confirmation has one primary action and an h1', async () => {
+    const user = userEvent.setup();
+    reopen(payload({
+      contacto: CONTACT,
+      alumno: { ...ALUMNO_START, child_curp: CURP, child_dob: '2020-05-01', child_sex: 'femenino', child_birth_country: 'México', child_birth_state: 'Ciudad de México', level: 'primaria' },
+      madre: { not_applicable: false, given_names: 'Marta', paternal_surname: 'Hernández', email: CONTACT.contact_email },
+      padre: { not_applicable: true },
+    }, SECTIONS));
+    post.mockResolvedValue({ data: { status: 'submitted', message: 'Ficha de inscripción enviada.', submitted_at: '2026-11-21T11:00:00Z' } } as never);
+    const { container } = renderWizard();
+    await screen.findByRole('heading', { level: 1, name: 'Paso 7 de 7: Revisión y firma' });
+    const accept = screen.getByLabelText(/He leído y acepto el Aviso de Privacidad/);
+    expect(accept).toHaveAttribute('aria-required', 'true');
+
+    // Sending without accepting: the focus lands on the box, not on a list.
+    await user.click(screen.getByRole('button', { name: 'Enviar la ficha de inscripción' }));
+    await waitFor(() => expect(accept).toHaveFocus());
+
+    await user.click(accept);
+    await user.type(screen.getByLabelText('Nombre completo de quien firma'), 'Marta Hernández Gil');
+    await user.click(screen.getByRole('button', { name: 'Enviar la ficha de inscripción' }));
+    const done = await screen.findByRole('heading', { level: 1, name: 'Recibimos su ficha de inscripción' });
+    await waitFor(() => expect(done).toHaveFocus());
+    expect(container.querySelectorAll('.btn-pink')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Ver los documentos requeridos/ })).toHaveClass('btn-pink');
+    expect(screen.getByRole('link', { name: 'Ver el proceso de admisión' })).not.toHaveClass('btn-outline');
+    expect(screen.getByRole('link', { name: 'Volver al inicio' })).toHaveAttribute('href', '/');
   });
 });

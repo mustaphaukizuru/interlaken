@@ -304,19 +304,16 @@ def without_link(paragraph: str, link: str) -> str:
     return text.rstrip(" :")
 
 
-def send_email_message(lead, msg: Message) -> bool:
-    """Branded email (the template text is the plain part, verbatim). Fail-soft."""
-    import logging
-
+def message_content(msg: Message):
+    """The ``EmailContent`` of an Expediente message (pure; render_emails previews it)."""
     from apps.portal.emailing import EmailContent
-    from apps.portal.services import build_email
 
     paragraphs = [p.strip() for p in msg.text.split("\n\n") if p.strip()]
     if msg.link and msg.cta_label:
         # The link is the button: «…enlace personal: <liga> (vence el …).» reads
         # «…enlace personal (vence el …).» above it.
         paragraphs = [without_link(p, msg.link) for p in paragraphs]
-    content = EmailContent(
+    return EmailContent(
         category="Admisiones",
         tone=msg.tone,
         title=msg.title,
@@ -327,6 +324,15 @@ def send_email_message(lead, msg: Message) -> bool:
         signoff="Equipo de Admisiones",
         reason=ADM_REASON,
     )
+
+
+def send_email_message(lead, msg: Message) -> bool:
+    """Branded email (the template text is the plain part, verbatim). Fail-soft."""
+    import logging
+
+    from apps.portal.services import build_email
+
+    content = message_content(msg)
     try:
         email = build_email(
             msg.subject,
@@ -466,9 +472,8 @@ def send_ficha_link(lead, actor, *, channel=None, override=False, override_reaso
     reg = out["registration"]
     values = base_values(lead) | {"liga": out["url"], "vence": long_date(reg.invite_expires_at)}
     text = render(template_text("ficha_link"), values)
-    msg = Message(
-        "ficha_link", f"Ficha de inscripción: {child_name(lead)}", "", text, link=out["url"]
-    )
+    # D13: subjects carry no names; the school's text (the body) names the child.
+    msg = Message("ficha_link", "Ficha de inscripción", "", text, link=out["url"])
     sent = False
     if channel == "email":
         sent = bool(email_invite(reg, out["url"], to=lead.parent_email))
@@ -515,7 +520,7 @@ def send_exam_date(lead, actor, *, channel=None) -> dict:
     text = render(template_text("exam_date"), values)
     msg = Message(
         "exam_date",
-        f"Examen de admisión de {child_name(lead)}",
+        "Fecha del examen de admisión",
         "Fecha del examen de admisión",
         text,
     )
@@ -559,7 +564,7 @@ def send_exam_result(lead, actor, *, channel=None) -> dict:
         text = render(template_text(key), values)
     msg = Message(
         key,
-        f"Resultado del examen de admisión de {child_name(lead)}",
+        "Resultado del examen de admisión",
         "Resultado del examen de admisión",
         text,
         link=invite["url"] if invite else "",

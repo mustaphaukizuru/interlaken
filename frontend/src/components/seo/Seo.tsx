@@ -25,8 +25,10 @@ import {
   SITE_NAME,
   TITLE_SUFFIX,
   canonicalFor,
+  expandYearTokens,
   type HeadData,
 } from '@/lib/siteMeta';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { PAGE_LD_ATTR, applyHead } from './applyHead';
 
 type RouteMetaModule = typeof import('@/lib/routeMeta');
@@ -150,17 +152,21 @@ export function loadRouteMeta(): Promise<RouteMetaModule> {
 export function RouteSeo() {
   const { pathname } = useLocation();
   const [table, setTable] = useState(routeMeta);
+  const settings = useSiteSettings();
   useEffect(() => {
     if (!table) void loadRouteMeta().then(setTable);
   }, [table]);
   if (!table) return null;
   const head = table.routeHead(pathname);
+  // The table holds {{ciclo}} / {{anios}}: today's values, as the server writes them (Costos: its prices' cycle).
+  const years = (text?: string) =>
+    expandYearTokens(text, settings.admissions_next_from_month, pathname.replace(/\/+$/, '') === '/admisiones/costos' ? settings.pricing_years : undefined);
   return (
     <Seo
       priority={0}
       bareTitle
-      title={head?.title}
-      description={head?.description}
+      title={years(head?.title)}
+      description={years(head?.description)}
       canonical={head?.canonical ?? canonicalFor(pathname)}
       image={head?.image}
       noindex={head ? head.robots === 'noindex' : undefined}

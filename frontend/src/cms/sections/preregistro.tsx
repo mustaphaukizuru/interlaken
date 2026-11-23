@@ -4,9 +4,11 @@
  * short pre-registro form and the old /inscripcion wizard (whose staff links
  * now open here). The wizard is a locked section that owns its state
  * (components/admissions/ficha); every word around the schema's fields is a
- * prop of it. The hero and the trust strip show only next to the start: the
- * wizard publishes a page-local view flag and they step aside on the other
- * screens (steps, confirmation, links), so a phone sees the form first.
+ * prop of it. The hero shows only next to the start (or the private-ficha
+ * panel); the trust strip («Unos 15 minutos…») only when the visitor can
+ * actually start. The wizard publishes a page-local view flag and both step
+ * aside on the other screens (steps, confirmation, links), so a phone sees
+ * the form first and the screen's own heading becomes the page's h1.
  *
  * The ficha is private (2026-11-21): the school sends each admitted family
  * its personal link. Without one, «the start» is the panel «La ficha de
@@ -47,7 +49,7 @@ interface HeroProps { label?: string; title?: string; subtitle?: string; image?:
 function PreRegisterHeroView(p: HeroProps) {
   const t = useTokens();
   const img = useCmsImage(p.image);
-  if (useView() !== 'start') return null;
+  if (useView() === 'other') return null;
   return (
     <FunnelHero
       step="pre-registro"

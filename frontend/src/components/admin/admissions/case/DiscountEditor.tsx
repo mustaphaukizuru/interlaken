@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import type { FieldErrorMap } from '@/lib/apiErrors';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import {
   casesApi, useCaseSideWrite,
   type CaseDetail, type CaseDiscount, type DiscountDuration, type DiscountInput, type DiscountKind,
@@ -100,6 +101,7 @@ function validate(f: FormState): FieldErrorMap {
 export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readOnly: boolean }) {
   const [editing, setEditing] = useState<CaseDiscount | 'new' | null>(null);
   const [voiding, setVoiding] = useState<CaseDiscount | null>(null);
+  const formGuard = useDirtyCloseGuard(() => setEditing(null));
   const discounts = detail.documentacion.discounts;
   return (
     <div className="space-y-3">
@@ -112,11 +114,11 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
         )}
       </div>
       {discounts.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin becas ni descuentos acordados.</p>
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-sm text-subtle">Sin becas ni descuentos acordados.</p>
       ) : (
         <ul className="space-y-2" aria-label="Becas y descuentos">
           {discounts.map((d) => (
-            <li key={d.id} className="rounded-xl border border-line bg-white px-3.5 py-3">
+            <li key={d.id} className="rounded-md bg-white px-3.5 py-3 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-ink">{d.summary}</p>
@@ -129,11 +131,11 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
                 {!readOnly && (
                   <div className="flex gap-1">
                     <button type="button" onClick={() => setEditing(d)} aria-label={`Editar: ${d.summary}`}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-subtle hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                       <Pencil size={16} aria-hidden="true" />
                     </button>
                     <button type="button" onClick={() => setVoiding(d)} aria-label={`Anular: ${d.summary}`}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-coral-700 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                       <Trash2 size={16} aria-hidden="true" />
                     </button>
                   </div>
@@ -144,9 +146,11 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
         </ul>
       )}
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Agregar beca o descuento' : 'Editar beca o descuento'} maxWidth={560}>
-        {editing !== null && <DiscountForm detail={detail} discount={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />}
+      <Modal open={editing !== null} onClose={formGuard.requestClose} title={editing === 'new' ? 'Agregar beca o descuento' : 'Editar beca o descuento'} maxWidth={560}>
+        {editing !== null && <DiscountForm detail={detail} discount={editing === 'new' ? null : editing} onDone={() => setEditing(null)}
+          onCancel={formGuard.requestClose} onDirty={formGuard.reportDirty} />}
       </Modal>
+      {formGuard.dialog}
       <Modal open={!!voiding} onClose={() => setVoiding(null)} title="Anular beca o descuento" maxWidth={460}>
         {voiding && <VoidDiscount detail={detail} discount={voiding} onDone={() => setVoiding(null)} />}
       </Modal>
@@ -154,8 +158,14 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
   );
 }
 
-export function DiscountForm({ detail, discount, onDone }: { detail: CaseDetail; discount: CaseDiscount | null; onDone: () => void }) {
-  const [form, setForm] = useState<FormState>(discount ? fromDiscount(discount) : EMPTY);
+export function DiscountForm({ detail, discount, onDone, onCancel, onDirty }: {
+  detail: CaseDetail; discount: CaseDiscount | null; onDone: () => void;
+  /** «Cancelar» (default: `onDone`); a guarded dialog asks first when edited. */
+  onCancel?: () => void; onDirty?: (dirty: boolean) => void;
+}) {
+  const [start] = useState<FormState>(() => (discount ? fromDiscount(discount) : EMPTY));
+  const [form, setForm] = useState<FormState>(start);
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const save = useCaseSideWrite(detail.id, (input: DiscountInput) =>
     discount ? casesApi.updateDiscount(detail.id, discount.id, input) : casesApi.addDiscount(detail.id, input));
@@ -179,9 +189,9 @@ export function DiscountForm({ detail, discount, onDone }: { detail: CaseDetail;
       <fieldset>
         <legend className="label">Valor</legend>
         <div className="flex flex-wrap items-start gap-2">
-          <div className="inline-flex rounded-full bg-cream p-1" role="radiogroup" aria-label="Porcentaje o monto fijo">
+          <div className="inline-flex rounded-md bg-cream p-1" role="radiogroup" aria-label="Porcentaje o monto fijo">
             {(['percent', 'amount'] as const).map((m) => (
-              <label key={m} className={clsx('inline-flex min-h-[40px] cursor-pointer items-center rounded-full px-4 text-sm font-semibold focus-within:ring-2 focus-within:ring-purple/40',
+              <label key={m} className={clsx('inline-flex min-h-[40px] cursor-pointer items-center rounded-sm px-4 text-sm font-semibold focus-within:ring-2 focus-within:ring-purple/40',
                 form.mode === m ? 'bg-white text-ink shadow-sm' : 'text-muted')}>
                 <input type="radio" name="disc-mode" className="sr-only" checked={form.mode === m} onChange={() => set('mode', m)} />
                 {m === 'percent' ? 'Porcentaje' : 'Monto fijo'}
@@ -218,7 +228,7 @@ export function DiscountForm({ detail, discount, onDone }: { detail: CaseDetail;
         placeholder="Por hermano inscrito en Secundaria." />
       <ErrorSummary errors={errors} labels={LABELS} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="ghost" onClick={onDone}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel ?? onDone}>Cancelar</Button>
         <Button type="submit" loading={save.isPending}>{discount ? 'Guardar cambios' : 'Agregar'}</Button>
       </div>
     </form>

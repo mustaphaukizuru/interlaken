@@ -2,6 +2,8 @@ import { lazy, Suspense, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
 import { AdmissionsPublicStartCard } from '@/components/admin/AdmissionsPublicStartCard';
+import { SchoolCycleCard } from '@/components/admin/SchoolCycleCard';
+import { CredentialPhotosCard } from '@/components/admin/CredentialPhotosCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -60,13 +62,13 @@ function SiteChromePreview({ form }: { form: SettingsForm }) {
       title="Vista previa del sitio"
       subtitle="Así verán las familias el contacto y las redes en el sitio público."
     >
-      <div className="overflow-hidden rounded-xl border border-line bg-cream">
+      <div className="overflow-hidden rounded-md bg-cream">
         {/* Preheader + accent (escritorio) */}
         <p className="px-3 pt-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">
           Barra superior
         </p>
         {hasPreheader ? (
-          <div className="mx-3 mt-1.5 rounded-lg bg-brand-800 px-3 py-2 text-[11px] text-white">
+          <div className="mx-3 mt-1.5 rounded-sm bg-brand-800 px-3 py-2 text-[11px] text-white">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 {socials.length > 0 ? socials.map(({ key, label }) => {
@@ -75,7 +77,7 @@ function SiteChromePreview({ form }: { form: SettingsForm }) {
                     <span
                       key={key}
                       title={label}
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/85"
+                      className="flex h-6 w-6 items-center justify-center rounded-sm bg-white/10 text-white/85"
                     >
                       <Icon className="h-3 w-3" aria-hidden="true" />
                     </span>
@@ -111,7 +113,7 @@ function SiteChromePreview({ form }: { form: SettingsForm }) {
         <p className="px-3 pt-4 text-[11px] font-semibold uppercase tracking-wide text-subtle">
           Pie de contacto
         </p>
-        <div className="mx-3 mt-1.5 mb-3 rounded-lg bg-dark px-3 py-3 text-xs text-white/70">
+        <div className="mx-3 mt-1.5 mb-3 rounded-sm bg-dark px-3 py-3 text-xs text-white/70">
           <ul className="space-y-2">
             {form.phone_display ? (
               <li className="flex items-start gap-2">
@@ -146,7 +148,7 @@ function SiteChromePreview({ form }: { form: SettingsForm }) {
                   <span
                     key={key}
                     title={label}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/70"
+                    className="flex h-8 w-8 items-center justify-center rounded-sm bg-white/5 text-white/70"
                   >
                     <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
@@ -157,13 +159,13 @@ function SiteChromePreview({ form }: { form: SettingsForm }) {
         </div>
 
         {/* WhatsApp float mock */}
-        <div className="relative mx-3 mb-3 h-20 overflow-hidden rounded-lg border border-dashed border-line bg-white">
+        <div className="relative mx-3 mb-3 h-20 overflow-hidden rounded-sm border border-dashed border-line bg-white">
           <p className="absolute left-3 top-2 text-[11px] font-semibold uppercase tracking-wide text-subtle">
             Botón de WhatsApp
           </p>
           {form.whatsapp_number ? (
             <div
-              className="absolute bottom-3 right-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-600 text-white shadow-green"
+              className="absolute bottom-3 right-3 flex h-12 w-12 items-center justify-center rounded-md bg-green-600 text-white shadow-green"
               title={`wa.me/${form.whatsapp_number.replace(/\D/g, '')}`}
               aria-label="Vista previa del botón de WhatsApp"
             >
@@ -239,7 +241,7 @@ export default function AdminSettings() {
     },
     onError: (err: unknown) => {
       if (err instanceof Error && err.message === 'settings-not-loaded') {
-        toast.error('Espere a que carguen los ajustes antes de guardar.');
+        toast.error('Espere a que carguen los ajustes.');
         return;
       }
       const next = settingsFieldErrors(err);
@@ -273,7 +275,7 @@ export default function AdminSettings() {
       {dirty && loaded && (
         // Sticky save: on a phone the header button scrolls out of view within
         // one swipe, and the accumulated edits are only in memory.
-        <div className="sticky top-16 z-20 mb-4 flex items-center justify-between gap-3 rounded-xl border border-purple/30 bg-purple/5 px-4 py-2.5 text-sm">
+        <div className="sticky top-16 z-sticky mb-4 flex items-center justify-between gap-3 rounded-md border border-purple/30 bg-purple/5 px-4 py-2.5 text-sm">
           <span className="text-ink">Cambios sin guardar</span>
           <Button size="sm" onClick={() => save.mutate()} loading={save.isPending}>
             <Save className="h-4 w-4" /> Guardar
@@ -289,7 +291,7 @@ export default function AdminSettings() {
           />
         </Card>
       ) : isLoading ? (
-        <div className="skeleton h-64 rounded-xl2" />
+        <div className="skeleton h-64 rounded-md" />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
           <div className="space-y-6">
@@ -359,11 +361,15 @@ export default function AdminSettings() {
               </div>
             </Card>
 
+            <SchoolCycleCard value={data?.admissions_next_from_month} loaded={loaded} />
+
             <AdmissionsPublicStartCard value={data?.admissions_public_start} loaded={loaded} />
+
+            <CredentialPhotosCard value={data?.families_upload_photos} loaded={loaded} />
 
             <AdmissionTemplatesCard />
 
-            <Suspense fallback={<Card title="Mensajes del expediente"><div className="skeleton h-48 rounded-xl" role="status" aria-label="Cargando mensajes" /></Card>}>
+            <Suspense fallback={<Card title="Mensajes del expediente"><div className="skeleton h-48 rounded-md" role="status" aria-label="Cargando mensajes" /></Card>}>
               <CaseTemplatesCard />
             </Suspense>
 

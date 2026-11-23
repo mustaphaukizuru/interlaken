@@ -150,7 +150,7 @@ export default function InscripcionesPage() {
                     {reg.status_label || reg.status}
                   </Badge>
                 </div>
-                <p className="rounded-xl bg-cream px-3.5 py-2.5 text-sm text-muted">
+                <p className="rounded-md bg-cream px-3.5 py-2.5 text-sm text-muted">
                   <span className="font-semibold text-ink">Siguiente paso: </span>
                   {nextActionHint(reg.status)}
                 </p>
@@ -183,7 +183,7 @@ function StatusChip({ active, onClick, children }: { active: boolean; onClick: (
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-[44px] rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+      className={`min-h-[44px] rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
         active ? 'bg-purple text-white' : 'border border-line bg-white text-muted hover:text-ink'
       }`}
     >

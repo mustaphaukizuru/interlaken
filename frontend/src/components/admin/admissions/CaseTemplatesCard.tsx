@@ -47,7 +47,7 @@ export function CaseTemplatesCard() {
     return <Card title="Mensajes del expediente"><ErrorState title="No se pudieron cargar los mensajes" onRetry={() => refetch()} /></Card>;
   }
   if (isLoading || !data) {
-    return <Card title="Mensajes del expediente"><div className="skeleton h-48 rounded-xl" role="status" aria-label="Cargando mensajes" /></Card>;
+    return <Card title="Mensajes del expediente"><div className="skeleton h-48 rounded-md" role="status" aria-label="Cargando mensajes" /></Card>;
   }
 
   const keys = [...ORDER.filter((k) => k in data.templates), ...Object.keys(data.templates).filter((k) => !ORDER.includes(k))];
@@ -92,7 +92,7 @@ export function CaseTemplatesCard() {
               <div className="flex flex-wrap gap-1.5" aria-label={`Datos disponibles para «${data.labels[k] ?? k}»`} role="group">
                 {(data.placeholders[k] ?? []).map((p) => (
                   <button key={p} type="button" onClick={() => insert(k, p)} aria-label={`Insertar ${p}`}
-                    className="inline-flex min-h-[36px] items-center rounded-full bg-cream px-2.5 font-mono text-xs text-ink ring-1 ring-inset ring-line hover:bg-purple/10 hover:text-purple focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                    className="inline-flex min-h-[36px] items-center rounded-sm bg-cream px-2.5 font-mono text-xs text-ink ring-1 ring-inset ring-line hover:bg-purple/10 hover:text-purple focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
                     {p}
                   </button>
                 ))}

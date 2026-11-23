@@ -4,7 +4,7 @@
  * and the curated icon and colour palettes the editor offers.
  */
 import { createContext, useCallback, useContext, type ReactNode } from 'react';
-import { CURRENT_CYCLE, FOUNDED_YEAR, SCHOOL_YEARS } from '@/lib/siteMeta';
+import { announcedCycleStart, cycleLabel, FOUNDED_YEAR, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { imageSrc, imageSrcSet, rememberMedia } from './media';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 
@@ -14,10 +14,13 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 export const TEXT_TOKENS = ['ciclo', 'anios', 'fundacion', 'anio', 'telefono', 'correo', 'direccion', 'horario', 'whatsapp'] as const;
 const TOKEN_RE = /\{\{\s*(ciclo|anios|fundacion|anio|telefono|correo|direccion|horario|whatsapp)\s*\}\}/g;
 
-export function applyTokens(text: string, s: { phone_display?: string; contact_email?: string; address?: string; office_hours?: string; whatsapp_number?: string }): string {
+type TokenSettings = { phone_display?: string; contact_email?: string; address?: string; office_hours?: string; whatsapp_number?: string; admissions_next_from_month?: number };
+
+/** `over` replaces a token's value in one place (Costos: {{ciclo}} is the cycle of the published prices). */
+export function applyTokens(text: string, s: TokenSettings, over?: Partial<Record<string, string>>): string {
   if (!text || !text.includes('{{')) return text;
   const map: Record<string, string> = {
-    ciclo: CURRENT_CYCLE,
+    ciclo: cycleLabel(announcedCycleStart(new Date(), s.admissions_next_from_month ?? 1)),
     anios: String(SCHOOL_YEARS),
     fundacion: String(FOUNDED_YEAR),
     anio: String(new Date().getFullYear()),
@@ -26,14 +29,19 @@ export function applyTokens(text: string, s: { phone_display?: string; contact_e
     direccion: s.address ?? '',
     horario: s.office_hours ?? '',
     whatsapp: s.whatsapp_number ?? '',
+    ...over,
   };
-  return text.replace(TOKEN_RE, (_, k: string) => map[k]);
+  return text.replace(TOKEN_RE, (_, k: string) => map[k] ?? '');
 }
 
-/** `t(text)` replaces tokens; tolerant of undefined/non-string props. */
-export function useTokens(): (text: unknown) => string {
+/** `t(text)` replaces tokens; tolerant of undefined/non-string props. `over` as in applyTokens. */
+export function useTokens(over?: Partial<Record<string, string>>): (text: unknown) => string {
   const s = useSiteSettings();
-  return useCallback((text: unknown) => (typeof text === 'string' ? applyTokens(text, s) : text == null ? '' : String(text)), [s]);
+  const ciclo = over?.ciclo;
+  return useCallback(
+    (text: unknown) => (typeof text === 'string' ? applyTokens(text, s, ciclo ? { ciclo } : undefined) : text == null ? '' : String(text)),
+    [s, ciclo],
+  );
 }
 
 /* ── Images ──────────────────────────────────────────────────────────────── */

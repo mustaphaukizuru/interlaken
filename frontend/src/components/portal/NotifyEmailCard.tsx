@@ -66,7 +66,7 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
       </p>
 
       {data?.email && (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-line bg-cream/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-3 rounded-md bg-cream/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-ink">{data.email}</p>
             {data.verified ? (
@@ -77,9 +77,9 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
           </div>
           <div className="flex shrink-0 gap-2">
             {!data.verified && (
-              <Button variant="secondary" size="sm" onClick={() => save.mutate(data.email)} loading={save.isPending} className="min-h-[36px]">Reenviar enlace</Button>
+              <Button variant="secondary" size="sm" onClick={() => save.mutate(data.email)} loading={save.isPending} className="min-h-[44px]">Reenviar enlace</Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => remove.mutate()} loading={remove.isPending} className="min-h-[36px]">Quitar</Button>
+            <Button variant="ghost" size="sm" onClick={() => remove.mutate()} loading={remove.isPending} className="min-h-[44px]">Quitar</Button>
           </div>
         </div>
       )}

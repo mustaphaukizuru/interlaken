@@ -12,6 +12,8 @@
     (offline.js, precached too; CSP script-src 'self') that only swaps in the
     copy edited in Navegación. A retry is just a link back to the same URL.
     Brand tokens mirror tailwind.config.js (cream/ink/purple/green/coral).
+    The art (sin-conexion-320.webp, the unplugged cloud) is precached on its
+    own by vite.config.ts (additionalManifestEntries), so it shows offline.
   -->
   <style>
     :root {
@@ -22,6 +24,7 @@
       --purple-light: #ede8f7;
       --green: #47a028;
       --green-strong: #38801e;
+      --green-dark: #316f1c;
       --coral: #dd2622;
       --line: #ECEAF3;
     }
@@ -39,14 +42,40 @@
     }
     .card {
       background: #ffffff;
-      border: 1px solid var(--line);
-      border-radius: 24px;
+      border-radius: 12px; /* --radius-md: borderless surface (decisions/0001-0002) */
       box-shadow: 0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10);
       padding: 40px 32px;
       max-width: 420px;
       width: 100%;
     }
-    .logo { width: 72px; height: 72px; margin: 0 auto 20px; display: block; }
+    .logo { width: 44px; height: 44px; margin: 0 auto 8px; display: block; }
+    .art {
+      position: relative;
+      width: 188px;
+      height: 188px;
+      margin: 0 auto 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .art::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px; /* decorative circle */
+      background: radial-gradient(circle at 50% 42%, var(--purple-light) 0%, var(--cream) 72%);
+    }
+    .art::after {
+      content: '';
+      position: absolute;
+      bottom: 14px;
+      width: 46%;
+      height: 12px;
+      border-radius: 9999px;
+      background: rgba(64,26,142,0.12);
+      filter: blur(6px);
+    }
+    .art img { position: relative; z-index: 1; width: 152px; height: 152px; object-fit: contain; }
     h1 {
       font-family: 'Poppins', 'Inter', system-ui, sans-serif;
       font-size: 1.4rem;
@@ -54,7 +83,7 @@
       margin-bottom: 10px;
     }
     h1 .accent { color: var(--purple); }
-    p { font-size: 0.95rem; line-height: 1.55; color: var(--muted); margin-bottom: 24px; }
+    p { font-size: 1rem; line-height: 1.55; color: var(--muted); margin-bottom: 24px; }
     .actions { display: flex; flex-direction: column; gap: 10px; }
     a.btn {
       display: inline-flex;
@@ -62,22 +91,25 @@
       justify-content: center;
       min-height: 44px;
       padding: 10px 22px;
-      border-radius: 999px;
+      border-radius: 8px; /* --radius-sm: no pill buttons */
       font-weight: 600;
       font-size: 0.95rem;
       text-decoration: none;
     }
     a.retry { background: var(--green-strong); color: #ffffff; }
-    a.retry:hover, a.retry:focus-visible { background: var(--green); }
+    a.retry:hover, a.retry:focus-visible { background: var(--green-dark); }
     a.home { border: 1.5px solid var(--purple); color: var(--purple); background: transparent; }
     a.home:hover, a.home:focus-visible { background: var(--purple-light); }
     a:focus-visible { outline: 3px solid rgba(64,26,142,0.4); outline-offset: 2px; }
-    .rule { width: 48px; height: 3px; border-radius: 2px; background: var(--coral); margin: 0 auto 18px; }
+    .rule { width: 48px; height: 3px; border-radius: 9999px; background: var(--coral); margin: 0 auto 18px; }
   </style>
 </head>
 <body>
   <main class="card">
-    <img class="logo" src="/icon-192.png" alt="" width="72" height="72" />
+    <img class="logo" src="/icon-192.png" alt="" width="44" height="44" />
+    <div class="art" aria-hidden="true">
+      <img src="/assets/illustrations/sin-conexion-320.webp" alt="" width="152" height="152" decoding="async" />
+    </div>
     <div class="rule" aria-hidden="true"></div>
     <h1><span id="offline-title">Sin conexión a</span> <span id="offline-accent" class="accent">internet</span></h1>
     <p id="offline-text">

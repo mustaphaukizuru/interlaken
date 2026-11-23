@@ -64,7 +64,7 @@ const DIFF_LABEL: Record<string, string> = { added: '+ Nuevo', removed: '− Eli
 function VersionDiff({ lines, number }: { lines: ReturnType<typeof diffBlocks>; number: number }) {
   const changes = lines.filter((l) => l.kind !== 'same');
   return (
-    <ul className="mt-2 space-y-0.5 rounded-lg bg-cream-2 p-2 text-xs" aria-label={`Cambios del borrador respecto a la versión ${number}`}>
+    <ul className="mt-2 space-y-0.5 rounded-sm bg-cream-2 p-2 text-xs" aria-label={`Cambios del borrador respecto a la versión ${number}`}>
       {changes.length === 0 && <li className="text-muted">El borrador es idéntico a esta versión.</li>}
       {changes.map((l) => (
         <li key={`${l.kind}-${l.id}`} className={l.kind === 'added' ? 'text-green-700' : l.kind === 'removed' ? 'text-coral-600' : 'text-ink'}>

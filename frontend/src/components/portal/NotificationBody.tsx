@@ -25,7 +25,7 @@ function List({ items }: { items: string[] }) {
   // plain bullets stay a simple list.
   if (parts.some((p) => p.details.length > 0)) {
     return (
-      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+      <ul className="divide-y divide-line overflow-hidden rounded-md border border-line">
         {parts.map((p, i) => (
           <li key={i} className="bg-white px-4 py-3">
             <p className="font-semibold text-ink"><Linked text={p.main} /></p>
@@ -72,7 +72,7 @@ function Block({ block }: { block: MessageBlock }) {
   if (block.kind === 'list') return <List items={block.items} />;
   if (block.kind === 'fields') {
     return (
-      <dl className="grid gap-x-6 gap-y-2 rounded-xl border border-line bg-cream-2 px-4 py-3 sm:grid-cols-[minmax(8rem,max-content)_1fr]">
+      <dl className="grid gap-x-6 gap-y-2 rounded-md bg-cream-2 px-4 py-3 sm:grid-cols-[minmax(8rem,max-content)_1fr]">
         {block.rows.map((r, i) => (
           <div key={i} className="contents">
             <dt className="text-sm font-semibold text-muted">{r.label}</dt>

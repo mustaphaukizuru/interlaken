@@ -36,12 +36,12 @@ export function CredentialsSummary({ result, phone }: { result: CredentialsResul
               : null;
             const wa = t ? whatsappDeliveryHref(phone, t) : null;
             return (
-              <li key={c.email} className="rounded-xl border border-line p-3 text-sm">
+              <li key={c.email} className="rounded-md border border-line p-3 text-sm">
                 <p className="font-semibold text-ink">{c.name || c.email}</p>
                 {c.password && t ? (
                   <>
                     <p className="text-xs text-subtle">
-                      Usuario {c.email} · contraseña <code className="select-all rounded bg-cream-2 px-1">{c.password}</code>
+                      Usuario {c.email} · contraseña <code className="select-all rounded-sm bg-cream-2 px-1">{c.password}</code>
                     </p>
                     <p className="mt-1 text-xs text-muted">La contraseña se muestra solo esta vez. Envíela ahora a la familia.</p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -64,7 +64,7 @@ export function CredentialsSummary({ result, phone }: { result: CredentialsResul
         </ul>
       )}
       {unlinked.length > 0 && (
-        <div className="rounded-xl border border-coral/30 bg-coral-50/50 p-3 text-sm" role="alert">
+        <div className="rounded-md border border-coral/30 bg-coral-50/50 p-3 text-sm" role="alert">
           <p className="font-semibold text-coral-dark">Tutores no vinculados</p>
           <ul className="mt-1 space-y-1 text-xs text-ink" aria-label="Tutores no vinculados">
             {unlinked.map((u) => (

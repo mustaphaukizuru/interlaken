@@ -24,7 +24,7 @@ export function SectionCard({ title, action, children, className = '' }: Section
         {action && (
           <Link
             to={action.to}
-            className="flex items-center gap-1 whitespace-nowrap rounded text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="flex items-center gap-1 whitespace-nowrap rounded-sm text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             {action.label} <ArrowRight size={13} />
           </Link>

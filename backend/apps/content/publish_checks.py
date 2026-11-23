@@ -142,11 +142,14 @@ _STRAY_CLOSE_RE = re.compile(r'(?<!\{)\{\s*([' + _LETTERS + r'_ ]+?)\s*\}\}')
 def token_values(today: dt.date | None = None) -> dict[str, str]:
     """What each token prints today (runtime.tsx applyTokens; contact data from the site settings)."""
     from .models import SiteSettings
+    from .site_years import announced_cycle_start, cycle_label
 
     s = SiteSettings.load()
-    year = (today or timezone.localdate()).year
+    today = today or timezone.localdate()
+    year = today.year
     return {
-        'ciclo': f'{year}–{year + 1}', 'anios': str(year - FOUNDED_YEAR), 'fundacion': str(FOUNDED_YEAR),
+        'ciclo': cycle_label(announced_cycle_start(today, s.admissions_next_from_month or 1)),
+        'anios': str(year - FOUNDED_YEAR), 'fundacion': str(FOUNDED_YEAR),
         'anio': str(year), 'telefono': s.phone_display or '', 'correo': s.contact_email or '',
         'direccion': s.address or '', 'horario': s.office_hours or '', 'whatsapp': s.whatsapp_number or '',
     }

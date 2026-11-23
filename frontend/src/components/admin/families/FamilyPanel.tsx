@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useFamilyDissolve, useFamilyRemoveStudent, useFamilyUpdate } from '@/hooks/queries/families';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { apiErrorMessage, apiFieldErrors } from '@/lib/apiErrors';
 import type { FamilyDetail, FamilyLogin, FamilyStudent } from '@/services/familiesApi';
 import { gradeLine, initial, lastLoginLabel } from './familyUtils';
@@ -25,7 +26,7 @@ export function LoginList({ logins }: { logins: FamilyLogin[] }) {
         const Icon = l.kind === 'student' ? GraduationCap : UserRound;
         return (
           <li key={l.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream text-purple">
+            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-cream text-purple">
               <Icon className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
@@ -117,7 +118,7 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
   const confirmDissolve = () => {
     dissolve.mutate(family.id, {
       onSuccess: () => {
-        toast.success(`${family.name} disuelta. Los expedientes y las cuentas no cambian.`);
+        toast.success(`${family.name} disuelta. Los expedientes no cambian.`);
         setDissolving(false);
         onGone?.();
       },
@@ -140,13 +141,13 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
           </Button>
           {/* Destructive: coral, like every Eliminar/Disolver in the console (Button's ghost would win the text color). */}
           <button type="button" onClick={() => setDissolving(true)} aria-label={`Disolver ${family.name}`}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-coral-700 transition duration-150 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-600/30 sm:min-h-[36px]">
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-3 py-1.5 text-xs font-semibold text-coral-700 transition duration-150 hover:bg-coral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-600/30 sm:min-h-[36px]">
             <Unlink className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Disolver</span>
           </button>
         </div>
       )}
     >
-      {family.notes && <p className="-mt-1 mb-4 rounded-xl bg-cream-2 px-3 py-2 text-sm text-muted">{family.notes}</p>}
+      {family.notes && <p className="-mt-1 mb-4 rounded-md bg-cream-2 px-3 py-2 text-sm text-muted">{family.notes}</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby={`${headingId}-kids`}>
@@ -164,7 +165,7 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
         </section>
       </div>
 
-      <p className="mt-5 flex gap-2 rounded-xl bg-brand-50 px-3 py-2.5 text-xs text-brand-700">
+      <p className="mt-5 flex gap-2 rounded-md bg-brand-50 px-3 py-2.5 text-xs text-brand-700">
         <Info className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
         Con cualquiera de estas cuentas la familia ve en el portal a todos los hermanos: saldo, recargas, movimientos y expediente.
       </p>
@@ -200,18 +201,25 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
 }
 
 function RenameFamilyModal({ family, open, onClose }: { family: FamilyDetail; open: boolean; onClose: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Renombrar familia" maxWidth={440}>
-      <RenameForm family={family} onClose={onClose} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Renombrar familia" maxWidth={440}>
+        <RenameForm family={family} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function RenameForm({ family, onClose }: { family: FamilyDetail; onClose: () => void }) {
+function RenameForm({ family, onClose, onCancel, onDirty }: {
+  family: FamilyDetail; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
+}) {
   const nameId = useId();
   const notesId = useId();
   const [name, setName] = useState(family.name);
   const [notes, setNotes] = useState(family.notes);
+  useReportDirty(name !== family.name || notes !== family.notes, onDirty);
   const [error, setError] = useState('');
   const update = useFamilyUpdate();
   return (
@@ -243,7 +251,7 @@ function RenameForm({ family, onClose }: { family: FamilyDetail; onClose: () => 
         <p className="mt-1 text-xs text-subtle">Solo las ve el colegio.</p>
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" loading={update.isPending} disabled={update.isPending}>Guardar</Button>
       </div>
     </form>

@@ -175,9 +175,9 @@ export default function CafeteriaTopupReturn() {
         <div
           role="status"
           aria-live="polite"
-          className={`rounded-xl2 border border-line bg-white p-8 text-center shadow-card ring-1 ${content.ring}`}
+          className={`rounded-md bg-white p-8 text-center shadow-card ring-1 ${content.ring}`}
         >
-          <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${content.accent}`}>
+          <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-md ${content.accent}`}>
             {content.icon}
           </div>
           {outcome === 'success' && (
@@ -188,7 +188,7 @@ export default function CafeteriaTopupReturn() {
           <h1 className="font-head text-fluid-xl font-bold text-ink">{content.title}</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">{content.text}</p>
           {outcome === 'success' && paid && (
-            <dl className="mt-5 divide-y divide-line rounded-xl border border-line text-left text-sm">
+            <dl className="mt-5 divide-y divide-line rounded-md border border-line text-left text-sm">
               {paid.student_name && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{paid.student_name}</dd></div>}
               {paid.amount && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Recarga</dt><dd className="font-bold text-ink">{formatMXN(paid.amount)}</dd></div>}
               {awaitingApply && (
@@ -218,7 +218,7 @@ export default function CafeteriaTopupReturn() {
                 href={whatsappHref(whatsapp, { folio: paid?.id, amount: paid?.amount })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-green-50 px-4 text-sm font-semibold text-green-700 transition hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600/40"
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-green-600/40 bg-green-50 px-4 text-sm font-semibold text-green-700 transition hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600/40"
               >
                 <WhatsAppIcon className="h-4 w-4" /> La necesito hoy: WhatsApp {formatWhatsapp(whatsapp)}
               </a>

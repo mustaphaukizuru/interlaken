@@ -67,7 +67,7 @@ export function SecurityPanel() {
             <div className="space-y-3">
               <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
                 <li>Abra Google Authenticator, Microsoft Authenticator o 1Password.</li>
-                <li>Agregue una cuenta con esta clave: <code className="select-all rounded bg-cream-2 px-1.5 py-0.5 text-ink">{setup.secret}</code> <a href={setup.otpauth_url} className="ml-1 font-semibold text-purple underline">o toque aquí desde el teléfono</a>.</li>
+                <li>Agregue una cuenta con esta clave: <code className="select-all rounded-sm bg-cream-2 px-1.5 py-0.5 text-ink">{setup.secret}</code> <a href={setup.otpauth_url} className="ml-1 font-semibold text-purple underline">o toque aquí desde el teléfono</a>.</li>
                 <li>Escriba el código de 6 dígitos que muestra la app.</li>
               </ol>
               <div className="flex flex-wrap items-end gap-2">

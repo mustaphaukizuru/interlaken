@@ -16,10 +16,10 @@ import {
   type ColDef, type EditRow, type GroupDef, type RowErrors, type TableDef,
 } from './model';
 
-const CELL = 'block w-full rounded-lg border bg-white px-2.5 py-2 text-base text-ink placeholder:text-subtle focus:outline-none focus:ring-2 sm:text-sm';
+const CELL = 'block w-full rounded-sm border bg-white px-2.5 py-2 text-base text-ink placeholder:text-subtle focus:outline-none focus:ring-2 sm:text-sm';
 const ok = 'border-line focus:border-purple focus:ring-purple/20';
 const bad = 'border-coral-600 focus:border-coral-600 focus:ring-coral-600/20';
-const ICON_BTN = 'inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30 md:h-9 md:w-9';
+const ICON_BTN = 'inline-flex h-11 w-11 items-center justify-center rounded-sm text-muted transition-colors hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30 md:h-9 md:w-9';
 
 interface Props {
   def: TableDef;
@@ -102,7 +102,7 @@ export function PriceGrid({ def, rows, before, errors, onChange, onDelete, group
       draggable
       onDragStart={(e) => { setDragKey(row._key); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row._key); }}
       onDragEnd={() => { setDragKey(null); setOverKey(null); }}
-      className="hidden cursor-grab items-center justify-center rounded text-subtle hover:text-ink active:cursor-grabbing md:inline-flex md:h-9 md:w-6"
+      className="hidden cursor-grab items-center justify-center rounded-sm text-subtle hover:text-ink active:cursor-grabbing md:inline-flex md:h-9 md:w-6"
       title="Arrastre para mover la fila (o Alt + ↑ / ↓ desde una celda)"
       aria-hidden="true"
     >
@@ -160,7 +160,7 @@ export function PriceGrid({ def, rows, before, errors, onChange, onDelete, group
 
   const caption = `${def.title}${group ? `, ${group.label}` : ''}`;
   const empty = view.length === 0 && (
-    <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
+    <p className="rounded-md border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
       No hay filas. {group ? `Sin filas aquí, la pestaña «${group.label}» no aparece en el sitio.` : 'Sin filas, esta tarjeta no aparece en el sitio.'}
     </p>
   );
@@ -171,7 +171,7 @@ export function PriceGrid({ def, rows, before, errors, onChange, onDelete, group
       <div role="presentation" onKeyDown={(e) => gridKeyDown(e, { onMoveRow: (r, d) => move(r, d) })}>
         {empty}
         {view.length > 0 && wide && (
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="overflow-x-auto rounded-md border border-line">
             <table className="w-full border-collapse text-sm">
               <caption className="sr-only">{caption}: celdas editables</caption>
               <thead className="bg-cream-2 text-left text-xs font-semibold text-muted">
@@ -206,7 +206,7 @@ export function PriceGrid({ def, rows, before, errors, onChange, onDelete, group
         {view.length > 0 && !wide && (
           <ol className="space-y-3" aria-label={caption}>
             {view.map((row, i) => (
-              <li key={row._key} className={`rounded-xl border bg-white p-3 ${!row.id ? 'border-green/40' : 'border-line'} ${!row.is_active ? 'bg-cream-2' : ''}`}>
+              <li key={row._key} className={`rounded-md border bg-white p-3 ${!row.id ? 'border-green/40' : 'border-line'} ${!row.is_active ? 'bg-cream-2' : ''}`}>
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <p className="min-w-0 break-words font-head text-sm font-bold text-ink">
                     <span className="mr-1 text-subtle">{i + 1}.</span>{name(i)}

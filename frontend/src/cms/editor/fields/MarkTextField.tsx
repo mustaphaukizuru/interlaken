@@ -74,15 +74,15 @@ export function MarkTextField({ id, label, required, hint, error, warning, onBlu
   return (
     <div onFocus={() => setFocused(true)} onBlur={(e) => { if (leftWrapper(e) && !linking) { setFocused(false); onBlur?.(); } }}>
       <FieldLabel htmlFor={id} label={label} required={required} />
-      <div className={`overflow-hidden rounded-xl border bg-white ${error ? 'border-coral-400' : 'border-line'}`}>
+      <div className={`overflow-hidden rounded-md border bg-white ${error ? 'border-coral-400' : 'border-line'}`}>
         <div role="toolbar" aria-label={`Formato de ${label}`} aria-controls={id} className="flex flex-wrap items-center gap-0.5 border-b border-line bg-cream-2/70 p-1">
           {marks.includes('bold') && (
-            <button type="button" title="Negritas" aria-label="Negritas" onMouseDown={(e) => e.preventDefault()} onClick={() => wrapSelection(ref.current, value, '**', '**', 'texto en negritas', onChange)} className="flex h-11 w-11 items-center justify-center rounded-lg text-ink hover:bg-white sm:h-9 sm:w-9">
+            <button type="button" title="Negritas" aria-label="Negritas" onMouseDown={(e) => e.preventDefault()} onClick={() => wrapSelection(ref.current, value, '**', '**', 'texto en negritas', onChange)} className="flex h-11 w-11 items-center justify-center rounded-sm text-ink hover:bg-white sm:h-9 sm:w-9">
               <Bold size={16} aria-hidden="true" />
             </button>
           )}
           {marks.includes('link') && (
-            <button type="button" title="Enlace" aria-label="Enlace" onMouseDown={(e) => e.preventDefault()} onClick={() => setLinking(true)} className="flex h-11 w-11 items-center justify-center rounded-lg text-ink hover:bg-white sm:h-9 sm:w-9">
+            <button type="button" title="Enlace" aria-label="Enlace" onMouseDown={(e) => e.preventDefault()} onClick={() => setLinking(true)} className="flex h-11 w-11 items-center justify-center rounded-sm text-ink hover:bg-white sm:h-9 sm:w-9">
               <Link2 size={16} aria-hidden="true" />
             </button>
           )}
@@ -102,7 +102,7 @@ export function MarkTextField({ id, label, required, hint, error, warning, onBlu
       </div>
       {focused && <TokenChips target={ref} value={value} onChange={onChange} onInserted={tokenUndo} />}
       {paragraphs.length > 0 && (
-        <div className="mt-2 rounded-lg border border-dashed border-line bg-cream-2/50 px-3 py-2" aria-label={`Vista previa de ${label}`} role="group">
+        <div className="mt-2 rounded-sm border border-dashed border-line bg-cream-2/50 px-3 py-2" aria-label={`Vista previa de ${label}`} role="group">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-subtle">Así se verá</p>
           <div className="max-h-48 space-y-2 overflow-y-auto text-sm leading-relaxed text-ink/80">
             {paragraphs.map((p, i) => <p key={i}><MarkPreview text={p} marks={marks} /></p>)}

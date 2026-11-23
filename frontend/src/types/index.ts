@@ -174,7 +174,11 @@ export interface CafeteriaCard {
     id: number; name: string; grade: string; group: string; student_id: string;
     /** A staff member's own cafetería account reads as its puesto, never «Alumno». */
     tipo?: PersonTipo; puesto?: StaffPuesto | ''; puesto_label?: string;
+    /** The account's uploaded photo or its Google picture; '' = the empty frame. */
+    photo?: string;
   };
+  /** «Subir foto»: the school allows families to set the photo, and this is the caller's child. */
+  can_upload_photo?: boolean;
   code: string;            // matrícula the POS scans (QR/barcode payload)
   linked: boolean;
   balance: string;

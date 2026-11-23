@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Share, Smartphone, X } from 'lucide-react';
+import { installEvent } from '@/lib/installPrompt';
 
 /**
  * Dismissible "Agregar a pantalla de inicio" card for the parent portal.
@@ -77,7 +78,9 @@ export function InstallHint() {
     const current = parseInt(localStorage.getItem(VISITS_KEY) ?? '0', 10) || 0;
     return sessionStorage.getItem(SESSION_KEY) ? current : current + 1;
   });
-  const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(capturedPrompt);
+  // main.tsx also keeps the event from the very first moment (lib/installPrompt),
+  // for when it fired before this portal chunk loaded.
+  const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(() => capturedPrompt ?? (installEvent() as BeforeInstallPromptEvent | null));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -124,24 +127,24 @@ export function InstallHint() {
   return (
     <section
       aria-label="Instalar la aplicación del portal"
-      className="relative rounded-xl2 border border-purple/20 bg-purple-light/50 px-4 py-3 text-sm text-ink"
+      className="relative rounded-md bg-purple-light px-4 py-3 text-sm text-ink print:hidden"
     >
       <button
         type="button"
         onClick={dismissForever}
         aria-label="No volver a mostrar esta sugerencia"
-        className="absolute right-1.5 top-1.5 rounded-lg p-2 text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+        className="absolute right-0.5 top-0.5 flex h-11 w-11 items-center justify-center rounded-sm text-subtle hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
       >
         <X size={16} aria-hidden="true" />
       </button>
-      <div className="flex items-start gap-2 pr-8">
+      <div className="flex items-start gap-2 pr-10">
         <Smartphone size={16} className="mt-0.5 shrink-0 text-purple" aria-hidden="true" />
         <div>
           <p className="font-medium">Lleve el portal en su pantalla de inicio</p>
           {ios ? (
             <p className="mt-1 text-muted">
               En Safari: toque{' '}
-              <Share size={13} className="-mt-0.5 inline" aria-hidden="true" />{' '}
+              <Share size={16} className="-mt-0.5 inline" aria-hidden="true" />{' '}
               <span className="font-medium text-ink">Compartir</span> y elija{' '}
               <span className="font-medium text-ink">“Agregar a pantalla de inicio”</span>.
             </p>
@@ -155,7 +158,7 @@ export function InstallHint() {
                 type="button"
                 onClick={onInstall}
                 disabled={busy}
-                className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-xl2 bg-purple px-4 py-2 text-sm font-semibold text-white hover:bg-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
+                className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-sm bg-purple px-4 py-2 text-sm font-semibold text-white hover:bg-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
               >
                 Agregar a pantalla de inicio
               </button>

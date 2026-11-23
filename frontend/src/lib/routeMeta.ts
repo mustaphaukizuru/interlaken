@@ -14,7 +14,6 @@
  * (siteMeta.test.ts fails when they drift).
  */
 import {
-  CURRENT_CYCLE,
   DEFAULT_DESCRIPTION,
   DEFAULT_TITLE,
   OG_IMAGE,
@@ -45,17 +44,23 @@ export interface RouteMeta {
  * slash). Titles stay under ~60 characters with the suffix and lead with the
  * search phrase families actually type ("primaria bilingüe en Tlalnepantla").
  */
+/*
+ * Years are tokens, not values: {{ciclo}} (the school cycle the site announces;
+ * on /admisiones/costos the cycle of the published prices) and {{anios}}. The
+ * server (backend/apps/core/spa.py) and RouteSeo fill them in on every visit,
+ * so a title built in December is still right in January.
+ */
 export const ROUTE_META: Record<string, RouteMeta> = {
   '/': {
     title: DEFAULT_TITLE,
-    description: DEFAULT_DESCRIPTION,
+    description: DEFAULT_DESCRIPTION.replace(`${SCHOOL_YEARS} años`, '{{anios}} años'),
     crumb: 'Inicio',
   },
   '/nosotros': {
-    title: `Nosotros: ${SCHOOL_YEARS} años educando en Tlalnepantla`,
+    title: `Nosotros: {{anios}} años educando en Tlalnepantla`,
     crumb: 'Quiénes somos',
     description:
-      `Conozca al Colegio Interlaken: ${SCHOOL_YEARS} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores.`,
+      `Conozca al Colegio Interlaken: {{anios}} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores.`,
   },
   '/modelo-educativo': {
     title: 'Modelo educativo bilingüe',
@@ -88,24 +93,24 @@ export const ROUTE_META: Record<string, RouteMeta> = {
       'Secundaria bilingüe en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, arte y viajes opcionales al extranjero.',
   },
   '/admisiones': {
-    title: `Admisiones ${CURRENT_CYCLE}`,
+    title: `Admisiones {{ciclo}}`,
     crumb: 'Admisiones',
     description:
-      `Admisiones ${CURRENT_CYCLE} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a su hijo en preescolar, primaria o secundaria.`,
+      `Admisiones {{ciclo}} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a su hijo en preescolar, primaria o secundaria.`,
   },
   '/admisiones/documentacion': {
     title: 'Documentos para la inscripción',
     crumb: 'Documentación',
     parent: '/admisiones',
     description:
-      `Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo ${CURRENT_CYCLE}), con enlaces a los trámites oficiales en gob.mx.`,
+      `Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo {{ciclo}}), con enlaces a los trámites oficiales en gob.mx.`,
   },
   '/admisiones/costos': {
-    title: `Costos y colegiaturas ${CURRENT_CYCLE}`,
+    title: `Costos y colegiaturas {{ciclo}}`,
     crumb: 'Costos',
     parent: '/admisiones',
     description:
-      `Costos del Colegio Interlaken para el ciclo ${CURRENT_CYCLE}: inscripción, colegiaturas, seguros, extraescolares y estancia de preescolar, primaria y secundaria.`,
+      `Costos del Colegio Interlaken para el ciclo {{ciclo}}: inscripción, colegiaturas, seguros, extraescolares y estancia de preescolar, primaria y secundaria.`,
   },
   '/agendar-visita': {
     title: 'Agende una visita al colegio',

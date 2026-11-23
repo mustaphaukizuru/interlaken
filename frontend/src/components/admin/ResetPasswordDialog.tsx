@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { portalApi } from '@/services/api';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { credentialTemplate, mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
 
 export interface ResetPasswordTarget {
@@ -63,6 +64,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  const once = useSingleFlight();
   const reset = useMutation({
     mutationFn: (payload: { password?: string; reason?: string }) =>
       portalApi.setUserPassword(target!.id, payload),
@@ -90,7 +92,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
       setCopied(true);
       toast.success('Contraseña copiada al portapapeles.');
     } catch {
-      toast.error('No se pudo copiar. Seleccione el texto y cópielo a mano.');
+      toast.error('No se pudo copiar. Cópielo a mano.');
     }
   };
 
@@ -103,11 +105,13 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
     setStep('confirm');
   };
 
+  // Two answers in flight could arrive out of order and show a password that
+  // no longer works: one request at a time.
   const apply = () => {
-    reset.mutate({
+    once(() => reset.mutateAsync({
       password: mode === 'manual' ? password : undefined,
       reason: reason.trim() || undefined,
-    });
+    }));
   };
 
   return (
@@ -123,7 +127,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
             Entregue esta contraseña a la familia de{' '}
             <span className="font-semibold">{target.label}</span> ({target.email}).
           </p>
-          <div className="rounded-2xl bg-cream/70 p-4 text-center">
+          <div className="rounded-md bg-cream/70 p-4 text-center">
             <span className="sr-only">Contraseña temporal:</span>
             <code className="block select-all break-all font-mono text-xl font-bold tracking-wide text-ink sm:text-2xl">
               {temporary}
@@ -144,7 +148,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
             {copied ? 'Copiada' : 'Copiar contraseña'}
           </Button>
           <DeliveryActions target={target} password={temporary} />
-          <div className="flex gap-3 rounded-2xl bg-coral-50 p-3 text-xs text-ink">
+          <div className="flex gap-3 rounded-md bg-coral-50 p-3 text-xs text-ink">
             <AlertTriangle className="h-4 w-4 shrink-0 text-coral-600" aria-hidden="true" />
             <p>
               Esta contraseña <strong>no se volverá a mostrar</strong>. Envíela a la familia por
@@ -158,7 +162,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
         </div>
       ) : step === 'confirm' ? (
         <div className="space-y-4">
-          <div className="flex gap-3 rounded-2xl bg-coral-50 p-3 text-sm text-ink">
+          <div className="flex gap-3 rounded-md bg-coral-50 p-3 text-sm text-ink">
             <AlertTriangle className="h-5 w-5 shrink-0 text-coral-600" aria-hidden="true" />
             <p>
               Se cambiará la contraseña de <strong>{target.label}</strong> ({target.email}) y se
@@ -207,7 +211,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
 
           <fieldset className="space-y-2">
             <legend className="label">¿Cómo desea restablecerla?</legend>
-            <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl bg-cream/60 px-4 py-2.5 text-sm text-ink">
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md bg-cream/60 px-4 py-2.5 text-sm text-ink">
               <input
                 type="radio"
                 name="reset-mode"
@@ -218,7 +222,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
               />
               Generar contraseña temporal
             </label>
-            <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl bg-cream/60 px-4 py-2.5 text-sm text-ink">
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md bg-cream/60 px-4 py-2.5 text-sm text-ink">
               <input
                 type="radio"
                 name="reset-mode"

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
  */
 export function LegacyDraftBanner({ onLoadDesign, canLoad }: { onLoadDesign: () => void; canLoad: boolean }) {
   return (
-    <div role="status" className="flex flex-col gap-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-sm md:flex-row md:items-center md:justify-between">
+    <div role="status" className="flex flex-col gap-3 rounded-md border border-amber/40 bg-amber/10 p-3 text-sm md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-2">
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />
         <div>
@@ -45,7 +45,7 @@ export function LegacyDraftDialog({ open, onClose, pageTitle, canLoad, onLoadDes
           <strong> la página del sitio perderá su diseño</strong> (fotos, colores y secciones) y se verá con esos bloques.
         </p>
         {canLoad && (
-          <p className="rounded-xl bg-green-50 px-3 py-2 text-green-700">
+          <p className="rounded-md bg-green-50 px-3 py-2 text-green-700">
             <strong>Recomendado:</strong> cargue el diseño actual, haga ahí sus cambios y publique después. El sitio no cambia hasta entonces.
           </p>
         )}

@@ -16,8 +16,8 @@ import type { FieldSpec } from '../blocks/registry';
 import { gridKeyDown } from './gridNav';
 import { describedBy, FieldNotes, RequiredMark } from './fields/FieldShell';
 
-const CELL = 'block w-full min-w-[7rem] rounded-md border border-line bg-white px-2 py-1.5 text-base text-ink focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/20 sm:text-sm';
-const ICON_BTN = 'inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-40 sm:h-8 sm:w-8';
+const CELL = 'block w-full min-w-[7rem] rounded-sm border border-line bg-white px-2 py-1.5 text-base text-ink focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/20 sm:text-sm';
+const ICON_BTN = 'inline-flex h-11 w-11 items-center justify-center rounded-sm text-muted hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-40 sm:h-8 sm:w-8';
 
 const swap = <T,>(list: T[], i: number, j: number): T[] => {
   if (j < 0 || j >= list.length) return list;
@@ -79,7 +79,7 @@ export function TableField({ spec, value, onChange, id: fieldId, hint, error, on
 
   return (
     <fieldset
-      className={`min-w-0 space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`}
+      className={`min-w-0 space-y-3 rounded-md border p-3 ${error ? 'border-coral-400' : 'border-line'}`}
       aria-describedby={describedBy(id, { hint, error })}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onBlur?.(); }}
     >
@@ -91,7 +91,7 @@ export function TableField({ spec, value, onChange, id: fieldId, hint, error, on
       {/* The form's error goes right under the instructions, next to the grid it is about. */}
       <FieldNotes id={id} error={error} />
       {/* Keys and paste bubble up from the cell inputs (the inputs are the interactive elements). */}
-      <div role="presentation" className="overflow-x-auto rounded-lg border border-line" onKeyDown={(e) => gridKeyDown(e, { onMoveRow: moveRow })} onPaste={onPaste}>
+      <div role="presentation" className="overflow-x-auto rounded-sm border border-line" onKeyDown={(e) => gridKeyDown(e, { onMoveRow: moveRow })} onPaste={onPaste}>
         <table className="w-full border-collapse text-sm" aria-describedby={`${id}-help`}>
           <caption className="sr-only">Contenido de la tabla</caption>
           <thead className="bg-cream-2">
@@ -154,11 +154,11 @@ export function TableField({ spec, value, onChange, id: fieldId, hint, error, on
       </div>
       {notice && <p role="status" className="text-xs text-green-700">{notice}</p>}
 
-      <details className="rounded-lg bg-cream-2 p-3" open={columns.length <= 3}>
+      <details className="rounded-sm bg-cream-2 p-3" open={columns.length <= 3}>
         <summary className="cursor-pointer text-xs font-semibold text-subtle">Columnas: formato y alineación</summary>
         <ul className="mt-3 space-y-3">
           {columns.map((c, i) => (
-            <li key={i} className="rounded-lg bg-white p-2">
+            <li key={i} className="rounded-sm bg-white p-2">
               <p className="mb-2 truncate text-sm font-semibold text-ink">{i + 1}. {c.label || 'Sin título'}</p>
               {/* One column: the editor's form panel is narrow at every screen width. */}
               <div className="grid gap-2">

@@ -59,7 +59,7 @@ export default function AdminGuardianMerge() {
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 {([['Se conserva', preview.keep, 'success'], ['Se fusiona', preview.drop, 'warning']] as const).map(([label, u, tone]) => (
-                  <div key={u.id} className="rounded-xl border border-line p-3 text-sm">
+                  <div key={u.id} className="rounded-md border border-line p-3 text-sm">
                     <Badge variant={tone}>{label}</Badge>
                     <p className="mt-2 font-semibold text-ink">{u.full_name}</p>
                     <p className="text-subtle">{u.email}{u.phone ? ` · ${u.phone}` : ''}</p>

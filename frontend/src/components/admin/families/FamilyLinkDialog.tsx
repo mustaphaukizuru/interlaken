@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { useStudentsList, type RosterStudent } from '@/hooks/queries/students';
 import { useFamilyLink } from '@/hooks/queries/families';
 import { apiErrorMessage } from '@/lib/apiErrors';
@@ -32,16 +33,25 @@ interface Props {
  */
 export function FamilyLinkDialog({ open, onClose, mode, preselected, onDone }: Props) {
   const title = mode.kind === 'family' ? `Agregar a ${mode.family.name}` : mode.kind === 'new' ? 'Nueva familia' : 'Vincular hermano';
+  // Students picked by hand are work: closing asks before it drops them.
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={640}>
-      {/* Mounted only while open: every opening starts clean. */}
-      <FamilyLinkBody mode={mode} preselected={preselected} onClose={onClose} onDone={onDone} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title={title} maxWidth={640}>
+        {/* Mounted only while open: every opening starts clean. */}
+        <FamilyLinkBody mode={mode} preselected={preselected} onClose={onClose} onCancel={guard.requestClose}
+          onDirty={guard.reportDirty} onDone={onDone} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function FamilyLinkBody({ mode, preselected, onClose, onDone }: Omit<Props, 'open'>) {
+function FamilyLinkBody({ mode, preselected, onClose, onCancel, onDirty, onDone }: Omit<Props, 'open'> & {
+  onCancel: () => void; onDirty: (dirty: boolean) => void;
+}) {
   const [picked, setPicked] = useState<PickedStudent[]>(preselected ?? []);
+  useReportDirty(valuesDiffer(picked.map((p) => p.id), (preselected ?? []).map((p) => p.id)), onDirty);
   const [step, setStep] = useState<'pick' | 'review'>(preselected?.length ? 'review' : 'pick');
   const minimum = mode.kind === 'new' ? 2 : 1;
   const studentIds = useMemo(() => {
@@ -51,11 +61,12 @@ function FamilyLinkBody({ mode, preselected, onClose, onDone }: Omit<Props, 'ope
 
   return step === 'pick' ? (
     <PickStep mode={mode} picked={picked} setPicked={setPicked} minimum={minimum}
-      onCancel={onClose} onNext={() => setStep('review')} />
+      onCancel={onCancel} onNext={() => setStep('review')} />
   ) : (
     <ReviewStep mode={mode} studentIds={studentIds}
       onBack={preselected?.length ? undefined : () => setStep('pick')}
-      onCancel={onClose}
+      onCancel={onCancel}
+      onClose={onClose}
       onDone={(plan) => { onDone?.(plan); onClose(); }} />
   );
 }
@@ -106,10 +117,10 @@ function PickStep({ mode, picked, setPicked, minimum, onCancel, onNext }: {
       {picked.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Alumnos elegidos">
           {picked.map((p) => (
-            <li key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 py-1 pl-3 pr-1 text-sm font-medium text-brand-700">
+            <li key={p.id} className="inline-flex items-center gap-1.5 rounded-sm bg-brand-50 py-1 pl-3 pr-1 text-sm font-medium text-brand-700">
               {p.name}
               <button type="button" onClick={() => setPicked(picked.filter((x) => x.id !== p.id))}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:h-6 sm:w-6"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:h-6 sm:w-6"
                 aria-label={`Quitar a ${p.name}`}>
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -134,19 +145,19 @@ function PickStep({ mode, picked, setPicked, minimum, onCancel, onNext }: {
 
       <div className="min-h-[180px]" aria-live="polite" aria-busy={isFetching}>
         {!searching ? (
-          <p className="rounded-xl bg-cream-2 px-4 py-6 text-center text-sm text-muted">
+          <p className="rounded-md bg-cream-2 px-4 py-6 text-center text-sm text-muted">
             Los resultados aparecen mientras escribe.
           </p>
         ) : isError ? (
-          <div className="rounded-xl bg-coral-50 px-4 py-4 text-sm text-coral-700">
+          <div className="rounded-md bg-coral-50 px-4 py-4 text-sm text-coral-700">
             No se pudo buscar. <button type="button" className="font-semibold underline" onClick={() => refetch()}>Reintentar</button>
           </div>
         ) : results.length === 0 && !isFetching ? (
-          <p className="rounded-xl bg-cream-2 px-4 py-6 text-center text-sm text-muted">
+          <p className="rounded-md bg-cream-2 px-4 py-6 text-center text-sm text-muted">
             Nadie coincide con «{q}». Pruebe con un solo apellido o con la matrícula.
           </p>
         ) : (
-          <ul className="divide-y divide-cream overflow-hidden rounded-xl border border-line" aria-label="Resultados">
+          <ul className="divide-y divide-cream overflow-hidden rounded-md border border-line" aria-label="Resultados">
             {results.map((s) => {
               const reason = blocked(s);
               const on = isPicked(s.id);
@@ -194,11 +205,13 @@ const HEADLINE: Record<FamilyPlan['action'], string> = {
   none: 'Ya están en la misma familia',
 };
 
-function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
+function ReviewStep({ mode, studentIds, onBack, onCancel, onClose, onDone }: {
   mode: FamilyLinkMode;
   studentIds: number[];
   onBack?: () => void;
   onCancel: () => void;
+  /** Closes without asking (nothing would change). */
+  onClose: () => void;
   onDone: (plan: FamilyPlan) => void;
 }) {
   const nameId = useId();
@@ -243,7 +256,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
   if (error) {
     return (
       <div className="space-y-4">
-        <div role="alert" className="flex gap-3 rounded-xl bg-coral-50 px-4 py-3 text-sm text-coral-700">
+        <div role="alert" className="flex gap-3 rounded-md bg-coral-50 px-4 py-3 text-sm text-coral-700">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <p>{error}</p>
         </div>
@@ -264,7 +277,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
 
   return (
     <div className="space-y-5">
-      <div className={`flex gap-3 rounded-xl px-4 py-3 text-sm ${plan.action === 'merge' ? 'bg-amber/10 text-ink' : 'bg-brand-50 text-brand-700'}`} role="status">
+      <div className={`flex gap-3 rounded-md px-4 py-3 text-sm ${plan.action === 'merge' ? 'bg-amber/10 text-ink' : 'bg-brand-50 text-brand-700'}`} role="status">
         {plan.action === 'merge'
           ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
           : <Info className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />}
@@ -296,7 +309,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
         <h4 id={`${nameId}-members`} className="text-xs font-semibold uppercase tracking-wide text-subtle">
           Hermanos ({plan.students_after.length})
         </h4>
-        <ul className="mt-2 divide-y divide-cream rounded-xl border border-line">
+        <ul className="mt-2 divide-y divide-cream rounded-md border border-line">
           {plan.students_after.map((s) => (
             <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
               <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream text-xs font-bold text-purple">{initial(s.name)}</span>
@@ -320,7 +333,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
           ) : (
             <ul className="mt-2 space-y-2">
               {plan.new_access.map((g) => (
-                <li key={g.id} className="flex gap-3 rounded-xl bg-cream-2 px-3 py-2.5">
+                <li key={g.id} className="flex gap-3 rounded-md bg-cream-2 px-3 py-2.5">
                   {g.kind === 'student'
                     ? <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
                     : <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />}
@@ -340,7 +353,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
 
       {!nothing && (
         <label className="flex min-h-[44px] cursor-pointer items-start gap-2.5 text-sm text-ink">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+          <input type="checkbox" className="mt-0.5 h-4 w-4 rounded-sm border-line text-purple focus:ring-purple/40"
             checked={notify} onChange={(e) => setNotify(e.target.checked)} />
           <span>
             Avisar a la familia
@@ -352,7 +365,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
       <div className={FOOTER}>
         {onBack ? <Button type="button" variant="ghost" onClick={onBack} disabled={commit.isPending}><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Atrás</Button> : null}
         {nothing ? (
-          <Button type="button" variant="secondary" onClick={onCancel}>Cerrar</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>Cerrar</Button>
         ) : (
           <>
             <Button type="button" variant="ghost" onClick={onCancel} disabled={commit.isPending}>Cancelar</Button>

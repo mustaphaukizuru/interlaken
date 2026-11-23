@@ -28,7 +28,7 @@ function ActionField({ spec }: { spec: FieldSpec }) {
     return () => window.removeEventListener('focus', back);
   }, [away, qc]);
   return (
-    <div className="space-y-2 rounded-xl border border-green/30 bg-green-50 p-3">
+    <div className="space-y-2 rounded-md border border-green/30 bg-green-50 p-3">
       {spec.hint && <p className="text-sm text-ink">{spec.hint}</p>}
       {role === 'admin' && spec.actionHref ? (
         <>

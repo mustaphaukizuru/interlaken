@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { areasOf, canOpen, consoleHome, hasConsole, homePath } from './areas';
+import { areasFor, areasOf, canOpen, consoleHome, hasConsole, homePath } from './areas';
 import { PUESTOS } from './areaCatalog';
 
 const admin = { role: 'admin' as const };
@@ -43,5 +43,11 @@ describe('console areas', () => {
     expect([...areasOf({ role: 'staff', staff_areas: ['cafeteria', 'root'] })]).toEqual(['cafeteria']);
     expect(hasConsole(parent)).toBe(false);
     expect(canOpen(parent, '/admin/cafeteria')).toBe(false);
+  });
+
+  it('names the areas a path needs (for the «Requiere el área…» state)', () => {
+    expect(areasFor('/admin/pagos?estado=failed')).toEqual(['cafeteria']);
+    expect(areasFor('/admin/calendario')).toEqual(['comunicados']);
+    expect(areasFor('/admin/usuarios')).toEqual([]);
   });
 });

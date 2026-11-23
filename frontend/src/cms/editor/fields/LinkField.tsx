@@ -64,8 +64,8 @@ export function HrefInput({ id, label, required, hint, error, warning, onBlur, v
   return (
     <div onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !open) onBlur?.(); }}>
       <FieldLabel htmlFor={id} label={label} required={required} />
-      <div className={`flex min-h-[52px] items-center gap-3 rounded-xl border bg-white px-3 py-2 ${problem ? 'border-coral-400' : 'border-line'}`}>
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${info.kind === 'empty' ? 'bg-cream-2 text-subtle' : 'bg-purple/10 text-purple'}`} aria-hidden="true">
+      <div className={`flex min-h-[52px] items-center gap-3 rounded-md border bg-white px-3 py-2 ${problem ? 'border-coral-400' : 'border-line'}`}>
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${info.kind === 'empty' ? 'bg-cream-2 text-subtle' : 'bg-purple/10 text-purple'}`} aria-hidden="true">
           <Icon size={17} />
         </span>
         <div className="min-w-0 flex-1 [contain:inline-size]">
@@ -148,7 +148,7 @@ function PickerBody({ value, onPick, onClose, kinds, given }: { value: string; o
               aria-controls={`${uid}-panel`}
               tabIndex={kind === k ? 0 : -1}
               onClick={() => setKind(k)}
-              className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 text-sm font-semibold ${kind === k ? 'border-purple bg-purple text-white' : 'border-line bg-white text-ink hover:border-purple/50'}`}
+              className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-sm border px-3 text-sm font-semibold ${kind === k ? 'border-purple bg-purple text-white' : 'border-line bg-white text-ink hover:border-purple/50'}`}
             >
               <Icon size={15} aria-hidden="true" /> {KIND_LABEL[k]}
             </button>
@@ -207,7 +207,7 @@ function PageOption({ title, detail, selected, onClick, sub }: { title: string; 
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left ${sub ? 'pl-8' : ''} ${selected ? 'bg-purple/10 ring-1 ring-purple' : 'hover:bg-cream-2'}`}
+      className={`flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 py-1.5 text-left ${sub ? 'pl-8' : ''} ${selected ? 'bg-purple/10 ring-1 ring-purple' : 'hover:bg-cream-2'}`}
     >
       {sub && <CornerDownRight size={14} className="shrink-0 text-subtle" aria-hidden="true" />}
       <span className="min-w-0 flex-1">
@@ -272,7 +272,7 @@ export interface LinkFieldProps extends Omit<FieldBaseProps, 'id'> {
 export function LinkField({ id, label, required, hint, error, warning, onBlur, value, onChange, textLabel = 'Texto del botón' }: LinkFieldProps) {
   const v = value ?? {};
   return (
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line p-3" aria-describedby={hint ? `${id}-hint` : undefined}>
+    <fieldset className="min-w-0 space-y-3 rounded-md border border-line p-3" aria-describedby={hint ? `${id}-hint` : undefined}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{label}{required && <span aria-hidden="true" className="text-coral-600"> *</span>}</legend>
       <TextField id={`${id}-label`} label={textLabel} value={v.label ?? ''} onChange={(t) => onChange({ ...v, label: t })} onBlur={onBlur} warning={warning} />
       <HrefInput id={id} label="Destino" value={v.href ?? ''} onChange={(href) => onChange({ ...v, href })} error={error} onBlur={onBlur} required={required} />

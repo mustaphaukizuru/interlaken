@@ -11,6 +11,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { MenuGroup } from '@/types/content';
 import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
+import { BackToTop } from '@/components/layout/BackToTop';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { isExternalHref, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteTexts, withYear, type ChromeButton } from '@/lib/siteChrome';
@@ -90,7 +91,7 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
 function ExternalMark() {
   return (
     <>
-      <ArrowUpRight className="ml-1 inline h-3.5 w-3.5 align-[-2px] opacity-60" aria-hidden="true" />
+      <ArrowUpRight className="ml-1 inline h-4 w-4 align-[-3px] opacity-60" aria-hidden="true" />
       <span className="sr-only"> (se abre en otra pestaña)</span>
     </>
   );
@@ -165,10 +166,10 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded-sm"
       >
         {label}
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
 
       {open && (
@@ -177,15 +178,15 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
         // ordinary links — role="menu"/"menuitem" would promise app-menu
         // keyboard behavior these plain links don't implement.
         <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-64">
-          <ul className="overflow-hidden rounded-2xl border border-line bg-white p-2 shadow-xl ring-1 ring-ink/5">
+          <ul className="overflow-hidden rounded-md bg-white p-2 shadow-xl ring-1 ring-ink/5">
             {items.map((item) => (
               <li key={item.label}>
                 <MenuLink
                   to={item.to}
                   onClick={() => setOpen(false)}
-                  className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                  className="group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green-strong group-hover:text-white">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm bg-green/10 text-green-dark transition-colors group-hover:bg-green-strong group-hover:text-white">
                     <item.icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <span className="font-medium">{item.label}{isExternalHref(item.to) && <ExternalMark />}</span>
@@ -196,6 +197,37 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
         </div>
       )}
     </div>
+  );
+}
+
+/** Footer link: 44px tall tap target (WCAG 2.5.5), 14px text. */
+const FOOTER_LINK = 'inline-flex min-h-[44px] items-center text-sm hover:text-white transition-colors';
+
+/** Phone, email and address in the footer (mobile accordion and desktop column). */
+function FooterContact({ settings, className = '' }: { settings: ReturnType<typeof useSiteSettings>; className?: string }) {
+  const row = 'flex min-h-[44px] items-center gap-2 text-sm hover:text-white transition-colors';
+  return (
+    <ul className={className}>
+      {settings.phone_display && (
+        <li>
+          <a href={`tel:${settings.phone_e164}`} className={row}>
+            <Phone className="h-4 w-4 flex-shrink-0" aria-hidden="true" />{settings.phone_display}
+          </a>
+        </li>
+      )}
+      {settings.contact_email && (
+        <li>
+          <a href={`mailto:${settings.contact_email}`} className={`${row} break-all`}>
+            <Mail className="h-4 w-4 flex-shrink-0" aria-hidden="true" />{settings.contact_email}
+          </a>
+        </li>
+      )}
+      <li>
+        <a href={settings.maps_url} target="_blank" rel="noopener noreferrer" title={settings.address} className={`${row} py-2`}>
+          <MapPin className="h-4 w-4 flex-shrink-0 self-start mt-0.5" aria-hidden="true" />{settings.address}
+        </a>
+      </li>
+    </ul>
   );
 }
 
@@ -276,19 +308,19 @@ export function PublicLayout() {
       <SiteNoticeBanner />
       {/* Preheader — solo escritorio/tablet. Petición del colegio (2026-08-21):
           teléfono a la izquierda, correo a la derecha; sin redes sociales. */}
-      <div className="hidden md:block bg-brand-800 text-white text-xs">
+      <div className="hidden md:block bg-brand-800 text-white text-xs print:hidden">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-1.5 sm:px-6">
           <div className="flex items-center gap-6">
             {settings.phone_display && (
               <a href={`tel:${settings.phone_e164}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
-                <Phone className="w-3 h-3" aria-hidden="true" /> {settings.phone_display}
+                <Phone className="w-4 h-4" aria-hidden="true" /> {settings.phone_display}
               </a>
             )}
           </div>
           <div className="flex items-center gap-6">
             {settings.contact_email && (
               <a href={`mailto:${settings.contact_email}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
-                <Mail className="w-3 h-3" aria-hidden="true" /> {settings.contact_email}
+                <Mail className="w-4 h-4" aria-hidden="true" /> {settings.contact_email}
               </a>
             )}
           </div>
@@ -296,8 +328,13 @@ export function PublicLayout() {
       </div>
 
       {/* Main nav */}
-      <div className="accent-bar" />
-      <header className="bg-white border-b border-line sticky top-0 z-50 shadow-sm">
+      <div className="accent-bar print:hidden" />
+      {/* Sticky and solid. z-header must stay: without it (a dev server on a
+          stale Tailwind config dropped the rule, 2026-11-22) any positioned
+          section (card photos, the round extracurricular photos) paints over
+          the bar. The stronger shadow keeps its edge visible over white
+          sections. */}
+      <header data-sticky-header="" className="sticky top-0 z-header border-b border-line bg-white shadow-md print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
@@ -335,7 +372,7 @@ export function PublicLayout() {
                 href={`tel:${settings.phone_e164}`}
                 aria-label={`Llamar al colegio, ${settings.phone_display}`}
                 onClick={() => trackEvent(ConversionEvent.PhoneCta, { context: 'header_movil' })}
-                className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                className="grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
               >
                 <Phone className="h-5 w-5" aria-hidden="true" />
               </a>
@@ -346,9 +383,9 @@ export function PublicLayout() {
               aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
               aria-expanded={open}
               aria-controls="mobile-menu"
-              className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="grid h-11 w-11 place-items-center rounded-sm text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             >
-              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {open ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -373,7 +410,7 @@ export function PublicLayout() {
               to="/contacto"
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `block px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
+                `block px-3 py-2.5 min-h-[44px] rounded-sm text-sm font-medium transition-colors ${
                   isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-cream'
                 }`
               }
@@ -389,10 +426,10 @@ export function PublicLayout() {
                   type="button"
                   aria-expanded={openGroup === group.label}
                   onClick={() => setOpenGroup((g) => (g === group.label ? null : group.label))}
-                  className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                  className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-sm text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
                   {group.label}
-                  <ChevronDown className={`w-4 h-4 transition-transform ${openGroup === group.label ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${openGroup === group.label ? 'rotate-180' : ''}`} aria-hidden="true" />
                 </button>
                 {openGroup === group.label && (
                   <div className="space-y-0.5 pl-2">
@@ -401,10 +438,10 @@ export function PublicLayout() {
                         key={item.label}
                         to={item.to}
                         onClick={() => setOpen(false)}
-                        className="flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-cream hover:text-ink"
+                        className="flex min-h-[44px] items-center gap-3 rounded-sm px-3 py-2 text-sm text-muted hover:bg-cream hover:text-ink"
                       >
-                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark">
-                          <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm bg-green/10 text-green-dark">
+                          <item.icon className="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span>{item.label}{isExternalHref(item.to) && <ExternalMark />}</span>
                       </MenuLink>
@@ -435,7 +472,8 @@ export function PublicLayout() {
           primary action. ONE bar with two actions: Agendar (primary) +
           WhatsApp (secondary, hidden when no number is configured). */}
       {showStickyCta && (
-        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-stretch gap-2 md:hidden">
+        // data-sticky-cta: the cookie banner lifts itself above this bar (CookieBanner.tsx).
+        <div data-sticky-cta="" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-sticky flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-stretch gap-2 md:hidden print:hidden">
           <ChromeLink button={{ label: chrome.sticky_label, href: chrome.sticky_href }} className="btn-pink min-w-0 flex-1 justify-center shadow-lg" />
           {settings.whatsapp_number && (
             <a
@@ -445,7 +483,7 @@ export function PublicLayout() {
               aria-label="Escribir por WhatsApp"
               title="Escribir por WhatsApp"
               onClick={() => trackEvent(ConversionEvent.WhatsappCta, { context: 'barra_fija' })}
-              className="flex w-[52px] flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white shadow-lg transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+              className="flex w-[52px] flex-shrink-0 items-center justify-center rounded-sm bg-green-600 text-white shadow-lg transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
             >
               <WhatsAppIcon className="h-6 w-6" />
             </a>
@@ -455,6 +493,16 @@ export function PublicLayout() {
 
       {/* Floating WhatsApp bubble — right side, every public page. */}
       <WhatsAppFloat stickyCtaVisible={showStickyCta} />
+      {/* «Volver arriba» sits above the phone bar or the WhatsApp bubble (centred on it). */}
+      <BackToTop
+        className={`${
+          showStickyCta
+            ? 'right-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4rem)]'
+            : settings.whatsapp_number
+              ? 'right-[1.375rem] bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.25rem)]'
+              : 'right-4 bottom-[max(1rem,env(safe-area-inset-bottom))]'
+        } ${settings.whatsapp_number ? 'md:right-[1.875rem] md:bottom-[5.75rem]' : 'md:right-6 md:bottom-6'} max-[767px]:[html[data-ficha-steps]_&]:hidden`}
+      />
 
       {/* Footer */}
       <footer
@@ -471,8 +519,11 @@ export function PublicLayout() {
             <p className="text-xs leading-relaxed">{chrome.footer_tagline}</p>
           </div>
 
+          {/* Footer groups are h3s: one hidden h2 names the region for screen readers. */}
+          <h2 className="sr-only">Mapa del sitio</h2>
+
           {/* Mobile (&lt;md): accordion link groups — desktop: open grid */}
-          <div className="md:hidden divide-y divide-white/10 border-y border-white/10">
+          <div className="md:hidden divide-y divide-white/10 border-y border-white/10 print:hidden">
             {[...FOOTER_GROUPS.map((g) => ({ ...g, contact: false })), { heading: footerContact, links: [] as typeof FOOTER_GROUPS[number]['links'], contact: true }].map((group) => {
               const isContact = group.contact;
               const expanded = footerOpen === group.heading;
@@ -485,41 +536,14 @@ export function PublicLayout() {
                     className="flex w-full min-h-[48px] items-center justify-between py-3 text-left text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   >
                     {group.heading}
-                    <ChevronDown className={`h-4 w-4 text-white/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-4 w-4 text-white/60 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                   </button>
                   {expanded && (
-                    isContact ? (
-                      <ul className="space-y-2.5 pb-4 text-xs">
-                        {settings.phone_display && (
-                          <li className="flex items-start gap-2">
-                            <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                            <a href={`tel:${settings.phone_e164}`} className="hover:text-white transition-colors">{settings.phone_display}</a>
-                          </li>
-                        )}
-                        {settings.contact_email && (
-                          <li className="flex items-start gap-2">
-                            <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                            <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
-                          </li>
-                        )}
-                        <li className="flex items-start gap-2">
-                          <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                          <a
-                            href={settings.maps_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={settings.address}
-                            className="hover:text-white transition-colors"
-                          >
-                            {settings.address}
-                          </a>
-                        </li>
-                      </ul>
-                    ) : (
-                      <ul className="space-y-2.5 pb-4 text-xs">
+                    isContact ? <FooterContact settings={settings} className="pb-3" /> : (
+                      <ul className="pb-3">
                         {group.links.map((l) => (
                           <li key={l.label}>
-                            <MenuLink to={l.to} className="hover:text-white transition-colors">{l.label}{isExternalHref(l.to) && <ExternalMark />}</MenuLink>
+                            <MenuLink to={l.to} className={FOOTER_LINK}>{l.label}{isExternalHref(l.to) && <ExternalMark />}</MenuLink>
                           </li>
                         ))}
                       </ul>
@@ -531,47 +555,22 @@ export function PublicLayout() {
           </div>
 
           {/* Desktop / tablet grid */}
-          <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-8">
+          <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-8 print:hidden">
             {FOOTER_GROUPS.map((group) => (
               <div key={group.heading}>
-                <h3 className="text-white font-semibold mb-3 text-sm">{group.heading}</h3>
-                <ul className="space-y-2 text-xs">
+                <h3 className="text-white font-semibold mb-1 text-sm">{group.heading}</h3>
+                <ul>
                   {group.links.map((l) => (
                     <li key={l.label}>
-                      <MenuLink to={l.to} className="hover:text-white transition-colors">{l.label}{isExternalHref(l.to) && <ExternalMark />}</MenuLink>
+                      <MenuLink to={l.to} className={FOOTER_LINK}>{l.label}{isExternalHref(l.to) && <ExternalMark />}</MenuLink>
                     </li>
                   ))}
                 </ul>
               </div>
             ))}
             <div>
-              <h3 className="text-white font-semibold mb-3 text-sm">{footerContact}</h3>
-              <ul className="space-y-2 text-xs">
-                {settings.phone_display && (
-                  <li className="flex items-start gap-2">
-                    <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                    <a href={`tel:${settings.phone_e164}`} className="hover:text-white transition-colors">{settings.phone_display}</a>
-                  </li>
-                )}
-                {settings.contact_email && (
-                  <li className="flex items-start gap-2">
-                    <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                    <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
-                  </li>
-                )}
-                <li className="flex items-start gap-2">
-                  <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <a
-                    href={settings.maps_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={settings.address}
-                    className="hover:text-white transition-colors"
-                  >
-                    {settings.address}
-                  </a>
-                </li>
-              </ul>
+              <h3 className="text-white font-semibold mb-1 text-sm">{footerContact}</h3>
+              <FooterContact settings={settings} />
             </div>
           </div>
 
@@ -579,8 +578,8 @@ export function PublicLayout() {
         <div className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
             <span>{withYear(chrome.footer_copyright).map((part, i) => <Fragment key={i}>{part}</Fragment>)}</span>
-            <div className="flex items-center gap-4">
-              {LEGAL.map((l) => <ChromeLink key={l.label + l.href} button={l} className="hover:text-white transition-colors" />)}
+            <div className="flex flex-wrap items-center justify-center gap-x-4">
+              {LEGAL.map((l) => <ChromeLink key={l.label + l.href} button={l} className="inline-flex min-h-[44px] items-center gap-1.5 hover:text-white transition-colors" />)}
               <span className="text-white/70">{chrome.footer_note}</span>
             </div>
           </div>

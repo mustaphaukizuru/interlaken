@@ -153,4 +153,47 @@ describe('StudentFormModal never overwrites medical data it did not show (launch
     await waitFor(() => expect(portalApi.updateStudent).toHaveBeenCalledTimes(1));
     expect(vi.mocked(portalApi.updateStudent).mock.calls[0]).toEqual([7, { group: 'C' }]);
   });
+
+  describe('unsaved changes', () => {
+    it('closes an untouched form without asking', async () => {
+      const onClose = vi.fn();
+      renderWithProviders(<StudentFormModal open onClose={onClose} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('¿Descartar los cambios?')).toBeNull();
+    });
+
+    it('asks before closing a form with changes (X or Cancelar)', async () => {
+      const onClose = vi.fn();
+      renderWithProviders(<StudentFormModal open onClose={onClose} />);
+      await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Ana');
+      await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+      expect(screen.getByRole('dialog', { name: '¿Descartar los cambios?' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Seguir editando' }));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/^nombre\(s\)/i)).toHaveValue('Ana');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask after a successful save (Loyverse result showing)', async () => {
+      createStudent.mockResolvedValue({ data: {
+        id: 14, tipo: 'alumno', user: { full_name: 'Eva Ruiz' },
+        loyverse_link: { status: 'not_found', message: 'No se encontró en Loyverse.' },
+      } } as never);
+      const onClose = vi.fn();
+      renderWithProviders(<StudentFormModal open onClose={onClose} />);
+      await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Eva');
+      await userEvent.type(screen.getByLabelText(/apellidos/i), 'Ruiz');
+      await userEvent.type(screen.getByLabelText(/matrícula/i), '55502');
+      await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');
+      await userEvent.click(screen.getByRole('button', { name: /crear alumno/i }));
+      await screen.findByText('No se encontró en Loyverse.');
+      await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('¿Descartar los cambios?')).toBeNull();
+    });
+  });
 });

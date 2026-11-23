@@ -11,6 +11,7 @@ import { contentApi } from '@/services/api';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { useTokens } from '@/cms/runtime';
 import { CmsAnchor } from '@/cms/sections/kit';
+import { estimatorPriceNote, namesPriceYear, usePriceYears } from '@/lib/priceYears';
 import { ESTIMATOR_COPY, type EstimatorCopy } from './estimatorCopy';
 
 // Same /content/pricing/ bundle shapes CostosPage consumes.
@@ -77,7 +78,14 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
   const [section, setSection] = useState<string>(() => (sections.includes(t(c.startSection)) ? t(c.startSection) : sections[0]));
   const [modality, setModality] = useState<Modality>('nuevo_ingreso');
   const { whatsapp_number } = useSiteSettings();
-  const notes = Array.isArray(c.notes) ? c.notes.filter((n) => n?.text) : [];
+  // Which year each figure's prices are (published in «Costos y precios») comes first and
+  // keeps itself current; a stored note that still names a year by hand gives way to it.
+  const prices = usePriceYears();
+  const yearNote = prices.ready ? estimatorPriceNote(prices.years, prices.target) : null;
+  const notes = [
+    ...(yearNote ? [{ text: yearNote.text, tone: yearNote.pending ? 'amber' : 'purple' }] : []),
+    ...(Array.isArray(c.notes) ? c.notes.filter((n) => n?.text && !namesPriceYear(n.text)) : []),
+  ];
 
   const { data, isLoading, isError, refetch } = useQuery<PricingBundle>({
     queryKey: ['pricing-bundle'],
@@ -96,7 +104,7 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
 
   if (isError) {
     return (
-      <div className="rounded-[20px] border border-ink/10 bg-white shadow-card">
+      <div className="rounded-md bg-white shadow-card">
         <ErrorState
           title={t(c.errorTitle)}
           description={t(c.errorText)}
@@ -109,7 +117,7 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
   if (isLoading || !data) {
     return (
       <div aria-busy="true" aria-label="Cargando estimador de costos">
-        <div className="skeleton h-[420px] rounded-[20px]" aria-hidden="true" />
+        <div className="skeleton h-[420px] rounded-md" aria-hidden="true" />
       </div>
     );
   }
@@ -122,10 +130,10 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
   const segurosTotal = seguros.reduce((sum, c) => sum + Number(c.cost), 0);
 
   return (
-    <div className="overflow-hidden rounded-[20px] border border-ink/10 bg-white shadow-card">
+    <div className="overflow-hidden rounded-md bg-white shadow-card">
       {/* Header */}
       <div className="flex items-start gap-3 border-b border-ink/10 bg-purple-light/60 px-5 py-4 sm:px-6">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple/15 text-purple">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-purple/15 text-purple">
           <Calculator className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
@@ -145,7 +153,7 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
                 type="button"
                 aria-pressed={section === s}
                 onClick={() => pickSection(s)}
-                className={`min-h-[44px] rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+                className={`min-h-[44px] rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                   section === s ? 'bg-purple text-white' : 'bg-cream text-muted hover:text-ink'
                 }`}
               >
@@ -164,7 +172,7 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
                   type="button"
                   aria-pressed={modality === key}
                   onClick={() => pickModality(key)}
-                  className={`min-h-[44px] flex-1 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
+                  className={`min-h-[44px] flex-1 rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
                     modality === key ? 'bg-purple text-white' : 'bg-cream text-muted hover:text-ink'
                   }`}
                 >
@@ -233,7 +241,7 @@ export function CostEstimator({ copy }: { copy?: Partial<EstimatorCopy> } = {}) 
         )}
         <CmsAnchor
           link={{ href: c.allHref }}
-          className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           {t(c.allLabel)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </CmsAnchor>

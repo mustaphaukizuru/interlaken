@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatMXN } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { STUDENTS_ENTITY, STUDENTS_RELATED } from '@/hooks/queries/studentKeys';
@@ -200,7 +201,7 @@ export function buildChecks(h: SyncHealth): Check[] {
         : drifting === 0
           ? `${audit.compared} alumno(s) comparados ${ago(audit.at)}`
             + (audit.deferred > 0 ? `; ${audit.deferred} en espera por movimientos recientes.` : '.')
-          : `Diferencia total $${driftTotal.toFixed(2)} (${ago(audit.at)}). Si persiste después del `
+          : `Diferencia total ${formatMXN(driftTotal)} (${ago(audit.at)}). Si persiste después del `
             + 'repaso nocturno, revise la pestaña Reconciliación.',
     },
     {
@@ -326,7 +327,7 @@ export function SyncHealthPanel() {
   if (isError && !data) {
     return (
       <section aria-label="Estado de la sincronización" className="mb-4">
-        <div className={`flex flex-wrap items-start justify-between gap-2 rounded-xl border px-3 py-2.5 ${TONE.bad}`} role="alert">
+        <div className={`flex flex-wrap items-start justify-between gap-2 rounded-md border px-3 py-2.5 ${TONE.bad}`} role="alert">
           <div className="flex min-w-0 items-start gap-2.5">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
@@ -373,7 +374,7 @@ export function SyncHealthPanel() {
         {checks.map((c) => {
           const Icon = c.tone === 'ok' ? CheckCircle2 : c.icon;
           return (
-            <li key={c.key} className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${TONE[c.tone]}`}>
+            <li key={c.key} className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 ${TONE[c.tone]}`}>
               <Icon size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold">{c.label}</p>
@@ -409,15 +410,15 @@ function RosterPreview({ report }: { report: RosterSyncReport }) {
     <div className="space-y-3 text-sm">
       <p className="text-muted">Vista previa: todavía no se ha escrito nada. Esto es lo que cambiaría al aplicar.</p>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Resumen de la vista previa">
-        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.created}</span><span className="text-xs text-subtle">alta(s)</span></li>
-        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.updated}</span><span className="text-xs text-subtle">actualizado(s)</span></li>
-        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.renamed}</span><span className="text-xs text-subtle">nombre(s)</span></li>
-        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.linked}</span><span className="text-xs text-subtle">vínculo(s)</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.created}</span><span className="text-xs text-subtle">alta(s)</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.updated}</span><span className="text-xs text-subtle">actualizado(s)</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.renamed}</span><span className="text-xs text-subtle">nombre(s)</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.linked}</span><span className="text-xs text-subtle">vínculo(s)</span></li>
       </ul>
       {s.possible_leavers > 0 && <p className="text-xs text-amber">{s.possible_leavers} alumno(s) sin grado en Loyverse (posible baja): no se dan de baja automáticamente.</p>}
       {nothing && <p className="text-xs text-subtle">No hay cambios pendientes: el roster ya coincide con Loyverse.</p>}
       {changes.length > 0 && (
-        <ul className="max-h-48 divide-y divide-line/60 overflow-y-auto rounded-lg border border-line text-xs" aria-label="Cambios">
+        <ul className="max-h-48 divide-y divide-line/60 overflow-y-auto rounded-sm border border-line text-xs" aria-label="Cambios">
           {changes.slice(0, 50).map((c, i) => (
             <li key={`${c.matricula}-${c.field}-${i}`} className="flex flex-wrap justify-between gap-2 px-2 py-1.5">
               <span className="min-w-0 truncate"><strong>{c.matricula}</strong> {c.name} · {c.field}</span>

@@ -27,7 +27,7 @@ interface Props {
 }
 
 const ACTION_BTN =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[36px]';
 
 /**
  * Appears as soon as one row is selected (Data Ops round, C5): the count,
@@ -49,7 +49,7 @@ export function BulkActionBar({
     <div
       role="region"
       aria-label="Acciones en lote"
-      className="fixed inset-x-0 bottom-0 z-40 mb-0 flex flex-wrap items-center gap-2 border-t border-brand-200 bg-brand-50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(16,12,40,0.25)] sm:sticky sm:top-0 sm:z-20 sm:mb-3 sm:rounded-xl2 sm:border sm:pb-3 sm:shadow-none"
+      className="fixed inset-x-0 bottom-0 z-dropdown mb-0 flex flex-wrap items-center gap-2 border-t border-brand-200 bg-brand-50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(16,12,40,0.25)] sm:sticky sm:top-0 sm:z-sticky sm:mb-3 sm:rounded-md sm:border sm:pb-3 sm:shadow-none"
     >
       <p className="text-sm text-brand-700" aria-live="polite">
         <strong className="font-semibold text-ink">{count.toLocaleString('es-MX')}</strong>{' '}
@@ -99,7 +99,7 @@ export function BulkActionBar({
                       role="menuitem"
                       type="button"
                       onClick={() => { close(); onAction?.(a); }}
-                      className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-cream-2 ${a.danger ? 'text-coral-700' : 'text-ink'}`}
+                      className={`flex min-h-[44px] w-full items-center gap-2 rounded-sm px-3 text-left text-sm hover:bg-cream-2 ${a.danger ? 'text-coral-700' : 'text-ink'}`}
                     >
                       {Icon && <Icon size={15} aria-hidden="true" />}
                       {a.label}
@@ -120,7 +120,7 @@ export function BulkActionBar({
           type="button"
           onClick={onClear}
           aria-label="Limpiar selección"
-          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full px-2 text-sm font-medium text-muted hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px] sm:min-w-[36px]"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-sm px-2 text-sm font-medium text-muted hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[36px] sm:min-w-[36px]"
         >
           <X size={16} aria-hidden="true" />
           <span className="hidden sm:inline">Limpiar</span>

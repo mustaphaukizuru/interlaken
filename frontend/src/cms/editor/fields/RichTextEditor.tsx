@@ -118,7 +118,7 @@ export function RichTextEditor({ id, label, required, hint, error, warning, onBl
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !linking) { setFocused(false); onBlur?.(); } }}
     >
       <FieldLabel id={labelId} htmlFor={id} label={label} required={required} />
-      <div className={`overflow-hidden rounded-xl border bg-white ${error ? 'border-coral-400' : 'border-line'} focus-within:border-purple/60 focus-within:ring-2 focus-within:ring-purple/15`}>
+      <div className={`overflow-hidden rounded-md border bg-white ${error ? 'border-coral-400' : 'border-line'} focus-within:border-purple/60 focus-within:ring-2 focus-within:ring-purple/15`}>
         <div role="toolbar" aria-label={`Formato de ${label}`} aria-controls={id} className="flex flex-wrap gap-0.5 border-b border-line bg-cream-2/70 p-1">
           {tools.map(({ key, label: tl, Icon }) => (
             <button
@@ -130,7 +130,7 @@ export function RichTextEditor({ id, label, required, hint, error, warning, onBl
               // Keep the selection in the text while clicking a tool.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => (key === 'link' ? (saveRange(), setLinking({ href: currentLink()?.getAttribute('href') ?? '' })) : run(key))}
-              className={`flex h-11 w-11 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${active[key] ? 'bg-purple/15 text-purple' : 'text-ink hover:bg-white'}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-sm sm:h-9 sm:w-9 ${active[key] ? 'bg-purple/15 text-purple' : 'text-ink hover:bg-white'}`}
             >
               {key === 'link' && active.link ? <Unlink size={16} aria-hidden="true" /> : <Icon size={16} aria-hidden="true" />}
             </button>

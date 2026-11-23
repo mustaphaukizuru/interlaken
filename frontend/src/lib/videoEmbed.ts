@@ -11,6 +11,23 @@ export interface ParsedVideo {
   embedUrl: string;
   /** Poster for the click-to-load placeholder; null when not derivable (Vimeo). */
   thumbnailUrl: string | null;
+  /**
+   * Silent looping preview for sections that autoplay: muted, inline, no
+   * controls, with the player's postMessage API on so the page can pause it
+   * off screen (see playerCommand).
+   */
+  previewUrl: string;
+  /** The player's origin: target for postMessage commands. */
+  origin: string;
+}
+
+/**
+ * A play/pause command for the embedded player (YouTube needs enablejsapi=1,
+ * Vimeo listens by default). Post it to the iframe with `origin` as target.
+ */
+export function playerCommand(provider: ParsedVideo['provider'], action: 'play' | 'pause'): string {
+  if (provider === 'vimeo') return JSON.stringify({ method: action });
+  return JSON.stringify({ event: 'command', func: action === 'play' ? 'playVideo' : 'pauseVideo', args: [] });
 }
 
 /** YouTube IDs are 11 chars today; accept a small range to be future-safe. */
@@ -47,6 +64,9 @@ export function parseVideoUrl(raw: string): ParsedVideo | null {
       id: ytId,
       embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`,
       thumbnailUrl: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`,
+      // loop needs playlist=<id>; rel=0 keeps the end screen to the same channel.
+      previewUrl: `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&playsinline=1&loop=1&playlist=${ytId}&controls=0&disablekb=1&rel=0&iv_load_policy=3&enablejsapi=1`,
+      origin: 'https://www.youtube-nocookie.com',
     };
   }
 
@@ -58,6 +78,9 @@ export function parseVideoUrl(raw: string): ParsedVideo | null {
         id: match[1],
         embedUrl: `https://player.vimeo.com/video/${match[1]}?autoplay=1&dnt=1`,
         thumbnailUrl: null,
+        // background=1: autoplay, muted, looped, no controls.
+        previewUrl: `https://player.vimeo.com/video/${match[1]}?background=1&dnt=1`,
+        origin: 'https://player.vimeo.com',
       };
     }
   }

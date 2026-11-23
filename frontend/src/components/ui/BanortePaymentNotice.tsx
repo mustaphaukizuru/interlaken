@@ -8,7 +8,7 @@ import { Lock } from 'lucide-react';
 export function BanortePaymentNotice() {
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-2 rounded-xl border border-green/30 bg-green-50 px-3 py-2.5 text-xs text-green-700">
+      <div className="flex items-start gap-2 rounded-md border border-green/30 bg-green-50 px-3 py-2.5 text-xs text-green-700">
         <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span>
           Se abrirá la ventana <strong>segura de Banorte</strong> para capturar tu tarjeta Visa o Mastercard; tu banco

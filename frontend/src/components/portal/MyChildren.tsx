@@ -73,7 +73,7 @@ export function MyChildren() {
 
       {!adding ? (
         data.can_add && (
-          <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-cream-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-3 rounded-md bg-cream-2 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-ink">
               ¿Tiene otro hijo en el Colegio Interlaken?
               <span className="block text-xs text-muted">Agréguelo aquí para ver su saldo, recargar y recibir sus avisos desde esta misma cuenta.</span>
@@ -136,7 +136,7 @@ function AddChild({ onCancel, onDone }: { onCancel: () => void; onDone: (name: s
   if (!sent) {
     return (
       <form
-        className="mt-4 space-y-4 rounded-2xl border border-line p-4"
+        className="mt-4 space-y-4 rounded-md border border-line p-4"
         onSubmit={(e) => { e.preventDefault(); if (student.trim()) send.mutate(); }}
         aria-labelledby={`${studentId}-title`}
       >
@@ -166,12 +166,12 @@ function AddChild({ onCancel, onDone }: { onCancel: () => void; onDone: (name: s
   const digits = code.replace(/\D/g, '');
   return (
     <form
-      className="mt-4 space-y-4 rounded-2xl border border-line p-4"
+      className="mt-4 space-y-4 rounded-md border border-line p-4"
       onSubmit={(e) => { e.preventDefault(); if (digits.length === 6) confirm.mutate(); }}
       aria-labelledby={`${codeId}-title`}
     >
       <h3 id={`${codeId}-title`} className="font-semibold text-ink">Escriba el código</h3>
-      <div className="flex gap-3 rounded-xl bg-brand-50 px-3 py-3 text-sm text-brand-700" role="status">
+      <div className="flex gap-3 rounded-md bg-brand-50 px-3 py-3 text-sm text-brand-700" role="status">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
         <p>
           Enviamos un código a <strong>{sent.sent_to.join(', ')}</strong>, el correo de{' '}

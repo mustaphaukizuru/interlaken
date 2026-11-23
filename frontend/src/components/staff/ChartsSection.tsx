@@ -4,7 +4,7 @@ import { ClipboardList, Megaphone, Receipt } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StaffCard } from '@/components/staff/StaffShell';
 import { fmtDay, fmtInt, fmtMXN, fmtMXNCompact, getChartTheme } from '@/lib/chartTheme';
-import { usePrefersDark, useReducedMotion } from '@/hooks/useMediaQuery';
+import { useReducedMotion } from '@/hooks/useMediaQuery';
 import { useChartEntrance } from '@/hooks/useChartEntrance';
 import type { AnalyticsPayload } from '@/types/analytics';
 
@@ -23,8 +23,8 @@ import type { AnalyticsPayload } from '@/types/analytics';
 const AXIS_FONT = 11;
 
 function useTheme() {
-  const dark = usePrefersDark();
-  return { theme: getChartTheme(dark), reduced: useReducedMotion() };
+  // Light theme only (the app has no dark mode): never follow the OS setting.
+  return { theme: getChartTheme(false), reduced: useReducedMotion() };
 }
 
 function tooltipStyle(theme: ReturnType<typeof getChartTheme>) {
@@ -214,7 +214,7 @@ function CafeteriaChart({ data }: { data: AnalyticsPayload }) {
       ) : (
         <>
           {/* Direct labels (no legend): series named inline, color-matched. */}
-          <p className="mb-2 text-xs text-muted dark:text-white/60" aria-hidden="true">
+          <p className="mb-2 text-xs text-muted" aria-hidden="true">
             <span className="font-semibold" style={{ color: theme.semantic.inflow }}>■ Recargas</span>
             <span className="mx-2">·</span>
             <span className="font-semibold" style={{ color: theme.semantic.outflow }}>■ Consumo</span>

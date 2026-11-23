@@ -64,7 +64,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await page.goto(`${link.pathname}${link.search}`);
 
   // ── 1 · Alumno ─────────────────────────────────────────────────────────
-  await expect(page.getByRole('heading', { level: 2, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
+  await expect(page.getByRole('heading', { level: 1, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
   await expect(page.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(page).toHaveURL(/\/pre-registro$/); // the token left the address bar
   // The phone's action bar floats at the bottom of the screen; the WhatsApp bubble steps aside.
@@ -108,7 +108,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   const context = await browser.newContext({ viewport: PHONE, serviceWorkers: 'block' });
   const later = await context.newPage();
   await later.goto(`${again.pathname}${again.search}`);
-  await expect(later.getByRole('heading', { level: 2, name: 'Paso 4 de 7: Información del padre' })).toBeFocused();
+  await expect(later.getByRole('heading', { level: 1, name: 'Paso 4 de 7: Información del padre' })).toBeFocused();
   await expect(later.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(later).toHaveURL(/\/pre-registro$/); // the token left the address bar
   await shot(later, '04-padre');
@@ -144,7 +144,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await later.getByLabel('Nombre completo de quien firma').fill('Marta Prueba Gil');
   await shot(later, '07-revision');
   await later.getByRole('button', { name: 'Enviar la ficha de inscripción' }).click();
-  await expect(later.getByRole('heading', { level: 2, name: 'Recibimos su ficha de inscripción' })).toBeVisible();
+  await expect(later.getByRole('heading', { level: 1, name: 'Recibimos su ficha de inscripción' })).toBeVisible();
   await shot(later, '08-enviada');
   // No horizontal scroll on the phone, at any step we passed.
   expect(await later.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);

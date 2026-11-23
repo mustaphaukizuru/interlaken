@@ -10,6 +10,7 @@ import admisiones from '@/cms/sections/admisiones';
 
 vi.mock('@/services/api', () => ({ contentApi: { getPricing: vi.fn(), getSettings: vi.fn(() => new Promise(() => {})) } }));
 import { contentApi } from '@/services/api';
+import { SITE_DEFAULTS } from '@/lib/siteContact';
 
 const BUNDLE = {
   enrollment_fees: [
@@ -27,8 +28,15 @@ const BUNDLE = {
   ],
 };
 
+/** Site settings with these published price years (and the January rule). */
+function settingsWith(years: Record<string, number>) {
+  vi.mocked(contentApi.getSettings).mockResolvedValue({ data: { ...SITE_DEFAULTS, admissions_next_from_month: 1, pricing_years: years } } as never);
+}
+
 beforeEach(() => {
   vi.mocked(contentApi.getPricing).mockResolvedValue({ data: BUNDLE } as never);
+  const y = new Date().getFullYear();
+  settingsWith({ fees: y + 1, tuition: y + 1, insurance: y, extras: y, daycare: y });
 });
 
 describe('policy highlighting', () => {
@@ -72,39 +80,50 @@ describe('PricingSections copy', () => {
     expect(screen.getByText(/devoluciones/)).toHaveClass('text-muted');
   });
 
-  it('marks each card with the year of its prices; an edited badge shows, an empty one hides', async () => {
+  // Years relative to today, so the tests hold every year: Y = the cycle the site announces now.
+  const Y = new Date().getFullYear();
+
+  it('marks each card with the year the administration published it for', async () => {
     renderWithProviders(<PricingSections />);
     await screen.findByRole('table', { name: /Nuevo ingreso/ });
-    // Inscripción and colegiaturas: 2027 (school price sheet, 2026-11); the other three cards: 2026.
-    expect(screen.getAllByText('Precios 2027')).toHaveLength(2);
-    expect(screen.getAllByText('Precios 2026')).toHaveLength(3);
+    // The 2026-11 price sheet shape: inscripción and colegiaturas already next year's, the other three this year's.
+    expect(await screen.findAllByText(`Precios ${Y + 1}`)).toHaveLength(2);
+    expect(screen.getAllByText(`Precios ${Y}`)).toHaveLength(3);
     const tuitionCard = screen.getByRole('heading', { name: 'Colegiaturas' }).parentElement!;
-    expect(within(tuitionCard).getByText('Precios 2027')).toBeInTheDocument();
+    expect(within(tuitionCard).getByText(`Precios ${Y + 1}`)).toBeInTheDocument();
   });
 
-  it('marks the cards without next-year prices as pending, and only those', async () => {
+  it('marks the groups still on an older year as pending, and only those', async () => {
     renderWithProviders(<PricingSections />);
     await screen.findByRole('table', { name: /Nuevo ingreso/ });
-    // Seguros, extraescolares and estancia keep their 2026 prices with a «pendientes» status.
-    expect(screen.getAllByText('Precios 2027: pendientes')).toHaveLength(3);
+    expect(await screen.findAllByText(`Precios ${Y + 1}: pendientes`)).toHaveLength(3);
     const insurance = screen.getByRole('heading', { name: 'Seguros y credenciales' }).parentElement!;
-    expect(within(insurance).getByText('Precios 2026')).toBeInTheDocument();
-    expect(within(insurance).getByText('Precios 2027: pendientes')).toBeInTheDocument();
+    expect(within(insurance).getByText(`Precios ${Y}`)).toBeInTheDocument();
+    expect(within(insurance).getByText(`Precios ${Y + 1}: pendientes`)).toBeInTheDocument();
     const tuition = screen.getByRole('heading', { name: 'Colegiaturas' }).parentElement!;
     expect(within(tuition).queryByText(/pendientes/)).not.toBeInTheDocument();
   });
 
-  it('hides the pending status once it is emptied in Contenido', async () => {
-    renderWithProviders(<PricingSections copy={{ insurancePending: '', extrasPending: '', daycarePending: '' }} />);
+  it('nothing is pending once every group is published for the cycle shown', async () => {
+    settingsWith({ fees: Y + 1, tuition: Y + 1, insurance: Y + 1, extras: Y + 1, daycare: Y + 1 });
+    renderWithProviders(<PricingSections />);
     await screen.findByRole('table', { name: /Nuevo ingreso/ });
+    expect(await screen.findAllByText(`Precios ${Y + 1}`)).toHaveLength(5);
     expect(screen.queryByText(/pendientes/)).not.toBeInTheDocument();
   });
 
-  it('hides a badge left empty and shows an edited one', async () => {
-    renderWithProviders(<PricingSections copy={{ feesYear: '', tuitionYear: 'Ciclo {{ciclo}}', insuranceYear: '', extrasYear: '', daycareYear: '', insurancePending: '', extrasPending: '', daycarePending: '' }} />);
+  it('a new year with no new prices published: every group says pending, nothing moves by itself', async () => {
+    settingsWith({ fees: Y - 1, tuition: Y - 1, insurance: Y - 1, extras: Y - 1, daycare: Y - 1 });
+    renderWithProviders(<PricingSections />);
     await screen.findByRole('table', { name: /Nuevo ingreso/ });
-    expect(screen.queryByText(/^Precios 20/)).not.toBeInTheDocument();
-    expect(screen.getByText(/^Ciclo 20\d\d/)).toBeInTheDocument();
+    expect(await screen.findAllByText(`Precios ${Y}: pendientes`)).toHaveLength(5);
+    expect(screen.getAllByText(`Precios ${Y - 1}`)).toHaveLength(5);
+  });
+
+  it('the stored «Precios 2027» texts of older drafts are ignored', async () => {
+    renderWithProviders(<PricingSections copy={{ feesYear: 'Precios 1999', insurancePending: 'Precios 1999: pendientes' } as never} />);
+    await screen.findByRole('table', { name: /Nuevo ingreso/ });
+    expect(screen.queryByText(/1999/)).not.toBeInTheDocument();
   });
 
   it('shows the edited error message', async () => {
@@ -158,5 +177,21 @@ describe('section specs', () => {
     const prices = costos.sections.find((s) => s.type === 'costos.prices')!;
     const groups = new Set(prices.fields.map((f) => f.group).filter(Boolean));
     expect([...groups]).toEqual(['Cómo se paga', 'Inscripción y reinscripción', 'Colegiaturas', 'Seguros y credenciales', 'Extraescolares', 'Estancia', 'Políticas de pago', 'Nota al final de las tablas', 'Llamado final', 'Si no hay precios o no cargan']);
+  });
+});
+
+describe('estimator price note', () => {
+  const Y = new Date().getFullYear();
+
+  it('says which year each figure uses and which are pending', async () => {
+    renderWithProviders(<CostEstimator />);
+    expect(await screen.findByText(`Inscripción y colegiatura con precios ${Y + 1}; seguros y credenciales con precios ${Y} (los de ${Y + 1} están pendientes).`)).toBeInTheDocument();
+  });
+
+  it('a note typed by hand with a price year gives way to the automatic one', async () => {
+    renderWithProviders(<CostEstimator copy={{ notes: [{ text: 'Inscripción con precios 2025.', tone: 'purple' }, { text: 'Otra nota.', tone: 'purple' }] }} />);
+    expect(await screen.findByText('Otra nota.')).toBeInTheDocument();
+    expect(screen.queryByText('Inscripción con precios 2025.')).not.toBeInTheDocument();
+    expect(screen.getByText(/están pendientes\)\.$/)).toBeInTheDocument();
   });
 });

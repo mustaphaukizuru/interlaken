@@ -75,7 +75,25 @@ const ROUTE_BUDGET_OVERRIDES = {
   // console page's lazy() stub and <Route> sits in the entry chunk the public
   // home also loads (~60 stubs today). Follow-up that reclaims more than this:
   // move the /admin route tree into one lazily loaded module.
-  '/': { budgetKb: 171, reason: 'intentional framer-motion animations (~30 kB gz) + admin route table in the entry chunk' },
+  // 2026-11-21 (+1 kB, PENDING OWNER REVIEW in the UX refinement PR): master
+  // 170.7 kB → 171.1 kB. The +0.4 kB is the public footer from UX Phase 5
+  // (44px tap targets, one contact list shared by the phone accordion and the
+  // desktop column, print rules, the region heading), all in PublicLayout in
+  // the entry chunk. The same structural follow-up above reclaims far more.
+  // 2026-11-22 structural follow-up DONE: the portal, staff and admin route
+  // tables moved out of App.tsx into routes/ConsoleRoutes (one lazy chunk), so
+  // public visitors no longer download them: 172.0 -> 169.3 kB with the new
+  // app-wide scroll manager and «Volver arriba» included. Budget back to 170.
+  '/': { budgetKb: 170, reason: 'intentional framer-motion animations (~30 kB gz)' },
+  // 2026-11-22 (+2 kB, PENDING OWNER REVIEW in the UX refinement PR): media
+  // round. 151.3 kB: the illustrated admission steps, SEP band and FAQ art
+  // (+0.8 kB in the admisiones chunk) and the shared Illustration component
+  // and name list (+1.2 kB, shared by every public page). The labels and the
+  // title matcher stay out (editor-only / illustrationTopics). The same
+  // structural follow-up as '/' (lazy admin route table) reclaims more.
+  // 2026-11-22: the lazy console route table brought /admisiones to 148.7 kB,
+  // back under the default 150 kB, so its +2 kB override is gone.
+
 };
 
 /**

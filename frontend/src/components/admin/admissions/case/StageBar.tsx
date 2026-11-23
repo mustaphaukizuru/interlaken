@@ -67,7 +67,7 @@ export function StageBar({ stage, closedFrom, onJump }: {
                 onClick={() => onJump(s)}
                 aria-current={state === 'current' ? 'step' : undefined}
                 aria-label={`${meta.step}. ${meta.label}: ${STATE_TEXT[state]}`}
-                className="relative z-10 flex min-h-[44px] w-full flex-col items-center gap-1 rounded-xl px-0.5 pb-1 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="relative z-10 flex min-h-[44px] w-full flex-col items-center gap-1 rounded-sm px-0.5 pb-1 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 <span
                   className={clsx(

@@ -1,0 +1,75 @@
+/*
+ * «Volver a la misma fila»: the row (or card) a person opened, softly tinted
+ * for about 2 s when they come back to the list.
+ *
+ * The keyframes leave out the end value on purpose: the tint then fades into
+ * whatever background the row already has (a white phone card, the hover
+ * cream), so there is no snap at the end.
+ *
+ * Pinned cells (index.css: select + first column from md, actions from lg)
+ * paint their own white over the row, so those cells fade too; every other
+ * cell is transparent and shows the row.
+ *
+ * Two identical animations: a second flash on the same row switches between
+ * them, which restarts the fade instead of letting the first one run on.
+ *
+ * Reduced motion: no fade, the tint simply shows and goes (the hook removes
+ * the class after the same 2 s).
+ */
+.flashA {
+  animation: lastOpenedA 2s ease-out;
+}
+
+.flashB {
+  animation: lastOpenedB 2s ease-out;
+}
+
+@media (min-width: 768px) {
+  :global(.admin-table--pin-first) .flashA > td:global(.admin-table__select),
+  :global(.admin-table--pin-first) .flashA > td:global(.admin-table__pin) {
+    animation: lastOpenedA 2s ease-out;
+  }
+
+  :global(.admin-table--pin-first) .flashB > td:global(.admin-table__select),
+  :global(.admin-table--pin-first) .flashB > td:global(.admin-table__pin) {
+    animation: lastOpenedB 2s ease-out;
+  }
+}
+
+@media (min-width: 1024px) {
+  :global(.admin-table--pin-actions) .flashA > td:global(.admin-table__actions) {
+    animation: lastOpenedA 2s ease-out;
+  }
+
+  :global(.admin-table--pin-actions) .flashB > td:global(.admin-table__actions) {
+    animation: lastOpenedB 2s ease-out;
+  }
+}
+
+@keyframes lastOpenedA {
+  0%,
+  40% {
+    background-color: theme('colors.brand.200');
+  }
+}
+
+@keyframes lastOpenedB {
+  0%,
+  40% {
+    background-color: theme('colors.brand.200');
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flashA,
+  .flashB,
+  :global(.admin-table--pin-first) .flashA > td:global(.admin-table__select),
+  :global(.admin-table--pin-first) .flashA > td:global(.admin-table__pin),
+  :global(.admin-table--pin-first) .flashB > td:global(.admin-table__select),
+  :global(.admin-table--pin-first) .flashB > td:global(.admin-table__pin),
+  :global(.admin-table--pin-actions) .flashA > td:global(.admin-table__actions),
+  :global(.admin-table--pin-actions) .flashB > td:global(.admin-table__actions) {
+    animation: none;
+    background-color: theme('colors.brand.200') !important;
+  }
+}
