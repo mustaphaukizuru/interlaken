@@ -4,7 +4,9 @@ import { useAppBadge } from '@/hooks/useAppBadge';
 import { useBadges } from '@/hooks/useBadges';
 import { OfflineBanner } from '@/components/portal/OfflineBanner';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { BackToTop } from './BackToTop';
+import { releaseScrollRoot, setScrollRoot } from '@/lib/scrollRoot';
 import Sidebar from './Sidebar';
 import AppHeader from './AppHeader';
 import MobileTabBar from './MobileTabBar';
@@ -92,11 +94,15 @@ function PortalShell({ role }: Props) {
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
-  // Only the content column scrolls (the sidebar + header stay fixed), so reset
-  // it to the top on each navigation — otherwise a new page opens mid-scroll.
+  // Only the content column scrolls (the sidebar + header stay fixed). The
+  // app-wide ScrollManager moves it: top on a new page, the same spot on Back.
   const scrollRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
-  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [pathname]);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    setScrollRoot(el);
+    return () => releaseScrollRoot(el);
+  }, []);
 
   // Announce the current page in the tab title on each portal navigation.
   useEffect(() => {
@@ -169,6 +175,8 @@ function PortalShell({ role }: Props) {
 
         {/* Staff analytics is a single-route surface — no bottom tab bar. */}
         {role !== 'staff' && <MobileTabBar role={role} />}
+        {/* Above the phone tab bar (64 px + the home-indicator inset). */}
+        <BackToTop className={role !== 'staff' ? 'right-4 bottom-[calc(80px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6' : 'right-4 bottom-4 lg:bottom-6 lg:right-6'} />
         </div>
       </div>
     </MobileNavContext.Provider>

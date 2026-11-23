@@ -11,6 +11,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { MenuGroup } from '@/types/content';
 import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
+import { BackToTop } from '@/components/layout/BackToTop';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { isExternalHref, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteTexts, withYear, type ChromeButton } from '@/lib/siteChrome';
@@ -333,7 +334,7 @@ export function PublicLayout() {
           section (card photos, the round extracurricular photos) paints over
           the bar. The stronger shadow keeps its edge visible over white
           sections. */}
-      <header className="sticky top-0 z-header border-b border-line bg-white shadow-md print:hidden">
+      <header data-sticky-header="" className="sticky top-0 z-header border-b border-line bg-white shadow-md print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
@@ -492,6 +493,16 @@ export function PublicLayout() {
 
       {/* Floating WhatsApp bubble — right side, every public page. */}
       <WhatsAppFloat stickyCtaVisible={showStickyCta} />
+      {/* «Volver arriba» sits above the phone bar or the WhatsApp bubble (centred on it). */}
+      <BackToTop
+        className={`${
+          showStickyCta
+            ? 'right-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4rem)]'
+            : settings.whatsapp_number
+              ? 'right-[1.375rem] bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.25rem)]'
+              : 'right-4 bottom-[max(1rem,env(safe-area-inset-bottom))]'
+        } ${settings.whatsapp_number ? 'md:right-[1.875rem] md:bottom-[5.75rem]' : 'md:right-6 md:bottom-6'} max-[767px]:[html[data-ficha-steps]_&]:hidden`}
+      />
 
       {/* Footer */}
       <footer

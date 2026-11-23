@@ -133,6 +133,10 @@
   }
   .skip-link:focus { transform: translateY(0); }
 
+  /* The page title takes the focus after each page change (ScrollManager), so
+     screen readers announce the new page. A heading is not a control: no ring. */
+  [data-route-focus]:focus { outline: none; }
+
   /* Portal/console frame: a box that clips and can never be scrolled, not even
      by focus(), scrollIntoView() or a skip link (`hidden` can be). `hidden`
      first for browsers without `clip` (Safari < 16). */
