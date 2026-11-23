@@ -5,6 +5,24 @@ import { assetSrcSet } from '@/lib/images';
 const SOUND_KEY = 'interlaken:hero-sound';
 
 /**
+ * Portrait phone cuts of the built-in hero loops (2026-11-23). On a portrait
+ * phone the cover crop shows only the centre ~30% of a 16:9 clip, so the phone
+ * gets just that strip (406 x 720, ~0.3 MB instead of ~1 MB): sharper, a third
+ * of the data, and never a larger paint than the poster, which stays the LCP.
+ * A URL from Ajustes (no cut) plays as it is.
+ */
+const PORTRAIT_CUTS: Record<string, string> = {
+  '/assets/video/hero-home.mp4': '/assets/video/hero-home-portrait.mp4',
+};
+
+/** The file to play here: the portrait cut on a portrait phone, else the source. */
+export function videoForScreen(src: string): string {
+  const cut = PORTRAIT_CUTS[src];
+  if (!cut || typeof window.matchMedia !== 'function') return src;
+  return window.matchMedia('(orientation: portrait) and (max-width: 767px)').matches ? cut : src;
+}
+
+/**
  * True when the visitor asked us not to spend their data: Save-Data header,
  * a 2g/3g connection, or reduced motion. Those visitors keep the poster image.
  */
@@ -124,7 +142,7 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
         <video
           ref={videoRef}
           className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 ${ready ? 'opacity-100' : 'opacity-0'}`}
-          src={src}
+          src={videoForScreen(src)}
           poster={poster}
           autoPlay
           muted
