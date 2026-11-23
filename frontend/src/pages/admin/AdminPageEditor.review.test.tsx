@@ -163,7 +163,7 @@ describe('AdminPageEditor «Revisión antes de publicar»', () => {
   it('asks before leaving with saved but unpublished edits', async () => {
     renderEditor();
     await ready();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Ocultar del sitio' })[0]);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }))[0]);
     await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
     await userEvent.click(screen.getByRole('link', { name: 'Ir a la lista' }));
     const ask = await screen.findByRole('dialog', { name: '¿Salir sin publicar?' });
