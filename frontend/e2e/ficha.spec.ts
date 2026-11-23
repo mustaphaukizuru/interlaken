@@ -144,7 +144,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await later.getByLabel('Nombre completo de quien firma').fill('Marta Prueba Gil');
   await shot(later, '07-revision');
   await later.getByRole('button', { name: 'Enviar la ficha de inscripción' }).click();
-  await expect(later.getByRole('heading', { level: 2, name: 'Recibimos su ficha de inscripción' })).toBeVisible();
+  await expect(later.getByRole('heading', { level: 1, name: 'Recibimos su ficha de inscripción' })).toBeVisible();
   await shot(later, '08-enviada');
   // No horizontal scroll on the phone, at any step we passed.
   expect(await later.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);

@@ -183,7 +183,7 @@ test('the office takes a prospect from the first call to «Inscrito»', async ({
     await f.getByLabel(/He leído y acepto el Aviso de Privacidad/).check();
     await f.getByLabel('Nombre completo de quien firma').fill('Marta Prueba Gil');
     await f.getByRole('button', { name: 'Enviar la ficha de inscripción' }).click();
-    await expect(f.getByRole('heading', { level: 2, name: 'Recibimos su ficha de inscripción' })).toBeVisible();
+    await expect(f.getByRole('heading', { level: 1, name: 'Recibimos su ficha de inscripción' })).toBeVisible();
     expect(await f.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
     await family.close();
 

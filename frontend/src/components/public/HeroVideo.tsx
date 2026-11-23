@@ -104,10 +104,15 @@ export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion,
 
   return (
     <section ref={wrapRef} className={`relative flex items-end overflow-hidden bg-dark text-white ${className}`}>
+      {/* `sizes`: the poster covers a tall box on a portrait phone, so it renders
+          about 1.65 screen heights wide, not 100vw. With 100vw the phone took the
+          480/960 px file, the browser saw an upscaled (small) image and the 1920 px
+          video's first frame became the larger paint: mobile LCP waited for the
+          whole video (Lighthouse 12.5 s). The full poster is ~80 kB. */}
       <img
         src={poster}
         srcSet={posterSrcSet ?? assetSrcSet(poster, { full: true })}
-        sizes="100vw"
+        sizes="(orientation: portrait) 165vh, 100vw"
         alt={posterAlt}
         {...{ fetchpriority: 'high' }}
         decoding="async"

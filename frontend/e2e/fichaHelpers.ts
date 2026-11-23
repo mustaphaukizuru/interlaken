@@ -34,7 +34,7 @@ export async function choose(page: Page, name: string | RegExp) {
 /** «Guardar y continuar», then the next step's heading takes the focus. */
 export async function next(page: Page, heading: string) {
   await page.getByRole('button', { name: 'Guardar y continuar', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 2, name: heading })).toBeFocused();
+  await expect(page.getByRole('heading', { level: 1, name: heading })).toBeFocused();
 }
 
 /** The dev administrator's JWT, as request headers. */

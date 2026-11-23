@@ -1,7 +1,9 @@
 /**
  * preload-lcp.js — kick off the home-page hero fetch before the SPA boots.
  *
- * The hero (/assets/court-wide.webp, ~144 kB) is the LCP element of "/", but
+ * The hero poster (/assets/hero-home.webp, ~80 kB, the first frame of the
+ * hero video; it was court-wide.webp before the 2026-11-22 media round) is
+ * the LCP element of "/", but
  * as a React-rendered <img> it is only discovered after index/vendor download
  * and execute. Injecting a high-priority preload at HTML-parse time starts the
  * image download in parallel with the JS instead. Route-conditional so portal
@@ -9,7 +11,9 @@
  *
  * Lives in its own file (loaded with `defer` from index.html) because the
  * public CSP is `script-src 'self'` — inline scripts are blocked. Keep the
- * href in sync with the hero <img> in src/pages/public/HomePage.tsx.
+ * href and `imagesizes` in sync with the poster <img> in
+ * src/components/public/HeroVideo.tsx and the home hero default in
+ * src/cms/sections/home.tsx.
  */
 (function () {
   // Fonts: the stylesheet is only preloaded in index.html so it cannot block
@@ -26,11 +30,11 @@
   var link = document.createElement('link');
   link.rel = 'preload';
   link.as = 'image';
-  link.href = '/assets/court-wide.webp';
-  // Same candidates as the hero <img> srcSet (lib/images.ts) so the browser
-  // preloads the size it will actually render instead of two files.
-  link.setAttribute('imagesrcset', '/assets/court-wide-480.webp 480w, /assets/court-wide-960.webp 960w, /assets/court-wide.webp 1600w');
-  link.setAttribute('imagesizes', '100vw');
+  link.href = '/assets/hero-home.webp';
+  // Same candidates and sizes as the poster <img> (lib/images.ts, HeroVideo)
+  // so the browser preloads the file it will actually render, once.
+  link.setAttribute('imagesrcset', '/assets/hero-home-480.webp 480w, /assets/hero-home-960.webp 960w, /assets/hero-home.webp 1600w');
+  link.setAttribute('imagesizes', '(orientation: portrait) 165vh, 100vw');
   link.fetchPriority = 'high';
   document.head.appendChild(link);
 

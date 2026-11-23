@@ -62,7 +62,9 @@ function NivelHeroView(p: HeroProps) {
       <img
         src={image.src}
         srcSet={image.srcSet}
-        sizes="100vw"
+        // Covers a box wider than the phone (object-cover): ask for the size it
+        // really renders, so the photo (not the video's first frame) stays the LCP.
+        sizes="(orientation: portrait) 90vh, 100vw"
         alt=""
         width={1600}
         height={900}
