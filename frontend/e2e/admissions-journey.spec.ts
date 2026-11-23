@@ -151,7 +151,7 @@ test('the office takes a prospect from the first call to «Inscrito»', async ({
     const family = await browser.newContext({ viewport: PHONE, serviceWorkers: 'block' });
     const f = await family.newPage();
     await f.goto(`${fichaUrl.pathname}${fichaUrl.search}`);
-    await expect(f.getByRole('heading', { level: 2, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
+    await expect(f.getByRole('heading', { level: 1, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
     await expect(f.getByLabel('Apellido paterno')).toHaveValue(surname);
     await f.getByLabel('CURP', { exact: true }).fill(CHILD_CURP);
     await expect(f.getByLabel('Fecha de nacimiento')).toHaveValue(CHILD_DOB);

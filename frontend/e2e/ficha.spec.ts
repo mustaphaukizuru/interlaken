@@ -64,7 +64,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await page.goto(`${link.pathname}${link.search}`);
 
   // ── 1 · Alumno ─────────────────────────────────────────────────────────
-  await expect(page.getByRole('heading', { level: 2, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
+  await expect(page.getByRole('heading', { level: 1, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
   await expect(page.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(page).toHaveURL(/\/pre-registro$/); // the token left the address bar
   // The phone's action bar floats at the bottom of the screen; the WhatsApp bubble steps aside.
@@ -108,7 +108,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   const context = await browser.newContext({ viewport: PHONE, serviceWorkers: 'block' });
   const later = await context.newPage();
   await later.goto(`${again.pathname}${again.search}`);
-  await expect(later.getByRole('heading', { level: 2, name: 'Paso 4 de 7: Información del padre' })).toBeFocused();
+  await expect(later.getByRole('heading', { level: 1, name: 'Paso 4 de 7: Información del padre' })).toBeFocused();
   await expect(later.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(later).toHaveURL(/\/pre-registro$/); // the token left the address bar
   await shot(later, '04-padre');
