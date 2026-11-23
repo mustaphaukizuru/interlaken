@@ -211,3 +211,39 @@ def test_published_head_follows_publish_and_unpublish(admin_user):
     assert head['title'] == 'Quiénes somos' and head['image'].endswith('/api/v1/content/media/5/lg/')
     page.unpublish(admin_user)
     assert published_head('/nosotros') is None                  # cache busted on unpublish
+
+
+# The published home skips the first-paint shell, so the server preloads the
+# poster its hero really shows (2026-11-23: a stale guess in preload-lcp.js made
+# visitors download a photo the live home never displayed).
+@pytest.mark.django_db
+def test_published_home_preloads_its_own_hero_poster(client, built_site, admin_user):
+    from apps.content.pages import Page
+    page = Page.objects.create(slug='inicio', title='Inicio', draft_blocks=[
+        {'id': 'h', 'type': 'home.hero', 'props': {'title': 'Hola', 'poster': '/assets/court-wide.webp', 'video': ''}},
+    ])
+    page.publish(admin_user)
+    html = client.get('/').content.decode()
+    links = re.findall(r'<link rel="preload" as="image"[^>]*>', html)
+    assert len(links) == 1
+    assert 'href="/assets/court-wide.webp"' in links[0]
+    assert 'imagesrcset="/assets/court-wide-480.webp 480w, /assets/court-wide-960.webp 960w, /assets/court-wide.webp 1600w"' in links[0]
+    assert 'imagesizes="(orientation: portrait) 165vh, 100vw"' in links[0]
+    assert 'data-shell' not in html  # published: no shell, the preload carries the LCP
+
+
+@pytest.mark.django_db
+def test_no_image_preload_without_a_known_poster(client, built_site, admin_user):
+    from apps.content.pages import Page, hero_preload
+    # Not published: the shell carries the poster itself, nothing to preload.
+    assert '<link rel="preload" as="image"' not in client.get('/').content.decode()
+    # A media-library poster (id) or a variant file: the page loads it itself.
+    assert hero_preload([{'type': 'home.hero', 'props': {'poster': 12}}]) is None
+    assert hero_preload([{'type': 'home.hero', 'props': {'poster': '/assets/court-wide-960.webp'}}]) is None
+    # Originals narrower than 960 px have no -960 file (lib/images.ts NO_960).
+    assert hero_preload([{'type': 'home.hero', 'props': {'poster': '/assets/secundaria.webp'}}])['srcset'] == \
+        '/assets/secundaria-480.webp 480w, /assets/secundaria.webp 960w'
+    Page.objects.create(slug='inicio', title='Inicio', draft_blocks=[
+        {'id': 'h', 'type': 'home.hero', 'props': {'title': 'Hola', 'poster': 7}},
+    ]).publish(admin_user)
+    assert '<link rel="preload" as="image"' not in client.get('/').content.decode()

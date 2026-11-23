@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -565,6 +566,32 @@ class PageAdminSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+# Built-in hero photos ship -480/-960 variants (frontend/src/lib/images.ts
+# assetSrcSet); these originals are narrower than 960 px and have none.
+_NO_960 = {'/assets/hopscotch', '/assets/primaria-gate', '/assets/secundaria'}
+_ASSET_WEBP = re.compile(r'^/assets/[^/]+\.webp$')
+# The home hero poster's `sizes` (frontend HeroVideo): it covers a tall box on a portrait phone.
+HOME_HERO_SIZES = '(orientation: portrait) 165vh, 100vw'
+
+
+def hero_preload(blocks) -> dict | None:
+    """A preload for the published home hero's poster, so the browser fetches the
+    LCP image while it parses the HTML (the published page skips the first-paint
+    shell that would otherwise carry it). Only built-in /assets photos, whose
+    candidates are known; a library image is left to the page itself."""
+    for b in blocks if isinstance(blocks, list) else []:
+        if not isinstance(b, dict) or b.get('type') != 'home.hero':
+            continue
+        src = (b.get('props') or {}).get('poster')
+        if not isinstance(src, str) or not _ASSET_WEBP.match(src) or re.search(r'-(480|960)\.webp$', src):
+            return None
+        base = src[:-len('.webp')]
+        srcset = (f'{base}-480.webp 480w, {src} 960w' if base in _NO_960
+                  else f'{base}-480.webp 480w, {base}-960.webp 960w, {src} 1600w')
+        return {'href': src, 'srcset': srcset, 'sizes': HOME_HERO_SIZES}
+    return None
+
+
 def published_head(path: str) -> dict | None:
     """SEO of the published CMS page served at `path`, for the server-rendered <head>.
 
@@ -598,6 +625,7 @@ def published_head(path: str) -> dict | None:
                 'description': (seo.get('description') or '').strip() or defaults['description'],
                 'image': f'{SITE}/api/v1/content/media/{og}/lg/' if isinstance(og, int) and not isinstance(og, bool) else '',
                 'noindex': bool(seo.get('noindex')),
+                'preload': hero_preload(page.published_version.blocks if page.published_version else []),
             }
         cache.set(key, head, 300)
     return head or None

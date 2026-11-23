@@ -1,19 +1,18 @@
 /**
- * preload-lcp.js — kick off the home-page hero fetch before the SPA boots.
+ * preload-lcp.js — attach the web-font stylesheet without blocking first paint.
  *
- * The hero poster (/assets/hero-home.webp, ~80 kB, the first frame of the
- * hero video; it was court-wide.webp before the 2026-11-22 media round) is
- * the LCP element of "/", but
- * as a React-rendered <img> it is only discovered after index/vendor download
- * and execute. Injecting a high-priority preload at HTML-parse time starts the
- * image download in parallel with the JS instead. Route-conditional so portal
- * and other public routes don't pay ~144 kB for an image they never render.
+ * The home hero's LCP image no longer needs a script (2026-11-23): this file
+ * used to guess it, and the guess went stale when the media round changed the
+ * default poster while the school's published home kept court-wide.webp, so
+ * visitors downloaded a photo they never saw. Now the HTML itself carries it:
+ *   - home page not published in Contenido: the first-paint shell
+ *     (public/shells.json, written by backend/apps/core/spa.py) holds the
+ *     poster <img>, discovered while the HTML parses;
+ *   - published home: spa.py writes a <link rel="preload"> for the poster the
+ *     published hero really shows (content.pages.hero_preload).
  *
  * Lives in its own file (loaded with `defer` from index.html) because the
- * public CSP is `script-src 'self'` — inline scripts are blocked. Keep the
- * href and `imagesizes` in sync with the poster <img> in
- * src/components/public/HeroVideo.tsx and the home hero default in
- * src/cms/sections/home.tsx.
+ * public CSP is `script-src 'self'` — inline scripts are blocked.
  */
 (function () {
   // Fonts: the stylesheet is only preloaded in index.html so it cannot block
@@ -26,16 +25,4 @@
     css.href = pre.getAttribute('href');
     document.head.appendChild(css);
   }
-  if (location.pathname !== '/') return;
-  var link = document.createElement('link');
-  link.rel = 'preload';
-  link.as = 'image';
-  link.href = '/assets/hero-home.webp';
-  // Same candidates and sizes as the poster <img> (lib/images.ts, HeroVideo)
-  // so the browser preloads the file it will actually render, once.
-  link.setAttribute('imagesrcset', '/assets/hero-home-480.webp 480w, /assets/hero-home-960.webp 960w, /assets/hero-home.webp 1600w');
-  link.setAttribute('imagesizes', '(orientation: portrait) 165vh, 100vw');
-  link.fetchPriority = 'high';
-  document.head.appendChild(link);
-
 })();
