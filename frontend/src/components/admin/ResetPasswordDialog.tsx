@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { portalApi } from '@/services/api';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { credentialTemplate, mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
 
 export interface ResetPasswordTarget {
@@ -63,6 +64,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  const once = useSingleFlight();
   const reset = useMutation({
     mutationFn: (payload: { password?: string; reason?: string }) =>
       portalApi.setUserPassword(target!.id, payload),
@@ -103,11 +105,13 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
     setStep('confirm');
   };
 
+  // Two answers in flight could arrive out of order and show a password that
+  // no longer works: one request at a time.
   const apply = () => {
-    reset.mutate({
+    once(() => reset.mutateAsync({
       password: mode === 'manual' ? password : undefined,
       reason: reason.trim() || undefined,
-    });
+    }));
   };
 
   return (

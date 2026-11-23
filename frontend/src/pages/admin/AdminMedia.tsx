@@ -17,6 +17,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { MEDIA_ENTITY, useMediaBulk, useMediaExport, useMediaList } from '@/hooks/queries/AdminContentQueries';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { mediaAdminApi } from '@/services/AdminContentApi';
@@ -72,6 +73,7 @@ export default function AdminMedia() {
   const selection = useRowSelection(count, JSON.stringify(filters));
 
   const [selected, setSelected] = useState<MediaAsset | null>(null);
+  const assetGuard = useDirtyCloseGuard(() => setSelected(null));
   const [toDelete, setToDelete] = useState<MediaAsset | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const [tagPrompt, setTagPrompt] = useState(false);
@@ -270,9 +272,11 @@ export default function AdminMedia() {
         </form>
       </Modal>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Detalles de la imagen" maxWidth={640}>
-        {selected && <AssetForm key={selected.id} asset={selected} onClose={() => setSelected(null)} onSaved={invalidate} onDelete={() => setToDelete(selected)} />}
+      <Modal open={!!selected} onClose={assetGuard.requestClose} title="Detalles de la imagen" maxWidth={640}>
+        {selected && <AssetForm key={selected.id} asset={selected} onClose={() => setSelected(null)} onCancel={assetGuard.requestClose}
+          onDirty={assetGuard.reportDirty} onSaved={invalidate} onDelete={() => setToDelete(selected)} />}
       </Modal>
+      {assetGuard.dialog}
       <ConfirmDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)}
         title="Eliminar imagen" message={`Se borrará "${toDelete?.filename ?? ''}" y sus variantes.${toDelete?.referenced ? ' Está en uso: las páginas o comunicados que la usan mostrarán un hueco.' : ''}`} confirmLabel="Eliminar" loading={remove.isPending} />
       <BulkConfirmDialog
@@ -291,10 +295,13 @@ export default function AdminMedia() {
   );
 }
 
-function AssetForm({ asset, onClose, onSaved, onDelete }: { asset: MediaAsset; onClose: () => void; onSaved: () => void; onDelete: () => void }) {
+function AssetForm({ asset, onClose, onCancel, onDirty, onSaved, onDelete }: {
+  asset: MediaAsset; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void; onDelete: () => void;
+}) {
   const [alt, setAlt] = useState(asset.alt);
   const [caption, setCaption] = useState(asset.caption);
   const [tags, setTags] = useState(asset.tags);
+  useReportDirty(alt !== asset.alt || caption !== asset.caption || tags !== asset.tags, onDirty);
   const [copied, setCopied] = useState<string | null>(null);
   const save = useMutation({
     mutationFn: () => contentApi.adminUpdateMedia(asset.id, { alt: alt.trim(), caption: caption.trim(), tags: tags.trim() }),
@@ -326,7 +333,7 @@ function AssetForm({ asset, onClose, onSaved, onDelete }: { asset: MediaAsset; o
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           <Button variant="ghost" onClick={onDelete} className="min-h-[44px] text-coral"><Trash2 className="h-4 w-4" aria-hidden="true" /> Eliminar</Button>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+            <Button variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
             <Button loading={save.isPending} onClick={() => save.mutate()} className="min-h-[44px]">Guardar</Button>
           </div>
         </div>

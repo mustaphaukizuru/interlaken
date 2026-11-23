@@ -21,6 +21,7 @@ import { mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTempla
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { adminKeys } from '@/hooks/queries/keys';
 import {
   PASSWORD_REQUESTS_ENTITY, usePasswordRequestsBulk, usePasswordRequestsExport, usePasswordRequestsList,
@@ -247,19 +248,26 @@ export default function AdminPasswordRequests() {
 }
 
 function LogRequestModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Registrar solicitud" maxWidth={480}>
-      <LogRequestForm key={String(open)} onClose={onClose} onSaved={onSaved} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Registrar solicitud" maxWidth={480}>
+        <LogRequestForm key={String(open)} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} onSaved={onSaved} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function LogRequestForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function LogRequestForm({ onClose, onCancel, onDirty, onSaved }: {
+  onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('whatsapp');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  useReportDirty(!!(email || name || note) || channel !== 'whatsapp', onDirty);
   const create = useMutation({
     mutationFn: () => portalApi.createPasswordRequest({ requested_email: email.trim(), requester_name: name.trim(), channel, note: note.trim() }),
     onSuccess: ({ data }) => {
@@ -285,7 +293,7 @@ function LogRequestForm({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       </div>
       <Input label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={create.isPending} className="min-h-[44px]">Registrar</Button>
       </div>
     </form>

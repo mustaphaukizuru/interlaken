@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
 
@@ -376,6 +376,30 @@ describe('CafeteriaPage online top-up through the Banorte lightbox', () => {
     await waitFor(() => expect(screen.getByTestId('path'))
       .toHaveTextContent('/portal/cafeteria/recarga/retorno?payment_id=55'));
     expect(closeBanorteLightbox).toHaveBeenCalled();
+  });
+
+  it('«Ir a pagar» starts one payment for a double click and cannot be closed or undone while it runs', async () => {
+    let resolve: (v: unknown) => void = () => {};
+    vi.mocked(cafeteriaApi.requestTopUp).mockImplementationOnce(() => new Promise((r) => { resolve = r; }) as never);
+    const u = userEvent.setup();
+    renderWithProviders(<><CafeteriaPage /><PathProbe /></>, { route: '/portal/cafeteria?recarga=200' });
+    const dialog = await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    await screen.findByDisplayValue('Centro');
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    const pay = screen.getByRole('button', { name: 'Ir a pagar' });
+    fireEvent.click(pay);
+    fireEvent.click(pay);
+    await waitFor(() => expect(cafeteriaApi.requestTopUp).toHaveBeenCalled());
+    await waitFor(() => expect(pay).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Atrás' })).toBeDisabled();
+    // Escape while the payment is being created: the dialog stays.
+    await u.keyboard('{Escape}');
+    expect(dialog).toBeInTheDocument();
+    resolve({ data: { id: 1, payment_id: 55, checkout: lightbox } });
+    await waitFor(() => expect(openBanorteLightbox).toHaveBeenCalledTimes(1));
+    expect(cafeteriaApi.requestTopUp).toHaveBeenCalledTimes(1);
   });
 
   it('stays on the page when the window is closed without a result', async () => {

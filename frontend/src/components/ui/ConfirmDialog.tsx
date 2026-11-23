@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
   message: ReactNode;
   /** Confirm button label (verb + object). */
   confirmLabel: string;
+  /** Label of the button that closes without confirming (default «Cancelar»). */
+  cancelLabel?: string;
   /**
    * When set, the user must type this exact word to enable the confirm button.
    * Use for irreversible operations (devoluciones, anular recarga).
@@ -43,6 +45,7 @@ export function ConfirmDialog({ open, title, onClose, ...body }: ConfirmDialogPr
 function ConfirmDialogBody({
   message,
   confirmLabel,
+  cancelLabel = 'Cancelar',
   requireText,
   confirmDisabled,
   loading,
@@ -76,7 +79,7 @@ function ConfirmDialogBody({
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={onClose}>
-          Cancelar
+          {cancelLabel}
         </Button>
         <Button
           type="button"

@@ -33,7 +33,9 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
     mutationFn: () => portalApi.resendAnnouncementFailed(announcementId!),
     onSuccess: ({ data: r }) => {
       toast.success(`${r.requeued} correo(s) en cola para reintento.`);
-      qc.invalidateQueries({ queryKey: ['announcement-delivery', announcementId] });
+      // Returned: the button stays busy until the failed list is fresh, so a
+      // second click can not re-queue the same emails.
+      return qc.invalidateQueries({ queryKey: ['announcement-delivery', announcementId] });
     },
     onError: () => toast.error('No se pudo reenviar.'),
   });

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useLeaveGuard } from '@/components/admin/pricing/useLeaveGuard';
 import type { FieldErrorMap } from '@/lib/apiErrors';
 import { casesApi, useCaseWrite, type CaseAction, type CaseDetail } from '@/hooks/queries/cases';
 import { ChoiceGroup, ErrorSummary, SaveStatus, SelectField, TextareaField, errorsFrom, useDraft } from './formKit';
@@ -72,6 +74,9 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
     referral_source: detail.lead.referral_source,
   };
   const form = useDraft(server);
+  // Contact data typed and not saved: leaving the case (tab close, reload,
+  // a link) asks first. `form.dirty` compares with the saved values.
+  const leave = useLeaveGuard(form.dirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const [saved, setSaved] = useState('');
   const [outcome, setOutcome] = useState<'' | 'continua_visita' | 'no_interesa'>('');
@@ -115,6 +120,7 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
   });
 
   return (
+    <>
     <StageCard stage="informes" state={state} open={open} onToggle={onToggle} summary={informesSummary(detail)}>
       <div className="grid gap-3 sm:grid-cols-2">
         <SentRow label="Cuotas del nivel (PDF)" sentAt={detail.informes.costs_sent_at} buttonLabel="Enviar cuotas"
@@ -177,6 +183,16 @@ export function InformesCard({ detail, state, open, onToggle, onSend }: {
         ) : <ReadOnlyNote stage={detail.stage} />}
       </div>
     </StageCard>
+    <ConfirmDialog
+      open={!!leave.pending}
+      title="¿Descartar los cambios?"
+      message="Tiene cambios sin guardar en «Datos de informes». Si sale ahora, se perderán."
+      confirmLabel="Descartar cambios"
+      cancelLabel="Seguir editando"
+      onConfirm={leave.leave}
+      onClose={leave.stay}
+    />
+    </>
   );
 }
 

@@ -24,6 +24,8 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { formatDateTime } from '@/lib/format';
+import { useLeaveGuard } from '@/components/admin/pricing/useLeaveGuard';
+import { valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { fromEditable, MIN_PARTS, noticeProblems, toEditable, type EditableNotice } from '@/lib/noticeText';
 import { legalNoticesApi, type NoticeStatus, type NoticeVersion } from '@/services/legalNoticesApi';
 import { withDefaults } from '@/cms/blocks/specs';
@@ -285,6 +287,10 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
     onSuccess: () => { toast.success('Borrador descartado.'); void qc.invalidateQueries({ queryKey: LIST_KEY }); navigate(BASE); },
     onError: (e) => { setDiscarding(false); toast.error(apiFieldErrors(e).detail || 'No se pudo descartar el borrador.'); },
   });
+  // Leaving with edits that differ from the saved draft asks first (tab
+  // close, reload, links). Typing and then undoing it is not a change.
+  const unsaved = (textDirty && valuesDiffer(text, initialText)) || (metaDirty && valuesDiffer(meta, initialMeta));
+  const leave = useLeaveGuard(unsaved && !publish.isPending && !discard.isPending);
 
   const submit = (e: FormEvent) => { e.preventDefault(); save.mutate(); };
   const consents = current?.consent_count ?? 0;
@@ -408,6 +414,16 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
         message={`Se borra el borrador ${notice.version}. El aviso vigente no cambia.`}
         confirmLabel="Descartar borrador"
         loading={discard.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!leave.pending}
+        title="¿Descartar los cambios?"
+        message="Tiene cambios sin guardar en el borrador. Si sale ahora, se perderán."
+        confirmLabel="Descartar cambios"
+        cancelLabel="Seguir editando"
+        onConfirm={leave.leave}
+        onClose={leave.stay}
       />
     </>
   );

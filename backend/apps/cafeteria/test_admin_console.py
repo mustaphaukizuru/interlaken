@@ -100,6 +100,41 @@ class TestAdjustBalance:
         assert len(set(refs)) == 3            # all distinct
         assert all(r.startswith("adjust-tx-") for r in refs)
 
+    def test_same_request_id_twice_applies_once(self, api_client, mailoutbox,
+                                                django_capture_on_commit_callbacks):
+        # A double click (or a client retry) sends the same request twice: the
+        # dialog's request_id makes the second one a 409 that moves nothing.
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="", parents=[parent])
+        _balance(student, 100)
+        api_client.force_authenticate(user=AdminFactory())
+        body = {"amount": "50.00", "reason": "Cortesía", "request_id": "3f2b9c1e-0a4d-4e8f-9b1a-77c2d5e6f801"}
+        url = reverse("admin-adjust", args=[student.id])
+        with django_capture_on_commit_callbacks(execute=True):
+            first = api_client.post(url, body, format="json")
+            second = api_client.post(url, body, format="json")
+        assert first.status_code == 201, first.data
+        assert second.status_code == 409, second.data
+        assert second.data["code"] == "already_applied"
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("150.00")
+        assert BalanceAdjustment.objects.filter(student=student).count() == 1
+        assert Notification.objects.filter(user=parent).count() == 1
+
+        # A new dialog opening (a new request_id) is a new, deliberate adjustment.
+        third = api_client.post(url, {**body, "request_id": "a1b2c3d4-0000-4000-8000-000000000002"}, format="json")
+        assert third.status_code == 201
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("200.00")
+
+    def test_malformed_request_id_is_rejected(self, api_client):
+        student = StudentProfileFactory(loyverse_id="")
+        _balance(student, 100)
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.post(
+            reverse("admin-adjust", args=[student.id]),
+            {"amount": "5", "reason": "x", "request_id": "no válido!"}, format="json")
+        assert resp.status_code == 400
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("100")
+
     def test_debit_below_zero_is_rejected(self, api_client):
         student = StudentProfileFactory(loyverse_id="")
         _balance(student, 20)

@@ -17,6 +17,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { TESTIMONIALS_ENTITY, useTestimonialsBulk, useTestimonialsExport, useTestimonialsList } from '@/hooks/queries/AdminContentQueries';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { contentApi, type BulkActionDef, type Testimonial, type TestimonialWrite } from '@/services/api';
@@ -76,6 +77,7 @@ export default function AdminTestimonials() {
   const selection = useRowSelection(count, JSON.stringify(filters));
 
   const [editing, setEditing] = useState<Testimonial | null | 'new'>(null);
+  const itemGuard = useDirtyCloseGuard(() => setEditing(null));
   const [toDelete, setToDelete] = useState<Testimonial | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const invalidate = () => { void invalidateEntity(qc, TESTIMONIALS_ENTITY); void qc.invalidateQueries({ queryKey: ['testimonials'] }); };
@@ -168,9 +170,11 @@ export default function AdminTestimonials() {
           empty={{ icon: Quote, title: 'Sin testimonios', description: 'Agregue frases reales de familias; aparecerán en el sitio al publicarlas.' }}
         />
       </Card>
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo testimonio' : 'Editar testimonio'} maxWidth={520}>
-        {editing !== null && <TestimonialForm key={editing === 'new' ? 'new' : editing.id} item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={invalidate} />}
+      <Modal open={editing !== null} onClose={itemGuard.requestClose} title={editing === 'new' ? 'Nuevo testimonio' : 'Editar testimonio'} maxWidth={520}>
+        {editing !== null && <TestimonialForm key={editing === 'new' ? 'new' : editing.id} item={editing === 'new' ? null : editing} onClose={() => setEditing(null)}
+          onCancel={itemGuard.requestClose} onDirty={itemGuard.reportDirty} onSaved={invalidate} />}
       </Modal>
+      {itemGuard.dialog}
       <ConfirmDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)}
         title="Eliminar testimonio" message={`¿Eliminar el testimonio de ${toDelete?.author ?? ''}?`} confirmLabel="Eliminar" loading={remove.isPending} />
       <BulkConfirmDialog
@@ -189,8 +193,12 @@ export default function AdminTestimonials() {
   );
 }
 
-function TestimonialForm({ item, onClose, onSaved }: { item: Testimonial | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState<TestimonialWrite>(item ? { quote: item.quote, author: item.author, role: item.role, level: item.level, is_published: item.is_published, order: item.order } : EMPTY);
+function TestimonialForm({ item, onClose, onCancel, onDirty, onSaved }: {
+  item: Testimonial | null; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
+  const [start] = useState<TestimonialWrite>(() => (item ? { quote: item.quote, author: item.author, role: item.role, level: item.level, is_published: item.is_published, order: item.order } : EMPTY));
+  const [form, setForm] = useState<TestimonialWrite>(start);
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const [error, setError] = useState('');
   const save = useMutation({
     mutationFn: () => item ? contentApi.adminUpdateTestimonial(item.id, form) : contentApi.adminCreateTestimonial(form),
@@ -223,7 +231,7 @@ function TestimonialForm({ item, onClose, onSaved }: { item: Testimonial | null;
       <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} /> Publicado</label>
       {error && <p className="text-xs text-coral-600">{error}</p>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={save.isPending} className="min-h-[44px]">Guardar</Button>
       </div>
     </form>

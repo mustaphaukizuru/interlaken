@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Ban, CalendarClock, CalendarPlus, Check, Eye, EyeOff, Loader2, RotateCcw, Trash2, Upload, UserCheck, UserX, X,
@@ -25,6 +25,8 @@ import { RowActionsMenu } from '@/components/admin/RowActionsMenu';
 import { useActiveFilters, useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection, type RowKey } from '@/hooks/useRowSelection';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
+import { useLeaveGuard } from '@/components/admin/pricing/useLeaveGuard';
 import {
   BOOKINGS_ENTITY, SLOTS_ENTITY, slotsImportApi, useBookingAction, useBookingsBulk, useBookingsExport, useBookingsList,
   useSlotDelete, useSlotsBulk, useSlotsExport, useSlotsList, useSlotUpdate,
@@ -50,19 +52,25 @@ const WEEKDAYS = [
   { value: 0, label: 'Dom' },
 ];
 
-function SlotGenerator({ onDone }: { onDone: () => void }) {
+const SLOT_FORM_START = {
+  title: '',
+  start_date: '',
+  end_date: '',
+  window_start: '09:00',
+  window_end: '11:00',
+  interval_minutes: 30,
+  capacity: 1,
+  location: 'Campus Interlaken',
+};
+
+function SlotGenerator({ onDone, onDirty }: { onDone: () => void; onDirty?: (dirty: boolean) => void }) {
   const [visitType, setVisitType] = useState<'individual' | 'open_class'>('individual');
-  const [form, setForm] = useState({
-    title: '',
-    start_date: '',
-    end_date: '',
-    window_start: '09:00',
-    window_end: '11:00',
-    interval_minutes: 30,
-    capacity: 1,
-    location: 'Campus Interlaken',
-  });
+  const [form, setForm] = useState(SLOT_FORM_START);
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  // What the page asks about before leaving: the values differ from the last
+  // ones generated (or from the defaults, before the first run).
+  const [saved, setSaved] = useState(() => ({ visitType, form, weekdays }));
+  useReportDirty(valuesDiffer({ visitType, form, weekdays: [...weekdays].sort() }, { ...saved, weekdays: [...saved.weekdays].sort() }), onDirty);
 
   const setVisitTypeAndDefaults = (next: 'individual' | 'open_class') => {
     setVisitType(next);
@@ -92,6 +100,7 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
       }),
     onSuccess: ({ data }) => {
       toast.success(data.detail ?? 'Horarios generados.');
+      setSaved({ visitType, form, weekdays });
       onDone();
     },
     onError: (err: unknown) => {
@@ -553,11 +562,22 @@ function BookingsView() {
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
     exporter.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
 
-  const act = (b: Booking, a: BookingAction, note?: string) =>
-    action.mutate({ id: b.id, act: a, note }, {
-      onSuccess: () => { toast.success('Reserva actualizada.'); setCancelFor(null); setNoteAsk(null); },
-      onError: (e) => toast.error(apiErrorMessage(e, 'No fue posible actualizar la reserva.')),
-    });
+  // Busy per row, not per mutation: «Confirmar» emails the family, and a
+  // click on another row must not re-enable this row's button mid-request.
+  const rowsInFlight = useRef(new Set<number>());
+  const [busyRows, setBusyRows] = useState<Record<number, BookingAction>>({});
+  const act = (b: Booking, a: BookingAction, note?: string) => {
+    if (rowsInFlight.current.has(b.id)) return;
+    rowsInFlight.current.add(b.id);
+    setBusyRows((m) => ({ ...m, [b.id]: a }));
+    action.mutateAsync({ id: b.id, act: a, note })
+      .then(() => { toast.success('Reserva actualizada.'); setCancelFor(null); setNoteAsk(null); })
+      .catch((e: unknown) => toast.error(apiErrorMessage(e, 'No fue posible actualizar la reserva.')))
+      .finally(() => {
+        rowsInFlight.current.delete(b.id);
+        setBusyRows((m) => Object.fromEntries(Object.entries(m).filter(([id]) => Number(id) !== b.id)));
+      });
+  };
 
   return (
     <Card title={`${count.toLocaleString('es-MX')} reservas`}
@@ -586,7 +606,7 @@ function BookingsView() {
         rowActions={(b) => (
           <BookingRowActions
             booking={b}
-            busyAct={action.isPending && action.variables?.id === b.id ? action.variables.act : undefined}
+            busyAct={busyRows[b.id]}
             onAct={act}
             onCancel={setCancelFor}
             onNote={setNoteAsk}
@@ -707,7 +727,7 @@ const IMPORT_HEADERS = [
   { key: 'titulo' },
 ];
 
-function SlotsView() {
+function SlotsView({ onFormDirty }: { onFormDirty?: (dirty: boolean) => void }) {
   const qc = useQueryClient();
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
@@ -754,7 +774,7 @@ function SlotsView() {
   return (
     <>
       <Card title="Publicar disponibilidad" subtitle="Elija el tipo: recorrido individual o evento de clase abierta.">
-        <SlotGenerator onDone={() => { void invalidateEntity(qc, SLOTS_ENTITY, [BOOKINGS_ENTITY]); }} />
+        <SlotGenerator onDirty={onFormDirty} onDone={() => { void invalidateEntity(qc, SLOTS_ENTITY, [BOOKINGS_ENTITY]); }} />
       </Card>
 
       <Card
@@ -900,9 +920,14 @@ const VIEWS: { value: View; label: string }[] = [
 export default function AdminBookings() {
   const { get, set, params } = useUrlFilters();
   const view: View = get('vista') === 'horarios' ? 'horarios' : 'reservas';
+  // «Publicar disponibilidad» half filled in: leaving the page or the tab asks first.
+  const [slotFormDirty, setSlotFormDirty] = useState(false);
+  const leave = useLeaveGuard(slotFormDirty);
+  const [askView, setAskView] = useState<View | null>(null);
   // A view switch starts clean: the two lists do not share filters.
-  const switchTo = (next: View) => {
+  const switchTo = (next: View, force = false) => {
     if (next === view) return;
+    if (!force && slotFormDirty) { setAskView(next); return; }
     const cleared: Record<string, null | string> = {};
     params.forEach((_v, k) => { cleared[k] = null; });
     set({ ...cleared, vista: next === 'reservas' ? null : next });
@@ -930,7 +955,19 @@ export default function AdminBookings() {
           </button>
         ))}
       </div>
-      {view === 'reservas' ? <BookingsView /> : <SlotsView />}
+      {view === 'reservas' ? <BookingsView /> : <SlotsView onFormDirty={setSlotFormDirty} />}
+      <ConfirmDialog
+        open={!!leave.pending || !!askView}
+        title="¿Descartar los cambios?"
+        message="Tiene cambios sin guardar en «Publicar disponibilidad». Si sale ahora, se perderán."
+        confirmLabel="Descartar cambios"
+        cancelLabel="Seguir editando"
+        onConfirm={() => {
+          if (askView) { const next = askView; setAskView(null); switchTo(next, true); }
+          else leave.leave();
+        }}
+        onClose={() => { setAskView(null); leave.stay(); }}
+      />
     </div>
   );
 }

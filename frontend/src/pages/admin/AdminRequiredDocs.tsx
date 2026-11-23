@@ -15,6 +15,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { apiErrorMessage, apiFieldErrors, type FieldErrorMap } from '@/lib/apiErrors';
 import { adminKeys } from '@/hooks/queries/keys';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import {
   REQUIRED_DOCS_ENTITY, requiredDocsApi, useAdminRequiredDocs, useRequiredDocsInvalidate,
   type LevelCode, type RequiredDoc, type RequiredDocWrite,
@@ -44,6 +45,7 @@ export default function AdminRequiredDocs() {
   const invalidate = useRequiredDocsInvalidate();
   const [tab, setTab] = useState<LevelTab>('todos');
   const [editing, setEditing] = useState<RequiredDoc | 'new' | null>(null);
+  const docGuard = useDirtyCloseGuard(() => setEditing(null));
   const [toDelete, setToDelete] = useState<RequiredDoc | null>(null);
   const [announce, setAnnounce] = useState('');
 
@@ -183,12 +185,14 @@ export default function AdminRequiredDocs() {
         </aside>
       </div>
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Agregar documento' : 'Editar documento'} maxWidth={560}>
+      <Modal open={editing !== null} onClose={docGuard.requestClose} title={editing === 'new' ? 'Agregar documento' : 'Editar documento'} maxWidth={560}>
         {editing !== null && (
           <DocForm key={editing === 'new' ? 'new' : editing.id} doc={editing === 'new' ? null : editing}
-            onClose={() => setEditing(null)} onSaved={() => { void invalidate(); }} />
+            onClose={() => setEditing(null)} onCancel={docGuard.requestClose} onDirty={docGuard.reportDirty}
+            onSaved={() => { void invalidate(); }} />
         )}
       </Modal>
+      {docGuard.dialog}
       <ConfirmDialog
         open={!!toDelete}
         onClose={() => setToDelete(null)}
@@ -256,12 +260,16 @@ function DocRow({ doc, position, total, busy, onMove, onEdit, onToggle, onDelete
   );
 }
 
-function DocForm({ doc, onClose, onSaved }: { doc: RequiredDoc | null; onClose: () => void; onSaved: () => void }) {
+function DocForm({ doc, onClose, onCancel, onDirty, onSaved }: {
+  doc: RequiredDoc | null; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
   const id = useId();
-  const [form, setForm] = useState<RequiredDocWrite>(doc ? {
+  const [start] = useState<RequiredDocWrite>(() => (doc ? {
     name: doc.name, description: doc.description, physical_note: doc.physical_note, levels: doc.levels,
     multiple_files: doc.multiple_files, link_url: doc.link_url, link_label: doc.link_label, active: doc.active,
-  } : EMPTY);
+  } : EMPTY));
+  const [form, setForm] = useState<RequiredDocWrite>(start);
+  useReportDirty(valuesDiffer({ ...form, levels: [...form.levels].sort() }, { ...start, levels: [...start.levels].sort() }), onDirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const ficha = doc?.kind === 'ficha';
   const set = <K extends keyof RequiredDocWrite>(k: K, v: RequiredDocWrite[K]) => {
@@ -330,7 +338,7 @@ function DocForm({ doc, onClose, onSaved }: { doc: RequiredDoc | null; onClose: 
       </label>
       {errors.detail && <p className="text-sm text-coral-600" role="alert">{errors.detail}</p>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" loading={save.isPending}>{doc ? 'Guardar cambios' : 'Agregar documento'}</Button>
       </div>
     </form>

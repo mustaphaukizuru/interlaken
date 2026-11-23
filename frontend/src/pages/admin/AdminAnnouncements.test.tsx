@@ -405,4 +405,84 @@ describe('AdminAnnouncements', () => {
     fireEvent.click(restricted);
     expect(screen.queryByRole('dialog', { name: /Aviso urgente/ })).not.toBeInTheDocument();
   });
+
+  it('«Enviar ahora» sends once for a double click and stays busy while it runs', async () => {
+    const user = userEvent.setup();
+    let resolve: (v: unknown) => void = () => {};
+    create.mockImplementationOnce(() => new Promise((r) => { resolve = r; }) as never);
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Suspensión' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'No hay clases.' } });
+    await user.click(within(dialog).getByRole('button', { name: /^Publicar$/i }));
+    const sendNow = within(dialog).getByRole('button', { name: /^Enviar ahora$/i });
+    fireEvent.click(sendNow);
+    fireEvent.click(sendNow);
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(sendNow).toBeDisabled());
+    expect(within(dialog).getByRole('button', { name: /^Volver$/i })).toBeDisabled();
+    resolve({ data: {} });
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Comunicado publicado y enviado.'));
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('«Enviar aviso urgente» sends once for a double click', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Aviso urgente/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Contingencia' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Sin clases.' } });
+    await user.click(within(dialog).getByLabelText(/Confirmo que este aviso es urgente/i));
+    const send = within(dialog).getByRole('button', { name: /Enviar aviso urgente/i });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(broadcast).toHaveBeenCalledTimes(1);
+  });
+
+  describe('unsaved changes', () => {
+    it('closes an untouched composer without asking', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+      await screen.findByText('Junta de padres');
+      await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('asks before closing a composer with text; «Descartar cambios» closes it', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+      await screen.findByText('Junta de padres');
+      await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+      const dialog = await screen.findByRole('dialog', { name: 'Nuevo comunicado' });
+      fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Borrador' } });
+      await user.keyboard('{Escape}');
+      const ask = screen.getByRole('dialog', { name: '¿Descartar los cambios?' });
+      await user.click(within(ask).getByRole('button', { name: 'Seguir editando' }));
+      expect(within(dialog).getByLabelText(/^Título$/i)).toHaveValue('Borrador');
+      await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+      await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('does not ask after the comunicado was saved', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+      await screen.findByText('Junta de padres');
+      await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByLabelText(/^Publicado/i));
+      fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Borrador' } });
+      fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Texto.' } });
+      await user.click(within(dialog).getByRole('button', { name: /Guardar borrador/i }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(screen.queryByText('¿Descartar los cambios?')).toBeNull();
+    });
+  });
 });

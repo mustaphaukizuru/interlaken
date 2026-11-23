@@ -528,9 +528,15 @@ class SpendLimitsSerializer(serializers.Serializer):
 
 
 class AdjustmentInputSerializer(serializers.Serializer):
-    """Validates a manual adjustment request (signed amount + reason)."""
+    """Validates a manual adjustment request (signed amount + reason).
+
+    ``request_id`` (optional, client-generated once per dialog opening) is the
+    idempotency key: a double click or a client retry of the same request is
+    applied once (the ledger stores it as ``adjust-tx-req-<request_id>``).
+    """
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     reason = serializers.CharField(max_length=500)
+    request_id = serializers.RegexField(r'^[A-Za-z0-9-]{8,64}$', required=False, allow_blank=True, default='')
 
     def validate_amount(self, value):
         if value == 0:

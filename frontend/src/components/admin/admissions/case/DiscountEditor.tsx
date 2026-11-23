@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import type { FieldErrorMap } from '@/lib/apiErrors';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import {
   casesApi, useCaseSideWrite,
   type CaseDetail, type CaseDiscount, type DiscountDuration, type DiscountInput, type DiscountKind,
@@ -100,6 +101,7 @@ function validate(f: FormState): FieldErrorMap {
 export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readOnly: boolean }) {
   const [editing, setEditing] = useState<CaseDiscount | 'new' | null>(null);
   const [voiding, setVoiding] = useState<CaseDiscount | null>(null);
+  const formGuard = useDirtyCloseGuard(() => setEditing(null));
   const discounts = detail.documentacion.discounts;
   return (
     <div className="space-y-3">
@@ -144,9 +146,11 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
         </ul>
       )}
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Agregar beca o descuento' : 'Editar beca o descuento'} maxWidth={560}>
-        {editing !== null && <DiscountForm detail={detail} discount={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />}
+      <Modal open={editing !== null} onClose={formGuard.requestClose} title={editing === 'new' ? 'Agregar beca o descuento' : 'Editar beca o descuento'} maxWidth={560}>
+        {editing !== null && <DiscountForm detail={detail} discount={editing === 'new' ? null : editing} onDone={() => setEditing(null)}
+          onCancel={formGuard.requestClose} onDirty={formGuard.reportDirty} />}
       </Modal>
+      {formGuard.dialog}
       <Modal open={!!voiding} onClose={() => setVoiding(null)} title="Anular beca o descuento" maxWidth={460}>
         {voiding && <VoidDiscount detail={detail} discount={voiding} onDone={() => setVoiding(null)} />}
       </Modal>
@@ -154,8 +158,14 @@ export function DiscountEditor({ detail, readOnly }: { detail: CaseDetail; readO
   );
 }
 
-export function DiscountForm({ detail, discount, onDone }: { detail: CaseDetail; discount: CaseDiscount | null; onDone: () => void }) {
-  const [form, setForm] = useState<FormState>(discount ? fromDiscount(discount) : EMPTY);
+export function DiscountForm({ detail, discount, onDone, onCancel, onDirty }: {
+  detail: CaseDetail; discount: CaseDiscount | null; onDone: () => void;
+  /** «Cancelar» (default: `onDone`); a guarded dialog asks first when edited. */
+  onCancel?: () => void; onDirty?: (dirty: boolean) => void;
+}) {
+  const [start] = useState<FormState>(() => (discount ? fromDiscount(discount) : EMPTY));
+  const [form, setForm] = useState<FormState>(start);
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const save = useCaseSideWrite(detail.id, (input: DiscountInput) =>
     discount ? casesApi.updateDiscount(detail.id, discount.id, input) : casesApi.addDiscount(detail.id, input));
@@ -218,7 +228,7 @@ export function DiscountForm({ detail, discount, onDone }: { detail: CaseDetail;
         placeholder="Por hermano inscrito en Secundaria." />
       <ErrorSummary errors={errors} labels={LABELS} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="ghost" onClick={onDone}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel ?? onDone}>Cancelar</Button>
         <Button type="submit" loading={save.isPending}>{discount ? 'Guardar cambios' : 'Agregar'}</Button>
       </div>
     </form>

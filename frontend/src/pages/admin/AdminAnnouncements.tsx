@@ -19,6 +19,8 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { ANNOUNCEMENTS_ENTITY, useAnnouncementsBulk, useAnnouncementsExport, useAnnouncementsList } from '@/hooks/queries/AdminContentQueries';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -57,6 +59,8 @@ export default function AdminAnnouncements() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
+  /** The composer's values when it opened: closing asks only if they changed. */
+  const [formStart, setFormStart] = useState<typeof EMPTY>(EMPTY);
   // ?nuevo=1 deep link from the header quick actions (P1-E8).
   const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
@@ -106,6 +110,10 @@ export default function AdminAnnouncements() {
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
     exportAnnouncements.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
 
+  // Publishing sends to the whole audience: one request at a time, even for
+  // a double click before the button shows it is busy.
+  const onceSave = useSingleFlight();
+  const onceBroadcast = useSingleFlight();
   const save = useMutation({
     mutationFn: async () => {
       if (editing) {
@@ -181,7 +189,7 @@ export default function AdminAnnouncements() {
     onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo enviar el aviso urgente.')),
   });
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setFormErrors({}); setConfirmSend(false); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY); setFormStart(EMPTY); setFormErrors({}); setConfirmSend(false); setOpen(true); };
 
   // Command-palette deep link: /admin/comunicados?nuevo=1 opens the composer
   // (same modal, same validations) and consumes the param.
@@ -210,12 +218,14 @@ export default function AdminAnnouncements() {
 
   const openEdit = (a: Announcement) => {
     setEditing(a);
-    setForm({
+    const start = {
       title: a.title, body: a.body, audience: a.audience,
       is_active: a.is_active, push_enabled: a.push_enabled ?? true,
       show_on_site: a.show_on_site ?? false, site_until: a.site_until ?? null, site_link: a.site_link ?? '',
       publish_at: a.publish_at ?? null, requires_ack: a.requires_ack ?? false, attachments: a.attachments ?? [],
-    });
+    };
+    setForm(start);
+    setFormStart(start);
     setFormErrors({});
     setConfirmSend(false);
     setOpen(true);
@@ -225,6 +235,10 @@ export default function AdminAnnouncements() {
     setAlertConfirm(false);
     setAlertOpen(true);
   };
+  // Closing either dialog with something typed asks first; a successful
+  // save or send closes it directly.
+  const composerGuard = useDirtyCloseGuard(() => { setOpen(false); setConfirmSend(false); }, open && valuesDiffer(form, formStart));
+  const alertGuard = useDirtyCloseGuard(() => { setAlertOpen(false); setAlertConfirm(false); }, alertOpen && valuesDiffer(alertForm, EMPTY_ALERT));
 
   const columns: Column<Announcement>[] = [
     {
@@ -355,7 +369,7 @@ export default function AdminAnnouncements() {
       />
 
       {/* Composer */}
-      <Modal open={open} onClose={() => { setOpen(false); setConfirmSend(false); }} title={editing ? 'Editar comunicado' : 'Nuevo comunicado'} maxWidth={520}>
+      <Modal open={open} onClose={composerGuard.requestClose} title={editing ? 'Editar comunicado' : 'Nuevo comunicado'} maxWidth={520}>
         <div className="space-y-4">
           <Input label="Título" value={form.title} onChange={(e) => setField('title', e.target.value)} placeholder="Ej. Suspensión de clases" error={formErrors.title} />
           <div>
@@ -421,14 +435,14 @@ export default function AdminAnnouncements() {
               </p>
               <div className="flex justify-end gap-2">
                 <Button ref={backFromSendRef} variant="secondary" onClick={() => setConfirmSend(false)} disabled={save.isPending}>Volver</Button>
-                <Button onClick={() => save.mutate()} loading={save.isPending}>Enviar ahora</Button>
+                <Button onClick={() => onceSave(() => save.mutateAsync())} loading={save.isPending}>Enviar ahora</Button>
               </div>
             </div>
           ) : (
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button variant="secondary" onClick={composerGuard.requestClose}>Cancelar</Button>
               <Button
-                onClick={() => (sendsNow ? setConfirmSend(true) : save.mutate())}
+                onClick={() => (sendsNow ? setConfirmSend(true) : onceSave(() => save.mutateAsync()))}
                 loading={save.isPending}
                 disabled={!form.title.trim() || !form.body.trim()}
               >
@@ -439,9 +453,11 @@ export default function AdminAnnouncements() {
         </div>
       </Modal>
 
+      {composerGuard.dialog}
+
       <Modal
         open={alertOpen}
-        onClose={() => { setAlertOpen(false); setAlertConfirm(false); }}
+        onClose={alertGuard.requestClose}
         title="Aviso urgente"
         maxWidth={520}
       >
@@ -497,17 +513,17 @@ export default function AdminAnnouncements() {
             Confirmo que este aviso es urgente y debe enviarse ahora a la audiencia seleccionada.
           </label>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => { setAlertOpen(false); setAlertConfirm(false); }}>
+            <Button variant="secondary" onClick={alertGuard.requestClose}>
               Cancelar
             </Button>
             <Button
               variant="danger"
-              onClick={() => broadcast.mutate({
+              onClick={() => onceBroadcast(() => broadcast.mutateAsync({
                 title: alertForm.title.trim(),
                 message: alertForm.message.trim(),
                 audience: alertForm.audience,
                 whatsapp: alertForm.whatsapp,
-              })}
+              }))}
               loading={broadcast.isPending}
               disabled={
                 !alertConfirm
@@ -521,6 +537,8 @@ export default function AdminAnnouncements() {
           </div>
         </div>
       </Modal>
+
+      {alertGuard.dialog}
 
       <DeliveryReportModal announcementId={report?.id ?? null} title={report?.title} onClose={() => setReport(null)} />
 

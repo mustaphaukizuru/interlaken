@@ -18,6 +18,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import {
   FORMS_ENTITY, SUBMISSIONS_ENTITY, useFormsBulk, useFormsExport, useFormsList, useSubmissionsBulk, useSubmissionsExport, useSubmissionsList,
 } from '@/hooks/queries/AdminContentQueries';
@@ -224,8 +225,11 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
     onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.fields || f.slug || f.detail || 'Revise los campos.'); },
   });
   const submit = (e: FormEvent) => { e.preventDefault(); setErrors({}); save.mutate(); };
+  // Closing with edits asks first; a successful save closes through onSaved.
+  const guard = useDirtyCloseGuard(onClose, valuesDiffer(form, initial));
   return (
-    <Modal open onClose={onClose} title={form.id ? 'Editar formulario' : 'Nuevo formulario'} maxWidth={760}>
+    <>
+    <Modal open onClose={guard.requestClose} title={form.id ? 'Editar formulario' : 'Nuevo formulario'} maxWidth={760}>
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Título" value={form.title ?? ''} onChange={(e) => setF({ title: e.target.value })} required error={errors.title} />
@@ -278,9 +282,11 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
           <Button type="button" size="sm" variant="secondary" onClick={() => setF({ fields: [...fields, { key: '', label: '', type: 'text' }] })}><Plus size={14} aria-hidden="true" /> Agregar campo</Button>
         </fieldset>
 
-        <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" loading={save.isPending}>Guardar</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={guard.requestClose}>Cancelar</Button><Button type="submit" loading={save.isPending}>Guardar</Button></div>
       </form>
     </Modal>
+    {guard.dialog}
+    </>
   );
 }
 

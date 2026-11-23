@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useFamilyDissolve, useFamilyRemoveStudent, useFamilyUpdate } from '@/hooks/queries/families';
+import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { apiErrorMessage, apiFieldErrors } from '@/lib/apiErrors';
 import type { FamilyDetail, FamilyLogin, FamilyStudent } from '@/services/familiesApi';
 import { gradeLine, initial, lastLoginLabel } from './familyUtils';
@@ -200,18 +201,25 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
 }
 
 function RenameFamilyModal({ family, open, onClose }: { family: FamilyDetail; open: boolean; onClose: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Renombrar familia" maxWidth={440}>
-      <RenameForm family={family} onClose={onClose} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Renombrar familia" maxWidth={440}>
+        <RenameForm family={family} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function RenameForm({ family, onClose }: { family: FamilyDetail; onClose: () => void }) {
+function RenameForm({ family, onClose, onCancel, onDirty }: {
+  family: FamilyDetail; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
+}) {
   const nameId = useId();
   const notesId = useId();
   const [name, setName] = useState(family.name);
   const [notes, setNotes] = useState(family.notes);
+  useReportDirty(name !== family.name || notes !== family.notes, onDirty);
   const [error, setError] = useState('');
   const update = useFamilyUpdate();
   return (
@@ -243,7 +251,7 @@ function RenameForm({ family, onClose }: { family: FamilyDetail; onClose: () => 
         <p className="mt-1 text-xs text-subtle">Solo las ve el colegio.</p>
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" loading={update.isPending} disabled={update.isPending}>Guardar</Button>
       </div>
     </form>

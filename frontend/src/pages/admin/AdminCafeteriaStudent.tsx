@@ -25,6 +25,8 @@ import { isCardTopUp } from '@/lib/status/cafeteria';
 import { useAdjustmentsList, useTransactionsList, CAF_MONEY_VIEWS } from '@/hooks/queries/cafeteria';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { useUrlPage } from '@/hooks/useUrlFilters';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
+import { newRequestId } from '@/lib/requestId';
 import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
 import type { AdminTransaction } from '@/services/cafeteriaAdmin';
 import type { ExportFormat } from '@/services/dataOps';
@@ -71,7 +73,11 @@ export default function AdminCafeteriaStudent() {
   const [adjustReason, setAdjustReason] = useState('');
   // Server answers shown next to their field, not as a toast (UX Phase 7).
   const [adjustErrors, setAdjustErrors] = useState<{ amount?: string; reason?: string; form?: string }>({});
-  const openAdjust = (sign: 1 | -1) => { setAdjustSign(sign); setAdjustErrors({}); setShowAdjust(true); };
+  // One idempotency key per dialog opening: the same adjustment sent twice
+  // (double click, retry) moves the balance once.
+  const [adjustRequestId, setAdjustRequestId] = useState('');
+  const openAdjust = (sign: 1 | -1) => { setAdjustSign(sign); setAdjustErrors({}); setAdjustRequestId(newRequestId()); setShowAdjust(true); };
+  const once = useSingleFlight();
 
   const [refundTx, setRefundTx] = useState<AdminTransaction | null>(null);
   // Ledger and adjustment trail are paged server-side (they grow without bound).
@@ -96,18 +102,28 @@ export default function AdminCafeteriaStudent() {
     void invalidateEntity(queryClient, CAF_MONEY_VIEWS[0], CAF_MONEY_VIEWS);
   };
 
+  const adjustDone = () => {
+    setShowAdjust(false);
+    setAdjustAmount('');
+    setAdjustReason('');
+    setAdjustErrors({});
+    invalidate();
+  };
   const adjustMutation = useMutation({
     mutationFn: () =>
-      cafeteriaApi.adjustBalance(id, adjustSign * parseFloat(adjustAmount), adjustReason),
+      cafeteriaApi.adjustBalance(id, adjustSign * parseFloat(adjustAmount), adjustReason, adjustRequestId),
     onSuccess: () => {
       toast.success('Ajuste aplicado.');
-      setShowAdjust(false);
-      setAdjustAmount('');
-      setAdjustReason('');
-      setAdjustErrors({});
-      invalidate();
+      adjustDone();
     },
     onError: (e: unknown) => {
+      // The same request already landed (a retry after a lost answer): it
+      // was applied once, so this is a success, not an error.
+      if ((e as { response?: { data?: { code?: string } } })?.response?.data?.code === 'already_applied') {
+        toast.success('El ajuste ya estaba aplicado.');
+        adjustDone();
+        return;
+      }
       const f = fieldErrorsOrNull(e);
       setAdjustErrors(f && (f.amount || f.reason)
         ? { amount: f.amount, reason: f.reason, form: f.detail ?? f.non_field_errors }
@@ -335,7 +351,7 @@ export default function AdminCafeteriaStudent() {
       {/* Adjust modal */}
       <Modal open={showAdjust} onClose={() => setShowAdjust(false)} title="Ajuste manual de saldo">
         <form
-          onSubmit={(e) => { e.preventDefault(); adjustMutation.mutate(); }}
+          onSubmit={(e) => { e.preventDefault(); once(() => adjustMutation.mutateAsync()); }}
           className="space-y-4"
         >
           <div className="flex gap-2">

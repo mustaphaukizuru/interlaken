@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { useStudentsList, type RosterStudent } from '@/hooks/queries/students';
 import { useFamilyLink } from '@/hooks/queries/families';
 import { apiErrorMessage } from '@/lib/apiErrors';
@@ -32,16 +33,25 @@ interface Props {
  */
 export function FamilyLinkDialog({ open, onClose, mode, preselected, onDone }: Props) {
   const title = mode.kind === 'family' ? `Agregar a ${mode.family.name}` : mode.kind === 'new' ? 'Nueva familia' : 'Vincular hermano';
+  // Students picked by hand are work: closing asks before it drops them.
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={640}>
-      {/* Mounted only while open: every opening starts clean. */}
-      <FamilyLinkBody mode={mode} preselected={preselected} onClose={onClose} onDone={onDone} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title={title} maxWidth={640}>
+        {/* Mounted only while open: every opening starts clean. */}
+        <FamilyLinkBody mode={mode} preselected={preselected} onClose={onClose} onCancel={guard.requestClose}
+          onDirty={guard.reportDirty} onDone={onDone} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function FamilyLinkBody({ mode, preselected, onClose, onDone }: Omit<Props, 'open'>) {
+function FamilyLinkBody({ mode, preselected, onClose, onCancel, onDirty, onDone }: Omit<Props, 'open'> & {
+  onCancel: () => void; onDirty: (dirty: boolean) => void;
+}) {
   const [picked, setPicked] = useState<PickedStudent[]>(preselected ?? []);
+  useReportDirty(valuesDiffer(picked.map((p) => p.id), (preselected ?? []).map((p) => p.id)), onDirty);
   const [step, setStep] = useState<'pick' | 'review'>(preselected?.length ? 'review' : 'pick');
   const minimum = mode.kind === 'new' ? 2 : 1;
   const studentIds = useMemo(() => {
@@ -51,11 +61,12 @@ function FamilyLinkBody({ mode, preselected, onClose, onDone }: Omit<Props, 'ope
 
   return step === 'pick' ? (
     <PickStep mode={mode} picked={picked} setPicked={setPicked} minimum={minimum}
-      onCancel={onClose} onNext={() => setStep('review')} />
+      onCancel={onCancel} onNext={() => setStep('review')} />
   ) : (
     <ReviewStep mode={mode} studentIds={studentIds}
       onBack={preselected?.length ? undefined : () => setStep('pick')}
-      onCancel={onClose}
+      onCancel={onCancel}
+      onClose={onClose}
       onDone={(plan) => { onDone?.(plan); onClose(); }} />
   );
 }
@@ -194,11 +205,13 @@ const HEADLINE: Record<FamilyPlan['action'], string> = {
   none: 'Ya están en la misma familia',
 };
 
-function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
+function ReviewStep({ mode, studentIds, onBack, onCancel, onClose, onDone }: {
   mode: FamilyLinkMode;
   studentIds: number[];
   onBack?: () => void;
   onCancel: () => void;
+  /** Closes without asking (nothing would change). */
+  onClose: () => void;
   onDone: (plan: FamilyPlan) => void;
 }) {
   const nameId = useId();
@@ -352,7 +365,7 @@ function ReviewStep({ mode, studentIds, onBack, onCancel, onDone }: {
       <div className={FOOTER}>
         {onBack ? <Button type="button" variant="ghost" onClick={onBack} disabled={commit.isPending}><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Atrás</Button> : null}
         {nothing ? (
-          <Button type="button" variant="secondary" onClick={onCancel}>Cerrar</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>Cerrar</Button>
         ) : (
           <>
             <Button type="button" variant="ghost" onClick={onCancel} disabled={commit.isPending}>Cancelar</Button>

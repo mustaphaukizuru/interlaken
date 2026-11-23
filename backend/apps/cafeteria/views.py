@@ -1497,9 +1497,12 @@ class AdminAdjustBalanceView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, student_pk):
+        from .services import AdjustmentAlreadyApplied
+
         student = get_object_or_404(StudentProfile, pk=student_pk)
         serializer = AdjustmentInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        request_id = serializer.validated_data['request_id']
 
         try:
             adj = adjust_balance(
@@ -1507,7 +1510,13 @@ class AdminAdjustBalanceView(APIView):
                 serializer.validated_data['amount'],
                 serializer.validated_data['reason'],
                 admin=request.user,
+                # Same request twice (double click, retry): the second one is
+                # refused under the wallet lock instead of moving money again.
+                reference=f'adjust-tx-req-{request_id}' if request_id else '',
             )
+        except AdjustmentAlreadyApplied:
+            return Response(error_body('Este ajuste ya se aplicó; no se volvió a aplicar.',
+                                       code='already_applied'), status=409)
         except ValueError as e:
             return Response(error_body(str(e)), status=400)
 

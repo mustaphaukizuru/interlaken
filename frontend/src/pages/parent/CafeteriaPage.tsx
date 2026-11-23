@@ -37,6 +37,7 @@ import { PortalExportButtons } from '@/components/portal/PortalExportButtons';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import {
   applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatCents, isScheduled, pendingCoversLowBalance, projectBalance, sentence,
@@ -357,6 +358,9 @@ export default function CafeteriaPage() {
     }
   };
 
+  // «Ir a pagar» starts a card payment: one request at a time, even for a
+  // double click before the button shows it is busy.
+  const once = useSingleFlight();
   const topupMutation = useMutation({
     mutationFn: () => cafeteriaApi.requestTopUp(selectedStudent!, topupAmountNum, topupMethod, {
       billing: { ...cardholder }, remember_billing: rememberCardholder,
@@ -426,6 +430,7 @@ export default function CafeteriaPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = async () => {
+    if (refreshing) return;
     setRefreshing(true);
     try {
       const { data } = await cafeteriaApi.refreshFromLoyverse();
@@ -525,6 +530,7 @@ export default function CafeteriaPage() {
           <LiveBadge
             updatedAt={balancesUpdatedAt}
             isFetching={balancesFetching || refreshing}
+            busy={refreshing}
             onRefresh={refresh}
             className="min-h-[44px] px-1"
           />
@@ -728,7 +734,9 @@ export default function CafeteriaPage() {
       {/* Top-up modal — 3-step wizard (BACKLOG P1-D1) */}
       <Modal
         open={showTopup}
-        onClose={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }}
+        // While «Ir a pagar» runs the Banorte window is about to open: closing
+        // now would leave a payment started behind a closed dialog.
+        onClose={() => { if (topupMutation.isPending) return; setShowTopup(false); setTopupAmount(''); setTopupStep(1); }}
         title="Recargar cafetería"
         maxWidth={520}
       >
@@ -889,7 +897,7 @@ export default function CafeteriaPage() {
 
         <div className="sticky bottom-0 -mx-1 flex flex-col gap-2 bg-white pt-2 sm:flex-row">
           {topupStep > 1 ? (
-            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as Step)} className="min-h-[44px] flex-1">Atrás</Button>
+            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as Step)} disabled={topupMutation.isPending} className="min-h-[44px] flex-1">Atrás</Button>
           ) : (
             <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }} className="min-h-[44px] flex-1">Cancelar</Button>
           )}
@@ -909,7 +917,7 @@ export default function CafeteriaPage() {
             <Button
               variant="primary"
               loading={topupMutation.isPending}
-              onClick={() => topupMutation.mutate()}
+              onClick={() => once(() => topupMutation.mutateAsync())}
               disabled={!topupAmountValid || !selectedStudent || !onlineAvailable || !cardholderReady}
               className="min-h-[44px] flex-1"
             >

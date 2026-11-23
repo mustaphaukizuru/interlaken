@@ -8,6 +8,7 @@ import { CopyButton } from '@/components/admin/CopyButton';
 import { apiErrorCode, apiErrorMessage, apiFieldErrors } from '@/lib/apiErrors';
 import { fmtDay, fmtDayTime } from '@/lib/caseStages';
 import { casesApi, useCaseSideWrite, type CaseAction, type CaseDetail, type SendResult } from '@/hooks/queries/cases';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 
 type Channel = 'email' | 'whatsapp' | 'copy';
 
@@ -120,6 +121,8 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [result, setResult] = useState<(SendResult & { requested: Channel; copied?: boolean }) | null>(null);
   const doneRef = useRef<HTMLHeadingElement>(null);
+  // Each send is an email or a new link (the previous one stops working): one at a time.
+  const once = useSingleFlight();
 
   const send = useCaseSideWrite(detail.id, (vars: { channel: 'email' | 'whatsapp'; override?: boolean; override_reason?: string }) =>
     casesApi.action(detail.id, action, vars).then((r) => r.data));
@@ -184,7 +187,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
     <form
       className="space-y-4"
       noValidate
-      onSubmit={(e) => { e.preventDefault(); void submit(); }}
+      onSubmit={(e) => { e.preventDefault(); once(submit); }}
     >
       <p className="text-sm text-muted">{copy.intro}</p>
       {last && <p className="text-xs text-subtle">Último envío: {fmtDayTime(last)}</p>}

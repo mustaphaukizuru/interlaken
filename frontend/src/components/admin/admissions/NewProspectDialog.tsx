@@ -12,6 +12,7 @@ import { fmtDay } from '@/lib/caseStages';
 import { casesApi, storeCase, type CaseRow, type ProspectInput } from '@/hooks/queries/cases';
 import { ChoiceGroup, ErrorSummary, SelectField, errorsFrom } from './case/formKit';
 import { GRADE_OPTIONS, RELATIONSHIPS, cycleChoices } from './case/caseBits';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 
 const LABELS: Record<string, string> = {
   child_name: 'Nombre del alumno',
@@ -74,17 +75,22 @@ function toInput(f: Form): ProspectInput {
  * the new Expediente.
  */
 export function NewProspectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const guard = useDirtyCloseGuard(onClose);
   return (
-    <Modal open={open} onClose={onClose} title="Nuevo prospecto" maxWidth={620} fullScreenOnPhone>
-      <NewProspectBody onClose={onClose} />
-    </Modal>
+    <>
+      <Modal open={open} onClose={guard.requestClose} title="Nuevo prospecto" maxWidth={620} fullScreenOnPhone>
+        <NewProspectBody onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} />
+      </Modal>
+      {guard.dialog}
+    </>
   );
 }
 
-function NewProspectBody({ onClose }: { onClose: () => void }) {
+function NewProspectBody({ onClose, onCancel, onDirty }: { onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState<Form>(EMPTY);
+  useReportDirty(valuesDiffer(form, EMPTY), onDirty);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const [duplicates, setDuplicates] = useState<CaseRow[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -171,7 +177,7 @@ function NewProspectBody({ onClose }: { onClose: () => void }) {
         <ErrorSummary errors={errors} labels={LABELS} />
       </div>
       <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-2 border-t border-line bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:px-0 sm:pb-6">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         {duplicates && duplicates.length > 0 ? (
           <Button type="button" loading={busy} onClick={() => void submit(true)}>Crear de todos modos</Button>
         ) : (

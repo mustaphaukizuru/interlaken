@@ -18,6 +18,7 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { CALENDAR_ENTITY, useCalendarBulk, useCalendarExport, useCalendarList } from '@/hooks/queries/AdminContentQueries';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { calendarAdminApi, calendarIcsUrl } from '@/services/AdminContentApi';
@@ -77,6 +78,7 @@ export default function AdminCalendar() {
   const selection = useRowSelection(count, JSON.stringify(filters));
 
   const [editing, setEditing] = useState<SchoolEvent | null | 'new'>(null);
+  const eventGuard = useDirtyCloseGuard(() => setEditing(null));
   const [toDelete, setToDelete] = useState<SchoolEvent | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const [importing, setImporting] = useState(false);
@@ -171,9 +173,11 @@ export default function AdminCalendar() {
         />
       </Card>
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nuevo evento' : 'Editar evento'} maxWidth={520}>
-        {editing !== null && <EventForm key={editing === 'new' ? 'new' : editing.id} event={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={invalidate} />}
+      <Modal open={editing !== null} onClose={eventGuard.requestClose} title={editing === 'new' ? 'Nuevo evento' : 'Editar evento'} maxWidth={520}>
+        {editing !== null && <EventForm key={editing === 'new' ? 'new' : editing.id} event={editing === 'new' ? null : editing} onClose={() => setEditing(null)}
+          onCancel={eventGuard.requestClose} onDirty={eventGuard.reportDirty} onSaved={invalidate} />}
       </Modal>
+      {eventGuard.dialog}
       <ConfirmDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)}
         title="Eliminar evento" message={`¿Eliminar "${toDelete?.title ?? ''}" del calendario?`} confirmLabel="Eliminar" loading={remove.isPending} />
       <BulkConfirmDialog
@@ -202,11 +206,15 @@ export default function AdminCalendar() {
   );
 }
 
-function EventForm({ event, onClose, onSaved }: { event: SchoolEvent | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState<SchoolEventWrite>(event ? {
+function EventForm({ event, onClose, onCancel, onDirty, onSaved }: {
+  event: SchoolEvent | null; onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void; onSaved: () => void;
+}) {
+  const [start] = useState<SchoolEventWrite>(() => (event ? {
     title: event.title, kind: event.kind, start_date: event.start_date, end_date: event.end_date ?? '', level: event.level,
     description: event.description, is_published: event.is_published,
-  } : EMPTY);
+  } : EMPTY));
+  const [form, setForm] = useState<SchoolEventWrite>(start);
+  useReportDirty(valuesDiffer(form, start), onDirty);
   const [errors, setErrors] = useState<Partial<Record<keyof SchoolEventWrite, string>>>({});
   const set = <K extends keyof SchoolEventWrite>(k: K, v: SchoolEventWrite[K]) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: undefined })); };
   const save = useMutation({
@@ -246,7 +254,7 @@ function EventForm({ event, onClose, onSaved }: { event: SchoolEvent | null; onC
       <Input label="Descripción (opcional)" value={form.description} onChange={(e) => set('description', e.target.value)} maxLength={300} />
       <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.is_published} onChange={(e) => set('is_published', e.target.checked)} /> Publicado en el sitio</label>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={save.isPending} className="min-h-[44px]">Guardar</Button>
       </div>
     </form>

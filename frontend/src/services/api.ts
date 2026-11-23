@@ -721,8 +721,9 @@ export const cafeteriaApi = {
   getStudentDetail: (studentId: number, params?: { ledger?: 0 | 1 }) =>
     api.get(`/cafeteria/admin/student/${studentId}/`, { params }),
 
-  adjustBalance: (studentId: number, amount: number, reason: string) =>
-    api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason }),
+  /** `requestId`: one per dialog opening; the same request sent twice is applied once (409 `already_applied`). */
+  adjustBalance: (studentId: number, amount: number, reason: string, requestId?: string) =>
+    api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason, ...(requestId ? { request_id: requestId } : {}) }),
 
   /** `bankRefundConfirmed`: staff already refunded the card charge in MultiCobros
    *  (required by the server for a real Banorte top-up). */
