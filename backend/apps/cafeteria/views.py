@@ -548,7 +548,9 @@ class MyCardsView(APIView):
         photo_ids = set()
         if request.user.role == User.Role.PARENT and not student_id:
             from apps.content.models import SiteSettings
-            if SiteSettings.load().families_upload_photos:
+            # One plain read (never get_or_create): the same single query on every
+            # request, whatever the number of children (test_consumption budget).
+            if SiteSettings.objects.filter(pk=1).values_list('families_upload_photos', flat=True).first():
                 photo_ids = set(family_students(request.user).filter(
                     tipo=StudentProfile.Tipo.ALUMNO).values_list('pk', flat=True))
         cards = []
