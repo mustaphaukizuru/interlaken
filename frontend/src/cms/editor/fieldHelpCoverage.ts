@@ -150,6 +150,7 @@ export const COVERAGE_HELP: Record<string, Record<string, string>> = {
     errNotInvited: googleError('el correo no tiene cuenta en el colegio'),
     errInactive: googleError('la cuenta está desactivada'),
     errEmailUnverified: googleError('el correo de Google no está verificado'),
+    errGoogleMismatch: googleError('una cuenta del personal entra con otra cuenta de Google'),
     errBackendUnreachable: googleError('el servidor del colegio no respondió'),
     errOther: googleError('pasó algo no previsto'),
   },

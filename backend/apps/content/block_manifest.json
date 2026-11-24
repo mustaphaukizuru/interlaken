@@ -415,6 +415,7 @@
         "errNotInvited": "Correo sin cuenta en el colegio",
         "errInactive": "Cuenta desactivada",
         "errEmailUnverified": "Correo de Google sin verificar",
+        "errGoogleMismatch": "Personal: otra cuenta de Google",
         "errBackendUnreachable": "Servidor no disponible",
         "errOther": "Otro error"
       },
@@ -468,6 +469,7 @@
         "errNotInvited": "text",
         "errInactive": "text",
         "errEmailUnverified": "text",
+        "errGoogleMismatch": "text",
         "errBackendUnreachable": "text",
         "errOther": "text"
       },
@@ -538,6 +540,7 @@
         "errNotInvited": "No hay una cuenta registrada con este correo. Pida al colegio que lo invite o vincule como tutor.",
         "errInactive": "Esta cuenta está desactivada. Si cree que es un error, contacte al colegio.",
         "errEmailUnverified": "Su correo de Google no está verificado. Verifíquelo e intente de nuevo.",
+        "errGoogleMismatch": "Esta cuenta del personal ya está vinculada a otra cuenta de Google. Pida a un administrador que la revise.",
         "errBackendUnreachable": "El servicio no está disponible en este momento. Intente más tarde.",
         "errOther": "Ocurrió un error. Intente de nuevo."
       }
