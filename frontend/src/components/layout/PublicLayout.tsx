@@ -165,6 +165,9 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
   const hoverCapable = useMediaQuery('(hover: hover) and (pointer: fine)');
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  // Opened by the pointer arriving: the click that usually follows keeps it
+  // open instead of closing it again (QA 2026-11-23); a second click closes.
+  const openedByHover = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -189,15 +192,19 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
     <div
       ref={ref}
       className="relative"
-      onMouseEnter={hoverCapable ? () => setOpen(true) : undefined}
-      onMouseLeave={hoverCapable ? () => setOpen(false) : undefined}
+      onMouseEnter={hoverCapable ? () => { openedByHover.current = true; setOpen(true); } : undefined}
+      onMouseLeave={hoverCapable ? () => { openedByHover.current = false; setOpen(false); } : undefined}
     >
       <button
         ref={btnRef}
         type="button"
         aria-expanded={open}
         aria-haspopup="true"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (openedByHover.current && open) { openedByHover.current = false; return; }
+          openedByHover.current = false;
+          setOpen((v) => !v);
+        }}
         className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded-sm"
       >
         {label}

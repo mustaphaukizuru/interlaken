@@ -10,10 +10,14 @@ const NO_960 = new Set(['/assets/hopscotch', '/assets/primaria-gate', '/assets/s
 export function assetSrcSet(src: string | undefined, opts: { full?: boolean } = {}): string | undefined {
   if (!src || !/^\/assets\/[^/]+\.webp$/.test(src) || /-(480|960)\.webp$/.test(src)) return undefined;
   const base = src.slice(0, -'.webp'.length);
+  // srcset separates candidates with spaces: a file name with one
+  // («interlaken-image (1).webp») must be encoded, or the browser drops the
+  // whole list and phones download the full-size file (QA 2026-11-23).
+  const url = (u: string) => u.replace(/ /g, '%20');
   // Cards stop at 960w: on a DPR-3 phone a 340px card would otherwise select
   // the full-size file. Heroes pass { full: true } to keep the 1600w candidate.
-  const mid = NO_960.has(base) ? `${src} 960w` : `${base}-960.webp 960w`;
-  return `${base}-480.webp 480w, ${mid}${opts.full && !NO_960.has(base) ? `, ${src} 1600w` : ''}`;
+  const mid = NO_960.has(base) ? `${url(src)} 960w` : `${url(base)}-960.webp 960w`;
+  return `${url(base)}-480.webp 480w, ${mid}${opts.full && !NO_960.has(base) ? `, ${url(src)} 1600w` : ''}`;
 }
 
 /** Default sizes for card/grid images; hero images pass "100vw". */

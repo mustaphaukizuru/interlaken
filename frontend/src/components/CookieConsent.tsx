@@ -8,7 +8,7 @@
  */
 import { lazy, Suspense, useState } from 'react';
 import { hasConsentDecision, setConsent } from '@/services/consent';
-import { initAnalytics, isAnalyticsConfigured, trackPageView } from '@/services/analytics';
+import { isAnalyticsConfigured } from '@/services/analytics';
 
 // Only a first visit (with analytics configured) shows the banner, so its
 // words and markup load on demand instead of in every page's first JS.
@@ -23,10 +23,11 @@ export function CookieConsent() {
 
   if (!visible) return null;
 
+  // Granting consent is enough: AnalyticsListener (subscribed to consent
+  // changes) boots analytics and reports this page once. Doing it here too
+  // counted the first page twice (QA 2026-11-23).
   const accept = () => {
     setConsent('granted');
-    initAnalytics();
-    trackPageView(window.location.pathname);
     setVisible(false);
   };
 
