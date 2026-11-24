@@ -35,7 +35,7 @@ const EXPLICIT_TITLES: Record<string, string> = {
   '/portal/comunicados': 'Comunicados',
   '/portal/perfil': 'Mi perfil',
   '/portal/privacidad': 'Privacidad',
-  '/admin': 'Dashboard',
+  '/admin': 'Inicio',
   '/admin/alumnos': 'Alumnos',
   '/admin/admisiones': 'Admisiones',
   '/admin/visitas': 'Visitas',

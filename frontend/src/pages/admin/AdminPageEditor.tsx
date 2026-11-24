@@ -20,7 +20,8 @@ import { templateFor } from '@/cms/sections';
 import { ROUTE_META } from '@/lib/routeMeta';
 import { loadAllGroups } from '@/cms/sections/loaders';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
-import { apiFieldErrors } from '@/lib/apiErrors';
+import { apiErrorStatus, apiFieldErrors } from '@/lib/apiErrors';
+import { RecordNotFound } from '@/components/admin/RecordNotFound';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cmsBase, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps } from '@/cms/editor/helpers';
 import { withoutSeedSeo } from '@/cms/seedSeo';
@@ -113,7 +114,7 @@ export default function AdminPageEditor() {
   // «Entiendo las advertencias» and «Publicar»: notices raised while it is open go on top.
   const phone = !useMediaQuery('(min-width: 768px)');
   const dialogToast = phone ? { position: 'top-center' as const } : undefined;
-  const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
+  const { data: page, isLoading, isError, error: pageError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
   const [blocks, setBlocksState] = useState<Block[]>([]);
   const [meta, setMetaState] = useState<Meta>(EMPTY_META);
@@ -589,7 +590,10 @@ export default function AdminPageEditor() {
     window.addEventListener('pointerup', onUp);
   };
 
-  if (!Number.isFinite(pageId)) return <ErrorState />;
+  // A wrong id in the address, or a page gone: say so, with the way back (QA 2026-11-24).
+  if (!Number.isFinite(pageId) || (isError && apiErrorStatus(pageError) === 404)) {
+    return <RecordNotFound backTo={base} backLabel="Volver a Páginas" />;
+  }
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (isLoading || !page || !sectionsReady) return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
 

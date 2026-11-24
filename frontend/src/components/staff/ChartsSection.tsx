@@ -55,11 +55,11 @@ function FunnelChart({ data }: { data: AnalyticsPayload }) {
   const takeaway = total === 0
     ? 'Aún no hay pre-registros en este ciclo'
     : f.pending > 0
-      ? `${fmtInt(f.pending)} de ${fmtInt(total)} pre-registros esperan primer contacto`
+      ? `${fmtInt(f.pending)} de ${fmtInt(total)} pre-registros ${f.pending === 1 ? 'espera' : 'esperan'} primer contacto`
       : 'Todos los pre-registros han sido atendidos';
 
   return (
-    <StaffCard title={takeaway} subtitle="Embudo de admisiones — pre-registros por etapa">
+    <StaffCard title={takeaway} subtitle="Embudo de admisiones: pre-registros por etapa">
       {total === 0 ? (
         <EmptyState
           icon={ClipboardList}
@@ -110,11 +110,11 @@ function RegFunnelChart({ data }: { data: AnalyticsPayload }) {
   const takeaway = total === 0
     ? 'Aún no hay inscripciones formales'
     : inReview > 0
-      ? `${fmtInt(inReview)} inscripciones esperan revisión del colegio`
+      ? (inReview === 1 ? '1 inscripción espera revisión del colegio' : `${fmtInt(inReview)} inscripciones esperan revisión del colegio`)
       : 'Ninguna inscripción pendiente de revisión';
 
   return (
-    <StaffCard title={takeaway} subtitle="Inscripciones formales — expedientes por etapa">
+    <StaffCard title={takeaway} subtitle="Inscripciones formales: expedientes por etapa">
       {total === 0 ? (
         <EmptyState
           icon={ClipboardList}
@@ -155,7 +155,7 @@ function ReferralsChart({ data }: { data: AnalyticsPayload }) {
     : `«${rows[0].source}» es la principal fuente de prospectos`;
 
   return (
-    <StaffCard title={takeaway} subtitle="¿Cómo nos conocieron? — pre-registros por fuente">
+    <StaffCard title={takeaway} subtitle="¿Cómo nos conocieron? Pre-registros por fuente">
       {rows.length === 0 ? (
         <EmptyState
           icon={Megaphone}
@@ -203,7 +203,7 @@ function CafeteriaChart({ data }: { data: AnalyticsPayload }) {
   return (
     <StaffCard
       title={takeaway}
-      subtitle="Cafetería — flujo diario de los últimos 30 días"
+      subtitle="Cafetería: flujo diario de los últimos 30 días"
       className="lg:col-span-2"
     >
       {empty ? (
@@ -272,7 +272,7 @@ function RevenueTrendChart({ data }: { data: AnalyticsPayload }) {
   const interval = Math.floor(series.length / 6);
 
   return (
-    <StaffCard title={takeaway} subtitle="Ingresos diarios — cafetería y otros cobros">
+    <StaffCard title={takeaway} subtitle="Ingresos diarios: cafetería y otros cobros">
       {total === 0 ? (
         <EmptyState
           icon={Receipt}

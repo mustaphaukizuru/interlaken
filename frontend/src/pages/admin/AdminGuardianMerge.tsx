@@ -11,6 +11,42 @@ import { Badge } from '@/components/ui/Badge';
 import { portalApi, type MergePreview, type MergeResult } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 
+/**
+ * What the preview's `references` keys (`app.Model.field`, every row that
+ * points at the account) mean for the office, by model (QA 2026-11-24: it
+ * listed «OutstandingToken: 32, LoginEvent: 16»). Anything else is internal
+ * and only counted together.
+ */
+const REFERENCE_LABEL: Record<string, string> = {
+  Notification: 'Notificaciones',
+  AnnouncementDelivery: 'Avisos entregados',
+  AnnouncementRead: 'Comunicados leídos',
+  AnnouncementComment: 'Comentarios en comunicados',
+  PushSubscription: 'Dispositivos con avisos push',
+  Payment: 'Pagos',
+  BillingProfile: 'Datos del titular de la tarjeta',
+  ConsentRecord: 'Consentimientos de privacidad',
+  ArcoRequest: 'Solicitudes ARCO',
+  PasswordRequest: 'Solicitudes de contraseña',
+  OutstandingToken: 'Sesiones',
+  LoginEvent: 'Inicios de sesión',
+  AuditLog: 'Registros de auditoría',
+};
+
+/** «Notificaciones: 3» rows, with the internal ones folded into one line. */
+function referenceRows(references: Record<string, number>): [string, number][] {
+  const rows = new Map<string, number>();
+  let other = 0;
+  for (const [key, n] of Object.entries(references)) {
+    const label = REFERENCE_LABEL[key.split('.')[1] ?? ''];
+    if (label) rows.set(label, (rows.get(label) ?? 0) + n);
+    else other += n;
+  }
+  const out = [...rows.entries()];
+  if (other) out.push(['Otros registros internos', other]);
+  return out;
+}
+
 /** /admin/fusionar-cuentas — merge two parent accounts (BACKLOG P4-6). */
 export default function AdminGuardianMerge() {
   const qc = useQueryClient();
@@ -70,8 +106,15 @@ export default function AdminGuardianMerge() {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-ink">Se moverán</h3>
-                {Object.keys(preview.references).length === 0 ? <p className="text-sm text-muted">Solo los hijos vinculados.</p> : (
-                  <ul className="mt-1 grid gap-1 text-xs text-muted sm:grid-cols-2">{Object.entries(preview.references).map(([k, n]) => <li key={k}>{k.split('.')[1]}: {n}</li>)}</ul>
+                <p className="mt-1 text-sm text-muted">
+                  {preview.drop.children.length === 0
+                    ? 'La cuenta que se fusiona no tiene hijos vinculados.'
+                    : `Hijos que pasan a la cuenta que se conserva: ${preview.drop.children.map((c) => c.name).join(', ')}.`}
+                </p>
+                {Object.keys(preview.references).length > 0 && (
+                  <ul className="mt-1 grid gap-1 text-xs text-muted sm:grid-cols-2" aria-label="Registros que se mueven">
+                    {referenceRows(preview.references).map(([label, n]) => <li key={label}>{label}: {n}</li>)}
+                  </ul>
                 )}
               </div>
               <Input label="Escriba FUSIONAR para confirmar" value={confirm} onChange={(e) => setConfirm(e.target.value.toUpperCase())} />

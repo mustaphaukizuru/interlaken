@@ -9,6 +9,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArrowLeft, Coffee, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { RecordNotFound } from '@/components/admin/RecordNotFound';
+import { apiErrorStatus } from '@/lib/apiErrors';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
@@ -38,7 +40,7 @@ import type { StudentProfile } from '@/types';
 export default function AdminStudentDetail({ id, embedded = false, onDeleted }: { id?: number; embedded?: boolean; onDeleted?: () => void } = {}) {
   const params = useParams();
   const studentId = id ?? params.studentId;
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: studentDetailKey(studentId ?? ''),
     queryFn: async () => (await portalApi.getStudent(Number(studentId))).data as StudentProfile,
     enabled: !!studentId,
@@ -54,6 +56,8 @@ export default function AdminStudentDetail({ id, embedded = false, onDeleted }: 
 
       {isLoading ? (
         <LoadingSpinner />
+      ) : isError && apiErrorStatus(error) === 404 ? (
+        <RecordNotFound backTo={embedded ? undefined : '/admin/alumnos'} backLabel="Volver a Alumnos" />
       ) : isError || !data ? (
         <ErrorState onRetry={() => refetch()} />
       ) : (

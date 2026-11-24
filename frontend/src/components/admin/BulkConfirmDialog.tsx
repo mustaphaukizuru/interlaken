@@ -68,6 +68,10 @@ function mergeResults(prev: BulkResult | null, next: BulkResult, failed: BulkFai
 
 const singularIfOne = (noun: string, n: number) => (n === 1 ? noun.replace(/s$/, '') : noun);
 
+/** «Se restaurarán» → «Se restaurará» for one row (QA 2026-11-24: «Se restaurarán 1 alumno»):
+ *  the plural future of `planVerb` agrees with the count. */
+const verbForCount = (verb: string, n: number) => (n === 1 ? verb.replace(/(\p{L}+r)án(?=\s|$)/gu, '$1á') : verb);
+
 /** Per-row outcomes the summary names instead of "procesados" (stem + suffix, gendered by the dialog). */
 const OUTCOME_WORDS: Record<string, [string, string]> = {
   erased: ['eliminad', ' por completo'],
@@ -327,7 +331,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </span>
             <div className="space-y-1 text-sm text-muted">
               <p>
-                {verb} <strong className="text-ink">{willRun.toLocaleString('es-MX')}</strong> {singularIfOne(entityLabel, willRun)}
+                {verbForCount(verb, willRun)} <strong className="text-ink">{willRun.toLocaleString('es-MX')}</strong> {singularIfOne(entityLabel, willRun)}
                 {plan.skipped.length > 0 && (
                   <>; <strong className="text-ink">{plan.skipped.length}</strong> se omitirá{plan.skipped.length === 1 ? '' : 'n'}</>
                 )}

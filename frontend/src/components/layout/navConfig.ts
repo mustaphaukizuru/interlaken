@@ -54,7 +54,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
     {
       heading: 'Operación',
       items: [
-        { icon: BarChart3,     label: 'Dashboard',  to: '/admin', end: true },
+        { icon: BarChart3,     label: 'Inicio',     to: '/admin', end: true },
         { icon: Users,         label: 'Alumnos',    to: '/admin/alumnos' },
         { icon: House,         label: 'Familias',   to: '/admin/familias' },
         { icon: ClipboardList, label: 'Admisiones', to: '/admin/admisiones', end: true, badgeKey: 'admisiones' },
@@ -167,7 +167,9 @@ export const mobileNavByRole: Record<Role, NavEntry[]> = {
  * to their console home and, for admins, Ajustes.
  */
 export function accountEntries(role: Role | string | undefined, home: string): NavEntry[] {
-  const console = role === 'admin' || role === 'staff';
+  // A staff account without console areas has no panel: /staff is for
+  // administrators (QA 2026-11-24), so no «Mi panel» that only says so.
+  const console = role === 'admin' || (role === 'staff' && home !== '/staff');
   return [
     ...(console && home !== '/portal' ? [{ icon: LayoutDashboard, label: 'Mi panel', to: home }] : []),
     { icon: UserCircle, label: 'Mi perfil', to: '/portal/perfil' },

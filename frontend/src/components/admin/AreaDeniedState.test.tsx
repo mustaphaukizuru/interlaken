@@ -20,4 +20,10 @@ describe('AreaDeniedState', () => {
     renderAt('/admin/usuarios');
     expect(screen.getByRole('alert')).toHaveTextContent('Esta sección es solo para administradores.');
   });
+
+  it('an account with no console area at all never loops back to /staff (QA 2026-11-24)', () => {
+    render(<MemoryRouter><AreaDeniedState user={{ role: 'staff', staff_areas: [] }} path="/staff" /></MemoryRouter>);
+    expect(screen.getByRole('alert')).toHaveTextContent('Su cuenta del personal aún no tiene áreas de la consola.');
+    expect(screen.getByRole('link', { name: 'Ir al portal' })).toHaveAttribute('href', '/portal');
+  });
 });

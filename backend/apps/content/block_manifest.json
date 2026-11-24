@@ -1100,7 +1100,7 @@
             "value": "{{telefono}} · {{correo}}"
           }
         ],
-        "note": "Resumen informativo — el texto oficial completo es el siguiente.",
+        "note": "Resumen informativo: el texto oficial completo es el siguiente.",
         "integralLabel": "Consultar el aviso integral",
         "errorTitle": "Aviso no disponible",
         "errorText": "",
@@ -1574,15 +1574,15 @@
         "structure": [
           {
             "title": "Inscripción",
-            "text": "— pago único al ingresar o reinscribirse."
+            "text": "pago único al ingresar o reinscribirse."
           },
           {
             "title": "Colegiatura",
-            "text": "— 11 mensualidades, de agosto a junio."
+            "text": "11 mensualidades, de agosto a junio."
           },
           {
             "title": "Seguros y credencial",
-            "text": "— conceptos anuales obligatorios."
+            "text": "conceptos anuales obligatorios."
           }
         ],
         "feesLabel": "Pago único",

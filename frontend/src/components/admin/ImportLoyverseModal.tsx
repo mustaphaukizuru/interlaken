@@ -258,14 +258,14 @@ function ImportLoyverseBody({ onClose, onImported }: {
           {imp.errors.length > 0 && (
             <p className="flex items-start gap-1.5 text-xs text-amber">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {imp.errors.length} error(es) en filas — se omitirán al aplicar.
+              {imp.errors.length} error(es) en filas: se omitirán al aplicar.
             </p>
           )}
 
           <div className="flex items-center justify-between gap-2 pt-1">
             {wouldChange === 0 ? (
               <p className="flex items-center gap-1.5 text-sm text-green-dark">
-                <CheckCircle2 className="h-4 w-4" /> Todo al día — nada por importar.
+                <CheckCircle2 className="h-4 w-4" /> Todo al día: nada por importar.
               </p>
             ) : <span />}
             <div className="flex gap-2">

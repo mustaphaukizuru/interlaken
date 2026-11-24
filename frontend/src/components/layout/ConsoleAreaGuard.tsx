@@ -29,3 +29,20 @@ export function ConsoleAreaGuard({ children }: { children: ReactNode }) {
   }
   return <>{children}</>;
 }
+
+/**
+ * /staff/* pages (the whole-school «Panel de Dirección»: admissions, ARCO,
+ * money and its CSV export; the site content and media) are for
+ * administrators only, like the API (QA 2026-11-24: a cafetería cashier could
+ * open them). A staff account opening /staff lands on its own console area;
+ * any other /staff page, or an account without areas, gets AreaDeniedState
+ * inside the shell (header, menu and «Cerrar sesión» stay).
+ */
+export function AdminOnlyPage({ children }: { children: ReactNode }) {
+  const user = useAuthStore((s) => s.user);
+  const { pathname } = useLocation();
+  if (!user || user.role === 'admin') return <>{children}</>;
+  const home = consoleHome(user);
+  if (home && pathname.replace(/\/+$/, '') === '/staff') return <Navigate to={home} replace />;
+  return <AreaDeniedState user={user} path={pathname} />;
+}

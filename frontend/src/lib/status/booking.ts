@@ -57,6 +57,26 @@ export function canMove(from: string, to: BookingStatus): boolean {
   return (BOOKING_TRANSITIONS[from as BookingStatus] ?? []).includes(to);
 }
 
+/** "2026-11-26 09:00" for `now` in the school's time zone (Mexico City). */
+function schoolStamp(now: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+}
+
+/**
+ * True once the visit's start time has come (school time zone): «Asistió» and
+ * «No asistió» are offered only then, and the server refuses them before
+ * (QA 2026-11-24). A missing date or time never blocks them.
+ */
+export function visitStarted(date: string | null | undefined, startTime: string | null | undefined, now: Date = new Date()): boolean {
+  if (!date || !startTime) return true;
+  return schoolStamp(now) >= `${date} ${startTime.slice(0, 5)}`;
+}
+
 export function bookingStatusMeta(status: string) {
   return BOOKING_STATUS_META[status as BookingStatus] ?? { label: status, tab: status, variant: 'neutral' as BadgeVariant };
 }

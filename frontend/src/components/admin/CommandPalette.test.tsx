@@ -123,7 +123,12 @@ describe('CommandPalette', () => {
 describe('role-aware actions (P1-E7)', () => {
   it('families get navigation actions and no student search', async () => {
     expect(actionsForRole('parent').some((a) => a.to === '/portal/cafeteria')).toBe(true);
-    expect(actionsForRole('staff').some((a) => a.to === '/staff/contenido')).toBe(true);
+    // Staff jump to their own console areas, never to the admin-only /staff pages (QA 2026-11-24).
+    const cashier = { role: 'staff' as const, staff_areas: ['cafeteria'] };
+    const staffActions = actionsForRole('staff', cashier).map((a) => a.to);
+    expect(staffActions).toContain('/admin/cafeteria?exportar=csv');
+    expect(staffActions).toContain('/portal/perfil');
+    expect(staffActions.some((to) => to?.startsWith('/staff'))).toBe(false);
     expect(actionsForRole('admin').some((a) => a.to === '/admin/visitas')).toBe(true);
     useAuthStore.setState({ user: { id: 2, email: 'p@x.mx', first_name: 'Pa', last_name: 'Dre', full_name: 'Pa Dre', role: 'parent', avatar: '', whatsapp: '', last_login: null } as never, isAuthenticated: true });
     renderPalette();

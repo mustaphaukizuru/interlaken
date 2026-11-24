@@ -179,11 +179,42 @@ describe('AdminAnnouncements', () => {
     await user.click(within(dialog).getByRole('button', { name: /^Publicar$/i }));
 
     const confirm = within(dialog).getByRole('alertdialog', { name: /¿Enviar ahora\?/i });
-    await waitFor(() => expect(confirm).toHaveTextContent(/~640 familia\(s\)/));
+    // The server counts accounts, not families (QA 2026-11-24).
+    await waitFor(() => expect(confirm).toHaveTextContent(/~640 cuentas\)/));
+    expect(within(dialog).getByText('Se notificará a ~640 cuentas.')).toBeInTheDocument();
+    expect(confirm).not.toHaveTextContent(/familia/);
     await user.click(within(confirm).getByRole('button', { name: /^Volver$/i }));
     expect(within(dialog).queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: /^Publicar$/i })).toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('a comunicado already sent has no «Eliminar»; one never sent keeps it (QA 2026-11-24)', async () => {
+    list.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [
+      { ...SAMPLE, id: 4, title: 'Junta de padres', is_active: true, fanout_at: '2026-08-01T12:05:00Z' },
+      { ...SAMPLE, id: 5, title: 'Borrador de cierre', fanout_at: null },
+    ] } } as never);
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    expect(screen.queryByRole('button', { name: 'Eliminar el comunicado "Junta de padres"' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eliminar el comunicado "Borrador de cierre"' })).toBeInTheDocument();
+  });
+
+  it('warns when a comunicado for the staff is also put on the public site (QA 2026-11-24)', async () => {
+    recipientCount.mockResolvedValue({ data: { count: 1 } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Dirigido a'), 'staff');
+    expect(await within(dialog).findByText('Se notificará a ~1 cuenta del personal.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('note')).toBeNull();
+    await user.click(within(dialog).getByLabelText(/Publicar en el sitio público/i));
+    expect(within(dialog).getByRole('note')).toHaveTextContent('la franja del sitio público la ve cualquier visitante');
+    await user.selectOptions(within(dialog).getByLabelText('Dirigido a'), 'parents');
+    expect(within(dialog).queryByRole('note')).toBeNull();
   });
 
   it('saves a draft without the send confirmation', async () => {

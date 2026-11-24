@@ -35,7 +35,7 @@ import { invalidateEntity } from '@/hooks/queries/keys';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { shortDateTime } from '@/lib/tableFormat';
 import {
-  BOOKING_SOURCE_OPTIONS, BOOKING_STATUS_OPTIONS, VISIT_TYPE_LABEL, VISIT_TYPE_OPTIONS, bookingStatusMeta, canMove,
+  BOOKING_SOURCE_OPTIONS, BOOKING_STATUS_OPTIONS, VISIT_TYPE_LABEL, VISIT_TYPE_OPTIONS, bookingStatusMeta, canMove, visitStarted,
   type BookingStatus,
 } from '@/lib/status/booking';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
@@ -419,19 +419,22 @@ function BookingRowActions({
   const s = booking.status as BookingStatus;
   const who = booking.parent_name;
   const busy = busyAct !== undefined;
+  // Attendance is recorded once the visit has started (the server refuses it
+  // before): no «Asistió» / «No asistió» on a visit still to come (QA 2026-11-24).
+  const started = visitStarted(booking.slot_date, booking.slot_start_time);
   const moves: RowMove[] = [];
   if (canMove(s, 'confirmed')) {
     moves.push({ act: 'confirm', label: 'Confirmar', ariaLabel: `Confirmar la reserva de ${who}`, Icon: Check,
       tone: 'hover:bg-green-50 hover:text-green-600', run: () => onAct(booking, 'confirm') });
   }
-  if (canMove(s, 'attended')) {
+  if (started && canMove(s, 'attended')) {
     moves.push({ act: 'attended', label: 'Asistió', ariaLabel: `Marcar que ${who} asistió`, Icon: UserCheck,
       tone: 'hover:bg-brand-50 hover:text-brand-600',
       run: () => (s === 'no_show'
         ? onNote({ booking, act: 'attended', title: 'Corregir: sí asistió', confirmLabel: 'Marcar asistió', message: `La visita de ${who} está marcada como «No asistió». Indique por qué se corrige.` })
         : onAct(booking, 'attended')) });
   }
-  if (canMove(s, 'no_show')) {
+  if (started && canMove(s, 'no_show')) {
     moves.push({ act: 'no_show', label: 'No asistió', ariaLabel: `Marcar que ${who} no asistió`, Icon: UserX,
       tone: 'hover:bg-coral-50 hover:text-coral-600',
       run: () => (s === 'attended'
@@ -654,10 +657,13 @@ function BookingsView() {
         rowName={(id) => bulkNames.get(id)}
       />
 
+      {/* «Volver» / «Cancelar la visita»: two «Cancelar» buttons read as the
+          same thing (QA 2026-11-24). */}
       <ConfirmDialog
         open={!!cancelFor}
-        title="Cancelar visita"
-        confirmLabel="Cancelar visita"
+        title="Cancelar la visita"
+        confirmLabel="Cancelar la visita"
+        cancelLabel="Volver"
         loading={action.isPending}
         onClose={() => setCancelFor(null)}
         onConfirm={() => cancelFor && act(cancelFor, 'cancel')}
@@ -665,7 +671,7 @@ function BookingsView() {
           <>
             Esto cancelará la visita de <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
             <span className="font-semibold text-ink">{format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}</span>{' '}
-            a las {hhmm(cancelFor.slot_start_time)} y liberará el cupo.
+            a las {hhmm(cancelFor.slot_start_time)} y liberará el cupo. La familia recibirá un correo con la cancelación.
           </>
         )}
       />

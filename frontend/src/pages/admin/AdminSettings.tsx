@@ -306,7 +306,7 @@ export default function AdminSettings() {
                   error={fieldErrors.phone_display}
                 />
                 <Input
-                  label="Teléfono (E.164)"
+                  label="Teléfono con lada (+52…)"
                   className={FIELD}
                   value={form.phone_e164}
                   onChange={(e) => set('phone_e164', e.target.value)}

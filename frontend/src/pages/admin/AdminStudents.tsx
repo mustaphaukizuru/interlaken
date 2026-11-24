@@ -501,7 +501,12 @@ export default function AdminStudents() {
         <Card title={personal
           ? `${count.toLocaleString('es-MX')} ${count === 1 ? 'persona del personal' : 'personas del personal'}`
           : `${count.toLocaleString('es-MX')} ${count === 1 ? 'alumno' : 'alumnos'}`}>
-          <p role="status" aria-live="polite" className="sr-only">{count} {personal ? 'personas del personal' : 'alumnos'} encontrados</p>
+          {/* «1 alumno encontrado», never «1 alumnos encontrados» (QA 2026-11-24). */}
+          <p role="status" aria-live="polite" className="sr-only">
+            {count === 1
+              ? (personal ? '1 persona del personal encontrada' : '1 alumno encontrado')
+              : `${count} ${personal ? 'personas del personal encontradas' : 'alumnos encontrados'}`}
+          </p>
           <DataTable<RosterStudent>
             tableId="students"
             columns={columns}

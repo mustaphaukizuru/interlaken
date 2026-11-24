@@ -70,6 +70,8 @@ export default function AdminStaffUsers() {
   const [confirming, setConfirming] = useState<{ action: BulkActionDef; one?: StaffUser } | null>(null);
   const [toEdit, setToEdit] = useState<StaffUser | null>(null);
   const [toView, setToView] = useState<StaffUser | null>(null);
+  // «Administrador» is never one click away: the select asks first (QA 2026-11-24).
+  const [toPromote, setToPromote] = useState<StaffUser | null>(null);
   const isLg = useMediaQuery('(min-width: 1024px)');
 
   const [page, setPage] = useUrlPage();
@@ -105,6 +107,21 @@ export default function AdminStaffUsers() {
     onSuccess: () => { invalidate(); setToToggle(null); toast.success('Actualizado.'); },
     onError: onErr,
   });
+  // A role change says what happened, to whom (it used to save in silence).
+  const changeRole = useMutation({
+    mutationFn: ({ user, role }: { user: StaffUser; role: StaffUser['role'] }) => portalApi.updateStaff(user.id, { role }),
+    onSuccess: (_r, { user, role }) => {
+      invalidate();
+      setToPromote(null);
+      toast.success(`${user.full_name || user.email} ahora es ${ROLE[role] ?? role}.`);
+    },
+    onError: onErr,
+  });
+  const pickRole = (u: StaffUser, role: StaffUser['role']) => {
+    if (role === u.role) return;
+    if (role === 'admin') setToPromote(u);
+    else changeRole.mutate({ user: u, role });
+  };
   const reset = useMutation({
     mutationFn: (u: StaffUser) => portalApi.resetStaffPassword(u.id).then((r) => ({ user: u, password: r.data.temporary_password })),
     onSuccess: (r) => { setToReset(null); setRevealed(r); },
@@ -149,8 +166,8 @@ export default function AdminStaffUsers() {
           aria-label={`Rol de ${u.email}`}
           className="input-field min-h-[36px] w-auto py-1 text-xs"
           value={u.role}
-          disabled={patch.isPending}
-          onChange={(e) => patch.mutate({ id: u.id, data: { role: e.target.value as StaffUser['role'] } })}
+          disabled={patch.isPending || changeRole.isPending}
+          onChange={(e) => pickRole(u, e.target.value as StaffUser['role'])}
         >
           <option value="admin">Administrador</option>
           <option value="staff">Personal</option>
@@ -332,6 +349,15 @@ export default function AdminStaffUsers() {
         message={toToggle?.is_active ? `${toToggle.email} no podrá iniciar sesión y sus sesiones abiertas se cerrarán.` : `${toToggle?.email} podrá volver a iniciar sesión.`}
         confirmLabel={toToggle?.is_active ? 'Desactivar' : 'Reactivar'}
         loading={patch.isPending}
+      />
+      <ConfirmDialog
+        open={!!toPromote}
+        onClose={() => { if (!changeRole.isPending) setToPromote(null); }}
+        onConfirm={() => toPromote && changeRole.mutate({ user: toPromote, role: 'admin' })}
+        title="Hacer administrador"
+        message={`${toPromote?.full_name || toPromote?.email || ''} tendrá acceso completo a la consola: el dinero (cafetería y pagos), los usuarios del personal y los ajustes del colegio.`}
+        confirmLabel="Hacer administrador"
+        loading={changeRole.isPending}
       />
       <ConfirmDialog
         open={!!toReset}

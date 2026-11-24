@@ -55,7 +55,8 @@ import { useStudentsBulk } from '@/hooks/queries/students';
 import { useAuthStore } from '@/store/authStore';
 import { LIVE } from '@/lib/live';
 import { GRADES } from '@/lib/grades';
-import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, isCardTopUp, options } from '@/lib/status/cafeteria';
+import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, isCardTopUp, movementSign, options } from '@/lib/status/cafeteria';
+import { MovementAmount } from '@/components/admin/MovementAmount';
 import { PAYMENT_FAILURE, gatewayLabel } from '@/lib/status/payment';
 import type { CafeteriaBalance, TopUpLogEntry } from '@/types';
 
@@ -399,14 +400,14 @@ function RosterTab() {
       {lastSync && (
         <div className="-mt-1 mb-3 text-xs text-subtle">
           <p>
-            Última sincronización — recibos: {lastSync.receipts}, compras nuevas:{' '}
+            Última sincronización. Recibos: {lastSync.receipts}, compras nuevas:{' '}
             {lastSync.purchases_created}, saldos sembrados: {lastSync.balances_ok}
             {lastSync.balances_failed > 0 ? `, fallidos: ${lastSync.balances_failed}` : ''}.
           </p>
           {(lastSync.skipped > 0 || lastSync.unmatched > 0) && (
             <p className="mt-0.5 text-muted">
               {lastSync.skipped > 0 && <>{lastSync.skipped} recibo(s) sin movimiento de monedero (venta en efectivo o tarjeta: el saldo no cambia). </>}
-              {lastSync.unmatched > 0 && <>{lastSync.unmatched} recibo(s) de un cliente que no es un alumno vinculado — revise “Vincular Loyverse” en Alumnos.</>}
+              {lastSync.unmatched > 0 && <>{lastSync.unmatched} recibo(s) de un cliente que no es un alumno vinculado: revise “Vincular Loyverse” en Alumnos.</>}
             </p>
           )}
         </div>
@@ -553,7 +554,8 @@ const TX_COLUMNS: Column<AdminTransaction>[] = [
     ),
   },
   { id: 'type', header: 'Tipo', sortKey: 'type', cell: (t) => <Badge variant={TX_TYPE[t.transaction_type]?.variant ?? 'neutral'}>{TX_TYPE[t.transaction_type]?.label ?? t.type_display}</Badge> },
-  { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (t) => mxn(t.amount) },
+  // An adjustment or a refund shows its direction when the API says it (QA 2026-11-24).
+  { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (t) => <MovementAmount type={t.transaction_type} amount={t.amount} sign={movementSign(t)} /> },
   { id: 'balance', header: 'Saldo', label: 'Saldo después', sortKey: 'balance', align: 'right', className: 'text-muted', cell: (t) => (t.balance_after !== null ? mxn(t.balance_after) : '—') },
   { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
   { id: 'description', header: 'Descripción', className: 'text-muted', truncate: 280, cell: (t) => t.description },

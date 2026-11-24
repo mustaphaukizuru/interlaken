@@ -15,7 +15,7 @@ import { BOOKINGS_ENTITY, SLOTS_ENTITY } from '@/hooks/queries/bookings';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { api, bookingsApi, type WeekBooking, type WeekSlot } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
-import { BOOKING_STATUS_META, type BookingStatus } from '@/lib/status/booking';
+import { BOOKING_STATUS_META, visitStarted, type BookingStatus } from '@/lib/status/booking';
 import { canOpen } from '@/lib/areas';
 import { useAuthStore } from '@/store/authStore';
 
@@ -142,7 +142,11 @@ export default function AdminVisitsWeek() {
                   <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">{DAY_NAMES[i]} <span className="text-ink">{Number(d.date.slice(8))}</span></h2>
                   {d.slots.length === 0 && !(examsByDay.get(d.date)?.length) && <p className="text-[11px] text-subtle">Sin horarios</p>}
                   <ul className="space-y-2">
-                    {d.slots.map((s) => (
+                    {d.slots.map((s) => {
+                      // «No asistió» and «Resultado» record attendance: only once
+                      // the visit has started (QA 2026-11-24; the server refuses before).
+                      const started = visitStarted(d.date, s.start_time);
+                      return (
                       <li key={s.id} className={`rounded-md border bg-white p-2 text-xs ${s.is_active ? 'border-line' : 'border-dashed border-line opacity-60'}`}>
                         <p className="font-semibold text-ink">{s.start_time}–{s.end_time} <span className="font-normal text-subtle">· {s.visit_type === 'open_class' ? 'Clase abierta' : 'Individual'} · {s.booked}/{s.capacity}</span></p>
                         {s.title && <p className="truncate text-subtle">{s.title}</p>}
@@ -156,8 +160,8 @@ export default function AdminVisitsWeek() {
                               {b.outcome && <p className="text-[11px] text-green-700">Resultado: {OUTCOMES.find(([k]) => k === b.outcome)?.[1] ?? b.outcome}</p>}
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setMoving(b); setTargetSlot(null); }}><MoveRight size={11} className="mr-0.5 inline" aria-hidden="true" />Reprogramar</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" disabled={action.isPending && action.variables?.id === b.id} onClick={() => setNoShowFor(b)}>{action.isPending && action.variables?.id === b.id ? 'Guardando…' : 'No asistió'}</button>}
+                                {started && (b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
+                                {started && (b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" disabled={action.isPending && action.variables?.id === b.id} onClick={() => setNoShowFor(b)}>{action.isPending && action.variables?.id === b.id ? 'Guardando…' : 'No asistió'}</button>}
                                 {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
                                 {b.case && seesAdmissions && <Link to={`/admin/admisiones/${b.case}`} className="inline-flex min-h-[36px] items-center rounded-sm px-2 text-[11px] text-purple hover:bg-white md:min-h-[32px]" aria-label={`Expediente de ${b.child_name || b.parent_name}`}><ExternalLink size={11} className="mr-0.5" aria-hidden="true" />Expediente</Link>}
                               </div>
@@ -165,7 +169,8 @@ export default function AdminVisitsWeek() {
                           ))}
                         </ul>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                   {(examsByDay.get(d.date) ?? []).length > 0 && (
                     <ul className="mt-2 space-y-2" aria-label={`Exámenes del ${DAY_NAMES[i]} ${Number(d.date.slice(8))}`}>

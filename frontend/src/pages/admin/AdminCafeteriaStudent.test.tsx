@@ -127,6 +127,43 @@ describe('AdminCafeteriaStudent money actions', () => {
     expect(cafeteriaAdminApi.adjustments).toHaveBeenCalledWith({ student: 7, page: 1 });
   });
 
+  it('a «Descontar» adjustment reads as a debit in Movimientos, a credit as a credit (QA 2026-11-24)', async () => {
+    const tx = (id: number, extra: Record<string, unknown>) => ({
+      id, student_id: 7, transaction_type: 'adjustment', items: [], date: '2026-08-02T15:00:00Z', loyverse_receipt_id: '', ...extra,
+    });
+    vi.mocked(cafeteriaAdminApi.transactions).mockResolvedValue({ data: { count: 4, results: [
+      // From the trail below (its audit row is −12.50).
+      tx(60, { amount: '12.50', description: 'Ajuste manual: Doble cobro', balance_after: '107.50' }),
+      // Not in the trail: the step from the older row says it (130.00 → 120.00).
+      tx(59, { amount: '10.00', description: 'Ajuste manual: Corrección', balance_after: '120.00' }),
+      tx(58, { amount: '5.00', description: 'Ajuste manual: Cortesía', balance_after: '130.00' }),
+      tx(57, { transaction_type: 'purchase', amount: '25.00', description: 'Jugo', balance_after: '125.00' }),
+    ] } } as never);
+    vi.mocked(cafeteriaAdminApi.adjustments).mockResolvedValue({ data: { count: 1, results: [
+      { ...DETAIL.adjustments[0], id: 4, amount: '-12.50', reason: 'Doble cobro', transaction: 60, balance_after: '107.50' },
+    ] } } as never);
+    renderPage();
+
+    const table = await screen.findByRole('table', { name: 'Movimientos del alumno' });
+    const row = (text: string) => within(table).getByText(text).closest('tr') as HTMLElement;
+    await within(table).findByText('Ajuste manual: Doble cobro');
+    expect(row('Ajuste manual: Doble cobro')).toHaveTextContent('−$12.50');
+    expect(within(row('Ajuste manual: Doble cobro')).getByText(/−\$12\.50/)).toHaveClass('text-coral-600');
+    expect(row('Ajuste manual: Corrección')).toHaveTextContent('−$10.00');
+    expect(row('Ajuste manual: Cortesía')).toHaveTextContent('+$5.00');
+    // Purchases read as before.
+    expect(row('Jugo')).toHaveTextContent('$25.00');
+    expect(row('Jugo')).not.toHaveTextContent('−$25.00');
+  });
+
+  it('a wallet that does not exist (404) says so with the way back to Cafetería (QA 2026-11-24)', async () => {
+    getStudentDetail.mockRejectedValue({ isAxiosError: true, response: { status: 404, data: { detail: 'No encontrado.' } } });
+    renderPage();
+    expect(await screen.findByText('No encontramos este registro')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a Cafetería' })).toHaveAttribute('href', '/admin/cafeteria');
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+  });
+
   it('abonars and descontar call adjustBalance with the signed amount', async () => {
     const user = userEvent.setup();
     renderPage();

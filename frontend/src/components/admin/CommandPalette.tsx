@@ -64,7 +64,8 @@ export function actionsForRole(role: string | undefined, user?: Parameters<typeo
   if (role === 'staff') {
     // A staff account with console areas also jumps to its own sections.
     const console = user ? ACTIONS.filter((a) => a.to?.startsWith('/admin/') && canOpen(user, a.to)) : [];
-    return [...console, ...STAFF_ACTIONS];
+    // The «Panel de Dirección» and the site content are for administrators (QA 2026-11-24).
+    return [...console, ...STAFF_ACTIONS.filter((a) => !a.to || canOpen(user, a.to))];
   }
   return FAMILY_ACTIONS;
 }

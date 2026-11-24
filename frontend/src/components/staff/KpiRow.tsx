@@ -170,9 +170,9 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
           return <div key={key} className={tile}>{body}</div>;
         }
         return to ? (
-          <Link key={key} to={to} className={cls} aria-label={`${title} — abrir vista`}>{body}</Link>
+          <Link key={key} to={to} className={cls} aria-label={`${title}: abrir vista`}>{body}</Link>
         ) : (
-          <a key={key} href={href} className={cls} aria-label={`${title} — abrir en administración`}>{body}</a>
+          <a key={key} href={href} className={cls} aria-label={`${title}: abrir en administración`}>{body}</a>
         );
       })}
     </div>

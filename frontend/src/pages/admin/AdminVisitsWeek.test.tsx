@@ -83,4 +83,17 @@ describe('AdminVisitsWeek', () => {
     await waitFor(() => expect(bookingsApi.bookingAction).toHaveBeenCalledWith(5, 'no_show'));
     expect(toast.success).toHaveBeenCalledWith('Visita marcada como «No asistió».');
   });
+  it('a visit still to come offers no «No asistió» and no «Resultado», only «Reprogramar» (QA 2026-11-24)', async () => {
+    vi.mocked(bookingsApi.adminWeek).mockResolvedValueOnce({ data: { start: '2099-06-15', end: '2099-06-21', days: [
+      { date: '2099-06-15', slots: [{ id: 2, title: '', visit_type: 'individual', start_time: '09:00', end_time: '09:30', capacity: 1, is_active: true, booked: 1, bookings: [
+        { id: 8, parent_name: 'Rosa', child_name: 'Leo', status: 'confirmed', outcome: '', num_attendees: 1, parent_phone: '', case: null },
+      ] }] },
+      ...[16, 17, 18, 19, 20, 21].map((d) => ({ date: `2099-06-${d}`, slots: [] })),
+    ] } } as never);
+    renderWithProviders(<AdminVisitsWeek />, { route: '/admin/visitas/semana' });
+    expect(await screen.findByText(/Rosa · Leo/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reprogramar/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'No asistió' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resultado/ })).toBeNull();
+  });
 });

@@ -22,7 +22,8 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { apiFieldErrors } from '@/lib/apiErrors';
+import { apiErrorStatus, apiFieldErrors } from '@/lib/apiErrors';
+import { RecordNotFound } from '@/components/admin/RecordNotFound';
 import { formatDateTime } from '@/lib/format';
 import { useLeaveGuard } from '@/components/admin/pricing/useLeaveGuard';
 import { valuesDiffer } from '@/hooks/useDirtyCloseGuard';
@@ -160,8 +161,14 @@ function VersionsOverview() {
 
 /* ── One version: read-only, or the draft editor ───────────────────────── */
 function VersionView({ id }: { id: number }) {
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['legal-notice-version', id], queryFn: async () => (await legalNoticesApi.get(id)).data });
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['legal-notice-version', id], queryFn: async () => (await legalNoticesApi.get(id)).data, enabled: Number.isFinite(id),
+  });
   const back = <Link to={BASE} className="mb-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-purple hover:underline"><ArrowLeft size={16} aria-hidden="true" /> Todas las versiones</Link>;
+  // A version that does not exist (or a wrong id): say so, never «Reintentar» (QA 2026-11-24).
+  if (!Number.isFinite(id) || (isError && apiErrorStatus(error) === 404)) {
+    return <>{back}<Card><RecordNotFound backTo={BASE} backLabel="Ver todas las versiones" /></Card></>;
+  }
   if (isLoading) return <>{back}<Card><ListSkeleton /></Card></>;
   if (isError || !data) return <>{back}<Card><ErrorState title="No se pudo abrir esta versión" onRetry={() => refetch()} /></Card></>;
   return (

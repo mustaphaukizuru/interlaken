@@ -193,7 +193,7 @@ export default function AdminAnnouncements() {
 
   // Command-palette deep link: /admin/comunicados?nuevo=1 opens the composer
   // (same modal, same validations) and consumes the param.
-  // ?emergencia=1 (header quick action "Emergencia (broadcast)") opens the
+  // ?emergencia=1 (header quick action «Emergencia (a todos)») opens the
   // urgent-notice modal instead.
   const [searchParams, setSearchParams] = useSearchParams();
   const wantsNew = searchParams.get('nuevo');
@@ -317,8 +317,12 @@ export default function AdminAnnouncements() {
                 className="rounded-sm p-2 text-subtle hover:bg-cream hover:text-ink"><Send className="h-4 w-4" aria-hidden="true" /></button>
               <button type="button" onClick={() => openEdit(a)} aria-label={`Editar el comunicado "${a.title}"`}
                 className="rounded-sm p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" aria-hidden="true" /></button>
-              <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
-                className="rounded-sm p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+              {/* A comunicado already sent cannot be deleted (the server refuses):
+                  «Desactivar» archives it (QA 2026-11-24). */}
+              {!a.fanout_at && (
+                <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
+                  className="rounded-sm p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+              )}
             </>
           )}
           toolbar={(
@@ -412,6 +416,12 @@ export default function AdminAnnouncements() {
               className="h-4 w-4 rounded-sm border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Publicar en el sitio público (franja de aviso arriba del encabezado)
           </label>
+          {form.show_on_site && form.audience === 'staff' && (
+            <p role="note" className="rounded-sm bg-warning-bg px-3 py-2 text-xs text-ink">
+              Este comunicado es para el personal, pero la franja del sitio público la ve cualquier visitante.
+              Desmarque «Publicar en el sitio público» si es solo para el personal.
+            </p>
+          )}
           {form.show_on_site && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Input label="Mostrar hasta (opcional)" type="date" value={form.site_until ?? ''} onChange={(e) => setField('site_until', e.target.value || null)} error={formErrors.site_until} />
@@ -430,7 +440,7 @@ export default function AdminAnnouncements() {
               <p id="ann-send-title" className="text-sm font-semibold text-ink">¿Enviar ahora?</p>
               <p id="ann-send-desc" className="text-sm text-muted">
                 «{form.title.trim()}» se enviará ahora a: {audienceMeta(form.audience).label.toLowerCase()}
-                {recipients.data ? ` (~${recipients.data.count} ${form.audience === 'staff' ? 'cuenta(s) del personal' : 'familia(s)'})` : ''}
+                {recipients.data ? ` (~${recipients.data.count} ${recipientNoun(form.audience, recipients.data.count)})` : ''}
                 , por notificación en el portal{form.push_enabled ? ', correo y push' : ' y correo'}. No se puede deshacer.
               </p>
               <div className="flex justify-end gap-2">
@@ -464,7 +474,7 @@ export default function AdminAnnouncements() {
         <div className="space-y-4">
           <p className="rounded-sm bg-danger-bg px-3 py-2 text-sm text-ink">
             Se creará un comunicado y se notificará de inmediato (app + primer lote de correo/push).
-            El resto lo completa el cron. Use solo para contingencias reales.
+            Los demás correos y avisos push salen solos en los minutos siguientes. Use solo para contingencias reales.
           </p>
           <Input
             label="Título"
@@ -501,7 +511,7 @@ export default function AdminAnnouncements() {
               onChange={(e) => setAlertForm((f) => ({ ...f, whatsapp: e.target.checked }))}
               className="h-4 w-4 rounded-sm border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40"
             />
-            También WhatsApp (solo números registrados, uno por número; requiere Cloud API). Se envía en segundo plano y el avance se ve en «Entrega».
+            También WhatsApp (solo números registrados, uno por número; requiere que la cuenta de WhatsApp del colegio esté conectada). Se envía en segundo plano y el avance se ve en «Entrega».
           </label>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink">
             <input
@@ -586,6 +596,13 @@ function activateMessage(a: Announcement | null): string {
   return `«${a.title}» se enviará ahora a: ${who} (notificación en el portal, correo y push si está activado). No se puede deshacer.`;
 }
 
+/** The server counts active accounts, not families (QA 2026-11-24: «~22 familia(s)»). */
+function recipientNoun(audience: string, count: number): string {
+  const one = count === 1;
+  if (audience === 'staff') return one ? 'cuenta del personal' : 'cuentas del personal';
+  return one ? 'cuenta' : 'cuentas';
+}
+
 /** Audience-size preview: how many active accounts publish would notify. */
 function RecipientCountHint({ audience }: { audience: string }) {
   const { data } = useQuery({
@@ -594,10 +611,9 @@ function RecipientCountHint({ audience }: { audience: string }) {
     staleTime: 60_000,
   });
   if (!data) return null;
-  const noun = audience === 'staff' ? 'cuenta(s) del personal' : 'familia(s)';
   return (
     <p className="mt-1.5 text-xs text-subtle">
-      Se notificará a ~{data.count} {noun}.
+      Se notificará a ~{data.count} {recipientNoun(audience, data.count)}.
     </p>
   );
 }

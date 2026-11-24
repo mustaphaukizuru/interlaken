@@ -129,6 +129,9 @@ describe('StudentFormModal never overwrites medical data it did not show (launch
     renderWithProviders(<StudentFormModal open onClose={() => {}} student={rosterRow as never} />);
 
     expect(await screen.findByDisplayValue('Nuez')).toBeInTheDocument();
+    // Who really sees the allergies (apps/accounts/medical.py), never «Visible en cafetería» (QA 2026-11-24).
+    expect(screen.getByText('Solo la ven los administradores y la familia que autorizó los datos de salud; el personal y la cafetería no la ven.')).toBeInTheDocument();
+    expect(screen.queryByText(/Visible en cafetería/)).toBeNull();
     const group = screen.getByLabelText(/^grupo/i);
     await userEvent.clear(group);
     await userEvent.type(group, 'b');

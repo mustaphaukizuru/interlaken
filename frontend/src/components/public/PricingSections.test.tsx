@@ -52,6 +52,16 @@ describe('policy highlighting', () => {
 });
 
 describe('PricingSections copy', () => {
+  it('«¿Cómo se estructura el pago?» reads «Inscripción: pago único…», never with an em-dash (QA 2026-11-24)', async () => {
+    const view = renderWithProviders(<PricingSections />);
+    const first = (await screen.findByText('Inscripción:', { selector: 'strong' })).parentElement as HTMLElement;
+    expect(first).toHaveTextContent('Inscripción: pago único al ingresar o reinscribirse.');
+    // A text saved in the CMS with the old leading «—» reads the same.
+    view.unmount();
+    renderWithProviders(<PricingSections copy={{ structure: [{ title: 'Colegiatura', text: '— 11 mensualidades.' }] }} />);
+    expect((await screen.findByText('Colegiatura:', { selector: 'strong' })).parentElement).toHaveTextContent(/^Colegiatura: 11 mensualidades\.$/);
+  });
+
   it('keeps today\'s headers and labels by default', async () => {
     renderWithProviders(<PricingSections />);
     const fees = await screen.findByRole('table', { name: 'Nuevo ingreso: gastos administrativos y inscripción por nivel' });

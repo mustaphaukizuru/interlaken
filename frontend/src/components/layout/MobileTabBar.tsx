@@ -42,12 +42,15 @@ export default function MobileTabBar({ role }: { role: Role }) {
   const user = useAuthStore((s) => s.user);
   const { pathname } = useLocation();
   // Staff in the console: their own sections (first five), not the admin's.
-  const items = role === 'admin' && user && !isAdmin(user)
+  // Every role's tabs pass the same check: a staff account never gets the
+  // admin-only /staff tabs (QA 2026-11-24).
+  const items = (role === 'admin' && user && !isAdmin(user)
     ? navByRole.admin.filter((item) => canOpen(user, item.to)).slice(0, 5)
-    : mobileNavByRole[role] ?? mobileNavByRole.parent;
+    : mobileNavByRole[role] ?? mobileNavByRole.parent
+  ).filter((item) => canOpen(user, item.to));
   const keyboardOpen = useKeyboardOpen();
   const badges = useBadges();
-  if (keyboardOpen) return null;
+  if (keyboardOpen || items.length === 0) return null;
 
   const active = activeTabIndex(items, pathname);
 

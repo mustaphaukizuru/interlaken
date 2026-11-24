@@ -283,7 +283,7 @@ export const sections = [
         { icon: 'ShieldCheck', label: 'Sus derechos', value: 'Acceso · Rectificación · Cancelación · Oposición (ARCO)' },
         { icon: 'Phone', label: 'Ejercerlos', value: '{{telefono}} · {{correo}}' },
       ],
-      note: 'Resumen informativo — el texto oficial completo es el siguiente.',
+      note: 'Resumen informativo: el texto oficial completo es el siguiente.',
       integralLabel: 'Consultar el aviso integral',
       errorTitle: 'Aviso no disponible',
       errorText: '',
