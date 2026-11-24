@@ -4,7 +4,7 @@ import { CalendarCheck, KeyRound, X } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { siteTexts } from '@/lib/siteChrome';
-import { PASSWORD_REQUEST_MESSAGE } from '@/components/portal/PasswordHelp';
+import { PASSWORD_REQUEST_MESSAGE } from '@/lib/passwordRequest';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 
@@ -21,7 +21,7 @@ export const FLOAT_DEFAULTS = {
  * Floating launcher on every public page (BACKLOG P2-14): one bubble that opens
  * three actions: WhatsApp, Agendar visita, Solicitar contraseña. The number is
  * admin-editable; with no number the launcher only offers the visit link.
- * On phones the sticky "Agendar visita" bar already carries WhatsApp, so while
+ * On phones the bottom bar («Pagos» + WhatsApp) already carries WhatsApp, so while
  * that bar is visible the bubble renders from md up only. The ficha's steps
  * (FichaWizard, `data-ficha-steps` on <html>) put their own action bar at the
  * bottom of a phone, so there too the bubble waits for md.
