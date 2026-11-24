@@ -174,7 +174,7 @@ test.describe('top-up return page (cafeteria/recarga/retorno)', () => {
     // then concludes "en proceso". ~8 s wall time; expect timeout covers it.
     await openReturn(page, 'processing');
     await expect(page.getByRole('heading', { name: 'Confirmando su pago…' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Recarga en proceso' }))
+    await expect(page.getByRole('heading', { name: 'Aún sin confirmación del banco' }))
       .toBeVisible({ timeout: 20_000 });
   });
 });

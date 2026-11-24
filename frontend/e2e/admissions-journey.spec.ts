@@ -118,7 +118,9 @@ test('the office takes a prospect from the first call to «Inscrito»', async ({
     await visita.getByText('Asistió y agenda examen', { exact: true }).click();
     await visita.getByRole('button', { name: 'Guardar resultado' }).click();
     await stageIs(page, 'Examen');
-    await expect(visita.getByRole('list', { name: 'Visitas vinculadas' })).toContainText('Asistió');
+    // The slot is weeks ahead: the case moves on, but a visit that has not
+    // happened yet is never marked «Asistió» (QA 2026-11-24).
+    await expect(visita.getByRole('list', { name: 'Visitas vinculadas' })).not.toContainText('Asistió');
 
     // ── 3 · Examen: date, then «Aceptado» ──────────────────────────────────
     const examen = await openCard(page, 'examen', '3.');

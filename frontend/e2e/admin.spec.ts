@@ -49,7 +49,7 @@ test('publishing a comunicado posts it and lists it in the admin console', async
   // Sending right away asks once more, naming the audience and how many will get it.
   const confirm = dialog.getByRole('alertdialog');
   await expect(confirm).toContainText('¿Enviar ahora?');
-  await expect(confirm).toContainText('~12 familia(s)');
+  await expect(confirm).toContainText('~12 cuentas');
   expect(createPayload).toBeNull(); // nothing sent yet
   await confirm.getByRole('button', { name: 'Enviar ahora' }).click();
 
