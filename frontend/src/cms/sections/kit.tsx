@@ -90,7 +90,7 @@ export const INFORMES_CTA = {
   href: 'https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken.',
 } as const satisfies CmsLink;
 
-type AnchorProps = { link: CmsLink | undefined; className?: string; children?: ReactNode; ariaLabel?: string };
+type AnchorProps = { link: CmsLink | undefined; className?: string; children?: ReactNode; ariaLabel?: string; onClick?: () => void };
 
 /** Renders a CMS link prop as a router Link (internal) or <a> (external); nothing without href. */
 export function CmsAnchor(props: AnchorProps) {
@@ -109,13 +109,13 @@ function TokenAnchor({ href, ...props }: AnchorProps & { href: string }) {
   return <Anchor {...props} href={resolved} />;
 }
 
-function Anchor({ link, href, className, children, ariaLabel }: AnchorProps & { href: string }) {
+function Anchor({ link, href, className, children, ariaLabel, onClick }: AnchorProps & { href: string }) {
   const content = children ?? link?.label;
   if (isExternal(href)) {
     const newTab = href.startsWith('http');
-    return <a href={href} className={className} aria-label={ariaLabel} {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>{content}</a>;
+    return <a href={href} className={className} aria-label={ariaLabel} onClick={onClick} {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>{content}</a>;
   }
-  return <Link to={href} className={className} aria-label={ariaLabel}>{content}</Link>;
+  return <Link to={href} className={className} aria-label={ariaLabel} onClick={onClick}>{content}</Link>;
 }
 
 /** Text with line breaks: each newline in the prop becomes a <br />. */

@@ -26,7 +26,7 @@ import { mergeChrome } from '@/lib/chromeMerge';
 import { WA_DEFAULTS } from '@/lib/whatsapp';
 import { COOKIE_DEFAULTS } from '@/components/CookieBanner';
 import { FLOAT_DEFAULTS } from '@/components/ui/WhatsAppFloat';
-import { PASSWORD_REQUEST_MESSAGE } from '@/components/portal/PasswordHelp';
+import { PASSWORD_REQUEST_MESSAGE } from '@/lib/passwordRequest';
 import { PRIVACY_NOTE_DEFAULTS } from '@/components/ui/PrivacyNote';
 import { FUNNEL_DEFAULTS } from '@/components/admissions/FunnelHero';
 
@@ -57,7 +57,7 @@ export const SITE_TEXT_GROUPS: TextGroup[] = [
     id: 'whatsapp', title: 'Mensajes de WhatsApp', where: 'El texto con el que se abre la conversación cuando una familia toca un botón de WhatsApp. {{ciclo}} pone el ciclo escolar.',
     fields: [
       { key: 'wa_admissions', label: 'Admisiones (botón «Informes» del proceso)', builtIn: WA_DEFAULTS.wa_admissions, max: 400, long: true },
-      { key: 'wa_visit', label: 'Barra inferior del teléfono («Agendar visita»)', builtIn: WA_DEFAULTS.wa_visit, max: 400, long: true },
+      { key: 'wa_visit', label: 'Barra inferior del teléfono (junto a «Pagos»)', builtIn: WA_DEFAULTS.wa_visit, max: 400, long: true },
       { key: 'wa_float', label: 'Burbuja de contacto', builtIn: FLOAT_DEFAULTS.wa_float, max: 400, long: true },
       { key: 'wa_password', label: 'Solicitar contraseña del portal', builtIn: PASSWORD_REQUEST_MESSAGE, max: 400, long: true, hint: 'También se usa como texto del correo para pedir la contraseña.' },
       { key: 'wa_estimator', label: 'Estimador de costos', builtIn: WA_DEFAULTS.wa_estimator, max: 400, long: true, hint: '{seccion} se reemplaza por la sección que eligió la familia.' },
@@ -67,9 +67,10 @@ export const SITE_TEXT_GROUPS: TextGroup[] = [
     id: 'bubble', title: 'Burbuja de contacto y menú', where: 'La burbuja verde de la esquina y las palabras fijas del encabezado.',
     fields: [
       { key: 'float_whatsapp', label: 'Burbuja: opción de WhatsApp', builtIn: FLOAT_DEFAULTS.float_whatsapp, max: 40 },
-      { key: 'float_visit', label: 'Burbuja: opción de agendar visita', builtIn: FLOAT_DEFAULTS.float_visit, max: 40 },
+      { key: 'float_visit', label: 'Botón «Agendar visita»', builtIn: FLOAT_DEFAULTS.float_visit, max: 40, hint: 'El mismo texto en la barra morada de arriba, en el menú y en la burbuja.' },
       { key: 'float_password', label: 'Burbuja: opción de contraseña', builtIn: FLOAT_DEFAULTS.float_password, max: 40 },
       { key: 'nav_contact', label: 'Menú: enlace a Contacto', builtIn: LAYOUT_TEXT_DEFAULTS.nav_contact, max: 40 },
+      { key: 'nav_payments', label: 'Menú del celular: título de los pagos', builtIn: LAYOUT_TEXT_DEFAULTS.nav_payments, max: 40, hint: 'Va sobre «Portal Cafetería» y «Colegiaturas» en el menú de celular y tableta.' },
       { key: 'skip_link', label: 'Enlace «saltar al contenido» (teclado)', builtIn: LAYOUT_TEXT_DEFAULTS.skip_link, max: 60, hint: 'Solo se ve al navegar con el teclado.' },
     ],
   },

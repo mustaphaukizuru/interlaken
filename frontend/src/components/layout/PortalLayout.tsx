@@ -167,7 +167,7 @@ function PortalShell({ role }: Props) {
             ref={scrollRef}
             className="relative flex-1 overflow-y-auto overflow-x-hidden print:overflow-visible"
           >
-            <div className="mx-auto w-full max-w-[1320px] 2xl:max-w-[1680px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] print:max-w-none print:p-0 lg:pb-6">
+            <div className="mx-auto w-full max-w-[1320px] 2xl:max-w-[1680px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(84px+env(safe-area-inset-bottom))] print:max-w-none print:p-0 lg:pb-6">
               <RouteTransition><Outlet /></RouteTransition>
             </div>
           </div>
@@ -175,8 +175,8 @@ function PortalShell({ role }: Props) {
 
         {/* Staff analytics is a single-route surface — no bottom tab bar. */}
         {role !== 'staff' && <MobileTabBar role={role} />}
-        {/* Above the phone tab bar (64 px + the home-indicator inset). */}
-        <BackToTop className={role !== 'staff' ? 'right-4 bottom-[calc(80px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6' : 'right-4 bottom-4 lg:bottom-6 lg:right-6'} />
+        {/* Above the floating phone tab bar (60 px, 8 px off the edge, plus its bump and dot) and the home-indicator inset. */}
+        <BackToTop className={role !== 'staff' ? 'right-4 bottom-[calc(92px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6' : 'right-4 bottom-4 lg:bottom-6 lg:right-6'} />
         </div>
       </div>
     </MobileNavContext.Provider>

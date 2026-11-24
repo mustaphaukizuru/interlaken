@@ -12,7 +12,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Helmet } from 'react-helmet-async';
 // Icons and button styles the main bundle does not share: importing the ErrorBoundary's ones
 // (AlertTriangle, RefreshCw, <Button>) split them out of it and grew every page's download.
 import { CheckCircle2, CircleAlert, Clock, Info, MailCheck, RotateCw } from 'lucide-react';
@@ -47,15 +46,24 @@ const linkOf = (err: unknown): NotifyEmailLink | null => {
 
 type Copy = (key: string) => string;
 
+/** <meta name="referrer" content="no-referrer"> while this page shows (the token is in its URL). */
+function useNoReferrer() {
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'referrer';
+    meta.content = 'no-referrer';
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
+}
+
 function Shell({ c, children }: { c: Copy; children: ReactNode }) {
   const email = c('helpEmail');
+  useNoReferrer();
   return (
     <div className="flex min-h-screen flex-col bg-cream">
       {/* The token is in this page's URL: never send it to another site (spa.py also sends
           Referrer-Policy: no-referrer). noindex comes from the template SEO below. */}
-      <Helmet>
-        <meta name="referrer" content="no-referrer" />
-      </Helmet>
       <div className="accent-bar" />
       <main id="contenido" className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:py-14">
         <div className="w-full max-w-[460px]">

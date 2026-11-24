@@ -122,10 +122,16 @@ export const FunnelEvent = {
  *  - AdmissionsStepCta → props { step }        (timeline CTA clicked)
  *  - EstimatorUsed     → props { section, modality }
  *  - WhatsappCta       → props { context }     (which WhatsApp button)
+ *  - VisitCta          → props { context }     («Agendar visita»: barra_superior | menu_movil)
+ *  - PaymentsCta       → props { context }     («Pagos»: barra_fija | encabezado_tableta)
+ *  - HeroCta           → props { target }      (a home hero button, its link)
  */
 export const ConversionEvent = {
   AdmissionsStepCta: 'admissions_step_cta',
   EstimatorUsed: 'estimator_used',
   WhatsappCta: 'whatsapp_cta',
   PhoneCta: 'phone_cta',
+  VisitCta: 'visit_cta',
+  PaymentsCta: 'payments_cta',
+  HeroCta: 'hero_cta',
 } as const;

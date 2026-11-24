@@ -335,8 +335,8 @@ export default function AdminPricing() {
       </section>
 
       {dirty.length > 0 && (
-        // Above the phone tab bar (62 px + safe area, MobileTabBar); at the bottom edge on desktop.
-        <div className="sticky bottom-[calc(62px+env(safe-area-inset-bottom))] z-sticky mt-6 rounded-md bg-white/95 px-4 py-3 shadow-card backdrop-blur lg:bottom-0">
+        // Above the floating phone tab bar (MobileTabBar: 60 px, 8 px off the edge, bump on top); at the bottom edge on desktop.
+        <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom))] z-sticky mt-6 rounded-md bg-white/95 px-4 py-3 shadow-card backdrop-blur lg:bottom-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink" role="status">
               <strong>{changesLabel(totalChanges)}</strong> sin guardar en {dirty.map((k) => TABLES.find((t) => t.key === k)!.tab).join(', ')}

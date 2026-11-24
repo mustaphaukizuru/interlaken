@@ -141,7 +141,8 @@ function useBottomNavHeight(): number {
     const measure = () => {
       const nav = document.querySelector<HTMLElement>('nav[aria-label="Navegación principal"]');
       const r = nav?.getBoundingClientRect();
-      setH(nav && r && r.height > 0 && getComputedStyle(nav).position === 'fixed' ? Math.max(0, Math.round(window.innerHeight - r.top)) : 0);
+      // +16: the active tab's bump and dot rise above the bar's top edge.
+      setH(nav && r && r.height > 0 && getComputedStyle(nav).position === 'fixed' ? Math.max(0, Math.round(window.innerHeight - r.top) + 16) : 0);
     };
     const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => setTimeout(measure, 60)); };
     measure();

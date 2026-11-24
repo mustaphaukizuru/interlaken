@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Megaphone, X } from 'lucide-react';
 import { portalApi, type SiteNotice } from '@/services/api';
+
+// The aviso's markup loads only when there is one to show (most visits: none).
+const SiteNoticeView = lazy(() => import('./SiteNoticeView'));
 
 const KEY = 'interlaken:dismissed-notices';
 
@@ -31,23 +32,7 @@ export function SiteNoticeBanner() {
     setDismissed(next);
     try { localStorage.setItem(KEY, JSON.stringify(next.slice(-20))); } catch { /* private mode */ }
   };
-  const isExternal = n.link.startsWith('http');
-  return (
-    // Warning status pair (AA: ink body 16:1, amber title/icon/link 4.6:1 on
-    // warning-bg). The old solid amber + ink pair was ~3.6:1.
-    <div role="status" aria-live="polite" className="bg-warning-bg text-ink print:hidden">
-      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-1.5 text-sm sm:gap-3 sm:px-6">
-        <Megaphone className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
-        <p className="line-clamp-2 min-w-0 flex-1 sm:line-clamp-1">
-          <strong className="font-semibold text-warning">{n.title}.</strong> {n.body}
-        </p>
-        {n.link && (isExternal
-          ? <a href={n.link} className="shrink-0 whitespace-nowrap font-semibold text-warning underline underline-offset-2" target="_blank" rel="noopener noreferrer">Ver más</a>
-          : <Link to={n.link} className="shrink-0 whitespace-nowrap font-semibold text-warning underline underline-offset-2">Ver más</Link>)}
-        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="grid h-11 w-11 shrink-0 place-items-center rounded-sm text-warning hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"><X className="h-4 w-4" aria-hidden="true" /></button>
-      </div>
-    </div>
-  );
+  return <Suspense fallback={null}><SiteNoticeView notice={n} onDismiss={dismiss} /></Suspense>;
 }
 
 export default SiteNoticeBanner;

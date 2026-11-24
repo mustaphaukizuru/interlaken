@@ -231,7 +231,6 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
     second: 'Segundo dato de confianza junto al formulario.',
   },
   'home.hero': {
-    showLogo: 'Muestra el logo del colegio sobre la foto o el video de portada.',
     title: 'El título grande de la portada (primera línea).',
     titleAccent: 'Segunda línea del título, en color degradado.',
     posterAlt: 'Qué se ve en la foto de portada, para quien no puede verla.',

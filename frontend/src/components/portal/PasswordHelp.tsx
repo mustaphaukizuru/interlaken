@@ -2,6 +2,7 @@ import { MessageCircle, Mail, KeyRound } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { siteText } from '@/lib/siteChrome';
+import { PASSWORD_REQUEST_MESSAGE } from '@/lib/passwordRequest';
 
 /**
  * School policy (2026-08-22): families and students NEVER reset or change
@@ -9,8 +10,7 @@ import { siteText } from '@/lib/siteChrome';
  * sets a new one from the portal. This block is the single place that
  * explains it, used on the login page and in "Mi información".
  */
-export const PASSWORD_REQUEST_MESSAGE =
-  'Hola, necesito que me recuerden o restablezcan la contraseña de mi acceso al portal de familias.';
+export { PASSWORD_REQUEST_MESSAGE };
 
 /** The inline line's words; the login page passes them (Contenido → Iniciar sesión). */
 export interface PasswordInlineCopy { before: string; whatsapp: string; or: string; email: string; after: string }

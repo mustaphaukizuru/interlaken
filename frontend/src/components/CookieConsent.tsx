@@ -6,11 +6,13 @@
  * declining keeps every tracker dormant. The banner's words are edited in
  * Navegación → «Textos del sitio» (./CookieBanner).
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { hasConsentDecision, setConsent } from '@/services/consent';
 import { initAnalytics, isAnalyticsConfigured, trackPageView } from '@/services/analytics';
 
-import CookieBanner from './CookieBanner';
+// Only a first visit (with analytics configured) shows the banner, so its
+// words and markup load on demand instead of in every page's first JS.
+const CookieBanner = lazy(() => import('./CookieBanner'));
 
 export function CookieConsent() {
   // Config + stored consent are fixed for the life of the page, so the initial
@@ -33,5 +35,5 @@ export function CookieConsent() {
     setVisible(false);
   };
 
-  return <CookieBanner onAccept={accept} onDecline={decline} />;
+  return <Suspense fallback={null}><CookieBanner onAccept={accept} onDecline={decline} /></Suspense>;
 }

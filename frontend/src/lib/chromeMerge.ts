@@ -12,4 +12,4 @@ export function mergeChrome(stored: object | null | undefined, ownKeys: readonly
 }
 
 /** The keys the header/footer form (AdminNavigation ChromeEditor) owns. */
-export const CHROME_KEYS = ['header_buttons', 'footer_tagline', 'footer_copyright', 'footer_note', 'sticky_label', 'sticky_href'] as const;
+export const CHROME_KEYS = ['header_buttons', 'footer_tagline', 'footer_copyright', 'footer_note', 'sticky_label', 'sticky_href', 'sticky_icon'] as const;

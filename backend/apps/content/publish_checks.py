@@ -113,7 +113,12 @@ LARGE_CHANGE_FIELDS = 15
 SCHEDULE_BLOCKING = frozenset({'token_glued', 'token_only_label', 'empty_required', 'restored_old_default'})
 # Advice (SEO lengths, a repeated section type, an http link): shown as
 # «Sugerencias», never asks for «Entiendo las advertencias».
-SUGGESTIONS = frozenset({'seo_description', 'seo_long', 'seo_title', 'seed_seo', 'missing_og_image', 'duplicate', 'insecure_link'})
+SUGGESTIONS = frozenset({'seo_description', 'seo_long', 'seo_title', 'seed_seo', 'missing_og_image', 'duplicate', 'insecure_link',
+                         'hero_repeats_header'})
+# Header version 3 (2026-11-23): where the header already takes families (the
+# «Agendar visita» pill, «Portal Cafetería», «Colegiaturas»). The home hero
+# should not repeat them: its buttons are «Proceso de admisión» and «Ver costos».
+HEADER_HREFS = frozenset({'/agendar-visita', '/login', 'https://interlaken.servoescolar.mx'})
 MAX_CHANGES = 150
 SHOW_MAX = 280
 
@@ -125,6 +130,7 @@ CODE_LABELS = {
     'missing_image': 'imagen borrada', 'missing_alt': 'foto sin descripción', 'token_glued': 'dato pegado',
     'token_only_label': 'etiqueta solo con datos', 'empty_required': 'texto vacío', 'restored_old_default': 'texto antiguo',
     'large_change': 'cambio grande', 'duplicate': 'sección repetida', 'insecure_link': 'enlace sin https',
+    'hero_repeats_header': 'portada repite el encabezado',
     'seo_description': 'SEO', 'seo_long': 'SEO', 'seo_title': 'SEO', 'seed_seo': 'SEO', 'missing_og_image': 'SEO',
 }
 
@@ -706,6 +712,20 @@ def content_issues(slug: str, blocks: list, seo: dict, baseline_blocks, values: 
                     add(make_issue('warning', 'empty_required', blocks, i, key,
                                    f'Quedó vacío: en la página esta parte se verá sin texto. Antes decía «{show(kind, before, values)}».',
                                    value=now.get(key), preview='', fix=fix))
+
+        # ── the home hero repeats the header (header version 3, a suggestion) ──
+        if t == 'home.hero':
+            for key in ('primary', 'secondary'):
+                link = props.get(key)
+                href = str(link.get('href') or '').strip().rstrip('/') if isinstance(link, dict) else ''
+                better = defaults.get(key)
+                if href in HEADER_HREFS and key not in flagged and isinstance(better, dict):
+                    add(make_issue('warning', 'hero_repeats_header', blocks, i, key,
+                                   'Repite un botón del encabezado. La portada de la versión 3 lleva '
+                                   '«Proceso de admisión» y «Ver costos».',
+                                   preview=_show_field(t, key, link, values),
+                                   fix={'kind': 'restore', 'label': f'Usar «{better.get("label")}»', 'value': copy.deepcopy(better),
+                                        'preview': _show_field(t, key, better, values)}))
 
         # ── values the designs retired (migration 0033) ──
         if m0033 is not None:

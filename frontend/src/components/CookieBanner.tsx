@@ -15,14 +15,14 @@ export const COOKIE_DEFAULTS = {
 } as const;
 
 /**
- * Lift above the public sticky «Agendar visita» bar only where that bar is
+ * Lift above the public phone bar («Pagos» + WhatsApp) only where that bar is
  * on screen (phones, on pages that show it: PublicLayout marks it with
  * `data-sticky-cta`). Elsewhere the banner sits on the bottom edge.
  */
 const CLEAR_STICKY_CTA = 'max-md:[body:has([data-sticky-cta])_&]:mb-[76px]';
 // The portal's phone tab bar (MobileTabBar, data-bottom-bar) shows below lg:
 // the banner lifts above it too instead of hiding the tabs (code review 2026-11-22).
-const CLEAR_TAB_BAR = 'max-lg:[body:has([data-bottom-bar])_&]:mb-[76px]';
+const CLEAR_TAB_BAR = 'max-lg:[body:has([data-bottom-bar])_&]:mb-[80px]';
 
 export default function CookieBanner({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
   const text = useSiteTexts(COOKIE_DEFAULTS);

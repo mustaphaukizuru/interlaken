@@ -400,3 +400,43 @@ def test_bulk_publish_skips_pages_with_warnings(admin_client, costos):
     assert r.status_code == 200
     assert Page.objects.get(pk=page.pk).published_version.number == 1
     assert 'advertencias' in str(r.data)
+
+
+@pytest.mark.django_db
+def test_home_hero_that_repeats_the_header_gets_a_suggestion_with_the_v3_buttons(admin_user):
+    """Header version 3 (2026-11-23): the hero leads to «Proceso de admisión» and «Ver costos»; a hero that
+    repeats the header (live: «Agendar visita» / «Portal Cafetería») is advised, never blocked."""
+    page = Page(slug='inicio', title='Inicio', draft_blocks=[
+        {'id': 'h', 'type': 'home.hero', 'props': {
+            'title': 'Formando líderes',
+            'primary': {'label': 'Agendar visita', 'href': '/agendar-visita'},
+            'secondary': {'label': 'Portal Cafetería', 'href': '/login'},
+        }},
+    ])
+    report = pc.review(page)
+    advice = {i['field']: i for i in report['suggestions'] if i['code'] == 'hero_repeats_header'}
+    assert set(advice) == {'primary', 'secondary'}
+    assert advice['primary']['fix']['value'] == {'label': 'Proceso de admisión', 'href': '/admisiones'}
+    assert advice['secondary']['fix']['value'] == {'label': 'Ver costos', 'href': '/admisiones/costos'}
+    assert not advice['primary']['acknowledge']
+    assert report['ok']
+
+
+@pytest.mark.django_db
+def test_home_hero_with_the_v3_buttons_has_no_suggestion(admin_user):
+    page = Page(slug='inicio', title='Inicio', draft_blocks=[
+        {'id': 'h', 'type': 'home.hero', 'props': {
+            'title': 'Formando líderes',
+            'primary': {'label': 'Proceso de admisión', 'href': '/admisiones'},
+            'secondary': {'label': 'Ver costos', 'href': '/admisiones/costos'},
+        }},
+    ])
+    assert not [i for i in pc.review(page)['issues'] if i['code'] == 'hero_repeats_header']
+
+
+def test_saving_a_draft_drops_the_retired_hero_props():
+    """The hero's logo switch and third button were retired (header version 3): the next save drops them."""
+    from apps.content.pages import validate_blocks
+    out = validate_blocks([{'id': 'h', 'type': 'home.hero', 'props': {
+        'title': 'Formando líderes', 'showLogo': True, 'tertiary': {'label': 'Colegiaturas', 'href': 'https://interlaken.servoescolar.mx'}}}])
+    assert out[0]['props'] == {'title': 'Formando líderes'}

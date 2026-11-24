@@ -2471,43 +2471,38 @@
         "poster"
       ],
       "labels": {
-        "showLogo": "Mostrar el logo",
         "title": "Título",
         "titleAccent": "Título (segunda línea, en degradado)",
         "subtitle": "Subtítulo",
         "primary": "Botón principal",
         "secondary": "Botón secundario",
-        "tertiary": "Tercer botón",
         "poster": "Foto de portada",
         "posterAlt": "Descripción de la foto (accesibilidad)",
         "video": "Video de portada (MP4)",
         "videoSound": "El video tiene sonido"
       },
       "kinds": {
-        "showLogo": "toggle",
         "title": "text",
         "titleAccent": "text",
         "subtitle": "textarea",
         "primary": "link",
         "secondary": "link",
-        "tertiary": "link",
         "poster": "image",
         "posterAlt": "text",
         "video": "url",
         "videoSound": "toggle"
       },
       "defaults": {
-        "showLogo": true,
         "title": "Formando líderes",
         "titleAccent": "con excelencia",
         "subtitle": "Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.",
         "primary": {
-          "label": "Agendar visita",
-          "href": "/agendar-visita"
+          "label": "Proceso de admisión",
+          "href": "/admisiones"
         },
         "secondary": {
-          "label": "Portal Cafetería",
-          "href": "/login"
+          "label": "Ver costos",
+          "href": "/admisiones/costos"
         },
         "poster": "/assets/hero-home.webp",
         "posterAlt": "Campus Colegio Interlaken",
@@ -3561,11 +3556,11 @@
             "illustration": "pagos"
           },
           {
-            "name": "Cafetería",
+            "name": "Portal Cafetería",
             "text": "Consulte el saldo de cafetería de sus hijos y haga recargas en línea.",
             "href": "/login",
             "icon": "Coffee",
-            "cta": "Entrar a Cafetería",
+            "cta": "Entrar al Portal Cafetería",
             "illustration": "cafeteria"
           }
         ],

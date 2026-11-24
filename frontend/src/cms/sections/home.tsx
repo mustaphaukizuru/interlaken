@@ -9,8 +9,8 @@ import { m } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Container } from '@/components/ui/Container';
-import Logo from '@/components/ui/Logo';
 import { HeroVideo } from '@/components/public/HeroVideo';
+import { ConversionEvent, trackEvent } from '@/services/analytics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, useCmsImage, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, headingFields, grouped, INFORMES_CTA, lazySection, sectionsOf, VISIT_CTA } from './kit';
@@ -40,8 +40,8 @@ const heroItem: Variants = {
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 interface HeroProps {
-  showLogo?: boolean; title?: string; titleAccent?: string; subtitle?: string;
-  primary?: CmsLink; secondary?: CmsLink; tertiary?: CmsLink;
+  title?: string; titleAccent?: string; subtitle?: string;
+  primary?: CmsLink; secondary?: CmsLink;
   poster?: number | string; posterAlt?: string; video?: string; videoSound?: boolean;
 }
 function HomeHeroView(p: HeroProps) {
@@ -51,12 +51,16 @@ function HomeHeroView(p: HeroProps) {
   const poster = useCmsImage(p.poster, t(p.posterAlt), { full: true });
   const primary = asLink(p.primary);
   const secondary = asLink(p.secondary);
-  // Optional (2026-11-22, «Colegiaturas»): a page published before it existed,
-  // or one that leaves it empty, keeps its two buttons.
-  const tertiary = asLink(p.tertiary);
+  // Header version 3 (school, 2026-11-23): no logo (the header carries it) and
+  // two buttons only. A page saved with the old `showLogo` or third button
+  // («tertiary») keeps those props, and they are simply not drawn.
   return (
     <HeroVideo
-      className="min-h-[min(92svh,820px)] sm:min-h-[min(88svh,760px)]"
+      // Phones: exactly the first screen under the header (72 px and its 1 px
+      // border), the 3 px accent bar and a school notice when one shows
+      // (--site-notice-h, SiteNoticeBanner). svh: the height with the
+      // browser bars showing.
+      className="min-h-[calc(100svh_-_76px_-_var(--site-notice-h,0px))] sm:min-h-[min(88svh,760px)]"
       src={(p.video || settings.hero_video_url || '').trim()}
       poster={poster.src}
       posterSrcSet={poster.srcSet}
@@ -69,11 +73,11 @@ function HomeHeroView(p: HeroProps) {
         className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
         style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.4), transparent 68%)' }}
       />
-      {/* pb on phones clears the fixed "Agendar visita" bar, which otherwise
-          sits on top of the secondary hero CTA at the fold. */}
-      <Container className="relative w-full !pb-28 !pt-28 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
+      {/* Phones: pb clears the fixed bottom bar («Pagos» and WhatsApp: 52 px
+          tall, 1 rem or the home indicator from the bottom) by 16 px; a small
+          pt lets the content fit a 360 x 640 screen (it sits at the bottom). */}
+      <Container className="relative w-full !pb-[calc(max(1rem,env(safe-area-inset-bottom))+4.25rem)] !pt-10 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
         <m.div className="max-w-[640px]" variants={heroGroup} initial="hidden" animate="show">
-          {p.showLogo !== false && <Logo variant="horizontal" theme="dark" size={56} eager className="mb-6 sm:mb-7" />}
           <m.h1 variants={heroItem} className="font-head font-black leading-[1.05] tracking-[-0.03em] text-fluid-5xl">
             {t(p.title)}
             {p.titleAccent && (
@@ -91,13 +95,10 @@ function HomeHeroView(p: HeroProps) {
             </m.p>
           )}
           <m.div variants={heroItem} className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap sm:gap-3.5">
-            <CmsAnchor link={primary} className="btn-pink btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark">
+            <CmsAnchor link={primary} onClick={() => trackEvent(ConversionEvent.HeroCta, { target: primary.href })} className="btn-pink btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark">
               {primary.label} <ArrowRight size={17} />
             </CmsAnchor>
-            <CmsAnchor link={secondary} className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark" />
-            {tertiary.label && tertiary.href && (
-              <CmsAnchor link={tertiary} className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark" />
-            )}
+            <CmsAnchor link={secondary} onClick={() => trackEvent(ConversionEvent.HeroCta, { target: secondary.href })} className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark" />
           </m.div>
         </m.div>
       </Container>
@@ -141,28 +142,26 @@ const artField = f.illustration('illustration', 'Ilustración', { hint: 'Sin ele
 
 export const sections = [
   section({
-    type: 'hero', label: 'Inicio · Portada', description: 'Portada con video o foto, logo, título y dos botones.',
+    type: 'hero', label: 'Inicio · Portada', description: 'Portada con video o foto, título y dos botones.',
     component: withMotion(HomeHeroView),
     fields: [
-      f.toggle('showLogo', 'Mostrar el logo'),
       f.text('title', 'Título', { required: true }),
       f.text('titleAccent', 'Título (segunda línea, en degradado)'),
       f.textarea('subtitle', 'Subtítulo', { hint: 'Puede usar {{ciclo}} y {{anios}}.' }),
       f.link('primary', 'Botón principal'),
       f.link('secondary', 'Botón secundario'),
-      f.link('tertiary', 'Tercer botón', { hint: 'Opcional: vacío = no se muestra.' }),
       f.image('poster', 'Foto de portada', { hint: 'Se ve mientras carga el video, o siempre si no hay video.' }),
       f.text('posterAlt', 'Descripción de la foto (accesibilidad)'),
       f.url('video', 'Video de portada (MP4)', { hint: 'Vacío = el video de Ajustes.' }),
       f.toggle('videoSound', 'El video tiene sonido', { hint: 'Muestra el botón «Activar sonido». Déjelo apagado para un video en bucle sin audio.' }),
     ],
     defaults: {
-      showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
+      title: 'Formando líderes', titleAccent: 'con excelencia',
       subtitle: 'Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.',
-      primary: VISIT_CTA,
-      // Same as the header buttons (owner, 2026-11-22: «Portal Cafetería»,
-      // no «Colegiaturas»). The optional third button stays empty.
-      secondary: { label: 'Portal Cafetería', href: '/login' },
+      // Header version 3 (school, 2026-11-23): the way in for new families. The
+      // visit is a step of «Proceso de admisión»; nothing here repeats the header.
+      primary: { label: 'Proceso de admisión', href: '/admisiones' },
+      secondary: { label: 'Ver costos', href: '/admisiones/costos' },
       // Media round 2026-11-22: the court photo animated (slow glide under the canopies, no people added), 10 s silent loop; the poster is its first frame.
       poster: '/assets/hero-home.webp', posterAlt: 'Campus Colegio Interlaken', video: '/assets/video/hero-home.mp4', videoSound: false,
     },

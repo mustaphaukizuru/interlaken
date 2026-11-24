@@ -81,7 +81,8 @@ STATIC_ROUTES = [
 ]
 
 
-CHROME_TEXT = {'footer_tagline': 300, 'footer_copyright': 200, 'footer_note': 200, 'sticky_label': 40}
+# sticky_icon: the phone bar button's lucide icon (blank = from its link: card for /pagos, calendar for the visit).
+CHROME_TEXT = {'footer_tagline': 300, 'footer_copyright': 200, 'footer_note': 200, 'sticky_label': 40, 'sticky_icon': 40}
 
 # Site-wide texts edited in Navegación → «Textos del sitio» (same JSON; blank =
 # the built-in text of each component). Mirrors frontend/src/lib/siteChrome.ts
@@ -90,11 +91,15 @@ SITE_TEXTS = {
     # Cookie banner (components/CookieConsent.tsx)
     'cookie_text': 400, 'cookie_link': 60, 'cookie_decline': 30, 'cookie_accept': 30,
     # Prefilled WhatsApp messages (lib/whatsapp.ts, WhatsAppFloat, PasswordHelp)
+    # wa_visit: the phone bar's WhatsApp button (next to «Pagos» since header version 3).
     'wa_admissions': 400, 'wa_visit': 400, 'wa_float': 400, 'wa_password': 400, 'wa_estimator': 400,
     # Contact bubble (components/ui/WhatsAppFloat.tsx)
     'float_whatsapp': 40, 'float_visit': 40, 'float_password': 40,
     # Header/footer words (components/layout/PublicLayout.tsx)
     'nav_contact': 40, 'footer_contact': 40, 'skip_link': 60,
+    # Header version 3 (2026-11-23): the label over the payment links in the phone/tablet menu.
+    # «Agendar visita» (top bar pill and menu button) shares float_visit with the bubble.
+    'nav_payments': 40,
     # Privacy note under the site's forms (components/ui/PrivacyNote.tsx)
     'privacy_note': 400, 'privacy_link': 60,
     # Admission steps in the funnel heroes (components/admissions/FunnelHero.tsx)

@@ -20,7 +20,7 @@ describe('whatsapp helpers', () => {
   it('prefilled messages carry the auto-computed school cycle', () => {
     expect(WA_MESSAGES.admissionsInfo).toContain(CURRENT_CYCLE);
     expect(WA_MESSAGES.admissionsInfo).toContain('informes de admisión');
-    expect(WA_MESSAGES.visit).toBe('Hola, quiero agendar una visita al colegio.');
+    expect(WA_MESSAGES.visit).toBe('Hola, me gustaría obtener más información sobre el Colegio Interlaken.');
   });
 
   it('waSectionMessage interpolates the section and cycle', () => {
