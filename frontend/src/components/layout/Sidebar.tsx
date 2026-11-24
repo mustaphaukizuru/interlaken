@@ -54,16 +54,19 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   // (The family portal renders with role «parent» for every family login.)
   const staffPortal = (role === 'parent' || role === 'student')
     && user?.role === 'student' && user.cafeteria_account?.tipo === 'personal';
+  // Only what the account may open: the «Panel de Dirección» and the site
+  // content (/staff) are for administrators (QA 2026-11-24).
+  const allowed = (gs: NavGroup[]) => gs
+    .map((g) => ({ ...g, items: g.items.filter((item) => canOpen(user, item.to)) }))
+    .filter((g) => g.items.length > 0);
   const groups = [
-    ...(role === 'staff' ? bridge : []),
-    ...(navGroupsByRole[role] ?? navGroupsByRole.parent)
-      .map((g) => ({ ...g, items: g.items.filter((item) => canOpen(user, item.to)) }))
-      .filter((g) => g.items.length > 0)
+    ...(role === 'staff' ? allowed(bridge) : []),
+    ...allowed(navGroupsByRole[role] ?? navGroupsByRole.parent)
       .map((g) => (!staffPortal ? g : {
         heading: g.heading === 'Familia' ? 'Personal' : g.heading,
         items: g.items.map((item) => (item.to === '/portal/cafeteria' ? { ...item, label: 'Mi cafetería' } : item)),
       })),
-    ...(role === 'admin' ? bridge : []),
+    ...(role === 'admin' ? allowed(bridge) : []),
     ...myCafe,
   ];
   const asideRef = useRef<HTMLElement>(null);
@@ -155,7 +158,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       {/* Logo + collapse toggle */}
       <div className={`flex items-center ${rail ? 'lg:flex-col lg:gap-2' : 'justify-between'}`}>
         {/* The horizontal lockup: the stacked one took ~150 px of height from the menu on a phone. */}
-        <Link to="/" className="flex justify-center px-1" aria-label="Colegio Interlaken — Inicio">
+        <Link to="/" className="flex justify-center px-1" aria-label="Colegio Interlaken, ir al inicio">
           <Logo variant={rail ? 'icon' : 'horizontal'} size={rail ? 40 : 38} theme="light" eager />
         </Link>
         <button

@@ -10,13 +10,21 @@ WhatsApp: when ``whatsapp=True`` and the user has a ``whatsapp`` number, we call
 ``send_text`` logs a no-op — same degradation as booking confirmations.
 """
 import logging
+import smtplib
 import time
 from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
 
+from apps.core.plurals import count as plural
+
 logger = logging.getLogger(__name__)
+
+# A dropped or timed-out SMTP connection (not a rejected address or a bad
+# login): worth exactly one retry on a fresh connection.
+_TRANSIENT_SMTP_ERRORS = (smtplib.SMTPServerDisconnected, TimeoutError, ConnectionError)
+EMAIL_RETRY_PAUSE = 2  # seconds
 
 
 def render_email_html(subject: str, message: str, *, cta_url: str = '', cta_label: str = '',
@@ -89,7 +97,17 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
         msg = build_email(subject, message, recipients, reply_to=reply_to, cta_url=cta_url,
                           cta_label=cta_label, html=html, content=content,
                           text_from_content=text_from_content)
-        sent = msg.send(fail_silently=False)
+        try:
+            sent = msg.send(fail_silently=False)
+        except _TRANSIENT_SMTP_ERRORS as first:
+            # The school's SMTP server now and then drops a connection mid-send
+            # («Connection unexpectedly closed: The read operation timed out»),
+            # and the family never got its «Recarga registrada» or «Compra en
+            # cafetería» email (4 lost 2026-11-11..23). One new connection
+            # after a short pause delivers it.
+            logger.warning('Email send retry (%r → %s): %s', subject, recipients, first)
+            time.sleep(EMAIL_RETRY_PAUSE)
+            sent = msg.send(fail_silently=False)
         if not sent:
             logger.error('Email send returned 0 (%r → %s)', subject, recipients)
         return bool(sent)
@@ -872,7 +890,7 @@ def _alert_ops_on_failures(failures) -> None:
     lines = [f'- #{n.id} {n.title} → {n.user.email} ({n.last_error})' for n in failures[:50]]
     more = '' if len(failures) <= 50 else f'\n… y {len(failures) - 50} más'
     send_email(
-        f'[Interlaken] {len(failures)} notificación(es) no entregada(s)',
+        f'[Interlaken] {plural(len(failures), "notificación no entregada", "notificaciones no entregadas")}',
         'El despachador agotó los reintentos de correo para:\n\n' + '\n'.join(lines) + more
         + '\n\nRevise la configuración SMTP y la bandeja de Auditoría.',
         [ops], html=False,

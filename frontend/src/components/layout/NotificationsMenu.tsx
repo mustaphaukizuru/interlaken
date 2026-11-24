@@ -21,15 +21,19 @@ export function NotificationsMenu() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const { data = [] } = useQuery({
+  const { data: feed } = useQuery({
     queryKey: NOTIFICATIONS_KEY,
     queryFn: fetchNotifications,
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
-
-  const unread = data.filter((n) => !n.is_read).length;
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['notifications'] });
+  const data = feed?.items ?? [];
+  const unread = feed?.unread ?? 0;
+  // The sidebar/tab-bar badge counts the same avisos: refresh it with the bell.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['notifications'] });
+    qc.invalidateQueries({ queryKey: ['badges'] });
+  };
   const markRead = useMutation({ mutationFn: (id: number) => portalApi.markNotificationRead(id), onSuccess: invalidate });
   const markAll = useMutation({ mutationFn: () => portalApi.markAllNotificationsRead(), onSuccess: invalidate });
 

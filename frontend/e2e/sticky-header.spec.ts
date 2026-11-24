@@ -14,6 +14,6 @@ for (const width of [390, 1280]) {
     await page.evaluate(() => window.scrollTo(0, 1600));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
     await expect.poll(async () => Math.round((await header.boundingBox())?.y ?? -1)).toBe(0);
-    await expect(header.getByRole('link', { name: /Inicio/ })).toBeInViewport();
+    await expect(header.getByRole('link', { name: /inicio/i })).toBeInViewport();
   });
 }

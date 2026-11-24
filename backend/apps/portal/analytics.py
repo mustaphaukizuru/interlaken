@@ -13,7 +13,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.cache import cache
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework.response import Response
@@ -21,9 +21,9 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 from apps.core.listing import day_start
-from apps.core.permissions import IsStaffOrAdmin
+from apps.core.permissions import IsAdmin
 
-CACHE_KEY_PREFIX = 'staff-analytics-v4'  # v4: funnel + cafetería adoption (P4-10)
+CACHE_KEY_PREFIX = 'staff-analytics-v5'  # v5: nested cohort funnel (2026-11-24)
 CACHE_TTL_SECONDS = 60
 # Whitelisted trend windows for ?days= (default 30).
 ALLOWED_RANGE_DAYS = (7, 30, 90)
@@ -166,24 +166,48 @@ def build_payload(days=30):
     ]).aggregate(n=Count('id'),
                  overdue=Count('id', filter=Q(statutory_deadline__lt=today)))
 
-    # ── Funnel (P4-10): visits → pre-registros → visitas agendadas → inscripciones, last `days` ──
+    # ── Funnel (P4-10): one cohort, nested steps ──
+    # The pre-registros created in the window, followed through. A lead counts
+    # at a step when it reached that step OR a later one (a family may skip the
+    # visit), so every step is a subset of the previous one and no rate passes
+    # 100% (QA 2026-11-24: «Inscripciones enviadas 2 · 200%» then «Inscritos 4
+    # · 200%», each step counted another population, and «Inscritos» added
+    # Registration COMPLETE to PreRegistration ENROLLED). One query.
+    from django.db.models import Exists, OuterRef
+
     from apps.accounts.models import StudentProfile
     from apps.bookings.models import Booking
     from apps.cafeteria.models import CafeteriaBalance
-    funnel_pre = PreRegistration.objects.filter(created_at__gte=since).count()
-    funnel_contacted = PreRegistration.objects.filter(created_at__gte=since).exclude(status=PreRegistration.Status.PENDING).count()
-    funnel_visits = Booking.objects.filter(created_at__gte=since).exclude(status=Booking.Status.CANCELLED).count()
-    funnel_attended = Booking.objects.filter(created_at__gte=since, status=Booking.Status.ATTENDED).count()
-    funnel_reg = Registration.objects.filter(created_at__gte=since).exclude(status=Registration.Status.DRAFT).count()
-    funnel_enrolled = (Registration.objects.filter(created_at__gte=since, status=Registration.Status.COMPLETE).count()
-                       + PreRegistration.objects.filter(created_at__gte=since, status=PreRegistration.Status.ENROLLED).count())
+    from apps.cafeteria.services import low_balance_queryset
+
+    lead = OuterRef('pk')
+    cohort = PreRegistration.objects.filter(created_at__gte=since).annotate(
+        _booked=Exists(Booking.objects.filter(pre_registration=lead)
+                       .exclude(status=Booking.Status.CANCELLED)),
+        _attended=Exists(Booking.objects.filter(pre_registration=lead,
+                                                status=Booking.Status.ATTENDED)),
+        _submitted=Exists(Registration.objects.filter(pre_registration=lead)
+                          .exclude(status=Registration.Status.DRAFT)),
+    )
+    enrolled = (Q(status=PreRegistration.Status.ENROLLED)
+                | Q(stage=PreRegistration.Stage.INSCRITO))
+    submitted = Q(_submitted=True) | enrolled
+    attended = Q(_attended=True) | submitted
+    visited = Q(_booked=True) | attended
+    contacted = (~Q(status=PreRegistration.Status.PENDING)
+                 | ~Q(stage=PreRegistration.Stage.INFORMES) | visited)
+    steps = cohort.aggregate(
+        pre=Count('id'), contacted=Count('id', filter=contacted),
+        visited=Count('id', filter=visited), attended=Count('id', filter=attended),
+        submitted=Count('id', filter=submitted), enrolled=Count('id', filter=enrolled),
+    )
     funnel = [
-        {'step': 'pre_registro', 'label': 'Pre-registros', 'count': funnel_pre},
-        {'step': 'contactado', 'label': 'Contactados', 'count': funnel_contacted},
-        {'step': 'visita', 'label': 'Visitas agendadas', 'count': funnel_visits},
-        {'step': 'asistio', 'label': 'Asistieron', 'count': funnel_attended},
-        {'step': 'inscripcion', 'label': 'Inscripciones enviadas', 'count': funnel_reg},
-        {'step': 'inscrito', 'label': 'Inscritos', 'count': funnel_enrolled},
+        {'step': 'pre_registro', 'label': 'Pre-registros', 'count': steps['pre']},
+        {'step': 'contactado', 'label': 'Contactados', 'count': steps['contacted']},
+        {'step': 'visita', 'label': 'Visitas agendadas', 'count': steps['visited']},
+        {'step': 'asistio', 'label': 'Asistieron', 'count': steps['attended']},
+        {'step': 'inscripcion', 'label': 'Inscripciones enviadas', 'count': steps['submitted']},
+        {'step': 'inscrito', 'label': 'Inscritos', 'count': steps['enrolled']},
     ]
     # ── Cafetería adoption: active students with a wallet, used in period, online top-ups ──
     # Pupils only: a staff wallet (tipo personal) is not a student adopting it.
@@ -197,8 +221,9 @@ def build_payload(days=30):
     topped_up = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.TOPUP,
                                                      student__tipo=pupil)
                  .values('student').distinct().count())
-    low = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE, student__tipo=pupil,
-                                          balance__lte=F('low_balance_threshold')).count()
+    # The dashboard's rule (at/below the threshold AND a movement lately):
+    # a $0 wallet of a child who never buys is not «saldo bajo».
+    low = low_balance_queryset().filter(student__tipo=pupil).count()
     adoption = {
         'active_students': active_students,
         'with_wallet': with_wallet,
@@ -233,8 +258,12 @@ def build_payload(days=30):
 
 
 class StaffAnalyticsView(APIView):
-    """GET /api/v1/portal/analytics/?days=7|30|90 — aggregated dashboard payload."""
-    permission_classes = [IsStaffOrAdmin]
+    """GET /api/v1/portal/analytics/?days=7|30|90 — aggregated dashboard payload.
+
+    «Panel de Dirección»: whole-school numbers (admissions, ARCO, money), so
+    admin-only (QA 2026-11-24: any staff account, a teacher included, read it).
+    """
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         try:

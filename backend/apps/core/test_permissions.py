@@ -72,7 +72,8 @@ def test_views_use_the_shared_classes():
     assert cafeteria_views.IsParentOrAdminOrAccountHolder is IsParentOrAdminOrAccountHolder
     assert issubclass(IsParentOrAdminOrAccountHolder, IsParentOrAdmin)
     assert cafeteria_views.TopUpRequestCreateView.permission_classes == [IsParentOrAdminOrAccountHolder]
-    assert analytics.StaffAnalyticsView.permission_classes == [IsStaffOrAdmin]
+    # «Panel de Dirección»: whole-school numbers, admin-only (QA 2026-11-24).
+    assert analytics.StaffAnalyticsView.permission_classes == [IsAdmin]
 
 
 def test_account_holder_adds_only_own_cafeteria_accounts():

@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -35,6 +35,9 @@ import { imageSrc, imageSrcSet, useCmsImage, useMediaAlt, useTokens, type CmsLin
 import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('visita');
+
+/** «jueves 26 de noviembre» → «Jueves 26 de noviembre» (Spanish keeps the rest lowercase). */
+const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** The one chosen in the editor; «none» hides it; nothing chosen (saved before the field existed) keeps the built-in one. */
 const artOf = (chosen: unknown, fallback?: IllustrationName): IllustrationName | undefined =>
@@ -151,6 +154,7 @@ function VisitBookingView(p: BookingProps) {
   // Saved before the field existed: the built-in photos; an emptied list hides the row.
   const photos = (p.photos === undefined ? VISIT_PHOTOS : asList<VisitPhoto>(p.photos)).filter((ph) => ph.image);
 
+  const queryClient = useQueryClient();
   const { data: slots, isLoading, isError, refetch } = useQuery<AvailabilitySlot[]>({
     queryKey: ['availability', 'individual'],
     queryFn: async () => {
@@ -214,6 +218,9 @@ function VisitBookingView(p: BookingProps) {
       setSelectedSlot(null);
       setSelectedDate(null);
       reset();
+      // The slot just booked may be full now: «Agendar otra visita» must not
+      // offer it again from the old list (QA 2026-11-24).
+      void queryClient.invalidateQueries({ queryKey: ['availability'] });
     } catch (err: any) {
       setBookingError(
         err?.response?.data?.detail ??
@@ -231,7 +238,7 @@ function VisitBookingView(p: BookingProps) {
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-2">{t(p.confirmedTitle) || '¡Visita confirmada!'}</h2>
           <p className="text-muted mb-1">
-            {format(parseISO(confirmed.date), "EEEE d 'de' MMMM, yyyy", { locale: es })} ·{' '}
+            {upperFirst(format(parseISO(confirmed.date), "EEEE d 'de' MMMM, yyyy", { locale: es }))} ·{' '}
             {confirmed.start_time.slice(0, 5)} h
           </p>
           {p.confirmedText && (
@@ -308,9 +315,11 @@ function VisitBookingView(p: BookingProps) {
 
                   {selectedDate && (
                     <div className="rounded-md bg-white p-4 shadow-card">
-                      <p className="mb-3 flex items-center gap-2 text-sm font-semibold capitalize text-ink">
+                      {/* Only the first letter («Jueves 26 de noviembre»): CSS
+                          `capitalize` also raised «De» and the month (QA 2026-11-24). */}
+                      <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
                         <CalendarDays className="h-4 w-4 text-purple" aria-hidden="true" />
-                        {format(parseISO(selectedDate), "EEEE d 'de' MMMM", { locale: es })}
+                        {upperFirst(format(parseISO(selectedDate), "EEEE d 'de' MMMM", { locale: es }))}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {daySlots.map((slot) => (
@@ -348,7 +357,7 @@ function VisitBookingView(p: BookingProps) {
                   <div className="bg-brand-50 rounded-md p-3 text-sm text-brand-700">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-                      <strong className="capitalize">
+                      <strong>
                         {format(parseISO(selectedSlot.date), "d 'de' MMMM, yyyy", { locale: es })}
                       </strong>
                     </div>

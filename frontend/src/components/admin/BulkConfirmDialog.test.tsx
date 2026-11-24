@@ -30,6 +30,17 @@ describe('BulkConfirmDialog', () => {
     expect(execute.mock.calls[0][0].ids).toHaveLength(16);
   });
 
+  it('one row reads in the singular: «Se restaurará 1 alumno» (QA 2026-11-24)', async () => {
+    const one: BulkResult = { action: 'restore', requested: 1, ok: 1, dry_run: true, failed: [], skipped: [] };
+    renderWithProviders(
+      <BulkConfirmDialog open onClose={() => {}} entityLabel="alumnos" ids={[7]}
+        action={{ name: 'restore', label: 'Restaurar', planVerb: 'Se restaurarán' }} execute={vi.fn(async () => one)} />,
+    );
+    expect(await screen.findByText(/Se restaurará/)).toHaveTextContent(/^Se restaurará 1 alumno\.?$/);
+    expect(screen.getByRole('dialog', { name: 'Restaurar: 1 alumno' })).toBeInTheDocument();
+    expect(screen.queryByText(/Se restaurarán/)).toBeNull();
+  });
+
   it('requires a note for reverse transitions and sends notify in the payload', async () => {
     const onDone = vi.fn();
     const execute = vi.fn(async (body: BulkRequest) => (body.dry_run ? { ...plan, skipped: [] } : { ...plan, skipped: [], dry_run: false }));

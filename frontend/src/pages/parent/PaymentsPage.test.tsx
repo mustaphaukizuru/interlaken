@@ -166,6 +166,17 @@ describe('PaymentsPage states', () => {
     expect(await screen.findByText('Pagada · por aplicar', { selector: 'span' })).toBeInTheDocument();
     expect(screen.queryByText('Completado', { selector: 'span' })).toBeNull();
   });
+
+  it('no top-up yet: «Última recarga» says «Sin recargas», never a bare «—» (QA 2026-11-24)', async () => {
+    mockedPayments.mockResolvedValue({ data: { count: 0, results: [] } } as never);
+    vi.mocked(paymentsApi.getSummary).mockResolvedValueOnce({
+      data: { month_total: '0.00', month_count: 0, last_success: null, pending_count: 0 },
+    } as never);
+    renderPage();
+    expect(await screen.findByText('Sin recargas')).toBeInTheDocument();
+    expect(screen.queryByText('—')).toBeNull();
+    expect(screen.queryByText('Sin recargas aún')).toBeNull();
+  });
 });
 
 describe('PaymentsPage after bitácora punto 10', () => {

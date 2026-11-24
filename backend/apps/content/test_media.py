@@ -68,3 +68,46 @@ def test_single_delete_refuses_referenced_asset(api_client, settings, tmp_path):
     page.draft_blocks = []
     page.save()
     assert api_client.delete(reverse('admin-media-detail', args=[asset_id])).status_code == 204
+
+
+# QA sweep 2026-11-24: the library trusted the declared Content-Type.
+@pytest.mark.parametrize('name, body', [
+    ('x.png', b'<html><script>alert(1)</script></html>'),
+    ('x.png', b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>'),
+    ('x.jpg', b'\xff\xd8\xff\xe0 not really a jpeg'),
+    ('x.gif', b'GIF89a'),
+])
+def test_non_image_declared_as_image_is_400(api_client, settings, tmp_path, name, body):
+    settings.MEDIA_ROOT = str(tmp_path)
+    api_client.force_authenticate(user=AdminFactory())
+    upload = SimpleUploadedFile(name, body, content_type='image/png')
+    resp = api_client.post(reverse('admin-media'), {'file': upload}, format='multipart')
+    assert resp.status_code == 400 and 'file' in resp.data
+    assert not MediaAsset.objects.exists()
+
+
+def test_truncated_png_is_400(api_client, settings, tmp_path):
+    settings.MEDIA_ROOT = str(tmp_path)
+    api_client.force_authenticate(user=AdminFactory())
+    data = _png(300, 200).read()
+    upload = SimpleUploadedFile('cut.png', data[: len(data) // 2], content_type='image/png')
+    resp = api_client.post(reverse('admin-media'), {'file': upload}, format='multipart')
+    assert resp.status_code == 400
+
+
+@pytest.mark.parametrize('fmt, declared, stored', [
+    ('JPEG', 'image/jpeg', 'image/jpeg'), ('WEBP', 'image/webp', 'image/webp'),
+    ('GIF', 'image/gif', 'image/gif'),
+    # A real PNG labelled JPEG is stored (and served) as what it is.
+    ('PNG', 'image/jpeg', 'image/png'),
+])
+def test_real_images_are_stored_with_their_real_type(api_client, settings, tmp_path, fmt, declared, stored):
+    settings.MEDIA_ROOT = str(tmp_path)
+    api_client.force_authenticate(user=AdminFactory())
+    buf = io.BytesIO()
+    Image.new('RGB', (400, 300), (10, 120, 60)).save(buf, format=fmt)
+    upload = SimpleUploadedFile(f'foto.{fmt.lower()}', buf.getvalue(), content_type=declared)
+    resp = api_client.post(reverse('admin-media'), {'file': upload}, format='multipart')
+    assert resp.status_code == 201, resp.data
+    assert resp.data['content_type'] == stored
+    assert resp.data['width'] == 400 or fmt == 'GIF'

@@ -7,7 +7,15 @@
  * Dates are shown in the school's time zone whatever the parent's device says.
  */
 import { formatMXN } from '@/lib/format';
-import type { TopUpPolicy } from '@/types';
+import type { CafeteriaBalance, TopUpPolicy } from '@/types';
+
+/**
+ * A wallet on the POS whose holder still attends: the server refuses an
+ * online top-up for anyone else. The cafetería page and Inicio's «Recarga
+ * rápida» both ask this, so neither offers a top-up the server would refuse.
+ */
+export const canTopUp = (b: Pick<CafeteriaBalance, 'student'>) =>
+  !!b.student.loyverse_id && b.student.is_active !== false;
 
 export const SCHOOL_TZ = 'America/Mexico_City';
 
@@ -116,13 +124,29 @@ export function applyNotice(
   const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const base = sentence(`Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las ${clock}`);
   if (!whatsapp) return base;
-  return `${base} Si necesitas que se aplique de inmediato, para que tu hijo use el saldo el mismo día, `
-    + `favor de mandar un mensaje por WhatsApp al ${formatWhatsapp(whatsapp)} con el comprobante de pago, `
-    + 'para que te ayudemos.';
+  // «usted», never «tú», with families (QA 2026-11-24).
+  return `${base} Si necesita que se aplique de inmediato, para que su hijo use el saldo el mismo día, `
+    + `envíe un mensaje por WhatsApp al ${formatWhatsapp(whatsapp)} con el comprobante de pago `
+    + 'y con gusto le ayudamos.';
 }
 
 /** True when card top-ups wait for the POS load (the default). */
 export const isScheduled = (policy?: Pick<TopUpPolicy, 'mode'> | null) => (policy?.mode ?? 'scheduled') === 'scheduled';
+
+/**
+ * True when the app itself loads a card top-up into the cafetería in seconds
+ * (`auto_load: 'instant'`), for `amount` when given (up to `auto_load_max`).
+ * Production runs `mode: 'scheduled'` with instant auto-load since 2026-11-21,
+ * and the page still promised «mañana a las 7:30 a.m.» (QA 2026-11-24).
+ */
+export function loadsInstantly(
+  policy?: Pick<TopUpPolicy, 'auto_load' | 'auto_load_max'> | null,
+  amount?: number,
+): boolean {
+  const max = Number(policy?.auto_load_max ?? 0);
+  if (policy?.auto_load !== 'instant' || !(max > 0)) return false;
+  return amount == null || !Number.isFinite(amount) || amount <= max;
+}
 
 /** "123.45" → 12345 (whole cents, so sums never drift). */
 const cents = (value: string | number | null | undefined) => Math.round(Number(value ?? 0) * 100) || 0;

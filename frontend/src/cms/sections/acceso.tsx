@@ -61,7 +61,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
           <div className="absolute -bottom-[100px] -right-[80px] h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(71,160,40,0.22),rgba(8,5,22,0)_68%)]" />
 
           <div className="relative">
-            <Link to="/" aria-label="Colegio Interlaken — Inicio">
+            <Link to="/" aria-label="Colegio Interlaken, ir al inicio">
               <Logo variant="stacked" size={120} theme="dark" eager />
             </Link>
           </div>
@@ -102,7 +102,7 @@ function LoginView({ c, p, s, a }: { c: Copy; p: LoginProps; s: ViewState; a: Vi
           <div className="w-full max-w-[400px]">
             {/* Mobile logo */}
             <div className="mb-7 flex justify-center lg:hidden">
-              <Link to="/" aria-label="Colegio Interlaken — Inicio">
+              <Link to="/" aria-label="Colegio Interlaken, ir al inicio">
                 <Logo variant="stacked" size={96} theme="light" eager />
               </Link>
             </div>

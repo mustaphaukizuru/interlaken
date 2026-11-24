@@ -25,9 +25,18 @@ describe('console areas', () => {
     }
   });
 
-  it('does not judge paths outside the console', () => {
-    expect(canOpen(teacher, '/staff')).toBe(true);
+  it('does not judge the family portal', () => {
     expect(canOpen(cafeteria, '/portal/perfil')).toBe(true);
+    expect(canOpen(teacher, '/portal')).toBe(true);
+  });
+
+  it('keeps the «Panel de Dirección» and the site content (/staff) for administrators (QA 2026-11-24)', () => {
+    for (const path of ['/staff', '/staff/', '/staff/contenido', '/staff/contenido/medios', '/staff/contenido/4', '/staff?x=1']) {
+      expect(canOpen(admin, path)).toBe(true);
+      expect(canOpen(cafeteria, path)).toBe(false);
+      expect(canOpen(teacher, path)).toBe(false);
+    }
+    expect(canOpen(cafeteria, '/staffing')).toBe(true);
   });
 
   it('lands each account where it works', () => {

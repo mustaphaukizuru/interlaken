@@ -129,7 +129,10 @@ def _compute_badges(user) -> dict:
     from apps.core.areas import user_areas
     from apps.portal.models import Notification
 
-    out = {'notificaciones': Notification.objects.filter(user=user, is_read=False).count()}
+    # Counted like the Avisos list (in_app only): a comunicado kept out of the
+    # app can never be read there, and «Marcar todo como leído» skips it, so
+    # counting it left the badge stuck above zero.
+    out = {'notificaciones': Notification.objects.filter(user=user, is_read=False, in_app=True).count()}
     # Admins get every work queue; a staff account only those of its console
     # areas (apps/core/areas.py), so nobody is shown a count they cannot open.
     areas = user_areas(user)

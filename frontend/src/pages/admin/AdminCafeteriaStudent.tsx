@@ -21,13 +21,15 @@ import type { CafeteriaStudentDetail } from '@/types';
 import { DataTable } from '@/components/ui/DataTable';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
-import { isCardTopUp } from '@/lib/status/cafeteria';
+import { isCardTopUp, movementSign } from '@/lib/status/cafeteria';
+import { MovementAmount } from '@/components/admin/MovementAmount';
 import { useAdjustmentsList, useTransactionsList, CAF_MONEY_VIEWS } from '@/hooks/queries/cafeteria';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { useUrlPage } from '@/hooks/useUrlFilters';
 import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { newRequestId } from '@/lib/requestId';
-import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
+import { apiErrorMessage, apiErrorStatus, fieldErrorsOrNull } from '@/lib/apiErrors';
+import { RecordNotFound } from '@/components/admin/RecordNotFound';
 import type { AdminTransaction } from '@/services/cafeteriaAdmin';
 import type { ExportFormat } from '@/services/dataOps';
 
@@ -89,7 +91,7 @@ export default function AdminCafeteriaStudent() {
   const [bankDone, setBankDone] = useState(false);
   const cardRefund = !!refundTx && isCardTopUp(refundTx);
 
-  const { data, isLoading, isError, refetch } = useQuery<CafeteriaStudentDetail>({
+  const { data, isLoading, isError, error, refetch } = useQuery<CafeteriaStudentDetail>({
     queryKey: ['admin-cafeteria-student', id],
     queryFn: async () => (await cafeteriaApi.getStudentDetail(id, { ledger: 0 })).data,
     enabled: !!id,
@@ -158,6 +160,10 @@ export default function AdminCafeteriaStudent() {
       <div className="skeleton h-64 rounded-md" />
     </div>
   );
+  // A wrong id in the address (or a record gone): say so, with the way back (QA 2026-11-24).
+  if (!id || (isError && apiErrorStatus(error) === 404)) {
+    return <RecordNotFound backTo="/admin/cafeteria" backLabel="Volver a Cafetería" />;
+  }
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
@@ -165,6 +171,13 @@ export default function AdminCafeteriaStudent() {
   const isLow = parseFloat(balance.balance) <= parseFloat(balance.low_balance_threshold ?? '20');
   const refundable = (t: AdminTransaction) =>
     t.transaction_type === 'purchase' || t.transaction_type === 'topup';
+  // Which way an adjustment or a refund moved the balance (the ledger stores
+  // it absolute): its row in the trail below, else the step from the next
+  // older movement on this page (newest first).
+  const adjTrail = new Map((adjs.data?.results ?? [])
+    .filter((a) => a.transaction != null).map((a) => [a.transaction as number, a.amount]));
+  const txRows = txs.data?.results ?? [];
+  const olderBalance = new Map(txRows.map((t, i) => [t.id, txRows[i + 1]?.balance_after ?? null]));
 
   return (
     <div className="space-y-6">
@@ -296,7 +309,10 @@ export default function AdminCafeteriaStudent() {
               { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
               { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
               { header: 'Descripción', className: 'text-muted', cell: (t) => <span className="block min-w-0 max-w-xs truncate" title={t.description}>{t.description || '—'}</span> },
-              { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => formatMXN(t.amount) },
+              { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => (
+                <MovementAmount type={t.transaction_type} amount={t.amount}
+                  sign={movementSign(t, { trail: adjTrail, olderBalance: olderBalance.get(t.id) })} />
+              ) },
               { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.applied === false ? (t.transaction_type === 'refund'
                 ? <span className="text-xs" title="Devolución del POS que el saldo ya tenía: saldo inicial, devolución hecha en la consola o recarga detectada en Loyverse antes de este recibo">ya en el saldo</span>
                 : <span className="text-xs" title="Compra anterior al alta: ya estaba incluida en el saldo inicial">incl. saldo inicial</span>) : t.balance_after !== null ? formatMXN(t.balance_after) : '—') },

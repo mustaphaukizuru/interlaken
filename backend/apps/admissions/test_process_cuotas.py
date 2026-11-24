@@ -162,3 +162,39 @@ def test_works_with_the_seeded_school_prices():
     pdf = cuotas_pdf.render_cuotas_pdf()
     assert pdf.count(b"/Type /Page ") == 3
     assert cuotas_pdf.level_figures("primaria")["new"] is not None
+
+
+# QA sweep 2026-11-24 (round 2): the PDF says which cycle it is for, and marks
+# the prices still from an older cycle. No price value changes.
+def _years(**years):
+    from django.core.cache import cache
+
+    s = SiteSettings.load()
+    s.pricing_years = years
+    s.save()
+    cache.clear()
+
+
+def test_every_page_names_the_school_cycle(monkeypatch):
+    _prices()
+    _years(fees=2090, tuition=2090, insurance=2090, extras=2090, daycare=2090)
+    lines = cuotas_pdf.level_document("primaria").text_lines()
+    assert "Ciclo escolar 2090–2091" in lines
+    pre = cuotas_pdf.level_document("preescolar").text_lines()
+    assert "Ciclo escolar 2090–2091 · Incluye Maternal" in pre
+    assert not any("precio del ciclo" in line for line in pre)
+    assert b"Ciclo escolar 2090" in cuotas_pdf.render_cuotas_pdf(["primaria"])
+
+
+def test_groups_still_on_an_older_cycle_are_marked():
+    _prices()
+    _years(fees=2090, tuition=2089, insurance=2089)
+    text = "\n".join(cuotas_pdf.level_document("primaria").text_lines())
+    assert "Ciclo escolar 2090–2091" in text
+    assert "11 mensualidades, agosto a junio · precio del ciclo 2089–2090" in text
+    assert "Pago anual: Seguro uno, Seguro dos · precio del ciclo 2089–2090" in text
+    assert "gastos administrativos $1,100.00  $7,200.00" in text   # fees are current
+    assert ("Los importes marcados son del ciclo 2089–2090: el colegio aún no publica los "
+            "del ciclo 2090–2091.") in text
+    # The amounts themselves never change.
+    assert "$5,333.00" in text and "$350.00" in text

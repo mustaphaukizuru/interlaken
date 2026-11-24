@@ -84,6 +84,54 @@ def sort_guardians(guardians: list[dict], ordering) -> list[dict]:
     return sorted(guardians, key=lambda g: (key(g), g['id']), reverse=desc)
 
 
+# Column widths (User / ParentProfile). A longer value, or a value that is not
+# text, used to reach the database (or ``.strip()``) and answer 500.
+GUARDIAN_MAX_LEN = {
+    'email': 254, 'first_name': 100, 'last_name': 100, 'full_name': 201,
+    'phone': 20, 'whatsapp': 20, 'relationship': 50,
+}
+GUARDIAN_LABELS = {
+    'email': 'El correo', 'first_name': 'El nombre', 'last_name': 'Los apellidos',
+    'full_name': 'El nombre completo', 'phone': 'El teléfono', 'whatsapp': 'El WhatsApp',
+    'relationship': 'El parentesco',
+}
+
+
+def clean_guardian_fields(data, keys) -> tuple[dict, dict]:
+    """``({key: stripped text}, {key: [error]})`` for the ``keys`` present in
+    ``data``. A number is read as text (a phone typed as digits); anything else
+    that is not text, or is longer than its column, is an error."""
+    values, errors = {}, {}
+    if not hasattr(data, 'get'):     # a JSON list or string body
+        data = {}
+    for key in keys:
+        if key not in data:
+            continue
+        raw = data.get(key)
+        if raw is None:
+            raw = ''
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            raw = str(raw)
+        if not isinstance(raw, str):
+            errors[key] = [f'{GUARDIAN_LABELS[key]} debe ser texto.']
+            continue
+        value = raw.strip()
+        limit = GUARDIAN_MAX_LEN[key]
+        if len(value) > limit:
+            errors[key] = [f'{GUARDIAN_LABELS[key]} admite como máximo {limit} caracteres.']
+            continue
+        values[key] = value
+    return values, errors
+
+
+def _find_user_by_email(email: str):
+    """The account that owns ``email``, whatever its capitalisation (an exact
+    match first). ``filter(email=...)`` missed «Maria@Test.mx» and the create
+    that followed failed on the unique email (500)."""
+    return (User.objects.filter(email=email).first()
+            or User.objects.filter(email__iexact=email).order_by('pk').first())
+
+
 class StudentGuardiansView(APIView):
     """List linked guardians or link a guardian by email (admin only)."""
     admin_area = 'alumnos'
@@ -118,24 +166,31 @@ class StudentGuardiansView(APIView):
             # A guardian would see (and be notified of) a staff member's wallet.
             return Response(error_body('El personal del colegio no tiene tutores.'),
                             status=status.HTTP_400_BAD_REQUEST)
-        email = (request.data.get('email') or '').strip().lower()
-        if not email or '@' not in email:
+        fields, errors = clean_guardian_fields(
+            request.data,
+            ('email', 'first_name', 'last_name', 'full_name', 'phone', 'relationship'))
+        email = fields.get('email', '').lower()
+        if 'email' in errors or not email or '@' not in email:
             return Response(
                 error_body('Proporcione un correo válido del padre/tutor.'),
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        first_name = (request.data.get('first_name') or '').strip()
-        last_name = (request.data.get('last_name') or '').strip()
-        full_name = (request.data.get('full_name') or '').strip()
-        phone = (request.data.get('phone') or '').strip()
-        relationship = (request.data.get('relationship') or 'Padre/Madre').strip() or 'Padre/Madre'
+        first_name = fields.get('first_name', '')
+        last_name = fields.get('last_name', '')
+        full_name = fields.get('full_name', '')
+        phone = fields.get('phone', '')
+        relationship = fields.get('relationship') or 'Padre/Madre'
 
         if not first_name and not last_name and full_name:
             first_name, last_name = _split_name(full_name)
+            first_name = first_name[:GUARDIAN_MAX_LEN['first_name']]
+            last_name = last_name[:GUARDIAN_MAX_LEN['last_name']]
 
         created = False
-        parent = User.objects.filter(email=email).first()
+        parent = _find_user_by_email(email)
         if parent is None:
             parent = User.objects.create_user(
                 email=email,
@@ -229,7 +284,9 @@ class StudentGuardianDetailView(APIView):
             return Response(error_body('Solo se editan cuentas de padres/tutores.'),
                             status=status.HTTP_403_FORBIDDEN)
 
-        data = {k: (request.data.get(k) or '').strip() for k in self.EDITABLE if k in request.data}
+        data, errors = clean_guardian_fields(request.data, self.EDITABLE)
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
         if not data:
             return Response(_serialize_guardian(parent, student=student))
         if 'email' in data:

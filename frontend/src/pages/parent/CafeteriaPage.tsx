@@ -40,7 +40,7 @@ import { LiveBadge } from '@/components/ui/LiveBadge';
 import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import {
-  applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatCents, isScheduled, pendingCoversLowBalance, projectBalance, sentence,
+  applyNotice, applyPhrase, canTopUp, DEFAULT_WHATSAPP, formatCents, isScheduled, loadsInstantly, pendingCoversLowBalance, projectBalance, sentence,
 } from '@/lib/topupApply';
 import { formatMXN } from '@/lib/format';
 
@@ -88,9 +88,6 @@ const txSign = (tx: { transaction_type: string; adjustment_amount?: string | nul
 
 type TypeFilter = '' | 'purchase' | 'topup' | 'refund';
 
-/** A child on the POS who still attends: the server refuses a top-up for anyone else. */
-const canTopUp = (b: CafeteriaBalance) => !!b.student.loyverse_id && b.student.is_active !== false;
-
 function topupErrorMessage(err: unknown): string {
   const fields = fieldErrorsOrNull(err);
   if (!fields) return 'No fue posible procesar la recarga. Intente nuevamente.';
@@ -124,6 +121,9 @@ export default function CafeteriaPage() {
   // school days) unless the server says they are credited on payment.
   const policy = availability?.topup_policy;
   const scheduled = isScheduled(policy);
+  // The app loads card top-ups into the cafetería itself (production since
+  // 2026-11-21): no «7:30 a.m.» promise for those (QA 2026-11-24).
+  const instantLoad = loadsInstantly(policy);
   const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
@@ -253,8 +253,8 @@ export default function CafeteriaPage() {
   }, [balances, childId, urlAlumno, urlChild, set, setChildId]);
 
   // Quick top-up deep link from the dashboard chips (`?recarga=200`): prefill
-  // the amount and open the top-up modal for the active (or first Loyverse-
-  // linked) student. The param is consumed immediately (replace, so Back does
+  // the amount and open the top-up modal for the child it names (or the
+  // active one). The param is consumed immediately (replace, so Back does
   // not re-trigger) and out-of-range amounts are ignored. No payment logic
   // lives here — this only pre-selects what the existing modal already does.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -279,13 +279,21 @@ export default function CafeteriaPage() {
       return next;
     }, { replace: true });
     const amount = Number(raw);
-    // The dashboard tile names its child (?hijo=); otherwise the selected one.
-    const hijo = Number(searchParams.get('hijo'));
-    const target =
-      balances.find((b) => b.student.id === hijo && canTopUp(b))
-      ?? balances.find((b) => b.student.id === childId && canTopUp(b))
-      ?? balances.find(canTopUp);
+    // The dashboard tile names its child (?hijo=); otherwise the child on
+    // screen, or the only one. Never a sibling instead: a family must not pay
+    // for the wrong child when the one asked for cannot take a top-up
+    // (QA 2026-11-24). The page opens on that child, whose card says why.
+    const hijo = searchParams.get('hijo');
+    const wanted = hijo != null ? Number(hijo) : childId;
+    const target = wanted != null
+      ? balances.find((b) => b.student.id === wanted)
+      : balances.length === 1 ? balances[0] : undefined;
     if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > topupMax) return;
+    if (!canTopUp(target)) {
+      toast(`Por ahora no es posible recargar en línea a ${target.student.user.full_name}. Contacte al colegio para activar el servicio.`,
+        { id: 'recarga-no-disponible' });
+      return;
+    }
     // Suppressed: one-shot URL command — the param is external navigation
     // state consumed (deleted) right above, so the modal state cannot be
     // derived from it and these one-time writes cannot cascade.
@@ -345,9 +353,9 @@ export default function CafeteriaPage() {
       done = true;
       setPaying(false);
       void queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
-      toast(scheduled
-        ? 'Cerraste la ventana de pago. Si completaste el pago, aparecerá como «Recarga por aplicar» en unos minutos.'
-        : 'Cerraste la ventana de pago. Si completaste el pago, lo verás reflejado en unos minutos.');
+      toast(scheduled && !loadsInstantly(policy, topupAmountNum)
+        ? 'Cerró la ventana de pago. Si completó el pago, aparecerá como «Recarga por aplicar» en unos minutos.'
+        : 'Cerró la ventana de pago. Si completó el pago, lo verá reflejado en unos minutos.');
     };
     setPaying(true);
     try {
@@ -442,7 +450,7 @@ export default function CafeteriaPage() {
       const created = data?.created ?? 0;
       toast.success(
         created > 0
-          ? `Actualizado — ${created} compra(s) nueva(s) desde Loyverse.`
+          ? `Actualizado: ${created} compra(s) nueva(s) desde Loyverse.`
           : 'Saldos y movimientos actualizados desde Loyverse.',
       );
     } catch {
@@ -504,6 +512,10 @@ export default function CafeteriaPage() {
   const anyLinked = (balances ?? []).some(canTopUp);
   // A staff member's own wallet (2026-11-18): «Mi cafetería», no «Grupo».
   const ownWallet = mine || (!!balances?.length && balances.every((b) => b.student.tipo === 'personal'));
+  // The wizard speaks of «la cuenta» when it tops up a staff wallet, never
+  // «el alumno» (QA 2026-11-24).
+  const topupIsStaff = (balances ?? []).find((b) => b.student.id === selectedStudent)?.student.tipo === 'personal';
+  const holderLabel = topupIsStaff ? 'Cuenta' : 'Alumno';
 
   return (
     <div className="space-y-6">
@@ -511,9 +523,11 @@ export default function CafeteriaPage() {
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{ownWallet ? 'Mi cafetería' : 'Cafetería'}</h1>
           <p className="mt-1 text-fluid-sm text-muted">
-            {scheduled
-              ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo cuando el colegio la carga en la caja de cafetería (días hábiles, 7:30 a.m.).'
-              : 'Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo aparece aquí al confirmar el pago; el colegio lo carga en el POS para compras en cafetería.'}
+            {instantLoad
+              ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo en unos segundos, al confirmarse el pago.'
+              : scheduled
+                ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo cuando el colegio la carga en la caja de cafetería (días hábiles, 7:30 a.m.).'
+                : 'Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo aparece aquí al confirmar el pago; el colegio lo carga en el POS para compras en cafetería.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start print:hidden">
@@ -611,12 +625,16 @@ export default function CafeteriaPage() {
               {left ? (
                 <p className="mt-3 flex items-start gap-2 rounded-sm bg-warning-bg px-3 py-2 text-xs leading-snug text-ink">
                   <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
-                  <span>Este alumno ya no está activo en el colegio. Para aclarar su saldo, contacte al colegio.</span>
+                  <span>{b.student.tipo === 'personal'
+                    ? 'Esta cuenta ya no está activa en el colegio. Para aclarar su saldo, contacte al colegio.'
+                    : 'Este alumno ya no está activo en el colegio. Para aclarar su saldo, contacte al colegio.'}</span>
                 </p>
               ) : notLinked && (
                 <p className="mt-3 flex items-start gap-2 rounded-sm bg-warning-bg px-3 py-2 text-xs leading-snug text-ink">
                   <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
-                  <span>Este alumno aún no está vinculado a cafetería/Loyverse. Contacte al colegio para activar el servicio.</span>
+                  <span>{b.student.tipo === 'personal'
+                    ? 'Esta cuenta aún no está vinculada a cafetería/Loyverse. Contacte al colegio para activar el servicio.'
+                    : 'Este alumno aún no está vinculado a cafetería/Loyverse. Contacte al colegio para activar el servicio.'}</span>
                 </p>
               )}
 
@@ -641,7 +659,11 @@ export default function CafeteriaPage() {
                 }}
                 className="mt-1 inline-flex min-h-[44px] items-center self-start rounded-sm text-left text-xs font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 print:hidden"
               >
-                Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '20').toFixed(0)}</span> · Cambiar
+                {/* One text run: in an inline-flex button the spaces at the edges
+                    of separate text nodes collapse («saldo bajo:$20· Cambiar»). */}
+                <span>
+                  Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '20').toFixed(0)}</span> · Cambiar
+                </span>
               </button>
 
               {/* Spending budget (#13): progress vs the parent-set daily/weekly cap.
@@ -715,13 +737,16 @@ export default function CafeteriaPage() {
         <CafeteriaCategoriesCard student={childId ?? 'all'} />
       )}
 
-      {/* No cafeteria accounts — school must link children to Loyverse. */}
+      {/* No wallet at all: the API opens one for every linked child, so this
+          account has no child yet. Same words as Inicio (QA 2026-11-24). */}
       {!balancesLoading && balances && balances.length === 0 && (
         <Card>
           <EmptyState
             icon={Coffee}
-            title="Sin servicio de cafetería"
-            description="El colegio aún no activa la cafetería de su hijo(a)."
+            title={mine ? 'Sin servicio de cafetería' : 'Cuenta sin alumno vinculado'}
+            description={mine
+              ? 'El colegio aún no vincula su cuenta con la cafetería.'
+              : 'El colegio aún no vincula a un alumno con este correo.'}
             action={
               <Link to="/contacto" className="btn-secondary text-sm">
                 Contactar al colegio
@@ -741,7 +766,7 @@ export default function CafeteriaPage() {
         maxWidth={520}
       >
         <ol className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide" aria-label="Pasos">
-          {(['Alumno y monto', 'Método de pago', 'Titular de la tarjeta', 'Revisar'] as const).map((label, i) => {
+          {([`${holderLabel} y monto`, 'Método de pago', 'Titular de la tarjeta', 'Revisar']).map((label, i) => {
             const n = (i + 1) as Step;
             const state = n < topupStep ? 'done' : n === topupStep ? 'current' : 'todo';
             return (
@@ -757,7 +782,7 @@ export default function CafeteriaPage() {
         {topupStep === 1 && (
           <>
             <div>
-              <label className="label" htmlFor="topup-student">Alumno</label>
+              <label className="label" htmlFor="topup-student">{holderLabel}</label>
               <select
                 id="topup-student"
                 className="input-field min-h-[44px] text-base"
@@ -838,9 +863,11 @@ export default function CafeteriaPage() {
                 <span className="block text-xs text-muted">
                   {!onlineAvailable
                     ? 'Muy pronto podrá pagar con tarjeta desde el portal. Mientras tanto, recargue en efectivo en la caja de cafetería.'
-                    : scheduled
-                      ? sentence(`El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
-                      : 'El saldo se aplica en minutos.'}
+                    : loadsInstantly(policy, topupAmountNum)
+                      ? 'El saldo se aplica en unos segundos.'
+                      : scheduled
+                        ? sentence(`El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
+                        : 'El saldo se aplica en minutos.'}
                 </span>
                 {onlineAvailable && (
                   <AmexNotAccepted className="mt-1.5" />
@@ -880,11 +907,11 @@ export default function CafeteriaPage() {
 
         {topupStep === 4 && (
           <dl className="divide-y divide-line rounded-md border border-line text-sm">
-            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
-            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">{holderLabel}</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? ''}</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">{formatMXN(topupAmountNum)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Titular</dt><dd className="text-right font-medium text-ink">{`${cardholder.first_name} ${cardholder.last_name}`.trim()} · CP {cardholder.postal_code}</dd></div>
-            {scheduled && (
+            {scheduled && !loadsInstantly(policy, topupAmountNum) && (
               <div className="flex justify-between gap-3 px-4 py-3"><dt className="whitespace-nowrap text-muted">Se aplica</dt><dd className="text-right font-medium text-ink">{applyPhrase(policy?.next_apply_at)}</dd></div>
             )}
             <div className="px-4 py-3 text-xs text-muted">
@@ -932,7 +959,7 @@ export default function CafeteriaPage() {
         {thresholdStudent && (
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              Te avisaremos cuando el saldo de{' '}
+              Le avisaremos cuando el saldo de{' '}
               <span className="font-semibold text-ink">{thresholdStudent.student.user.full_name}</span>{' '}
               baje de este monto.
             </p>
@@ -972,9 +999,9 @@ export default function CafeteriaPage() {
         {budgetStudent && (
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              Establece cuánto puede gastar{' '}
+              Establezca cuánto puede gastar{' '}
               <span className="font-semibold text-ink">{budgetStudent.student.user.full_name}</span>{' '}
-              en cafetería. Te avisaremos cuando una compra supere el límite. Deja un
+              en cafetería. Le avisaremos cuando una compra supere el límite. Deje un
               campo vacío o en 0 para desactivarlo.
             </p>
             <div>
@@ -1151,7 +1178,7 @@ export default function CafeteriaPage() {
                   <span className={`text-sm font-semibold ${
                     txSign(tx) === '+' ? 'text-green-700' : 'text-ink'
                   }`}>
-                    {txSign(tx)}${parseFloat(tx.amount).toFixed(2)}
+                    {txSign(tx)}{formatMXN(Math.abs(parseFloat(tx.amount)))}
                   </span>
                   {tx.applied === false && (
                     // History only: a purchase older than the opening balance, or a
@@ -1162,7 +1189,7 @@ export default function CafeteriaPage() {
                     </p>
                   )}
                   {tx.balance_after != null && (
-                    <p className="text-xs text-subtle sm:mt-0.5">Saldo ${parseFloat(tx.balance_after).toFixed(2)}</p>
+                    <p className="text-xs text-subtle sm:mt-0.5">Saldo {formatMXN(tx.balance_after)}</p>
                   )}
                 </div>
               </div>

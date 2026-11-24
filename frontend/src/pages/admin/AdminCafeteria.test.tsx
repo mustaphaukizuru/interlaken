@@ -305,6 +305,17 @@ describe('AdminCafeteria Movimientos', () => {
     await waitFor(() => expect(cafeteriaApi.refundTransaction).toHaveBeenCalledWith(55, '', false));
   });
 
+  it('a «Descontar» adjustment shows a minus sign in the debit colour when the API gives its sign (QA 2026-11-24)', async () => {
+    api.transactions.mockResolvedValue(page([{
+      id: 61, student_id: 7, student_name: 'Luis López', student_code: '07', loyverse_code: 'ci07', type_display: 'Ajuste',
+      transaction_type: 'adjustment', amount: '12.50', adjustment_amount: '-12.50', description: 'Ajuste manual: Doble cobro',
+      items: [], balance_after: '107.50', date: '2026-08-02T15:00:00Z', loyverse_receipt_id: '',
+    }]));
+    await openTab(/Movimientos/);
+    const row = (await screen.findByText('Ajuste manual: Doble cobro')).closest('tr') as HTMLElement;
+    expect(within(row).getByText(/−\$12\.50/)).toHaveClass('text-coral-600');
+  });
+
   it('a card top-up refund requires confirming the MultiCobros refund first', async () => {
     api.transactions.mockResolvedValue(page([{
       id: 56, student_id: 7, student_name: 'Luis López', student_code: '07', loyverse_code: 'ci07', type_display: 'Recarga',

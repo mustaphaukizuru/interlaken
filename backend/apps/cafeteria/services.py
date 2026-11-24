@@ -37,6 +37,8 @@ from django.utils.dateparse import parse_datetime
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from apps.cafeteria.schedule import format_amount
+
 logger = logging.getLogger(__name__)
 
 # (connect, read) timeouts in seconds.
@@ -61,6 +63,42 @@ _READ_BUDGET: ContextVar[tuple[int, int] | None] = ContextVar('loyverse_read_bud
 
 class LoyverseError(Exception):
     pass
+
+
+def _end_sentence(text: str) -> str:
+    """``text`` closed with one period (a name ending in an initial, «Ana R.»,
+    already has it)."""
+    text = (text or '').rstrip()
+    return text if text.endswith('.') else f'{text}.'
+
+
+def family_cafeteria_path(student) -> str:
+    """The family portal's cafetería page opened on ``student`` (the portal
+    reads ``?alumno=<StudentProfile pk>``): a notice about one child must not
+    open a sibling's wallet (QA 2026-11-24)."""
+    return f'/portal/cafeteria?alumno={student.pk}'
+
+
+def loyverse_error_es(error) -> str:
+    """A Loyverse failure (exception or its raw text, often an English
+    ``requests`` message) as one Spanish sentence for the office. The raw
+    text stays in the server log (QA 2026-11-24: the health panel showed
+    «LOYVERSE_API_TOKEN is not configured.»)."""
+    raw = str(error or '').strip()
+    low = raw.lower()
+    if not raw:
+        return ''
+    if 'not configured' in low:
+        return ('La conexión con Loyverse no está configurada en el servidor (falta la clave '
+                'de acceso). Avise a soporte técnico.')
+    if '401' in low or '403' in low or 'unauthorized' in low or 'forbidden' in low:
+        return ('Loyverse rechazó la clave de acceso de la app (caducó o se revocó). '
+                'Avise a soporte técnico.')
+    if '429' in low or 'too many' in low:
+        return 'Loyverse pidió esperar por exceso de solicitudes. Intente de nuevo en unos minutos.'
+    if 'timed out' in low or 'timeout' in low or 'connection' in low or 'max retries' in low:
+        return 'Loyverse no respondió a tiempo. Intente de nuevo en unos minutos.'
+    return 'No fue posible comunicarse con Loyverse. Intente de nuevo en unos minutos.'
 
 
 def _base_url() -> str:
@@ -528,12 +566,13 @@ def _notify_purchase(tx):
     refund = tx.transaction_type == CafeteriaTransaction.TxType.REFUND
     if refund:
         title = 'Devolución en cafetería'
-        head = f'Se registró una devolución de ${tx.amount:.2f}'
+        head = f'Se registró una devolución de {format_amount(tx.amount)}'
     else:
         title = 'Compra en cafetería'
-        head = f'Compra en cafetería: ${tx.amount:.2f}'
-    detail = f' — {tx.description}' if tx.description else ''
-    balance = f' Saldo actual: ${tx.balance_after:.2f}.' if tx.balance_after is not None else ''
+        head = f'Compra en cafetería: {format_amount(tx.amount)}'
+    # «Compra en cafetería: $36.00 (2× Tacos). Saldo actual: $10,039.00.»
+    detail = f' ({tx.description})' if tx.description else ''
+    balance = f' Saldo actual: {format_amount(tx.balance_after)}.' if tx.balance_after is not None else ''
     message = f'{student.user.full_name}: {head}{detail}.{balance}'
     # Email only: the same facts as a card, the balance left as the figure that matters.
     # D13: the email names the child «Carla R.».
@@ -604,8 +643,8 @@ def _maybe_low_balance_alert(cb, now):
     title = 'Saldo bajo en cafetería'
     message = (
         f'El saldo de cafetería de {student.user.full_name} es de '
-        f'${cb.balance:.2f}, por debajo del mínimo de '
-        f'${cb.low_balance_threshold:.2f}. Le recomendamos recargar para evitar '
+        f'{format_amount(cb.balance)}, por debajo del mínimo de '
+        f'{format_amount(cb.low_balance_threshold)}. Le recomendamos recargar para evitar '
         f'contratiempos a la hora del almuerzo.'
     )
     from apps.portal.emailing import money, person_initial
@@ -617,7 +656,7 @@ def _maybe_low_balance_alert(cb, now):
         # siempre se envían», and only urgent alerts bypass a muted category.
         notify(parent, Notification.NotifType.WARNING, title, message,
                whatsapp=use_wa, fanout=False, tone='warning',
-               url='/portal/cafeteria',
+               url=family_cafeteria_path(student),
                highlight=('Saldo actual', money(cb.balance)),
                details=[('Alumno', person_initial(student.user)),
                         ('Saldo mínimo configurado', money(cb.low_balance_threshold))],
@@ -673,11 +712,11 @@ def _maybe_budget_alert(cb, now):
     if daily > 0:
         day_spend = _spend_since(student, start_of_day)
         if day_spend > daily:
-            over.append(f'hoy lleva ${day_spend:.2f} (límite diario ${daily:.2f})')
+            over.append(f'hoy lleva {format_amount(day_spend)} (límite diario {format_amount(daily)})')
     if weekly > 0:
         week_spend = _spend_since(student, start_of_week)
         if week_spend > weekly:
-            over.append(f'esta semana lleva ${week_spend:.2f} (límite semanal ${weekly:.2f})')
+            over.append(f'esta semana lleva {format_amount(week_spend)} (límite semanal {format_amount(weekly)})')
 
     if not over:
         return 0
@@ -1340,7 +1379,6 @@ def _claim_verify_alert(topup_id, now) -> str | None:
 
 def _held_line(student, topup, payment) -> str:
     """``Ana López · $200.00 · control IK000815 · folio 815``"""
-    from apps.cafeteria.schedule import format_amount
 
     checkout = payment.banorte_checkout()
     parts = [student.user.full_name, format_amount(payment.amount)]
@@ -1359,7 +1397,6 @@ def notify_staff_held_unverified(held, now=None) -> int:
     one short in-app notice per staff account and one email to all of them,
     with a button to «Por aplicar». Returns how many top-ups it announced.
     """
-    from apps.cafeteria.schedule import format_amount
     from apps.portal.emailing import EmailContent, portal_url
     from apps.portal.models import Notification
     from apps.portal.services import notify, send_email
@@ -1520,7 +1557,6 @@ def _simulation_refused(payment) -> bool:
 
 def notify_topup_applied(topup, balance) -> int:
     """Tell the family the money is now spendable (in-app + email). Best-effort."""
-    from apps.cafeteria.schedule import format_amount
 
     try:
         return _notify_balance_change(
@@ -1615,10 +1651,10 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
                        else Decimal(str(points)) + _pos_queue_net(student) - local)
             if surplus < amount:
                 raise TopUpApplyError(
-                    f'Loyverse aún no muestra esta recarga: tiene ${points:.2f} para el '
-                    f'alumno y el saldo en la app es ${local:.2f}, así que '
-                    f'Loyverse debería tener al menos ${local + amount:.2f}. Cargue '
-                    f'${amount:.2f} en el POS y vuelva a intentarlo. Si ya la cargó y el '
+                    f'Loyverse aún no muestra esta recarga: tiene {format_amount(points)} para el '
+                    f'alumno y el saldo en la app es {format_amount(local)}, así que '
+                    f'Loyverse debería tener al menos {format_amount(local + amount)}. Cargue '
+                    f'{format_amount(amount)} en el POS y vuelva a intentarlo. Si ya la cargó y el '
                     f'alumno acaba de comprar, espere un minuto.',
                     code='pos_not_loaded', status=409,
                     loyverse_points=f'{points:.2f}', wallet_balance=f'{local:.2f}',
@@ -1698,7 +1734,6 @@ def refund_paid_topup(topup, *, actor=None, note: str = '', bank_refund_confirme
                 'pos_not_loaded_confirmed': True, 'payment': payment.pk if payment else None},
                actor=actor, context='cafeteria.topup.refund_paid')
 
-    from apps.cafeteria.schedule import format_amount
     try:
         _notify_balance_change(
             topup.student, 'Recarga devuelta',
@@ -1814,7 +1849,7 @@ def notify_topup_result(payment, *, success: bool) -> int:
         return 0
 
     from apps.cafeteria.models import TopUpRequest
-    from apps.cafeteria.schedule import format_amount, format_apply_at, whatsapp_display
+    from apps.cafeteria.schedule import format_apply_at, whatsapp_display
 
     # Read after commit: the settlement that just ran may have moved it.
     topup.refresh_from_db(fields=['status', 'apply_due_at', 'applied_via'])
@@ -1850,15 +1885,16 @@ def notify_topup_result(payment, *, success: bool) -> int:
     elif success:
         title = 'Recarga de cafetería exitosa'
         message = (
-            f'Se registró el pago de ${payment.amount:.2f} para el saldo de '
+            f'Se registró el pago de {format_amount(payment.amount)} para el saldo de '
             f'cafetería de {student.user.full_name}. Ya puede verlo en el portal; '
             f'el colegio cargará el monto en el POS para que pueda usarlo al comprar. '
             f'Referencia: {payment.gateway_tx_id or payment.id}.'
         )
         tone, highlight = 'success', ('Monto pagado', format_amount(payment.amount))
         details.append(('Referencia', str(payment.gateway_tx_id or payment.id)))
-        intro = (f'Se registró el pago para el saldo de cafetería de {short}. Ya puede verlo en el '
-                 f'portal; el colegio cargará el monto en el POS para que pueda usarlo al comprar.')
+        intro = (f'Se registró el pago para el saldo de cafetería de {_end_sentence(short)} Ya '
+                 f'puede verlo en el portal; el colegio cargará el monto en el POS para que pueda '
+                 f'usarlo al comprar.')
     elif payment.is_soft_failed():
         # The bank did not confirm (Payworks T, "sin respuesta del banco"): the
         # card may have been charged, and staff look it up in MultiCobros. "No
@@ -1878,21 +1914,23 @@ def notify_topup_result(payment, *, success: bool) -> int:
     else:
         title = 'Recarga de cafetería no completada'
         message = (
-            f'No fue posible procesar la recarga de ${payment.amount:.2f} para '
-            f'{student.user.full_name}. No se realizó ningún cargo a su saldo. '
+            f'No fue posible procesar la recarga de {format_amount(payment.amount)} para '
+            f'{student.user.full_name}. No se realizó ningún cargo a su tarjeta. '
             f'Puede intentarlo nuevamente desde el portal.'
         )
         tone, cta_label = 'danger', 'Intentar de nuevo'
         details += [('Monto', format_amount(payment.amount)), ('Cargo', 'No se realizó ningún cargo')]
-        intro = (f'No fue posible procesar la recarga de {format_amount(payment.amount)} para {short}. '
-                 f'No se realizó ningún cargo a su saldo. Puede intentarlo nuevamente desde el portal.')
+        # «Valentina H.» already ends the sentence: no «Valentina H..».
+        intro = (f'No fue posible procesar la recarga de {format_amount(payment.amount)} para '
+                 f'{_end_sentence(short)} No se realizó ningún cargo a su tarjeta. Puede '
+                 f'intentarlo nuevamente desde el portal.')
 
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
         notify(parent, Notification.NotifType.PAYMENT, title, message, fanout=False,
                details=details, highlight=highlight, tone=tone, cta_label=cta_label,
-               url='/portal/cafeteria' if cta_label else None, intro=intro)
+               url=family_cafeteria_path(student) if cta_label else None, intro=intro)
         notified += 1
     # Any other account of the child's family sees it in the bell (no extra email).
     from apps.portal.services import copy_to_family
@@ -1906,7 +1944,6 @@ def notify_topup_not_charged(payment) -> int:
     again. Best-effort; call after the transaction committed. Returns the
     number of guardians notified."""
     from apps.accounts.family import family_notify_recipients
-    from apps.cafeteria.schedule import format_amount
     from apps.portal.emailing import person_initial
     from apps.portal.models import Notification
     from apps.portal.services import notify
@@ -1925,7 +1962,7 @@ def notify_topup_not_charged(payment) -> int:
     for parent in family_notify_recipients(student):
         notify(parent, Notification.NotifType.PAYMENT, 'Pago de recarga no realizado', message,
                fanout=False, tone='neutral', cta_label='Intentar de nuevo',
-               url='/portal/cafeteria',
+               url=family_cafeteria_path(student),
                details=[('Alumno', short), ('Monto', amount),
                         ('Cargo', 'No se realizó ningún cargo'), ('Folio', str(payment.id))],
                intro=(f'Revisamos con Banorte su pago para la cafetería de '
@@ -2049,6 +2086,20 @@ def _audit_wallet(context, balance, *, admin=None, **metadata):
 class AdjustmentAlreadyApplied(ValueError):
     """``adjust_balance`` was given a reference that is already in the ledger
     (a retried bulk top-up, a re-uploaded ajuste masivo). Nothing was applied."""
+
+
+# The wallet columns are DecimalField(max_digits=10, decimal_places=2): a
+# balance above this cannot be stored (the database raised and the request
+# answered 500). Manual adjustments and refunds refuse it with a clean error.
+MAX_WALLET_BALANCE = Decimal('99999999.99')
+
+
+def _check_wallet_ceiling(new_balance, current, action='El ajuste'):
+    if new_balance > MAX_WALLET_BALANCE:
+        raise ValueError(
+            f'{action} dejaría el saldo en {format_amount(new_balance)}; el saldo máximo es '
+            f'{format_amount(MAX_WALLET_BALANCE)} (saldo actual {format_amount(current)}).'
+        )
 
 
 class PosDebitBlocked(ValueError):
@@ -2195,9 +2246,9 @@ def check_pos_debit(student, new_balance, points) -> None:
     if expected > new_balance:
         gap = expected - new_balance
         raise PosDebitBlocked(
-            f'Loyverse tiene ${points:.2f} para este alumno y el saldo local quedaría en '
-            f'${new_balance:.2f}: la siguiente sincronización volvería a abonar ${gap:.2f} '
-            f'como recarga del POS. Quite primero ${gap:.2f} del saldo del cliente en '
+            f'Loyverse tiene {format_amount(points)} para este alumno y el saldo local quedaría en '
+            f'{format_amount(new_balance)}: la siguiente sincronización volvería a abonar {format_amount(gap)} '
+            f'como recarga del POS. Quite primero {format_amount(gap)} del saldo del cliente en '
             f'Loyverse y vuelva a intentarlo.'
         )
 
@@ -2243,9 +2294,10 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
         new_balance = current + amount
         if new_balance < 0:
             raise ValueError(
-                f'El ajuste dejaría el saldo en ${new_balance:.2f}; no se permite un '
-                f'saldo negativo (saldo actual ${current:.2f}).'
+                f'El ajuste dejaría el saldo en {format_amount(new_balance)}; no se permite un '
+                f'saldo negativo (saldo actual {format_amount(current)}).'
             )
+        _check_wallet_ceiling(new_balance, current)
         if amount < 0:
             check_pos_debit(student, new_balance, pos_points)
 
@@ -2283,19 +2335,21 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
         )
 
         if notify:
+            # «Se acreditaron $10.00 al saldo», «Se descontaron $12.50 del saldo».
             verb = 'acreditaron' if amount > 0 else 'descontaron'
+            to = 'al' if amount > 0 else 'del'
             title = 'Ajuste de saldo en cafetería'
-            message = (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
+            message = (f'Se {verb} {format_amount(amount.copy_abs())} {to} saldo de cafetería de '
                        f'{student.user.full_name}. Motivo: {reason}. '
-                       f'Saldo actual: ${cb.balance:.2f}.')
-            card = [('Ajuste', f'{"+" if amount > 0 else "-"}${amount.copy_abs():,.2f}'), ('Motivo', reason)]
-            figure = ('Saldo actual', f'${cb.balance:,.2f}')
+                       f'Saldo actual: {format_amount(cb.balance)}.')
+            card = [('Ajuste', f'{"+" if amount > 0 else "-"}{format_amount(amount.copy_abs())}'), ('Motivo', reason)]
+            figure = ('Saldo actual', f'{format_amount(cb.balance)}')
             # After COMMIT (immediately when no transaction is open). robust:
             # a mail failure is logged and can never undo or 500 the money.
             transaction.on_commit(
                 lambda: _notify_balance_change(
                     student, title, message, details=card, highlight=figure,
-                    intro=(f'Se {verb} ${amount.copy_abs():,.2f} al saldo de cafetería de '
+                    intro=(f'Se {verb} {format_amount(amount.copy_abs())} {to} saldo de cafetería de '
                            f'{student.user.first_name or student.user.full_name}.')),
                 robust=True)
 
@@ -2362,13 +2416,13 @@ def reconcile_to_loyverse(student, remote, *, expected_balance=None, admin=None)
 
     remote = Decimal(str(remote))
     if remote < 0:
-        raise ValueError(f'Loyverse reporta un saldo negativo (${remote:.2f}); revise en el POS.')
+        raise ValueError(f'Loyverse reporta un saldo negativo ({format_amount(remote)}); revise en el POS.')
     with transaction.atomic():
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
         local = cb.balance or Decimal('0')
         if expected_balance is not None and local != Decimal(str(expected_balance)):
             raise ReconcileConflict(
-                f'El saldo cambió mientras se revisaba (ahora ${local:.2f}); actualice la '
+                f'El saldo cambió mientras se revisaba (ahora {format_amount(local)}); actualice la '
                 f'lista y vuelva a intentarlo.')
         reason = pos_queue_reasons([student.id]).get(student.id)
         if reason:
@@ -2381,9 +2435,9 @@ def reconcile_to_loyverse(student, remote, *, expected_balance=None, admin=None)
             credit = _recent_local_credit(student, since)
             if credit > 0:
                 raise ValueError(
-                    f'No se corrige: el saldo local está ${-delta:.2f} arriba de Loyverse y en '
+                    f'No se corrige: el saldo local está {format_amount(-delta)} arriba de Loyverse y en '
                     f'los últimos {RECONCILE_LOCAL_CREDIT_DAYS} días recibió abonos locales por '
-                    f'${credit:.2f} (recarga en caja, ajuste o devolución) que quizá aún no se '
+                    f'{format_amount(credit)} (recarga en caja, ajuste o devolución) que quizá aún no se '
                     f'cargan en el POS. Revise el detalle del alumno; si el descuento es '
                     f'correcto, use un ajuste manual.')
         # notify=False: the documented reconcile mode (the ledger is being SET
@@ -2391,7 +2445,7 @@ def reconcile_to_loyverse(student, remote, *, expected_balance=None, admin=None)
         # the row lock taken above is kept.
         return adjust_balance(
             student, delta,
-            reason=f'{RECONCILE_REASON_PREFIX} (local ${local:.2f} → ${remote:.2f})',
+            reason=f'{RECONCILE_REASON_PREFIX} (local {format_amount(local)} → {format_amount(remote)})',
             admin=admin, notify=False, pos_points=remote)
 
 
@@ -2572,9 +2626,10 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
         new_balance = current + reversal
         if new_balance < 0:
             raise ValueError(
-                f'La devolución dejaría el saldo en ${new_balance:.2f}; el alumno ya '
-                f'gastó ese saldo. Saldo actual ${current:.2f}.'
+                f'La devolución dejaría el saldo en {format_amount(new_balance)}; el alumno ya '
+                f'gastó ese saldo. Saldo actual {format_amount(current)}.'
             )
+        _check_wallet_ceiling(new_balance, current, 'La devolución')
 
         cb.balance = new_balance
         cb.last_synced = timezone.now()
@@ -2624,13 +2679,13 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
     _notify_balance_change(
         student,
         'Devolución en cafetería',
-        (f'Se procesó una devolución de ${reversal.copy_abs():.2f} en el saldo de '
+        (f'Se procesó una devolución de {format_amount(reversal.copy_abs())} en el saldo de '
          f'cafetería de {student.user.full_name}.'
          + (f' Motivo: {reason}.' if reason else '')
-         + f' Saldo actual: ${cb.balance:.2f}.'),
-        details=[('Devolución', f'${reversal.copy_abs():,.2f}')] + ([('Motivo', reason)] if reason else []),
-        highlight=('Saldo actual', f'${cb.balance:,.2f}'), tone='success',
-        intro=(f'Se procesó una devolución de ${reversal.copy_abs():,.2f} en el saldo de cafetería de '
+         + f' Saldo actual: {format_amount(cb.balance)}.'),
+        details=[('Devolución', f'{format_amount(reversal.copy_abs())}')] + ([('Motivo', reason)] if reason else []),
+        highlight=('Saldo actual', f'{format_amount(cb.balance)}'), tone='success',
+        intro=(f'Se procesó una devolución de {format_amount(reversal.copy_abs())} en el saldo de cafetería de '
                f'{student.user.first_name or student.user.full_name}.'),
     )
     logger.info(f'Refund of tx #{tx.id} for {student} by {admin} — reversal ${reversal}')
@@ -2940,11 +2995,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
             continue
         _notify_balance_change(
             student, 'Recarga registrada',
-            f'Se registró una recarga de ${delta:.2f} en la cafetería. '
-            f'Saldo actual: ${cb.balance:.2f}.',
-            details=[('Recarga', f'${delta:,.2f}')],
-            highlight=('Saldo actual', f'${cb.balance:,.2f}'), tone='success',
-            intro=(f'Se registró una recarga de ${delta:,.2f} en la cafetería para '
+            f'Se registró una recarga de {format_amount(delta)} en la cafetería. '
+            f'Saldo actual: {format_amount(cb.balance)}.',
+            details=[('Recarga', f'{format_amount(delta)}')],
+            highlight=('Saldo actual', f'{format_amount(cb.balance)}'), tone='success',
+            intro=(f'Se registró una recarga de {format_amount(delta)} en la cafetería para '
                    f'{student.user.first_name or student.user.full_name}.'))
 
     if stamp:
@@ -3232,7 +3287,7 @@ def sync_health() -> dict:
         'stale_links': active.filter(loyverse_missing_since__isnull=False).count(),
         'unmatched_receipts': UnmatchedReceipt.objects.filter(resolved_at__isnull=True).count(),
         'loyverse_ok': ok,
-        'loyverse_error': error,
+        'loyverse_error': loyverse_error_es(error),
         'last_purchases_cursor': state.last_purchases_cursor,
         'last_full_fetch_at': state.last_full_fetch_at,
         # When the poll last RAN: the honest "is the cron alive" signal.
@@ -3462,7 +3517,7 @@ def link_profile_on_save(profile, *, actor=None, customers=None) -> dict:
         replay = replay_unmatched_receipts(loyverse_ids=[uuid])
         replayed = replay.get('replayed', 0) + replay.get('absorbed', 0)
     status = 'already_linked' if already else 'linked'
-    return out(status, message=f'Vinculado a Loyverse ✓ · saldo ${balance:,.2f}',
+    return out(status, message=f'Vinculado a Loyverse ✓ · saldo {format_amount(balance)}',
                balance=f'{balance:.2f}', customer_code=code, matched_by=how, replayed=replayed)
 
 
@@ -3758,6 +3813,19 @@ def _stamp_snapshot(profile, c, snapshot, incoming_name):
     return snapshot
 
 
+def _snapshot_current(snapshot, profile, c, incoming_name) -> bool:
+    """True when ``_stamp_snapshot`` would write nothing for this customer."""
+    from apps.cafeteria.loyverse_profile import parse_customer_snapshot
+
+    if snapshot is None or snapshot.student_id != profile.pk:
+        return False
+    fresh = parse_customer_snapshot(c)
+    return (snapshot.customer_code == fresh['customer_code']
+            and snapshot.name == fresh['name']
+            and snapshot.address_code == fresh['address_code']
+            and snapshot.applied_name == incoming_name)
+
+
 def import_students_from_loyverse(customers, *, commit=False, seed_balances=True) -> dict:
     """Create/refresh StudentProfiles from Loyverse customers (students only).
 
@@ -3805,6 +3873,22 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
         p.loyverse_id: p for p in LoyverseProfile.objects
         .filter(loyverse_id__in={c.get('id') for c in pupils if c.get('id')})
     }
+    # Two more for the written run, so a student whose row would not change
+    # costs no query at all. Production's database is remote (~40 ms a round
+    # trip) and five per student made «Sincronizar roster ahora» run ~90 s,
+    # past the 60 s request limit, on a roster where nothing had changed
+    # (QA 2026-11-24).
+    existing_pks = [s.pk for s in existing_by_code.values()]
+    own_guardian = set(
+        StudentProfile.parents.through.objects
+        .filter(studentprofile_id__in=existing_pks)
+        .values_list('studentprofile_id', 'user_id')
+    ) if commit else set()
+    seeded = set(
+        CafeteriaBalance.objects
+        .filter(student_id__in=existing_pks, last_synced__isnull=False)
+        .values_list('student_id', flat=True)
+    ) if commit else set()
 
     seen_codes = set()
     for c in customers:
@@ -3857,6 +3941,16 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
                 _note_change(report, matricula=code, name=display_name if is_new else
                              existing.user.full_name, field=field, before=before,
                              after=after, action='crear' if is_new else 'actualizar')
+
+            if (commit and not is_new and not diffs and not rename
+                    and (existing.pk, existing.user_id) in own_guardian
+                    and (not uuid or _snapshot_current(snapshot, existing, c, incoming_name))
+                    and not (seed_balances and points > 0 and existing.pk not in seeded)):
+                # Nothing to write: the very state the block below would leave.
+                if uuid:
+                    snapshots[uuid] = snapshot
+                report['unchanged'] += 1
+                continue
 
             if not commit:
                 if is_new:

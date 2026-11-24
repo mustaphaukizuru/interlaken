@@ -45,7 +45,7 @@ LEVELS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "secundaria": ("Secundaria", ("secundaria",), "secundaria"),
 }
 ALL = "todos"
-CACHE_KEY = "admissions.cuotas-pdf.v1:{}"
+CACHE_KEY = "admissions.cuotas-pdf.v2:{}"  # v2: the school cycle on every page
 CACHE_TTL = 120  # seconds: a price edit shows within two minutes
 
 
@@ -94,6 +94,22 @@ def level_figures(level: str) -> dict:
     }
 
 
+def price_cycle() -> tuple[int, dict]:
+    """``(cycle start year, {price group: year})``: the cycle these prices are
+    for, the same rule as the Costos page (``content.site_years``): the year
+    the school published them for, or the announced cycle when that is newer.
+    ``years`` only holds the groups the school stamped with a year."""
+    from django.utils import timezone
+
+    from apps.content.site_years import price_cycle_start, year_settings
+
+    from_month, raw = year_settings()
+    years = {
+        k: v for k, v in (raw or {}).items() if isinstance(v, int) and not isinstance(v, bool)
+    }
+    return price_cycle_start(years, timezone.localdate(), from_month), years
+
+
 def _contact() -> list[tuple[str, str]]:
     from django.conf import settings
 
@@ -116,9 +132,23 @@ def _contact() -> list[tuple[str, str]]:
 
 
 def level_document(level: str) -> Document:
+    from apps.content.site_years import cycle_label
+
     from .process import required_documents
 
     f = level_figures(level)
+    # QA 2026-11-24: the PDF never said which school cycle it was for. A price
+    # group still stamped with an older year is marked as such.
+    cycle, years = price_cycle()
+    stale_years: set[int] = set()
+
+    def older(group: str) -> str:
+        year = years.get(group)
+        if year is None or year >= cycle:
+            return ""
+        stale_years.add(year)
+        return f" · precio del ciclo {cycle_label(year)}"
+
     rows: list[Row] = []
     summary: list[tuple[str, str]] = []
     new = f["new"]
@@ -127,7 +157,8 @@ def level_document(level: str) -> Document:
             Row(
                 [
                     "Inscripción nuevo ingreso",
-                    f"Cuota {_money(new.cuota)} + gastos administrativos {_money(new.gastos_administrativos)}",
+                    f"Cuota {_money(new.cuota)} + gastos administrativos "
+                    f"{_money(new.gastos_administrativos)}{older('fees')}",
                     _money(f["new_total"]),
                 ]
             )
@@ -141,7 +172,7 @@ def level_document(level: str) -> Document:
             Row(
                 [
                     "Colegiatura mensual",
-                    f"{t.section} · 11 mensualidades, agosto a junio",
+                    f"{t.section} · 11 mensualidades, agosto a junio{older('tuition')}",
                     _money(t.colegiatura),
                 ]
             )
@@ -157,7 +188,7 @@ def level_document(level: str) -> Document:
                 [
                     "Bono «Sigue con nosotros»",
                     f"Reinscripción {_money(again.cuota)} + gastos administrativos "
-                    f"{_money(again.gastos_administrativos)}",
+                    f"{_money(again.gastos_administrativos)}{older('fees')}",
                     _money(f["again_total"]),
                 ]
             )
@@ -165,16 +196,26 @@ def level_document(level: str) -> Document:
     if f["insurance"]:
         names = ", ".join(c.name for c in f["insurance"])
         rows.append(
-            Row(["Seguros y credenciales", f"Pago anual: {names}", _money(f["insurance_total"])])
+            Row(["Seguros y credenciales", f"Pago anual: {names}{older('insurance')}",
+                 _money(f["insurance_total"])])
         )
     notes = []
+    if stale_years:
+        previous = ", ".join(cycle_label(y) for y in sorted(stale_years))
+        notes.append(
+            f"Los importes marcados son del ciclo {previous}: el colegio aún no publica los del "
+            f"ciclo {cycle_label(cycle)}."
+        )
     documents = required_documents(level)
     if documents:
         notes.append("Documentos para la inscripción: " + "; ".join(documents) + ".")
     return Document(
         title=f"Cuotas {f['label']}",
         reference="Admisiones",
-        subtitle="Incluye Maternal" if level == "preescolar" else "",
+        subtitle=" · ".join(
+            x for x in (f"Ciclo escolar {cycle_label(cycle)}",
+                        "Incluye Maternal" if level == "preescolar" else "") if x
+        ),
         summary=summary,
         info=_contact(),
         table=Table(

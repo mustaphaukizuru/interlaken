@@ -10,11 +10,13 @@ export type FamilyBalance = NonNullable<DashboardData['cafeteria_balances']>[num
 /**
  * The family's linked children and their wallets, read from the dashboard
  * payload the portal already loads (`['dashboard']`, shared with Inicio and
- * Mi perfil): no extra endpoint. Only family logins ask for it; the console
- * and a staff member's own cafetería login get an empty list.
+ * Mi perfil): no extra endpoint. Every family login asks for it: a parent's,
+ * and a child's own school login, which most families use and which sees its
+ * siblings through the Family (QA 2026-11-24). The console (admin, staff)
+ * gets an empty list: its dashboard has no children.
  */
 export function useFamilyChildren() {
-  const isFamily = useAuthStore((s) => s.user?.role === 'parent');
+  const isFamily = useAuthStore((s) => s.user?.role === 'parent' || s.user?.role === 'student');
   const { data, isSuccess } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
@@ -32,7 +34,8 @@ export function useFamilyChildren() {
 /**
  * The child every portal page is about: the one picked in the header (shared
  * store) when it belongs to this family, else the first. Never writes the
- * store, so pages that own a default (Cafetería, Credencial) cannot fight it.
+ * store itself; the pages that show one child (Inicio, Cafetería, Credencial)
+ * adopt their default into it, so they all agree.
  */
 export function useActiveChild() {
   const family = useFamilyChildren();

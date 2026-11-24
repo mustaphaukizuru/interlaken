@@ -89,6 +89,23 @@ class StudentWriteSerializer(serializers.Serializer):
         return (value or '').strip().upper()
     loyverse_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
+    def validate_loyverse_id(self, value):
+        # The column is unique when not blank (accounts_student_loyverse_id_uniq):
+        # a duplicate used to reach the database and answer 500.
+        value = (value or '').strip()
+        if not value:
+            return value
+        qs = StudentProfile.objects.filter(loyverse_id=value).select_related('user')
+        current = self.context.get('profile')
+        if current is not None:
+            qs = qs.exclude(pk=current.pk)
+        other = qs.first()
+        if other is not None:
+            raise serializers.ValidationError(
+                f'Ese ID de Loyverse ya está asignado a {other.user.full_name} '
+                f'(matrícula {other.student_id}).')
+        return value
+
     def __init__(self, *args, partial=False, **kwargs):
         super().__init__(*args, partial=partial, **kwargs)
         if partial:

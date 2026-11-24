@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/myFamilyApi', () => ({
@@ -49,9 +49,12 @@ describe('MyChildren (Mi perfil → Mis hijos)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enviar código/ }));
     await waitFor(() => expect(add).toHaveBeenCalledWith('ci09628@interlaken.com.mx'));
 
-    // Step 2 says where the code went and for whom.
-    expect(await screen.findByText('ci…@interlaken.com.mx')).toBeInTheDocument();
-    const submit = screen.getByRole('button', { name: /Agregar a Alejandro/ });
+    // Step 2 is neutral: no name, grade or address of the child typed (QA 2026-11-24).
+    expect(await screen.findByText(/Enviamos un código al correo registrado del alumno\. Escríbalo aquí para confirmar\./)).toBeInTheDocument();
+    expect(screen.queryByText(/ci…@interlaken\.com\.mx/)).toBeNull();
+    expect(screen.queryByText(/Alejandro/)).toBeNull();
+    expect(screen.queryByText(/1° Secundaria/)).toBeNull();
+    const submit = screen.getByRole('button', { name: 'Agregar a su cuenta' });
     expect(submit).toBeDisabled();
     await userEvent.type(screen.getByLabelText('Código de 6 números'), '123 456');
     expect(submit).toBeEnabled();
@@ -80,9 +83,40 @@ describe('MyChildren (Mi perfil → Mis hijos)', () => {
     await userEvent.type(screen.getByLabelText('Correo escolar o matrícula de su otro hijo'), '09628');
     await userEvent.click(screen.getByRole('button', { name: /Enviar código/ }));
     await userEvent.type(await screen.findByLabelText('Código de 6 números'), '000000');
-    await userEvent.click(screen.getByRole('button', { name: /Agregar a Alejandro/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar a su cuenta' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Le quedan 4 intentos');
     expect(screen.getByLabelText('Código de 6 números')).toBeInTheDocument();
+  });
+
+  it('a double click sends one code and confirms once (QA 2026-11-24)', async () => {
+    let sendDone: (v: unknown) => void = () => {};
+    add.mockImplementationOnce(() => new Promise((r) => { sendDone = r; }) as never);
+    let confirmDone: (v: unknown) => void = () => {};
+    confirm.mockImplementationOnce(() => new Promise((r) => { confirmDone = r; }) as never);
+    renderWithProviders(<MyChildren />);
+    await userEvent.click(await screen.findByRole('button', { name: /Agregar otro hijo/ }));
+    await userEvent.type(screen.getByLabelText('Correo escolar o matrícula de su otro hijo'), '09628');
+
+    const send = screen.getByRole('button', { name: /Enviar código/ });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    await waitFor(() => expect(send).toBeDisabled());
+    expect(add).toHaveBeenCalledTimes(1);
+    await act(async () => sendDone({ data: {
+      sent_to: ['ci…@interlaken.com.mx'], expires_in_minutes: 15,
+      student: { name: 'Alejandro Alvarado Felix', first_name: 'Alejandro', grade: '1° Secundaria', group: 'A' },
+    } }));
+
+    await userEvent.type(await screen.findByLabelText('Código de 6 números'), '123456');
+    const submit = screen.getByRole('button', { name: 'Agregar a su cuenta' });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    await waitFor(() => expect(submit).toBeDisabled());
+    expect(confirm).toHaveBeenCalledTimes(1);
+    // «Enviar otro código» waits too while the code is being checked.
+    expect(screen.getByRole('button', { name: 'Enviar otro código' })).toBeDisabled();
+    await act(async () => confirmDone({ data: { linked: 'Alejandro Alvarado Felix', children: [olivia, alejandro] } }));
+    expect(toast.success).toHaveBeenCalledWith('Alejandro Alvarado Felix ya aparece en su cuenta.');
   });
 
   it('removes a sibling who left the school, after a clear confirmation', async () => {

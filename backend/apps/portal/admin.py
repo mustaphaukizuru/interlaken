@@ -1,6 +1,8 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
+from apps.core.plurals import count as plural
+
 from .models import Announcement, AnnouncementComment, Notification
 
 
@@ -43,12 +45,12 @@ class AnnouncementCommentAdmin(ModelAdmin):
     @admin.action(description='Ocultar comentarios seleccionados')
     def hide_comments(self, request, queryset):
         n = queryset.update(is_hidden=True)
-        self.message_user(request, f'{n} comentario(s) ocultado(s).')
+        self.message_user(request, f'{plural(n, "comentario ocultado", "comentarios ocultados")}.')
 
     @admin.action(description='Mostrar comentarios seleccionados')
     def unhide_comments(self, request, queryset):
         n = queryset.update(is_hidden=False)
-        self.message_user(request, f'{n} comentario(s) visible(s).')
+        self.message_user(request, f'{plural(n, "comentario visible", "comentarios visibles")}.')
 
 
 @admin.register(Notification)

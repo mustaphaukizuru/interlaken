@@ -295,11 +295,12 @@ class TestPages:
         assert not Page.objects.filter(pk=empty.pk).exists()
         assert "Borrador" in _body(admin_client.get(reverse("admin-pages-export")))
 
-    def test_staff_lists_but_cannot_bulk_or_export(self, api_client):
+    def test_staff_cannot_list_bulk_or_export(self, api_client):
+        # Site content is admin-only (QA 2026-11-24).
         staff = UserFactory(role=User.Role.STAFF)
         api_client.force_authenticate(staff)
         Page.objects.create(slug="x", title="X")
-        assert api_client.get(reverse("admin-pages")).data["count"] == 1
+        assert api_client.get(reverse("admin-pages")).status_code == 403
         assert _bulk(api_client, "admin-pages-bulk", "delete", [1]).status_code == 403
         assert api_client.get(reverse("admin-pages-export")).status_code == 403
 

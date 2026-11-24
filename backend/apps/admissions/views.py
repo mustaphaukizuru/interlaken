@@ -720,14 +720,27 @@ class OpenSchoolDaySignUpView(APIView):
     MAX_ATTENDEES = 20  # a family signup, not a bulk reservation
 
     def post(self, request):
+        from apps.bookings.serializers import BookingCreateSerializer
+
         d = request.data
+        if not hasattr(d, 'get'):
+            return Response({'detail': 'Solicitud no válida.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         slot_id = d.get('slot') or d.get('event')
         if not slot_id:
             return Response({'detail': 'Seleccione un evento.'},
                             status=status.HTTP_400_BAD_REQUEST)
+        # A non-numeric id used to reach the ORM and answer 500.
+        try:
+            slot_id = int(str(slot_id).strip())
+        except (TypeError, ValueError):
+            slot_id = 0
+        if not 0 < slot_id < 2 ** 31:
+            return Response({'detail': 'Evento no válido.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
             num = int(d.get('num_attendees') or d.get('children_count') or 1)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             num = 1
         num = min(max(1, num), self.MAX_ATTENDEES)
 
@@ -737,12 +750,24 @@ class OpenSchoolDaySignUpView(APIView):
         if slot is None or slot.visit_type != VisitType.OPEN_CLASS:
             return Response({'detail': 'Evento no válido.'},
                             status=status.HTTP_400_BAD_REQUEST)
+        # Same rules as the main booking form (BookingCreateSerializer): name,
+        # e-mail and phone are required and checked. Without this a blank
+        # signup took a seat of the event.
+        serializer = BookingCreateSerializer(data={
+            'slot': slot_id,
+            'parent_name': d.get('parent_name') or d.get('name') or '',
+            'parent_email': d.get('parent_email') or d.get('email') or '',
+            'parent_phone': d.get('parent_phone') or d.get('phone') or '',
+            'num_attendees': num,
+        })
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
         try:
             booking = create_booking(
                 slot_id=slot_id,
-                parent_name=d.get('parent_name') or d.get('name') or '',
-                parent_email=d.get('parent_email') or d.get('email') or '',
-                parent_phone=d.get('parent_phone') or d.get('phone') or '',
+                parent_name=data['parent_name'],
+                parent_email=data['parent_email'],
+                parent_phone=data['parent_phone'],
                 num_attendees=num,
                 source=Booking.Source.WEB,
             )

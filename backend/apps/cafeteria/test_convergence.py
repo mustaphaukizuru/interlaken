@@ -445,7 +445,7 @@ class TestDailyDriftAlarm:
         with patch('apps.portal.services.send_email', return_value=True) as send:
             call_command('check_wallet_drift', stdout=StringIO())
         body = send.call_args.args[1]
-        assert '2 alumno(s) con una recarga con tarjeta ya cargada' in body
+        assert '2 alumnos con una recarga con tarjeta ya cargada' in body
         assert '«Verificar en MultiCobros»' in body
 
     def test_the_same_problems_are_emailed_once_and_a_change_is_emailed_again(self):

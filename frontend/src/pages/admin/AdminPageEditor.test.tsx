@@ -79,6 +79,15 @@ beforeEach(() => {
 });
 
 describe('AdminPageEditor action bar', () => {
+  it('a page that does not exist (404) says so with the way back, not «No pudimos conectar» (QA 2026-11-24)', async () => {
+    vi.mocked(contentApi.adminGetPage).mockRejectedValue(httpError(404, { detail: 'No encontrado.' }));
+    renderEditor();
+    expect(await screen.findByText('No encontramos este registro')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a Páginas' })).toHaveAttribute('href', '/admin/contenido');
+    expect(screen.queryByText(/No pudimos conectar/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Reintentar/ })).toBeNull();
+  });
+
   it('shows the primary actions, the state chip and the rest under «Más»', async () => {
     renderEditor();
     await ready();

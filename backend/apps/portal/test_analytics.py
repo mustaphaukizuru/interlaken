@@ -31,8 +31,9 @@ def _clear_analytics_cache():
 
 
 @pytest.fixture
-def staff_user(db):
-    return UserFactory(role=User.Role.STAFF, email='staff@interlaken.edu.mx')
+def director(db):
+    # «Panel de Dirección» is admin-only (QA 2026-11-24).
+    return UserFactory(role=User.Role.ADMIN, email='direccion@interlaken.edu.mx')
 
 
 class TestAccess:
@@ -47,9 +48,13 @@ class TestAccess:
         api_client.force_authenticate(student_user)
         assert api_client.get(URL).status_code == 403
 
-    def test_staff_200(self, api_client, staff_user):
-        api_client.force_authenticate(staff_user)
-        assert api_client.get(URL).status_code == 200
+    @pytest.mark.parametrize('areas', [[], ['cafeteria'], ['alumnos', 'accesos', 'admisiones',
+                                                         'visitas', 'mensajes', 'comunicados']])
+    def test_staff_403_whatever_their_areas(self, api_client, areas):
+        # Whole-school numbers (admissions, ARCO, money): a teacher or a
+        # cashier read them before (QA 2026-11-24).
+        api_client.force_authenticate(UserFactory(role=User.Role.STAFF, staff_areas=areas))
+        assert api_client.get(URL).status_code == 403
 
     def test_admin_200(self, api_client, admin_user):
         api_client.force_authenticate(admin_user)
@@ -59,8 +64,8 @@ class TestAccess:
 class TestEmptySafety:
     """With zero rows in the DB the shapes must still render a dashboard."""
 
-    def test_shape_with_no_data(self, api_client, staff_user):
-        api_client.force_authenticate(staff_user)
+    def test_shape_with_no_data(self, api_client, director):
+        api_client.force_authenticate(director)
         data = api_client.get(URL).json()
 
         assert set(data) == {'funnel', 'admissions', 'payments', 'cafeteria', 'documents',
@@ -90,7 +95,7 @@ class TestEmptySafety:
 
 
 class TestAggregation:
-    def test_counts_and_sums(self, api_client, staff_user):
+    def test_counts_and_sums(self, api_client, director):
         now = timezone.now()
         PreRegistration.objects.create(
             child_first_name='A', child_last_name='B', child_dob='2019-01-01',
@@ -123,7 +128,7 @@ class TestAggregation:
             student=profile, transaction_type=CafeteriaTransaction.TxType.PURCHASE,
             amount=Decimal('45.50'), date=now, loyverse_receipt_id='t-purchase-1')
 
-        api_client.force_authenticate(staff_user)
+        api_client.force_authenticate(director)
         data = api_client.get(URL).json()
 
         assert data['admissions']['pre_funnel']['pending'] == 1
@@ -149,7 +154,7 @@ class TestMonthOverMonthWindow:
             payment_type='cafeteria',
             completed_at=timezone.make_aware(datetime.combine(day, dt_time(12, 0))))
 
-    def test_prev_month_to_date_is_a_clamped_prefix(self, api_client, staff_user):
+    def test_prev_month_to_date_is_a_clamped_prefix(self, api_client, director):
         today = timezone.localdate()
         month_start = today.replace(day=1)
         prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
@@ -158,7 +163,7 @@ class TestMonthOverMonthWindow:
         self._pay(prev_month_start, '1000.00')  # first day → always in-window
         self._pay(last_day_prev, '500.00')      # last day → only when late in month
 
-        api_client.force_authenticate(staff_user)
+        api_client.force_authenticate(director)
         pay = api_client.get(URL).json()['payments']
 
         # Full prior month sees both; to-date is a prefix that always includes
@@ -169,7 +174,7 @@ class TestMonthOverMonthWindow:
 
 
 class TestPerformanceAndCache:
-    def test_query_budget_no_n_plus_1(self, api_client, staff_user,
+    def test_query_budget_no_n_plus_1(self, api_client, director,
                                       django_assert_max_num_queries):
         # Data volume must not change the query count (pure aggregation).
         profile = StudentProfileFactory()
@@ -185,42 +190,42 @@ class TestPerformanceAndCache:
                 amount=Decimal('10.00'), date=now - timedelta(days=i % 20),
                 loyverse_receipt_id=f't-bulk-{i}')
 
-        api_client.force_authenticate(staff_user)
+        api_client.force_authenticate(director)
         with django_assert_max_num_queries(25):  # +12 constant aggregates for funnel + adoption (P4-10)
             assert api_client.get(URL).status_code == 200
 
-    def test_second_call_served_from_cache(self, api_client, staff_user,
+    def test_second_call_served_from_cache(self, api_client, director,
                                            django_assert_num_queries):
-        api_client.force_authenticate(staff_user)
+        api_client.force_authenticate(director)
         assert api_client.get(URL).status_code == 200
         with django_assert_num_queries(0):
             assert api_client.get(URL).status_code == 200
 
-    def test_reads_are_not_audit_logged(self, api_client, staff_user):
-        api_client.force_authenticate(staff_user)
+    def test_reads_are_not_audit_logged(self, api_client, director):
+        api_client.force_authenticate(director)
         before = AuditLog.objects.count()
         assert api_client.get(URL).status_code == 200
         assert AuditLog.objects.count() == before
 
 
 class TestRangeParam:
-    def test_seven_day_window(self, api_client, staff_user):
-        api_client.force_authenticate(staff_user)
+    def test_seven_day_window(self, api_client, director):
+        api_client.force_authenticate(director)
         data = api_client.get(URL, {'days': 7}).json()
         assert data['range_days'] == 7
         assert len(data['admissions']['series']) == 7
         assert len(data['payments']['series']) == 7
         assert len(data['cafeteria']['series']) == 7
 
-    def test_unknown_values_fall_back_to_30(self, api_client, staff_user):
-        api_client.force_authenticate(staff_user)
+    def test_unknown_values_fall_back_to_30(self, api_client, director):
+        api_client.force_authenticate(director)
         for bad in ('999', 'abc', '-7'):
             data = api_client.get(URL, {'days': bad}).json()
             assert data['range_days'] == 30
 
-    def test_ranges_are_cached_independently(self, api_client, staff_user,
+    def test_ranges_are_cached_independently(self, api_client, director,
                                              django_assert_num_queries):
-        api_client.force_authenticate(staff_user)
+        api_client.force_authenticate(director)
         assert api_client.get(URL, {'days': 7}).status_code == 200
         assert api_client.get(URL, {'days': 90}).status_code == 200
         with django_assert_num_queries(0):
@@ -229,7 +234,7 @@ class TestRangeParam:
 
 
 @pytest.mark.django_db
-def test_funnel_and_adoption_counts(api_client, staff_user):
+def test_funnel_and_adoption_counts(api_client, director):
     from decimal import Decimal
 
     from apps.accounts.factories import StudentProfileFactory
@@ -244,10 +249,69 @@ def test_funnel_and_adoption_counts(api_client, staff_user):
     CafeteriaBalance.objects.get_or_create(student=s1, defaults={'balance': Decimal('10')})
     CafeteriaBalance.objects.get_or_create(student=s2, defaults={'balance': Decimal('500')})
     CafeteriaTransaction.objects.create(student=s1, transaction_type=CafeteriaTransaction.TxType.PURCHASE, amount=Decimal('5'), loyverse_receipt_id='r1')
-    api_client.force_authenticate(staff_user)
+    api_client.force_authenticate(director)
     data = api_client.get(URL).data
     funnel = {f['step']: f['count'] for f in data['funnel']}
     assert funnel['pre_registro'] == 2 and funnel['contactado'] == 1
     ad = data['cafeteria']['adoption']
     assert ad['active_students'] == 2 and ad['with_wallet'] == 2 and ad['used_in_period'] == 1 and ad['low_balance'] == 1
     assert ad['wallet_rate'] == 1.0 and ad['usage_rate'] == 0.5
+
+
+@pytest.mark.django_db
+def test_funnel_is_one_nested_cohort(api_client, director):
+    """QA 2026-11-24: every step counted another population, so rates passed
+    100% («Inscripciones enviadas 2 · 200%», «Inscritos 4 · 200%»). Now each
+    step is a subset of the previous one."""
+    import datetime as dt
+
+    from apps.admissions.models import PreRegistration, Registration
+    from apps.bookings.models import AvailabilitySlot, Booking, VisitType
+
+    def lead(email, **kw):
+        return PreRegistration.objects.create(
+            child_first_name='A', child_last_name='X', child_dob='2019-01-01', level='preescolar',
+            grade_applying='K', parent_name='P', parent_email=email, parent_phone='5', **kw)
+
+    slot = AvailabilitySlot.objects.create(visit_type=VisitType.INDIVIDUAL, date=dt.date(2026, 11, 20),
+                                           start_time=dt.time(9), end_time=dt.time(10), capacity=9)
+    lead('nuevo@x.mx')                                                     # only pre-registro
+    lead('llamado@x.mx', status=PreRegistration.Status.CONTACTED)           # contacted
+    visita = lead('visita@x.mx')
+    Booking.objects.create(slot=slot, parent_name='P', parent_email='visita@x.mx', parent_phone='5',
+                           pre_registration=visita)                         # booked
+    fue = lead('fue@x.mx')
+    Booking.objects.create(slot=slot, parent_name='P', parent_email='fue@x.mx', parent_phone='5',
+                           pre_registration=fue, status=Booking.Status.ATTENDED)
+    envio = lead('envio@x.mx')
+    Registration.objects.create(pre_registration=envio, status=Registration.Status.SUBMITTED,
+                                child_first_name='A', child_last_name='X')
+    # Enrolled without a recorded visit (a family may skip it), with a
+    # COMPLETE registration: counted once, at every step.
+    inscrito = lead('inscrito@x.mx', status=PreRegistration.Status.ENROLLED)
+    Registration.objects.create(pre_registration=inscrito, status=Registration.Status.COMPLETE,
+                                child_first_name='A', child_last_name='X')
+    Booking.objects.create(slot=slot, parent_name='Sin expediente', parent_email='z@x.mx',
+                           parent_phone='5')                                # not in the cohort
+
+    api_client.force_authenticate(director)
+    counts = [f['count'] for f in api_client.get(URL).data['funnel']]
+    #           pre  contactado  visita  asistio  inscripcion  inscrito
+    assert counts == [6, 5, 4, 3, 2, 1]
+    assert all(later <= earlier for earlier, later in zip(counts, counts[1:], strict=False))
+
+
+@pytest.mark.django_db
+def test_low_balance_uses_the_dashboard_rule(api_client, director):
+    from decimal import Decimal
+
+    from apps.accounts.factories import StudentProfileFactory
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+    idle, buyer = StudentProfileFactory(), StudentProfileFactory()
+    CafeteriaBalance.objects.create(student=idle, balance=Decimal('0'))     # never buys
+    CafeteriaBalance.objects.create(student=buyer, balance=Decimal('5'))
+    CafeteriaTransaction.objects.create(student=buyer, transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                                        amount=Decimal('5'), loyverse_receipt_id='qa-low-1')
+    api_client.force_authenticate(director)
+    assert api_client.get(URL).data['cafeteria']['adoption']['low_balance'] == 1

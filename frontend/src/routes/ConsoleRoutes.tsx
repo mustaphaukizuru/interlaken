@@ -11,6 +11,7 @@
 import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
+import { AdminOnlyPage } from '@/components/layout/ConsoleAreaGuard';
 
 // PortalLayout stays its own chunk: the sidebar, header and notifications
 // (date-fns + `es` locale) load with the first console page, as before.
@@ -98,7 +99,11 @@ export function PortalRoutes() {
   );
 }
 
-/** /staff/*: the staff analytics dashboard. */
+/**
+ * /staff/*: the «Panel de Dirección» and the site content, administrators
+ * only (QA 2026-11-24). A staff account is sent to its console area, or told
+ * why it has none (AdminOnlyPage).
+ */
 export function StaffRoutes() {
   return (
     <Routes>
@@ -107,10 +112,10 @@ export function StaffRoutes() {
           <PortalLayout role="staff" />
         </ProtectedRoute>
       }>
-        <Route index element={<StaffDashboard />} />
-        <Route path="contenido" element={<AdminPages />} />
-        <Route path="contenido/medios" element={<AdminMedia />} />
-        <Route path="contenido/:id" element={<AdminPageEditor />} />
+        <Route index element={<AdminOnlyPage><StaffDashboard /></AdminOnlyPage>} />
+        <Route path="contenido" element={<AdminOnlyPage><AdminPages /></AdminOnlyPage>} />
+        <Route path="contenido/medios" element={<AdminOnlyPage><AdminMedia /></AdminOnlyPage>} />
+        <Route path="contenido/:id" element={<AdminOnlyPage><AdminPageEditor /></AdminOnlyPage>} />
         <Route path="*" element={<Navigate to="/staff" replace />} />
       </Route>
     </Routes>

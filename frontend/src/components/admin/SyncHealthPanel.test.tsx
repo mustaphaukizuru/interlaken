@@ -185,11 +185,12 @@ describe('buildChecks — the Roster light (2026-09-24: sync_roster had never ru
     expect(c.detail).toMatch(/06:07/);
   });
 
-  it('is red after 30 h and names the date it last ran plus the cron hint', () => {
+  it('is red after 30 h and names the date it last ran plus what to do, in plain Spanish (QA 2026-11-24)', () => {
     const c = check({ last_roster_sync_at: hoursAgo(31) }, 'roster_sync');
     expect(c.tone).toBe('bad');
     expect(c.label).toMatch(/^El roster no se ha sincronizado desde /);
-    expect(c.detail).toMatch(/sync_roster en el crontab/);
+    expect(c.detail).toMatch(/avise a soporte técnico/);
+    expect(c.detail).not.toMatch(/crontab|cron\b/);
     expect(c.detail).toMatch(/Sincronizar roster ahora/);
   });
 

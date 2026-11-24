@@ -24,6 +24,12 @@ import { PublicLayout } from './PublicLayout';
 const bar = () => document.querySelector<HTMLElement>('[data-sticky-cta]');
 
 describe('header version 3', () => {
+  it('the logo link reads «Colegio Interlaken, ir al inicio», no em-dash (QA 2026-11-24)', async () => {
+    renderWithProviders(<PublicLayout />, { route: '/' });
+    expect(await within(screen.getByRole('banner')).findByRole('link', { name: 'Colegio Interlaken, ir al inicio' })).toHaveAttribute('href', '/');
+    expect(document.querySelector('[aria-label*="—"]')).toBeNull();
+  });
+
   it('phone bar: «Pagos» → /pagos with WhatsApp, hidden while the menu is open', async () => {
     renderWithProviders(<PublicLayout />, { route: '/' });
     const pay = await within(await vi.waitFor(() => bar()!)).findByRole('link', { name: 'Pagos' });

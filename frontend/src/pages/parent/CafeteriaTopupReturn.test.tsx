@@ -141,8 +141,26 @@ describe('CafeteriaTopupReturn polling', () => {
       });
     }
 
-    expect(screen.getByText('Recarga en proceso')).toBeInTheDocument();
-    expect(getStatus.mock.calls.length).toBeGreaterThanOrEqual(5);
+    // It stops asking and says what to do (QA 2026-11-24: «se está procesando» forever).
+    expect(screen.getByText('Aún sin confirmación del banco')).toBeInTheDocument();
+    expect(screen.getByText(/Si cerró la ventana de Banorte sin terminar, la recarga no se hizo/)).toBeInTheDocument();
+    expect(screen.getByText(/contacte al colegio con el folio 9\./)).toBeInTheDocument();
+    expect(screen.queryByText(/se está procesando/)).toBeNull();
+    const calls = getStatus.mock.calls.length;
+    expect(calls).toBeGreaterThanOrEqual(5);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(getStatus.mock.calls.length).toBe(calls);
+  });
+
+  it('an unknown or another account’s payment (404): «No encontramos este pago», no polling (QA 2026-11-24)', async () => {
+    getStatus.mockRejectedValue({ isAxiosError: true, response: { status: 404, data: { detail: 'No encontrado.' } } });
+    renderAt('?payment_id=999999');
+
+    expect(await screen.findByText('No encontramos este pago')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver saldo de cafetería/ })).toHaveAttribute('href', '/portal/cafeteria');
+    expect(screen.getByRole('link', { name: 'Ver historial de pagos' })).toHaveAttribute('href', '/portal/pagos');
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/se está procesando/)).toBeNull();
   });
 
   it('clears the poll timer on unmount', async () => {

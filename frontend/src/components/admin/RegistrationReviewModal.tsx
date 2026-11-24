@@ -72,7 +72,7 @@ export function RegistrationReviewModal({ id, open, onClose }: {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={`Revisar inscripción — ${fullName}`} maxWidth={640}>
+    <Modal open={open} onClose={onClose} title={`Revisar inscripción: ${fullName}`} maxWidth={640}>
       {isLoading ? (
         <div className="py-10"><LoadingSpinner /></div>
       ) : isError || !data ? (

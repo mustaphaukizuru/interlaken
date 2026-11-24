@@ -16,6 +16,7 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.audit import record, tracked_fields
 from apps.core.bulk import AdminBulkView
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 from apps.core.importing import (
@@ -34,6 +35,7 @@ from .models import SETTINGS_CACHE_KEY, SchoolEvent, SiteSettings, Testimonial
 from .ops import (
     ICS_CACHE_KEY,
     AuditedCrudMixin,
+    audit_value,
     bool_filter,
     delete_action,
     flag_action,
@@ -60,9 +62,28 @@ class AdminSiteSettingsView(APIView):
         return Response(AdminSiteSettingsSerializer(SiteSettings.load()).data)
 
     def patch(self, request):
-        ser = AdminSiteSettingsSerializer(SiteSettings.load(), data=request.data, partial=True)
+        import copy
+
+        settings_row = SiteSettings.load()
+        ser = AdminSiteSettingsSerializer(settings_row, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
+        before = {k: copy.deepcopy(getattr(settings_row, k, None)) for k in ser.validated_data}
         ser.save()
+        # Menu, header buttons (chrome), school year, admissions dates...: who
+        # changed what (QA 2026-11-24: these saves left no audit row). Phone,
+        # WhatsApp, e-mail and socials are already recorded by the model
+        # signal (register_audit, «content.settings»), so they are skipped
+        # here. A JSON field (menu, chrome) is named, not copied.
+        signal_fields = tracked_fields(SiteSettings)
+        changes = {}
+        for key, old in before.items():
+            new = getattr(settings_row, key, None)
+            if old != new and key not in signal_fields:
+                changes[key] = ('(modificado)' if isinstance(new, (list, dict))
+                                else [audit_value(old), audit_value(new)])
+        if changes:
+            record('update', settings_row, changes, actor=request.user,
+                   context='cms: ajustes del sitio')
         return Response(ser.data)
 
 

@@ -78,6 +78,41 @@ describe('AdminStaffUsers (Data Ops Phase 3)', () => {
     expect(await screen.findByRole('dialog', { name: 'Invitar personal desde un archivo' })).toBeInTheDocument();
   });
 
+  it('making someone Administrador asks first, and every role change is confirmed by a toast (QA 2026-11-24)', async () => {
+    const toast = (await import('react-hot-toast')).default;
+    vi.mocked(portalApi.updateStaff).mockResolvedValue({ data: { ...berta, role: 'admin' } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Berta Zea');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Rol de berta@x.mx' }), 'admin');
+    const dialog = await screen.findByRole('dialog', { name: 'Hacer administrador' });
+    expect(dialog).toHaveTextContent('Berta Zea tendrá acceso completo a la consola: el dinero (cafetería y pagos), los usuarios del personal y los ajustes del colegio.');
+    expect(portalApi.updateStaff).not.toHaveBeenCalled();
+    // Cancelling keeps the role.
+    await user.click(within(dialog).getByRole('button', { name: /Cancelar/ }));
+    expect(screen.getByRole('combobox', { name: 'Rol de berta@x.mx' })).toHaveValue('staff');
+    expect(portalApi.updateStaff).not.toHaveBeenCalled();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Rol de berta@x.mx' }), 'admin');
+    await user.click(within(await screen.findByRole('dialog', { name: 'Hacer administrador' })).getByRole('button', { name: 'Hacer administrador' }));
+    await waitFor(() => expect(portalApi.updateStaff).toHaveBeenCalledWith(2, { role: 'admin' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Berta Zea ahora es Administrador.'));
+  });
+
+  it('taking the role back to Personal saves at once, with a toast', async () => {
+    const toast = (await import('react-hot-toast')).default;
+    const dora = { ...me, id: 4, email: 'dora@x.mx', full_name: 'Dora Paz', role: 'admin' };
+    vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [me, dora] } } as never);
+    vi.mocked(portalApi.updateStaff).mockResolvedValue({ data: { ...dora, role: 'staff' } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Dora Paz');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Rol de dora@x.mx' }), 'staff');
+    await waitFor(() => expect(portalApi.updateStaff).toHaveBeenCalledWith(4, { role: 'staff' }));
+    expect(screen.queryByRole('dialog', { name: 'Hacer administrador' })).toBeNull();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Dora Paz ahora es Personal.'));
+  });
+
   it('offers «Generar contraseña» for staff rows but never for another admin', async () => {
     const dora = { ...me, id: 4, email: 'dora@x.mx', full_name: 'Dora Paz', role: 'admin' };
     vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 3, next: null, previous: null, results: [me, berta, dora] } } as never);

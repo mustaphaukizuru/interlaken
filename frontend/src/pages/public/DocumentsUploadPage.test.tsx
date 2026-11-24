@@ -148,6 +148,15 @@ describe('DocumentsUploadPage (family)', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  it('a link without its token says it is incomplete, not «ya se usó» (QA 2026-11-24)', async () => {
+    renderWithProviders(<DocumentsUploadPage />, { route: '/inscripcion/documentos' });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Este enlace está incompleto');
+    expect(alert).toHaveTextContent('pida');
+    expect(alert).not.toHaveTextContent('ya se usó');
+    expect(exchange).not.toHaveBeenCalled();
+  });
+
   it('offers a retry when the list does not load', async () => {
     get.mockRejectedValueOnce({ response: { status: 500 } });
     render();

@@ -60,6 +60,28 @@ class AnnouncementAdminSerializer(serializers.ModelSerializer):
             return annotated
         return obj.reads.filter(acknowledged_at__isnull=False).count()
 
+    def validate_site_link(self, value):
+        """The «Ver más» link of the site banner: a path of this site (``/…``,
+        not ``//host``) or an ``https://``/``http://`` address. Anything else
+        (``javascript:``, ``data:``...) would run in a visitor's browser."""
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import URLValidator
+
+        value = (value or '').strip()
+        if not value:
+            return value
+        bad = any(ch.isspace() or ord(ch) < 32 or ch == '\\' for ch in value)
+        if not bad and value.startswith('/') and not value.startswith('//'):
+            return value
+        if not bad and value.lower().startswith(('https://', 'http://')):
+            try:
+                URLValidator(schemes=['http', 'https'])(value)
+                return value
+            except DjangoValidationError:
+                pass
+        raise serializers.ValidationError(
+            'Use una ruta del sitio (por ejemplo /admisiones) o una dirección que empiece con https://.')
+
     def validate_attachments(self, value):
         from apps.content.media import MediaAsset
         if not isinstance(value, list) or len(value) > 10:

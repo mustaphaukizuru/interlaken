@@ -237,6 +237,27 @@ describe('CredencialPage follows the child picked anywhere in the portal (P0, 20
     await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(10));
   });
 
+  it('nothing picked yet: opens on the lowest student id like Inicio, whatever order the API sends (QA 2026-11-24)', async () => {
+    // The cards come unordered; Inicio and Cafetería list children by id.
+    getCards.mockResolvedValue({ data: [DIEGO, CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await within(await screen.findByTestId('credencial-face')).findByText('ci09824')).toBeInTheDocument();
+    await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(10));
+  });
+
+  it('a child’s own school login (role «student») waits for the family list like a parent’s', async () => {
+    useAuthStore.setState({ user: { ...PARENT, role: 'student' }, accessToken: 't', isAuthenticated: true });
+    getDashboard.mockResolvedValue({ data: { children: [
+      { id: 10, name: 'Emma Quintana', grade: '4°', group: 'A', student_id: '09824' },
+      { id: 12, name: 'Diego Quintana', grade: '1°', group: 'B', student_id: '09825' },
+    ] } } as never);
+    act(() => useSelectedChildStore.setState({ childId: 12 }));
+    getCards.mockResolvedValue({ data: [CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Diego aún no tiene credencial')).toBeInTheDocument();
+    expect(screen.queryByText('ci09824')).toBeNull();
+  });
+
   it('a sibling without a credential: says so and never shows another child’s barcode', async () => {
     useAuthStore.setState({ user: PARENT, accessToken: 't', isAuthenticated: true });
     getDashboard.mockResolvedValue({ data: { children: [

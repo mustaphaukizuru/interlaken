@@ -224,7 +224,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
               `Se marcarán ${selected.size} alumno(s) como baja definitiva: dejan de contar como activos, `
               + 'su cuenta de alumno ya no puede iniciar sesión y quedan en Auditoría. '
               + (selectedBalance > 0
-                ? `Entre ellos queda un saldo de ${formatMXN(selectedBalance)} en cafetería; la baja no lo toca — decida su devolución por separado.`
+                ? `Entre ellos queda un saldo de ${formatMXN(selectedBalance)} en cafetería; la baja no lo toca: decida su devolución por separado.`
                 : 'Ninguno de los seleccionados tiene saldo pendiente en cafetería.')
             }
           />
@@ -232,7 +232,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
           {report.duplicate_codes.length > 0 && (
             <p className="flex items-start gap-1.5 text-xs text-amber">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Códigos duplicados en Loyverse: {report.duplicate_codes.slice(0, 10).join(', ')} — se usó el primero.
+              Códigos duplicados en Loyverse: {report.duplicate_codes.slice(0, 10).join(', ')} (se usó el primero).
             </p>
           )}
 

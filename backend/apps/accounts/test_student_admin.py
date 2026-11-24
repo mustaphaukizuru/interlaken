@@ -90,3 +90,37 @@ class TestExtendedFile:
         assert detail['allergies'] == 'Nuez' and detail['age'] is not None
         log = AuditLog.objects.filter(context='portal: edición de alumno').latest('id')
         assert log.changes['allergies'] == {'from': '', 'to': '[set]'}
+
+
+class TestLoyverseIdUnique:
+    """QA sweep 2026-11-24: a duplicate Loyverse ID answered 500 (IntegrityError)."""
+
+    def test_create_with_a_taken_loyverse_id_is_400(self, admin_client):
+        StudentProfileFactory(loyverse_id='cust-123')
+        resp = admin_client.post(reverse('admin-student-create'), {
+            'first_name': 'X', 'last_name': 'Y', 'student_id': 'q900', 'grade': '2° Primaria',
+            'loyverse_id': ' cust-123 ',
+        }, format='json')
+        assert resp.status_code == 400 and 'loyverse_id' in resp.data
+        assert not StudentProfile.objects.filter(student_id='q900').exists()
+
+    def test_edit_to_a_taken_loyverse_id_is_400(self, admin_client):
+        StudentProfileFactory(loyverse_id='cust-123')
+        mine = StudentProfileFactory(loyverse_id='cust-999')
+        resp = admin_client.patch(reverse('admin-student-update', args=[mine.pk]),
+                                  {'loyverse_id': 'cust-123'}, format='json')
+        assert resp.status_code == 400 and 'loyverse_id' in resp.data
+        mine.refresh_from_db()
+        assert mine.loyverse_id == 'cust-999'
+
+    def test_resaving_own_id_and_blank_ids_are_fine(self, admin_client):
+        StudentProfileFactory(loyverse_id='')
+        mine = StudentProfileFactory(loyverse_id='cust-777')
+        resp = admin_client.patch(reverse('admin-student-update', args=[mine.pk]),
+                                  {'loyverse_id': 'cust-777', 'first_name': 'Nuevo'}, format='json')
+        assert resp.status_code == 200, resp.data
+        resp = admin_client.post(reverse('admin-student-create'), {
+            'first_name': 'X', 'last_name': 'Y', 'student_id': 'q901', 'grade': '2° Primaria',
+            'loyverse_id': '',
+        }, format='json')
+        assert resp.status_code == 201, resp.data

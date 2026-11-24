@@ -53,6 +53,7 @@ from .exceptions import PayloadTooLarge, cap_message, error_response
 from .exporting import CONTENT_TYPES, csv_safe, xlsx_bytes
 from .exports import as_download, export_filename
 from .permissions import IsAdmin
+from .plurals import count as plural
 from .throttling import SharedScopedRateThrottle
 
 logger = logging.getLogger(__name__)
@@ -312,7 +313,20 @@ def _cell_text(value) -> str:
     return str(value).strip()
 
 
-def _parse_csv(data: bytes):
+CSV_UNREADABLE = (
+    "No se pudo leer el archivo CSV{where}. Guárdelo de nuevo como CSV (o use la "
+    "plantilla) y revise que ninguna celda sea demasiado larga."
+)
+XLSX_UNREADABLE = "No se pudo leer el archivo XLSX."
+
+
+def _over_cap(rows, max_rows) -> bool:
+    """True once ``rows`` holds one row more than the cap: the caller answers 413
+    without reading (or validating) the rest of a huge file."""
+    return max_rows is not None and len(rows) > max_rows
+
+
+def _parse_csv(data: bytes, max_rows: int | None = None):
     try:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -322,31 +336,41 @@ def _parse_csv(data: bytes):
         raise UploadError("Archivo vacío o sin encabezados.")
     first_line = text.splitlines()[0]
     reader = csv.reader(io.StringIO(text), delimiter=_sniff_delimiter(first_line))
-    headers = [str(h or "").strip() for h in next(reader, [])]
-    while headers and not headers[-1]:
-        headers.pop()
-    if not any(headers):
-        raise UploadError("Archivo vacío o sin encabezados.")
-    rows = []
-    for values in reader:
-        if not any(str(v or "").strip() for v in values):
-            continue
-        row = {
-            h: (str(values[i]).strip() if i < len(values) and values[i] is not None else "")
-            for i, h in enumerate(headers)
-            if h
-        }
-        rows.append((reader.line_num, row))
+    # A binary file read as text, a stray carriage return or a cell above the
+    # csv module's field limit raised csv.Error and the request answered 500.
+    try:
+        headers = [str(h or "").strip() for h in next(reader, [])]
+        while headers and not headers[-1]:
+            headers.pop()
+        if not any(headers):
+            raise UploadError("Archivo vacío o sin encabezados.")
+        rows = []
+        for values in reader:
+            if not any(str(v or "").strip() for v in values):
+                continue
+            row = {
+                h: (str(values[i]).strip() if i < len(values) and values[i] is not None else "")
+                for i, h in enumerate(headers)
+                if h
+            }
+            rows.append((reader.line_num, row))
+            if _over_cap(rows, max_rows):
+                break
+    except csv.Error:
+        where = f" (fila {reader.line_num})" if reader.line_num else ""
+        raise UploadError(CSV_UNREADABLE.format(where=where)) from None
     return rows, headers
 
 
-def _parse_xlsx(data: bytes):
+def _parse_xlsx(data: bytes, max_rows: int | None = None):
     from openpyxl import load_workbook
 
     try:
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     except Exception:
-        raise UploadError("No se pudo leer el archivo XLSX.") from None
+        raise UploadError(XLSX_UNREADABLE) from None
+    # read_only mode parses the sheet lazily: a truncated or corrupt sheet only
+    # fails while iterating (ParseError, BadZipFile...), which answered 500.
     try:
         ws = wb.worksheets[0]
         iterator = ws.iter_rows(values_only=True)
@@ -362,17 +386,24 @@ def _parse_xlsx(data: bytes):
                 continue
             row = {h: (cells[i] if i < len(cells) else "") for i, h in enumerate(headers) if h}
             rows.append((line, row))
+            if _over_cap(rows, max_rows):
+                break
+    except UploadError:
+        raise
+    except Exception:
+        raise UploadError(XLSX_UNREADABLE) from None
     finally:
         wb.close()
     return rows, headers
 
 
-def parse_upload(upload, *, max_bytes: int = MAX_BYTES):
+def parse_upload(upload, *, max_bytes: int = MAX_BYTES, max_rows: int | None = None):
     """→ ``(rows, headers, fmt)`` where ``rows`` is ``[(line, {header: text}), ...]``.
 
     Raises ``PayloadTooLarge`` above ``max_bytes`` and ``UploadError`` for an
     unusable file. The format is taken from the name (``.xlsx``) or the zip
-    magic bytes, so a mislabelled Excel file still parses.
+    magic bytes, so a mislabelled Excel file still parses. With ``max_rows``
+    reading stops at ``max_rows + 1`` data rows (the caller refuses the file).
     """
     name = (getattr(upload, "name", "") or "").lower()
     data = upload.read() if hasattr(upload, "read") else bytes(upload)
@@ -381,9 +412,9 @@ def parse_upload(upload, *, max_bytes: int = MAX_BYTES):
             detail=f"El archivo excede el límite de {max_bytes // (1024 * 1024)} MB."
         )
     if name.endswith(".xlsx") or data[:4] == b"PK\x03\x04":
-        rows, headers = _parse_xlsx(data)
+        rows, headers = _parse_xlsx(data, max_rows)
         return rows, headers, "xlsx"
-    rows, headers = _parse_csv(data)
+    rows, headers = _parse_csv(data, max_rows)
     return rows, headers, "csv"
 
 
@@ -689,7 +720,9 @@ class ImportView(APIView):
                 detail=f"El archivo excede el límite de {spec.max_bytes // (1024 * 1024)} MB."
             )
         try:
-            rows, headers, fmt = parse_upload(upload, max_bytes=spec.max_bytes)
+            rows, headers, fmt = parse_upload(
+                upload, max_bytes=spec.max_bytes, max_rows=spec.max_rows
+            )
             if len(rows) > spec.max_rows:
                 raise PayloadTooLarge(detail=cap_message(spec.max_rows, verb="Divida el archivo"))
             report = validate(rows, spec, headers=headers, fmt=fmt)
@@ -714,8 +747,8 @@ class ImportView(APIView):
         if report.has_errors and not only_valid:
             counts = report.counts
             return error_response(
-                f'El archivo tiene {counts["error"]} fila(s) con error. Corríjalas o marque '
-                f"«Importar solo las filas válidas».",
+                f'El archivo tiene {plural(counts["error"], "fila", "filas")} con error. '
+                f"Corríjalas o marque «Importar solo las filas válidas».",
                 counts=counts,
             )
 

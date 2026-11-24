@@ -1,13 +1,13 @@
 import { type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({
   portalApi: { getDashboard: vi.fn(), getNotifications: vi.fn(), markNotificationRead: vi.fn() },
-  cafeteriaApi: { getSpendingTrend: vi.fn() },
+  cafeteriaApi: { getSpendingTrend: vi.fn(), getMyBalance: vi.fn() },
 }));
 
 vi.mock('@/components/portal/PushOptIn', () => ({
@@ -44,6 +44,13 @@ import { useSelectedChildStore } from '@/store/selectedChildStore';
 const getDashboard = vi.mocked(portalApi.getDashboard);
 const getNotifications = vi.mocked(portalApi.getNotifications);
 const getSpendingTrend = vi.mocked(cafeteriaApi.getSpendingTrend);
+const getMyBalance = vi.mocked(cafeteriaApi.getMyBalance);
+
+/** A row of /cafeteria/balance/ (the cafetería page's list): on the POS or not. */
+const wallet = (id: number, name: string, loyverse_id = `loy-${id}`) => ({
+  id: id * 10, balance: '0.00', low_balance_threshold: '20.00', last_synced: '',
+  student: { id, user: { full_name: name }, grade: '', group: '', student_id: `A-${id}`, loyverse_id, is_active: true },
+});
 
 const SAMPLE_USER: User = {
   id: 3,
@@ -107,6 +114,7 @@ const hoy = () => within(screen.getByRole('list', { name: 'Pendientes de hoy' })
 function apiDefaults() {
   getNotifications.mockResolvedValue({ data: [] } as never);
   getSpendingTrend.mockResolvedValue({ data: { days: 30, total: 0, average: 0, series: [] } } as never);
+  getMyBalance.mockResolvedValue({ data: [wallet(11, 'Luis López'), wallet(12, 'Sofía López')] } as never);
 }
 
 /** Assert `a` comes before `b` in DOM order (mobile reading order). */
@@ -221,6 +229,47 @@ describe('ParentDashboard', () => {
     expect(categoriesProps[categoriesProps.length - 1]).toBe(12);
     expect(trendProps).not.toContain('all');
     expect(screen.getByRole('button', { name: /Alumno: Sofía López/ })).toBeInTheDocument();
+  });
+
+  it('a child the POS does not know yet gets a note, never «Recarga rápida» (QA 2026-11-24)', async () => {
+    getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
+    // Luis is not on the POS (no Loyverse link); Sofía is.
+    getMyBalance.mockResolvedValue({ data: [wallet(11, 'Luis López', ''), wallet(12, 'Sofía López')] } as never);
+    renderPage();
+
+    expect(await within(await screen.findByTestId('wallet-hero'))
+      .findByText('Las recargas en línea aún no están activas para Luis López. Contacte al colegio para activarlas.')).toBeInTheDocument();
+    expect(within(hero()).queryByText('Recarga rápida')).toBeNull();
+    expect(within(hero()).queryByRole('link', { name: /Recargar \$/ })).toBeNull();
+    expect(within(hero()).queryByRole('link', { name: 'Elegir otro monto' })).toBeNull();
+    expect(within(hero()).getByRole('link', { name: /Mostrar credencial/ })).toBeInTheDocument();
+
+    // Sofía, who can: her own chips, for her alone.
+    act(() => useSelectedChildStore.getState().setChildId(12));
+    expect(await within(hero()).findByRole('link', { name: 'Recargar $100 a Sofía López' }))
+      .toHaveAttribute('href', '/portal/cafeteria?recarga=100&hijo=12');
+    expect(within(hero()).queryByText(/aún no están activas/)).toBeNull();
+  });
+
+  it('nothing picked yet: Inicio adopts the child it shows, so Cafetería and the Credencial agree (QA 2026-11-24)', async () => {
+    getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
+    renderPage();
+    expect(await screen.findByText('Saldo de Luis')).toBeInTheDocument();
+    await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(11));
+  });
+
+  it('a child’s own school login with siblings gets the switcher and the per-child Inicio (QA 2026-11-24)', async () => {
+    // Most families sign in with the pupil's account: role «student», siblings through the Family.
+    useAuthStore.setState({ user: { ...SAMPLE_USER, role: 'student' }, accessToken: 'test', isAuthenticated: true });
+    getDashboard.mockResolvedValue({ data: LINKED_DATA } as never);
+    renderPage({ withHeader: true });
+
+    expect(await screen.findByText('Saldo de Luis')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /Alumno: Luis López/ }));
+    const switcher = await screen.findByRole('group', { name: /Seleccionar alumno/i });
+    await userEvent.click(within(switcher).getByRole('button', { name: /Sofía López/ }));
+    expect(await screen.findByText('Saldo de Sofía')).toBeInTheDocument();
+    expect(within(hero()).getByText('$180.00')).toBeInTheDocument();
   });
 
   it('a child without an active wallet gets its own note, not a sibling\'s balance', async () => {
@@ -508,6 +557,15 @@ describe('ParentDashboard «Hoy» (Phase 6 pilot)', () => {
     expect(within(rows[1]).getByText('2 avisos sin leer')).toBeInTheDocument();
     expect(within(rows[1]).getByRole('link', { name: /Ver avisos/ })).toHaveAttribute('href', '/portal/notificaciones?sin_leer=1');
     expect(screen.queryByText('Ya leído')).toBeNull();
+  });
+
+  it('counts the unread avisos past the first page from the server total (QA 2026-11-24: «19» for 75)', async () => {
+    getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [] } } as never);
+    const page = Array.from({ length: 20 }, (_, i) => notif({ id: i + 1, title: `Compra ${i + 1}`, is_read: i === 19 }));
+    getNotifications.mockResolvedValue({ data: { count: 83, results: page, unread_count: 75 } } as never);
+    renderPage();
+    expect(await screen.findByText('75 avisos sin leer')).toBeInTheDocument();
+    expect(screen.queryByText('19 avisos sin leer')).toBeNull();
   });
 
   it('a single unread aviso gets its own row; opening it marks it read', async () => {

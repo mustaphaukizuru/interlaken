@@ -28,13 +28,37 @@ from apps.core.audit import record
 from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 from apps.core.listing import AdminListMixin, apply_date_range
-from apps.core.permissions import IsAdminOrStaff
+from apps.core.permissions import IsAdmin
 
 from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, referenced_media_ids, tri_state
 
 MAX_UPLOAD = 10 * 1024 * 1024
 VARIANTS = {'thumb': 320, 'md': 960, 'lg': 1600}
 ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+# What Pillow detects → the type stored and served. MPO is the JPEG variant
+# some phone cameras write.
+PIL_FORMAT_TYPES = {'JPEG': 'image/jpeg', 'MPO': 'image/jpeg', 'PNG': 'image/png',
+                    'WEBP': 'image/webp', 'GIF': 'image/gif'}
+
+
+def sniff_image_type(f) -> str | None:
+    """The real type of an uploaded file, read by Pillow from its content
+    (header + structure, ``verify()``), or None when it is not an accepted
+    image. The declared Content-Type is the browser's (or a script's) word:
+    an HTML or SVG file sent as «image/png» was stored and served from the
+    site's own domain."""
+    try:
+        from PIL import Image
+
+        f.seek(0)
+        with Image.open(f) as img:
+            fmt = img.format
+            img.verify()
+    except Exception:  # noqa: BLE001 - Pillow raises many types for non-images
+        return None
+    finally:
+        f.seek(0)
+    return PIL_FORMAT_TYPES.get(fmt or '')
 
 
 def _upload_to(instance, filename):
@@ -201,8 +225,14 @@ MEDIA_ORDERING = {
 class MediaListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
     """GET /content/admin/media/?q=&type=&from=&to=&unreferenced=&ordering=
     POST multipart {file, alt, caption, tags}; an identical file (sha256) → 409
-    ``{detail, existing}`` so the uploader can reuse the asset instead."""
-    permission_classes = [IsAdminOrStaff]
+    ``{detail, existing}`` so the uploader can reuse the asset instead.
+
+    Admins, plus staff holding the «comunicados» area: a comunicado's
+    attachments are picked and uploaded here (AttachmentsField → MediaPicker).
+    Editing, deleting and exporting the library stay admin-only (QA 2026-11-24:
+    any staff account could)."""
+    permission_classes = [IsAdmin]
+    admin_area = 'comunicados'
     serializer_class = MediaAssetSerializer
     parser_classes = [MultiPartParser, FormParser]
     search_fields = ('filename', 'alt', 'caption', 'tags')
@@ -229,6 +259,11 @@ class MediaListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateA
         ctype = f.content_type or mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
         if ctype not in ALLOWED_TYPES:
             return Response({'file': ['Solo imágenes JPG, PNG, WebP o GIF.']}, status=status.HTTP_400_BAD_REQUEST)
+        # Trust the content, not the declared type; store what it really is.
+        ctype = sniff_image_type(f)
+        if ctype is None:
+            return Response({'file': ['El archivo no es una imagen JPG, PNG, WebP o GIF válida.']},
+                            status=status.HTTP_400_BAD_REQUEST)
         digest = hashlib.sha256()
         for chunk in f.chunks():
             digest.update(chunk)
@@ -270,7 +305,7 @@ class MediaInUse(APIException):
 
 
 class MediaDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]
     serializer_class = MediaAssetSerializer
     queryset = MediaAsset.objects.all()
     audit_context = 'cms.media'
@@ -305,6 +340,7 @@ class MediaExportView(AdminExportMixin, MediaListCreateView):
     """GET /content/admin/media/export/?fmt=csv|xlsx|pdf&…list filters…"""
     http_method_names = ['get', 'head', 'options']
     export_spec = MEDIA_EXPORT
+    admin_area = None  # the list's «comunicados» grant is for picking, not exports
 
 
 def _add_tag_plan(asset, payload):
@@ -330,7 +366,7 @@ def _add_tag(asset, payload, actor):
 class MediaBulkView(AdminBulkView):
     """POST /content/admin/media/bulk/ — ``delete`` (unreferenced only) and
     ``add_tag`` (payload ``tag``). Staff manage media like admins do."""
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]
     entity = 'content.mediaasset'
     list_view_class = MediaListCreateView
     actions = {

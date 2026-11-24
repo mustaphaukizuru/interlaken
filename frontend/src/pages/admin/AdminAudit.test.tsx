@@ -36,7 +36,7 @@ describe('AdminAudit (reference page)', () => {
     expect(await screen.findByText('ada@interlaken.mx')).toBeInTheDocument();
     expect(screen.getByText('Sistema')).toBeInTheDocument();
     expect(screen.getByText('cafeteria.adjust')).toBeInTheDocument();
-    expect(screen.getByText(/Motivo: Pago en caja · amount: 150.00/)).toBeInTheDocument();
+    expect(screen.getByText(/Motivo: Pago en caja · monto: 150.00/)).toBeInTheDocument();
     expect(screen.getByText('cafeteria.balanceadjustment#42')).toBeInTheDocument();
     expect(getAuditLog).toHaveBeenCalledWith({ page: 1, actor: undefined, action: undefined, from: undefined, to: undefined, ordering: undefined });
   });

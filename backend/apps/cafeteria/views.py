@@ -35,9 +35,11 @@ from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
 from .models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+from .schedule import format_amount
 from .serializers import (
     NO_CONSUMPTION,
     AdjustmentInputSerializer,
+    AdminCafeteriaBalanceSerializer,
     BalanceAdjustmentSerializer,
     CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
@@ -58,6 +60,7 @@ from .services import (
     get_all_customers,
     get_balance_from_customer,
     get_customer_by_id,
+    loyverse_error_es,
     mirror_pos_topups,
     pending_covers_low_balance,
     record_receipts,
@@ -898,7 +901,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                         user=payer,
                         payment_type=Payment.Type.CAFETERIA,
                         amount=topup.amount,
-                        description=f'Recarga cafetería — {student.user.full_name}',
+                        description=f'Recarga cafetería · {student.user.full_name}',
                         gateway=gateway.name,
                         related_topup=topup,
                         status=Payment.Status.PENDING,
@@ -969,7 +972,7 @@ class AdminApplyTopUpView(APIView):
                 add_points_to_customer(
                     loyverse_customer_id=student.loyverse_id,
                     points=topup.amount,
-                    note=f'Recarga en caja — #{topup.id}',
+                    note=f'Recarga en caja · #{topup.id}',
                     reference=f'topup-request-{topup.id}',
                 )
                 topup.status = TopUpRequest.Status.COMPLETED
@@ -1144,7 +1147,7 @@ class AdminSyncAllView(APIView):
             try:
                 pos = mirror_pos_topups()
             except LoyverseError as exc:
-                pos, pos_error = {}, str(exc)[:200]
+                pos, pos_error = {}, loyverse_error_es(exc)
                 logger.warning('mirror_pos_topups skipped: %s', exc)
             return Response({
                 'detail': 'Sincronización completada.',
@@ -1166,10 +1169,11 @@ class AdminSyncAllView(APIView):
                 'unmatched': purchases.get('unmatched', 0),
                 'skipped': purchases.get('skipped', 0),
             })
-        except Exception:
+        except Exception as exc:
             logger.exception('Admin sync-all failed')
-            return Response(error_body('No se pudo sincronizar con Loyverse. Intente de nuevo '
-                                       'en unos minutos.'), status=502)
+            detail = (loyverse_error_es(exc) if isinstance(exc, LoyverseError)
+                      else 'No se pudo sincronizar con Loyverse. Intente de nuevo en unos minutos.')
+            return Response(error_body(detail), status=502)
 
 
 # ── Admin console (Phase D) ──────────────────────────────────────────────────
@@ -1227,8 +1231,8 @@ class AdminSyncRosterView(APIView):
         try:
             customers = get_all_customers()
         except LoyverseError as exc:
-            return Response({'detail': f'No se pudo conectar con Loyverse: {exc}'},
-                            status=502)
+            logger.warning('sync-roster: Loyverse unreachable: %s', exc)
+            return Response({'detail': loyverse_error_es(exc)}, status=502)
         from apps.cafeteria.services import roster_sync_line, sync_roster
         report = sync_roster(customers, commit=not dry_run)
         if not dry_run:
@@ -1529,7 +1533,9 @@ class AdminStudentDetailView(APIView):
 
         return Response({
             # pending_topups: paid card top-ups still to load into the POS.
-            'balance': CafeteriaBalanceSerializer(
+            # Without the student's personal data (CURP, birth date, emergency
+            # contacts): a «cafetería»-only staff member opens this page.
+            'balance': AdminCafeteriaBalanceSerializer(
                 balance, context={'pending_topups': build_pending_topups_map([student])}).data,
             'parents': parents,
             'transactions': CafeteriaTransactionSerializer(transactions, many=True).data,
@@ -1744,6 +1750,10 @@ class MyStatementPdfView(APIView):
         month = request.query_params.get('month') or timezone.localdate().strftime('%Y-%m')
         try:
             y, m = (int(p) for p in month.split('-'))
+            # The month's end + 1 day (the query bound) overflowed for year
+            # 9999 (500); no statement exists outside these years anyway.
+            if not 1900 <= y <= 2999:
+                raise ValueError(month)
             start = _date(y, m, 1)
             end = _date(y, m, _cal.monthrange(y, m)[1])
         except (ValueError, TypeError):
@@ -1993,9 +2003,9 @@ class AdminBulkTopUpView(APIView):
         notified = queued = 0
         title = 'Ajuste de saldo en cafetería'
         for s, balance_after in credited:
-            message = (f'Se acreditaron ${amount:.2f} al saldo de cafetería de '
+            message = (f'Se acreditaron {format_amount(amount)} al saldo de cafetería de '
                        f'{s.user.full_name}. Motivo: Recarga masiva: {reason}. '
-                       f'Saldo actual: ${balance_after:.2f}.')
+                       f'Saldo actual: {format_amount(balance_after)}.')
             try:
                 if time.monotonic() - started < BULK_TOPUP_NOTIFY_SECONDS:
                     notified += _notify_balance_change(s, title, message)

@@ -55,7 +55,9 @@ class Command(BaseCommand):
         # last 30 days), the same rule as the dashboard and the Saldo bajo tab:
         # a child who never buys at the cafetería must not get a weekly nag
         # about an empty wallet, and a leaver's family must not get one at all.
+        from apps.cafeteria.schedule import format_amount
         from apps.cafeteria.services import (
+            family_cafeteria_path,
             low_balance_queryset,
             pending_covers_low_balance,
             pending_paid_totals,
@@ -81,8 +83,8 @@ class Command(BaseCommand):
             title = 'Saldo bajo en cafetería'
             message = (
                 f'El saldo de cafetería de {student.user.full_name} es de '
-                f'${cb.balance:.2f}, por debajo del mínimo de '
-                f'${cb.low_balance_threshold:.2f}. Le recomendamos recargar para '
+                f'{format_amount(cb.balance)}, por debajo del mínimo de '
+                f'{format_amount(cb.low_balance_threshold)}. Le recomendamos recargar para '
                 f'evitar contratiempos a la hora del almuerzo.'
             )
 
@@ -92,7 +94,8 @@ class Command(BaseCommand):
                 # An urgent alert (WARNING): sent whatever the family muted, as
                 # the Avisos tab promises for «saldo muy bajo».
                 notify(parent, Notification.NotifType.WARNING, title, message,
-                       whatsapp=use_wa, fanout=False, tone='warning', url='/portal/cafeteria',
+                       whatsapp=use_wa, fanout=False, tone='warning',
+                       url=family_cafeteria_path(student),
                        cta_label='Recargar saldo')
                 notified_parents += 1
                 sent_to_someone = True

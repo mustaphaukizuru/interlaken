@@ -155,6 +155,7 @@ class FacturacionRequestView(APIView):
     # Mismos 7 campos, todos obligatorios, que el formulario oficial del colegio
     # (interlaken.com.mx/index-7.html). Bitácora 13/10/2026, ref. 8.
     FIELDS = ('student', 'razon_social', 'rfc', 'cp', 'regimen', 'email', 'phone')
+    MAX_LENGTH = 300  # each field is one line (the longest régimen is ~90)
     REGIMENES = (
         'Régimen de sueldos y salarios e ingresos asimilados a salarios',
         'Régimen simplificado de confianza',
@@ -171,17 +172,31 @@ class FacturacionRequestView(APIView):
     )
 
     def post(self, request):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import validate_email
+
         from apps.portal.services import send_email
 
         from .models import ContactMessage
+        from .serializers import LINE_BREAKS
 
-        d = {k: str(request.data.get(k, '') or '').strip() for k in self.FIELDS}
+        data = request.data if hasattr(request.data, 'get') else {}
+        d = {k: str(data.get(k, '') or '').strip() for k in self.FIELDS}
         errors = {}
         for k in self.FIELDS:
             if not d[k]:
                 errors[k] = ['Requerido.']
-        if d['email'] and '@' not in d['email']:
-            errors['email'] = ['Correo inválido.']
+            elif len(d[k]) > self.MAX_LENGTH:
+                errors[k] = [f'Máximo {self.MAX_LENGTH} caracteres.']
+            elif any(ch in d[k] for ch in LINE_BREAKS):
+                # Every field is one line; the razón social goes into the
+                # e-mail subject (header injection).
+                errors[k] = ['Escríbalo en una sola línea, sin saltos de línea.']
+        if d['email'] and 'email' not in errors:
+            try:
+                validate_email(d['email'])
+            except DjangoValidationError:
+                errors['email'] = ['Correo inválido.']
         if d['rfc'] and not (12 <= len(d['rfc']) <= 13):
             errors['rfc'] = ['El RFC debe tener 12 o 13 caracteres.']
         if d['cp'] and not (d['cp'].isdigit() and len(d['cp']) == 5):

@@ -19,8 +19,9 @@ import type { CafeteriaCard, LoyverseHistoryReceipt } from '@/types';
 import { formatMXN } from '@/lib/format';
 
 const money = formatMXN;
+// No visit yet: words, not a bare «—» (QA 2026-11-24).
 const fmtDate = (d: string | null, withTime = false) =>
-  d ? format(new Date(d), withTime ? "d MMM yyyy · HH:mm" : 'd MMM yyyy', { locale: es }) : '—';
+  d ? format(new Date(d), withTime ? "d MMM yyyy · HH:mm" : 'd MMM yyyy', { locale: es }) : 'Sin registro';
 // A calendar date (YYYY-MM-DD) is that local day: `new Date('2024-09-03')` is
 // UTC midnight, which in Mexico is still the 2nd.
 const fmtDay = (ymd: string) => format(parseISO(ymd), 'd MMM yyyy', { locale: es });
@@ -63,6 +64,10 @@ export default function CredencialPage() {
       setServedAt(Number.isFinite(date) ? date : null);
       return r.data;
     },
+    // By student id, the order of Inicio and Cafetería (the API sends the
+    // cards unordered): with nothing picked yet, all three open on the same
+    // child, and a swipe follows the header's order (QA 2026-11-24).
+    select: (rows) => (Array.isArray(rows) ? [...rows].sort((a, b) => a.student.id - b.student.id) : rows),
   });
 
   // The child is the one picked anywhere in the portal (header switcher,

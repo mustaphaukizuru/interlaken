@@ -406,7 +406,7 @@ export function PublicLayout() {
       <header data-sticky-header="" className="sticky top-0 z-header border-b border-line bg-white shadow-md print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
-          <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
+          <Link to="/" className="flex items-center" aria-label="Colegio Interlaken, ir al inicio">
             <Logo variant="horizontal" size={52} theme="light" eager />
           </Link>
 

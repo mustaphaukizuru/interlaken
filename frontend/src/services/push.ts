@@ -23,6 +23,21 @@ export function pushPermission(): NotificationPermission | 'unsupported' {
   return Notification.permission;
 }
 
+/**
+ * True when this device already has a push subscription. Reads the current
+ * registration (never `serviceWorker.ready`, which waits forever without a
+ * service worker); false when there is none or it cannot be read.
+ */
+export async function isPushSubscribed(): Promise<boolean> {
+  if (!isPushSupported()) return false;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    return !!(await registration?.pushManager.getSubscription());
+  } catch {
+    return false;
+  }
+}
+
 function urlBase64ToUint8Array(base64: string): BufferSource {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');

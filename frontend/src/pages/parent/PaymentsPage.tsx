@@ -252,11 +252,13 @@ export default function PaymentsPage() {
 }
 
 function SummaryTiles({ summary, loading }: { summary?: PaymentSummary; loading: boolean }) {
+  // Words, never a bare «—» placeholder (QA 2026-11-24: «Última recarga —»).
+  const none = 'Sin datos';
   const tiles = [
-    { icon: Wallet, label: 'Recargado este mes', value: summary ? formatMXN(summary.month_total) : '—', sub: summary ? `${summary.month_count} pago(s)` : '' },
-    { icon: CalendarDays, label: 'Última recarga', value: summary?.last_success ? formatMXN(summary.last_success.amount) : '—',
-      sub: summary?.last_success ? format(new Date(summary.last_success.created_at), 'd MMM yyyy', { locale: es }) : 'Sin recargas aún' },
-    { icon: Clock, label: 'Pendientes', value: summary ? String(summary.pending_count) : '—', sub: 'por confirmar' },
+    { icon: Wallet, label: 'Recargado este mes', value: summary ? formatMXN(summary.month_total) : none, sub: summary ? `${summary.month_count} pago(s)` : '' },
+    { icon: CalendarDays, label: 'Última recarga', value: summary?.last_success ? formatMXN(summary.last_success.amount) : summary ? 'Sin recargas' : none,
+      sub: summary?.last_success ? format(new Date(summary.last_success.created_at), 'd MMM yyyy', { locale: es }) : '' },
+    { icon: Clock, label: 'Pendientes', value: summary ? String(summary.pending_count) : none, sub: 'por confirmar' },
   ];
   return (
     <div className="mb-6 grid gap-3 sm:grid-cols-3" aria-busy={loading}>

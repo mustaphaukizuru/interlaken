@@ -75,9 +75,9 @@ export const PRICING_COPY: PricingCopy = {
   emptySecondary: { label: 'Ver admisiones', href: '/admisiones' },
   structureTitle: '¿Cómo se estructura el pago?',
   structure: [
-    { title: 'Inscripción', text: '— pago único al ingresar o reinscribirse.' },
-    { title: 'Colegiatura', text: '— 11 mensualidades, de agosto a junio.' },
-    { title: 'Seguros y credencial', text: '— conceptos anuales obligatorios.' },
+    { title: 'Inscripción', text: 'pago único al ingresar o reinscribirse.' },
+    { title: 'Colegiatura', text: '11 mensualidades, de agosto a junio.' },
+    { title: 'Seguros y credencial', text: 'conceptos anuales obligatorios.' },
   ],
   feesLabel: 'Pago único', feesTitle: 'Inscripción y reinscripción', feesSubtitle: 'Se divide en 4 parcialidades, de enero a abril',
   newTag: 'Nuevo ingreso', returningTag: 'Alumnos Interlaken',
@@ -253,7 +253,9 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     {structure.map((st, i) => (
                       <li key={i} className="flex gap-2.5">
                         <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${STEP_BG[i % STEP_BG.length]} text-[11px] font-bold text-white`}>{i + 1}</span>
-                        <span><strong className="text-ink">{t(st.title)}</strong> {t(st.text)}</span>
+                        {/* «Inscripción: pago único…» (QA 2026-11-24: no em-dash); a text saved
+                            with the old leading «—» reads the same. */}
+                        <span><strong className="text-ink">{t(st.title)}{t(st.title) ? ':' : ''}</strong> {t(st.text).replace(/^\s*—\s*/, '')}</span>
                       </li>
                     ))}
                   </ol>

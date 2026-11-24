@@ -54,6 +54,8 @@ class TestTopUpInitiation:
         assert payment.payment_type == Payment.Type.CAFETERIA
         assert payment.status == Payment.Status.PENDING
         assert payment.related_topup_id == topup.id
+        # «·», not « — », in what the family reads (QA 2026-11-24).
+        assert payment.description == f"Recarga cafetería · {student.user.full_name}"
         # No credit yet — settlement of the bank result does that.
         assert not CafeteriaTransaction.objects.filter(student=student).exists()
 

@@ -66,6 +66,11 @@ class ConsentView(APIView):
     def _student(self, request, sid):
         if not sid:
             return None
+        # ``?student=abc`` reached the ORM and answered 500.
+        try:
+            sid = int(str(sid).strip())
+        except (TypeError, ValueError):
+            raise ValidationError({'student': ['Alumno no válido.']}) from None
         # A guardian may only record/read consent for their own family's children.
         from apps.accounts.family import family_students
 
@@ -104,7 +109,10 @@ class ArcoRequestView(generics.ListCreateAPIView):
         return ArcoRequest.objects.filter(requester=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(requester=self.request.user, requester_email=self.request.user.email)
+        arco = serializer.save(requester=self.request.user, requester_email=self.request.user.email)
+        # The same acknowledgement (with the legal deadline) as a request the
+        # office records by hand (QA 2026-11-24: the portal one got nothing).
+        _notify_requester(arco, intake=True)
 
 
 class ArcoExportView(APIView):

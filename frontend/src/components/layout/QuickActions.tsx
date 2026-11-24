@@ -5,11 +5,13 @@ import { Dropdown } from '@/components/ui/Dropdown';
 const ACTIONS = [
   { icon: UserPlus,  label: 'Nuevo alumno',          to: '/admin/alumnos?nuevo=1' },
   { icon: Megaphone, label: 'Nuevo comunicado',      to: '/admin/comunicados?nuevo=1' },
-  { icon: Coffee,    label: 'Recarga manual',        to: '/admin/cafeteria' },
+  // It opens the cafetería list, where the balance is adjusted per person
+  // («Ajustar saldo» on the alumno): the label says so (QA 2026-11-24, was «Recarga manual»).
+  { icon: Coffee,    label: 'Ajustar saldo (elegir alumno)', to: '/admin/cafeteria' },
   { icon: KeyRound,  label: 'Registrar solicitud de contraseña', to: '/admin/contrasenas?nuevo=1' },
 ];
 /** Set apart below a divider, in the danger colour: it reaches every family at once. */
-const EMERGENCY = { icon: Siren, label: 'Emergencia (broadcast)', to: '/admin/comunicados?emergencia=1' };
+const EMERGENCY = { icon: Siren, label: 'Emergencia (a todos)', to: '/admin/comunicados?emergencia=1' };
 
 const ITEM = 'flex min-h-[44px] items-center gap-3 rounded-sm px-2.5 py-1.5 text-[15px] font-medium leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40';
 

@@ -54,14 +54,19 @@ def _fold(line: str) -> str:
     return '\r\n'.join([first, *rest])
 
 
-def build_ics(booking) -> str:
-    """Return an RFC-5545 VCALENDAR/VEVENT string for ``booking``."""
+def build_ics(booking, *, cancel: bool = False) -> str:
+    """Return an RFC-5545 VCALENDAR/VEVENT string for ``booking``.
+
+    ``cancel=True`` builds the cancellation of the same event (same UID,
+    ``METHOD:CANCEL``, ``STATUS:CANCELLED`` and a higher ``SEQUENCE``), which
+    removes it from the calendar the confirmation's invite was added to.
+    """
     slot = booking.slot
     tz = ZoneInfo(getattr(settings, 'TIME_ZONE', 'America/Mexico_City'))
     start = datetime.combine(slot.date, slot.start_time, tzinfo=tz)
     end = datetime.combine(slot.date, slot.end_time, tzinfo=tz)
 
-    summary = f'Visita — Colegio Interlaken ({slot.get_visit_type_display()})'
+    summary = f'Visita al Colegio Interlaken ({slot.get_visit_type_display()})'
     location = slot.location or 'Campus Interlaken'
     description = (
         f'Visita agendada para {booking.parent_name}. '
@@ -75,16 +80,17 @@ def build_ics(booking) -> str:
         'VERSION:2.0',
         'PRODID:-//Colegio Interlaken//Visitas//ES',
         'CALSCALE:GREGORIAN',
-        'METHOD:PUBLISH',
+        'METHOD:CANCEL' if cancel else 'METHOD:PUBLISH',
         'BEGIN:VEVENT',
         f'UID:{uid}',
+        f'SEQUENCE:{1 if cancel else 0}',
         f'DTSTAMP:{_utc(timezone.now())}',
         f'DTSTART:{_utc(start)}',
         f'DTEND:{_utc(end)}',
         f'SUMMARY:{_escape(summary)}',
         f'DESCRIPTION:{_escape(description)}',
         f'LOCATION:{_escape(location)}',
-        'STATUS:CONFIRMED',
+        'STATUS:CANCELLED' if cancel else 'STATUS:CONFIRMED',
         'END:VEVENT',
         'END:VCALENDAR',
     ]

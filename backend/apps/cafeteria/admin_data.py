@@ -85,8 +85,8 @@ from .models import (
     UnmatchedReceipt,
 )
 from .serializers import (
+    AdminCafeteriaBalanceSerializer,
     BalanceAdjustmentSerializer,
-    CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
     LowBalanceThresholdSerializer,
     LoyverseCustomerSerializer,
@@ -655,7 +655,7 @@ class AdminBalancesView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     """
     admin_area = 'cafeteria'
 
-    serializer_class = CafeteriaBalanceSerializer
+    serializer_class = AdminCafeteriaBalanceSerializer
     filterset_class = BalanceFilter
     ordering = BALANCE_ORDERING
     default_ordering = STUDENT_NAME
@@ -687,7 +687,7 @@ def _sync_handler(balance, payload, actor):
     try:
         new_balance = services.sync_student_balance(balance.student)
     except services.LoyverseError as exc:
-        raise ValueError(f"Loyverse: {exc}") from None
+        raise ValueError(services.loyverse_error_es(exc)) from None
     return {"seeded": not was_seeded, "balance": str(new_balance)}
 
 
@@ -1026,8 +1026,13 @@ class AdminTransactionListView(
     search_code_fields = ("student__student_id", "student__loyverse_profile__customer_code")
 
     def get_queryset(self):
-        return CafeteriaTransaction.objects.select_related(
-            "student__user", "student__loyverse_profile"
+        # ``adjustment_amount`` (one subquery): the sign of a refund or an
+        # adjustment, so the console tells a deduction from a credit (QA
+        # 2026-11-24: the school-wide Movimientos list carried none).
+        return services.with_signed_amounts(
+            CafeteriaTransaction.objects.select_related(
+                "student__user", "student__loyverse_profile"
+            )
         )
 
 
@@ -1143,7 +1148,7 @@ def _apply_handler(topup, payload, actor):
     services.add_points_to_customer(
         loyverse_customer_id=topup.student.loyverse_id,
         points=topup.amount,
-        note=f"Recarga en caja — #{topup.id}",
+        note=f"Recarga en caja · #{topup.id}",
         reference=f"topup-request-{topup.id}",
     )
     topup.status = TopUpRequest.Status.COMPLETED
@@ -1314,7 +1319,7 @@ class AdminLowBalanceView(CodeSearchMixin, AdminListMixin, generics.ListAPIView)
     """
     admin_area = 'cafeteria'
 
-    serializer_class = CafeteriaBalanceSerializer
+    serializer_class = AdminCafeteriaBalanceSerializer
     filterset_class = BalanceFilter
     ordering = LOW_BALANCE_ORDERING
     default_ordering = "balance"
@@ -1449,9 +1454,9 @@ def store_points() -> tuple[dict, str | None]:
     """``({customer_id: points}, None)``, or ``({}, message)`` when Loyverse fails."""
     try:
         customers = services.get_all_customers()
-    except services.LoyverseError:
+    except services.LoyverseError as exc:
         logger.exception("Reconciliation: Loyverse customer list failed")
-        return {}, "No se pudo leer Loyverse; intente de nuevo en unos minutos."
+        return {}, services.loyverse_error_es(exc)
     return {c.get("id"): services.get_balance_from_customer(c) for c in customers}, None
 
 
@@ -1505,15 +1510,19 @@ class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
         next_url, previous_url = paginator.get_next_link(), paginator.get_previous_link()
         points, error = store_points()
         rows = [serialize_reconcile_row(r) for r in reconcile_rows(students, points, error=error)]
+        # Loyverse unreachable: nothing was compared, so no row is a drift
+        # (QA 2026-11-24: every row counted as one); ``error`` says why.
+        drifting = [] if error else [r for r in rows if not r["in_sync"]]
         if params.get("only") == "drift":
-            rows = [r for r in rows if not r["in_sync"]]
+            rows = drifting
         checked = len(students)
         return Response(
             {
+                "error": error,
                 "count": len(rows),
                 "next": next_url,
                 "previous": previous_url,
-                "drift_count": sum(1 for r in rows if not r["in_sync"]),
+                "drift_count": len(drifting),
                 "checked": checked,
                 "total": total,
                 "offset": offset,
@@ -1547,7 +1556,8 @@ class AdminReconcileExportView(AdminReconcileView):
         try:
             customers = services.get_all_customers()
         except services.LoyverseError as exc:
-            return error_response(f"No se pudo conectar con Loyverse: {exc}", 502)
+            logger.warning("Reconcile export: Loyverse unreachable: %s", exc)
+            return error_response(services.loyverse_error_es(exc), 502)
         points = {c.get("id"): services.get_balance_from_customer(c) for c in customers}
         rows = []
         for student in students:

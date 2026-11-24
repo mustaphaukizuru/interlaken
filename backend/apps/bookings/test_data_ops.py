@@ -208,7 +208,7 @@ class TestSingleRowActions:
         assert len(mail.outbox) == 1 and mail.outbox[0].to == ["loud@test.mx"]
 
     def test_no_show_row_action_and_correction_note(self, admin_client):
-        b = _booking(_slot())
+        b = _booking(_slot(days=-1))
         assert self._act(admin_client, b, "no_show").data["status"] == "no_show"
         assert self._act(admin_client, b, "attended").status_code == 400  # needs a note
         resp = self._act(admin_client, b, "attended", note="Llegó tarde")
@@ -279,7 +279,7 @@ class TestBookingBulk:
         assert Booking.objects.filter(status=S.CONFIRMED).count() == 0
 
     def test_cancel_attended_no_show_and_note_required_correction(self, admin_client):
-        slot = _slot()
+        slot = _slot(days=-1)  # attendance is recorded once the visit happened
         a = _booking(slot, "A")
         b = _booking(slot, "B")
         att = _booking(slot, "C", status=S.ATTENDED)
@@ -301,7 +301,7 @@ class TestBookingBulk:
         """«Marcar asistió» on a mixed selection: the dry run names the rows
         already marked «No asistió» (corrections) instead of failing them, so
         the dialog can ask for the note; nothing is written."""
-        slot = _slot()
+        slot = _slot(days=-1)  # attendance is recorded once the visit happened
         fresh = _booking(slot, "A")
         wrong = _booking(slot, "B", status=S.NO_SHOW)
         also_wrong = _booking(slot, "C", status=S.NO_SHOW)
@@ -317,7 +317,7 @@ class TestBookingBulk:
     def test_commit_without_the_note_fails_only_the_corrections(self, admin_client):
         """The backend stays the source of truth: a correction sent without a
         note fails row by row, the plain moves of the same call go through."""
-        slot = _slot()
+        slot = _slot(days=-1)  # attendance is recorded once the visit happened
         fresh = _booking(slot, "A")
         wrong = _booking(slot, "B", status=S.NO_SHOW)
         resp = self._post(admin_client, action="attended", ids=[fresh.pk, wrong.pk])
@@ -329,7 +329,7 @@ class TestBookingBulk:
         assert (fresh.status, wrong.status) == (S.ATTENDED, S.NO_SHOW)
 
     def test_commit_with_the_note_corrects_and_audits_it(self, admin_client):
-        slot = _slot()
+        slot = _slot(days=-1)  # attendance is recorded once the visit happened
         fresh = _booking(slot, "A")
         wrong = _booking(slot, "B", status=S.ATTENDED)
         resp = self._post(
@@ -390,7 +390,7 @@ class TestSlotBulk:
         assert resp.data["skipped"] == [
             {
                 "id": booked.pk,
-                "reason": "Tiene 1 reserva(s); desactívelo para ocultarlo sin perder el historial.",
+                "reason": "Tiene 1 reserva; desactívelo para ocultarlo sin perder el historial.",
             }
         ]
         assert not AvailabilitySlot.objects.filter(pk=empty.pk).exists()

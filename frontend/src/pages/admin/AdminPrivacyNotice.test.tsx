@@ -60,6 +60,14 @@ describe('AdminPrivacyNotice (/admin/aviso-privacidad)', () => {
     expect(screen.getAllByLabelText('Título del apartado')[0]).toHaveValue('Primer apartado del aviso de prueba');
   });
 
+  it('a version that does not exist (404) says so with the way back (QA 2026-11-24)', async () => {
+    api.get.mockRejectedValue({ isAxiosError: true, response: { status: 404, data: { detail: 'No encontrado.' } } });
+    open('/admin/aviso-privacidad/999');
+    expect(await screen.findByText('No encontramos este registro')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver todas las versiones' })).toHaveAttribute('href', '/admin/aviso-privacidad');
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+  });
+
   it('a published version is read-only and previews the public page', async () => {
     open('/admin/aviso-privacidad/1');
     expect(await screen.findByText(/Su texto quedó fijo/)).toBeInTheDocument();

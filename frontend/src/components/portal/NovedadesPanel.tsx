@@ -7,6 +7,8 @@ import { portalApi, type NovedadItem } from '@/services/api';
 import { formatDateTime } from '@/lib/format';
 
 const KEY = 'interlaken:novedades-seen';
+/** Rows shown; the count in the title counts only these (QA 2026-11-24: «9» over 8 rows). */
+const MAX_ROWS = 8;
 const ICON: Record<string, typeof Bell> = { comunicado: Megaphone, evento: CalendarDays, cafeteria: Coffee, pago: Receipt, sitio: FileText };
 
 export function readSeen(): string | null {
@@ -35,14 +37,17 @@ export function NovedadesPanel({ className = '' }: { className?: string }) {
   const [since] = useState<string | null>(readSeen);
   const { data, isLoading } = useQuery({ queryKey: ['novedades', since], queryFn: async () => (await portalApi.novedades(since ?? undefined)).data, staleTime: 60_000 });
   useEffect(() => { if (data) writeSeen(new Date().toISOString()); }, [data]);
-  const items: NovedadItem[] = data?.items ?? [];
+  const items: NovedadItem[] = (data?.items ?? []).slice(0, MAX_ROWS);
+  // The server counts every item it sent; the panel has no «ver todas» page,
+  // so the title counts the new rows it actually lists.
+  const unread = items.filter((it) => it.unread).length;
   return (
-    <SectionCard title={`Novedades${data?.unread ? ` (${data.unread})` : ''}`} className={className}>
+    <SectionCard title={`Novedades${unread ? ` (${unread})` : ''}`} className={className}>
       {isLoading ? <div className="skeleton h-24" aria-hidden="true" /> : items.length === 0 ? (
         <SectionEmpty icon={Sparkles}>Nada nuevo desde su última visita</SectionEmpty>
       ) : (
         <ul className="divide-y divide-line px-3 py-1" aria-label="Novedades">
-          {items.slice(0, 8).map((it, i) => {
+          {items.map((it, i) => {
             const Icon = ICON[it.type] ?? Bell;
             return (
               <li key={i}>

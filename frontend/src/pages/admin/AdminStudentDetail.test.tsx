@@ -81,6 +81,15 @@ describe('AdminStudentDetail', () => {
     expect(await screen.findByRole('heading', { name: 'Luis López' })).toBeInTheDocument();
   });
 
+  it('a student that does not exist (404) says so with the way back, never «Reintentar» (QA 2026-11-24)', async () => {
+    getStudent.mockRejectedValue({ isAxiosError: true, response: { status: 404, data: { detail: 'No encontrado.' } } });
+    renderPage();
+    expect(await screen.findByText('No encontramos este registro')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a Alumnos' })).toHaveAttribute('href', '/admin/alumnos');
+    expect(screen.queryByText(/No pudimos conectar/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+  });
+
   it('renders identity, guardians and the cafetería shortcut (no tuition UI)', async () => {
     getStudent.mockResolvedValue({ data: STUDENT } as never);
 

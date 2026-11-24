@@ -16,7 +16,8 @@ def _slot(days=3, hour=9, capacity=2):
 
 @pytest.fixture
 def booking(db):
-    return Booking.objects.create(slot=_slot(), parent_name='María', parent_email='maria@test.mx', parent_phone='5512345678',
+    # Yesterday: a result (and «Asistió») is recorded once the visit happened.
+    return Booking.objects.create(slot=_slot(days=-1), parent_name='María', parent_email='maria@test.mx', parent_phone='5512345678',
                                   child_name='Ana', status=Booking.Status.CONFIRMED)
 
 
@@ -112,7 +113,7 @@ def test_outcome_refused_for_cancelled_or_no_show(admin_client, booking):
 def test_reschedule_guards(admin_client, booking):
     url = reverse('bookings-admin-reschedule', args=[booking.pk])
     assert admin_client.post(url, {'slot': 'abc'}, format='json').status_code == 400
-    past = _slot(days=-1)
+    past = _slot(days=-2)
     r = admin_client.post(url, {'slot': past.pk}, format='json')
     assert r.status_code == 400 and 'pasó' in str(r.data)
     Booking.objects.filter(pk=booking.pk).update(status='attended')

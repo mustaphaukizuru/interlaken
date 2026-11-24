@@ -46,10 +46,20 @@ ADMIN_ONLY = {
     'apps.content.navigation.AdminRedirectsImportTemplateView',
     'apps.content.navigation.AdminRedirectsImportView',
     'apps.content.navigation.AdminRedirectsView',
+    'apps.content.media.MediaBulkView',
+    'apps.content.media.MediaDetailView',
+    'apps.content.media.MediaExportView',
     'apps.content.pages.PageBulkView',
+    'apps.content.pages.PageChecksView',
+    'apps.content.pages.PageDetailView',
+    'apps.content.pages.PageDiscardView',
     'apps.content.pages.PageExportView',
+    'apps.content.pages.PageListCreateView',
+    'apps.content.pages.PagePreviewTokenView',
     'apps.content.pages.PagePublishView',
+    'apps.content.pages.PageReviewView',
     'apps.content.pages.PageVersionsView',
+    'apps.content.pages.PagesChecksSummaryView',
     'apps.content.pricing_admin.AdminPricingExportView',
     'apps.content.pricing_admin.AdminPricingImportView',
     'apps.content.pricing_admin.AdminPricingTableView',
@@ -70,6 +80,7 @@ ADMIN_ONLY = {
     'apps.legal.views.AdminArcoIntakeView',
     'apps.legal.views.AdminArcoListView',
     'apps.legal.views.AdminArcoStatusView',
+    'apps.portal.analytics.StaffAnalyticsView',
     'apps.portal.views.EmergencyBroadcastView',
 }
 
@@ -251,12 +262,27 @@ def test_admin_edits_areas_and_unknown_ones_are_refused(admin_client):
     assert log.changes['staff_areas']['to'] == ['visitas', 'cafeteria']
 
 
-def test_promotion_to_admin_clears_the_stored_areas(admin_client):
-    target = staff('cafeteria', title='Cafetería')
-    r = admin_client.patch(f'{STAFF_URL}{target.pk}/', {'role': 'admin'}, format='json')
-    assert r.status_code == 200
+def test_promotion_to_admin_keeps_the_stored_areas_for_the_way_back(admin_client):
+    # QA 2026-11-24: the promotion wiped them, so back in Personal the person
+    # had no console. An admin ignores them (every area) and shows none.
+    target = staff('cafeteria', 'visitas', title='Cafetería')
+    url = f'{STAFF_URL}{target.pk}/'
+    r = admin_client.patch(url, {'role': 'admin'}, format='json')
+    assert r.status_code == 200 and r.data['staff_areas'] == []
     target.refresh_from_db()
-    assert target.role == User.Role.ADMIN and target.staff_areas == []
+    assert target.role == User.Role.ADMIN and target.staff_areas == ['cafeteria', 'visitas']
+    assert user_areas(target) == frozenset(AREAS)
+    r = admin_client.patch(url, {'role': 'staff'}, format='json')
+    assert r.status_code == 200 and r.data['staff_areas'] == ['cafeteria', 'visitas']
+    target.refresh_from_db()
+    assert user_areas(target) == frozenset({'cafeteria', 'visitas'})
+
+
+def test_new_admin_account_stores_no_areas(admin_client):
+    r = admin_client.post(STAFF_URL, {'email': 'nueva.dir@test.mx', 'first_name': 'Nueva',
+                                      'role': 'admin', 'staff_areas': ['cafeteria']}, format='json')
+    assert r.status_code == 201, r.data
+    assert User.objects.get(email='nueva.dir@test.mx').staff_areas == []
 
 
 def test_staff_cannot_grant_themselves_areas(api_client):

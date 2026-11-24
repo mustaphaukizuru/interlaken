@@ -53,8 +53,17 @@ function sectionOf(path: string): [string, AreaKey[]] | undefined {
   return SECTIONS.find(([prefix]) => clean === prefix || clean.startsWith(`${prefix}/`));
 }
 
-/** May `user` open this console path? Paths outside /admin are not judged here. */
+/** /staff: the whole-school «Panel de Dirección» and the site content editor. */
+const isStaffPanel = (path: string) => /^\/staff(?:[/?#]|$)/.test(path);
+
+/**
+ * May `user` open this console path? /staff (the «Panel de Dirección» with
+ * admissions, ARCO and money, and the site content) is for administrators
+ * only, like the API (QA 2026-11-24). Other paths outside /admin are not
+ * judged here.
+ */
 export function canOpen(user: Who, path: string): boolean {
+  if (isStaffPanel(path)) return isAdmin(user);
   if (!path.startsWith('/admin')) return true;
   if (isAdmin(user)) return true;
   const section = sectionOf(path);
@@ -76,7 +85,9 @@ export function consoleHome(user: Who): string | null {
   return first ? first[0] : null;
 }
 
-/** Home after login / when a role guard bounces: the console for staff that have one. */
+/** Home after login / when a role guard bounces: the console for staff that
+ *  have one. A staff account without areas gets /staff, which tells it why it
+ *  has no console and where to go instead. */
 export function homePath(user: Who): string {
   switch (user?.role) {
     case 'admin': return '/admin';

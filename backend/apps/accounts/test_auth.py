@@ -275,6 +275,18 @@ class TestGoogleTokenExchange:
         resp = api_client.post(reverse("google-token"), {"credential": "bad"}, format="json")
         assert resp.status_code == 401
 
+    def test_google_certs_unreachable_is_503_not_500(self, api_client):
+        # QA sweep 2026-11-24: TransportError (Google's certs could not be
+        # fetched) was not caught. Same code as the redirect flow.
+        from google.auth.exceptions import TransportError
+
+        with patch("apps.accounts.views.google_id_token.verify_oauth2_token",
+                   side_effect=TransportError("Could not fetch certificates")):
+            resp = api_client.post(reverse("google-token"), {"credential": "x"}, format="json")
+        assert resp.status_code == 503
+        assert resp.data["code"] == "google_unreachable"
+        assert "Google" in resp.data["detail"]
+
 
 # ── cookie session: refresh rotation, CSRF, silent refresh, logout ─────────
 class TestCookieSession:
@@ -301,8 +313,12 @@ class TestCookieSession:
         new_csrf = r1.cookies[CSRF_COOKIE].value
         assert new_refresh and new_refresh != old_refresh  # rotated
 
-        # Replaying the old (now blacklisted) refresh token fails.
-        replay = self._refresh(api_client, new_csrf, refresh_value=old_refresh)
+        # Once the new token has been used, replaying the old (blacklisted) one
+        # fails. (Before that, a replay within a minute is the browser that lost
+        # the answer: see test_refresh_grace.py.)
+        r2 = self._refresh(api_client, new_csrf, refresh_value=new_refresh)
+        assert r2.status_code == 200
+        replay = self._refresh(api_client, r2.cookies[CSRF_COOKIE].value, refresh_value=old_refresh)
         assert replay.status_code == 401
 
     def test_refresh_requires_csrf_double_submit(self, api_client):

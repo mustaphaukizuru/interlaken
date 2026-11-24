@@ -32,6 +32,7 @@ from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 from apps.core.listing import AdminListMixin, apply_date_range
 from apps.core.permissions import IsAdmin
+from apps.core.plurals import count as plural
 from apps.core.ratelimit import ratelimit
 
 from .ops import AuditedCrudMixin, bool_filter, delete_action
@@ -362,7 +363,7 @@ def _form_delete_guard(form) -> str | None:
     count = getattr(form, 'submissions_count', None)
     if count is None:
         count = form.submissions.count()
-    return f'tiene {count} envío(s); elimínelo desde su ficha' if count else None
+    return f'tiene {plural(count, "envío", "envíos")}; elimínelo desde su ficha' if count else None
 
 
 class FormBulkView(AdminBulkView):

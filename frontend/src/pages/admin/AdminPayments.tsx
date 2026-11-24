@@ -121,7 +121,7 @@ export default function AdminPayments() {
     <>
       <PageHeader
         title="Pagos en línea"
-        subtitle="Ledger de la pasarela: recargas de cafetería pagadas con tarjeta. Reembolsos y pagos en caja se gestionan en Cafetería."
+        subtitle="Registro de pagos: recargas de cafetería pagadas con tarjeta. Reembolsos y pagos en caja se gestionan en Cafetería."
         actions={<ExportMenu filenamePrefix="pagos" selectedCount={selection.count} fetch={fetchExport} />}
       />
 

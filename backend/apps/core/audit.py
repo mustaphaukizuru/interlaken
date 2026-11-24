@@ -189,6 +189,12 @@ class AuditActorMiddleware:
 _TRACKED = {}
 
 
+def tracked_fields(model) -> frozenset[str]:
+    """The fields ``register_audit`` already records for ``model`` (a view
+    that audits the rest explicitly skips these: no double rows)."""
+    return frozenset(_TRACKED.get(model, ((),))[0])
+
+
 def register_audit(model, fields, context_label='', sensitive=()):
     """Auto-record create/update(diff)/delete on `model` for `fields`.
 

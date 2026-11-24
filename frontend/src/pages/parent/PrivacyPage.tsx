@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { legalApi } from '@/services/api';
 import { ARCO_STATUS_META, ARCO_TYPE_LABEL } from '@/lib/status/arco';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 
 const PURPOSE_LABELS: Record<string, string> = {
   academic_processing: 'Tratamiento académico',
@@ -78,6 +79,8 @@ export default function PrivacyPage() {
     },
     onError: () => toast.error('No se pudo enviar la solicitud ARCO.'),
   });
+  // A double click used to file two ARCO requests (QA 2026-11-24).
+  const arcoOnce = useSingleFlight();
 
   const exportData = useMutation({
     mutationFn: async () => (await legalApi.exportMyData()).data,
@@ -219,8 +222,8 @@ export default function PrivacyPage() {
                 type="button"
                 variant="primary"
                 loading={createArco.isPending}
-                disabled={arcoDetails.trim().length < 5}
-                onClick={() => createArco.mutate()}
+                disabled={arcoDetails.trim().length < 5 || createArco.isPending}
+                onClick={() => arcoOnce(() => createArco.mutateAsync())}
                 className="min-h-[44px]"
               >
                 Enviar solicitud

@@ -18,12 +18,12 @@ import { cafeteriaApi, portalApi } from '@/services/api';
 import { PushOptIn } from '@/components/portal/PushOptIn';
 import { InstallHint } from '@/components/portal/InstallHint';
 import { BalanceWithPending } from '@/components/portal/BalanceWithPending';
-import type { DashboardData, PendingTopUp } from '@/types';
+import type { CafeteriaBalance, DashboardData, PendingTopUp } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { LIVE } from '@/lib/live';
 import { formatMXN } from '@/lib/format';
-import { formatCents, projectBalance } from '@/lib/topupApply';
+import { canTopUp, formatCents, projectBalance } from '@/lib/topupApply';
 import { fetchNotifications, notifDestination, NOTIFICATIONS_KEY, pinUrgent, type Notif } from '@/lib/notifications';
 
 // Recharts (heavy) stays out of the dashboard's main chunk — loaded only when a
@@ -94,6 +94,7 @@ export default function ParentDashboard() {
   const { user } = useAuthStore();
   const qc = useQueryClient();
   const childId = useSelectedChildStore((s) => s.childId);
+  const setChildId = useSelectedChildStore((s) => s.setChildId);
   const { data, isLoading, isError, dataUpdatedAt, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
@@ -107,7 +108,10 @@ export default function ParentDashboard() {
   });
   const markRead = useMutation({
     mutationFn: (id: number) => portalApi.markNotificationRead(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['badges'] });
+    },
   });
 
   const nowMs = useNowMs();
@@ -117,6 +121,14 @@ export default function ParentDashboard() {
   // The header switcher (shared store) picks the child; the first one otherwise.
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
   const several = children.length > 1;
+  // No (or a stale) pick and several children: adopt the one shown, so the
+  // header, Cafetería and the Credencial open on this same child, whichever
+  // page the family visits next (QA 2026-11-24).
+  const pickValid = childId != null && children.some((c) => c.id === childId);
+  const firstChildId = children[0]?.id;
+  useEffect(() => {
+    if (several && !pickValid && firstChildId != null) setChildId(firstChildId);
+  }, [several, pickValid, firstChildId, setChildId]);
   // A staff member's own cafetería login (2026-11-18): no siblings to add, a puesto instead.
   const staffOnly = children.length > 0 && children.every((c) => c.tipo === 'personal');
   const balances = data?.cafeteria_balances ?? [];
@@ -127,6 +139,22 @@ export default function ParentDashboard() {
     ?? (children.length <= 1 && balances.length === 1 ? balances[0] : undefined);
   const hasCafeteria = balances.length > 0;
   const otherChildren = children.filter((c) => c.id !== selectedChild?.id);
+  // Whether the selected wallet takes an online top-up (on the POS, still
+  // attending): the cafetería page's own list, same key and request. A child
+  // who cannot gets a note instead of «Recarga rápida», whose chips would open
+  // the payment wizard (QA 2026-11-24). Until the list answers, the chips show
+  // as before: the cafetería page never opens the wizard for such a child.
+  const { data: wallets } = useQuery<CafeteriaBalance[]>({
+    queryKey: ['cafeteria-balances'],
+    queryFn: async () => {
+      const { data } = await cafeteriaApi.getMyBalance();
+      return Array.isArray(data) ? data : [data];
+    },
+    enabled: hasCafeteria,
+    staleTime: 60_000,
+  });
+  const selectedWallet = wallets?.find((w) => w.student.id === selectedChild?.id);
+  const topUpBlocked = !!selectedWallet && !canTopUp(selectedWallet);
 
   // ── «Hoy»: what needs attention now, built only from data already here ──
   const hoy: HoyItem[] = [];
@@ -157,7 +185,8 @@ export default function ParentDashboard() {
   }
   // Unread avisos: urgent ones first, one row each; the rest as one row. A
   // «saldo bajo» alert already has its row above.
-  const unread = pinUrgent((notifs ?? []).filter((n) => !n.is_read))
+  const pageUnread = (notifs?.items ?? []).filter((n) => !n.is_read);
+  const unread = pinUrgent(pageUnread)
     .filter((n) => !(lowBalances.length && /saldo bajo/i.test(n.title)));
   const openNotif = (n: Notif) => { markRead.mutate(n.id); };
   const urgent = unread.filter((n) => n.notif_type === 'warning');
@@ -168,8 +197,10 @@ export default function ParentDashboard() {
       action: { label: 'Leer', to: notifDestination(n), aria: `Leer el aviso: ${n.title}`, onClick: () => openNotif(n) },
     });
   }
-  // The bell's list when it loaded, else the dashboard's own count.
-  const restCount = notifsLoaded ? rest.length : (data?.unread_notifications ?? 0);
+  // The bell's list when it loaded (plus the unread ones past its first page,
+  // from the server's total), else the dashboard's own count.
+  const beyondPage = Math.max(0, (notifs?.unread ?? 0) - pageUnread.length);
+  const restCount = notifsLoaded ? rest.length + beyondPage : (data?.unread_notifications ?? 0);
   if (restCount === 1 && rest[0]) {
     const n = rest[0];
     hoy.push({
@@ -271,6 +302,7 @@ export default function ParentDashboard() {
                 balance={selectedBalance.balance || '0'}
                 pending={pendingOf(selectedBalance)}
                 low={!!selectedBalance.low}
+                topUp={!topUpBlocked}
               />
             ) : hasCafeteria ? (
               <div className="card h-full">
@@ -404,13 +436,16 @@ function HoyRow({ item, ok = false }: { item: HoyItem; ok?: boolean }) {
  * Hero: the SELECTED child's cafetería wallet (never a sum of siblings),
  * quick top-up chips and the credential. The chips deep-link into
  * CafeteriaPage with `?recarga=<monto>&hijo=<id>` so its top-up wizard opens
- * for this child with the amount prefilled (no payment logic here).
+ * for this child with the amount prefilled (no payment logic here). A wallet
+ * that takes no online top-up (`topUp` false) shows a note instead.
  */
-function WalletHero({ childId, name, several, balance, pending, low }: {
+function WalletHero({ childId, name, several, balance, pending, low, topUp = true }: {
   childId?: number; name: string; several: boolean; balance: string;
   /** Paid card top-ups waiting for the 7:30 POS load: «$150.00 → $350.00». */
   pending: Pick<PendingTopUp, 'amount' | 'apply_due_at'>[];
   low: boolean;
+  /** False when the wallet is not on the POS yet (or its holder left). */
+  topUp?: boolean;
 }) {
   const first = firstName(name);
   const hijo = childId ? `hijo=${childId}` : '';
@@ -428,6 +463,12 @@ function WalletHero({ childId, name, several, balance, pending, low }: {
         expandable
       />
       <div className="mt-auto space-y-3">
+        {!topUp ? (
+          <p className="flex items-start gap-2 rounded-sm bg-warning-bg px-3 py-2 text-xs leading-snug text-ink">
+            <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />
+            <span>Las recargas en línea aún no están activas para {name}. Contacte al colegio para activarlas.</span>
+          </p>
+        ) : (
         <div>
           <p className="mb-2 text-xs font-semibold text-subtle">Recarga rápida</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -449,6 +490,7 @@ function WalletHero({ childId, name, several, balance, pending, low }: {
             </Link>
           </div>
         </div>
+        )}
         <Link
           to="/portal/credencial"
           className="inline-flex min-h-[44px] items-center gap-2 rounded-sm px-1 text-sm font-semibold text-ink transition-colors hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
@@ -463,7 +505,7 @@ function WalletHero({ childId, name, several, balance, pending, low }: {
 /** At most three figures for the selected child, from queries the page already makes. */
 function Kpis({ childId, staffPuesto, count }: { childId?: number; staffPuesto: string | null; count: number }) {
   // The trend chart's own query (same key and payload): one request for both.
-  const { data: trend } = useQuery({
+  const { data: trend, isError: trendError } = useQuery({
     queryKey: ['cafeteria-spending-trend', 30, childId ?? 'all'],
     queryFn: async () => (await cafeteriaApi.getSpendingTrend(30, childId)).data as { total: number; average: number },
     enabled: childId != null,
@@ -471,8 +513,10 @@ function Kpis({ childId, staffPuesto, count }: { childId?: number; staffPuesto: 
   });
   const items: { label: string; value: ReactNode }[] = [];
   if (childId != null) {
-    items.push({ label: 'Consumo en 30 días', value: trend ? formatMXN(trend.total) : '—' });
-    items.push({ label: 'Promedio por día', value: trend ? formatMXN(trend.average) : '—' });
+    // «…» while it loads, words if it fails: never a bare «—» (QA 2026-11-24).
+    const pending = trendError ? 'Sin datos' : '…';
+    items.push({ label: 'Consumo en 30 días', value: trend ? formatMXN(trend.total) : pending });
+    items.push({ label: 'Promedio por día', value: trend ? formatMXN(trend.average) : pending });
   }
   items.push(staffPuesto != null
     ? { label: 'Personal del colegio', value: staffPuesto }

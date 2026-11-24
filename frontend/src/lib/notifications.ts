@@ -12,12 +12,20 @@ export interface Notif {
   announcement?: number | null;
 }
 
-/** The bell's list (first page, newest first), shared by the header menu and
- *  Inicio's «Hoy» under one cache key, so neither asks twice. */
+/** The bell's list (first page, newest first) and the account's real unread
+ *  total, shared by the header menu and Inicio's «Hoy» under one cache key,
+ *  so neither asks twice. `unread` is the server's count: the page holds only
+ *  20, and counting it showed «19 sin leer» to a family with 75 (QA 2026-11-24). */
+export interface NotifFeed {
+  items: Notif[];
+  unread: number;
+}
 export const NOTIFICATIONS_KEY = ['notifications'] as const;
-export async function fetchNotifications(): Promise<Notif[]> {
+export async function fetchNotifications(): Promise<NotifFeed> {
   const r = await portalApi.getNotifications();
-  return (r.data.results ?? r.data) as Notif[];
+  const items = (r.data.results ?? r.data) as Notif[];
+  const total = (r.data as { unread_count?: unknown }).unread_count;
+  return { items, unread: typeof total === 'number' ? total : items.filter((n) => !n.is_read).length };
 }
 
 /** Category per type. The page and menu are «Avisos»; `warning` is the

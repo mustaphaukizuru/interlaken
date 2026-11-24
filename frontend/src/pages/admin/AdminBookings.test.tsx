@@ -120,6 +120,40 @@ describe('AdminBookings: reservas', () => {
     expect(screen.queryByRole('button', { name: 'Más acciones para la reserva de Carla' })).not.toBeInTheDocument();
   });
 
+  it('a visit still to come offers no «Asistió» / «No asistió» (QA 2026-11-24)', async () => {
+    api.getAdminBookings.mockResolvedValue(page([
+      booking(5, 'Eva', 'pending', { slot_date: '2099-06-15' }),
+      booking(6, 'Fer', 'confirmed', { slot_date: '2099-06-15' }),
+    ]) as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Eva');
+    expect(screen.getByRole('button', { name: 'Confirmar la reserva de Eva' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Eva' }));
+    expect(within(screen.getByRole('menu', { name: 'Más acciones para la reserva de Eva' })).getAllByRole('menuitem')
+      .map((m) => m.getAttribute('aria-label'))).toEqual(['Cancelar la reserva de Eva']);
+    await userEvent.keyboard('{Escape}');
+    // Confirmed and not started: cancelling is the only move.
+    expect(screen.queryByRole('button', { name: 'Marcar que Fer asistió' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Marcar que Fer no asistió' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cancelar la reserva de Fer' })).toBeInTheDocument();
+  });
+
+  it('the cancel dialog reads «Volver» / «Cancelar la visita» and says the family gets an email (QA 2026-11-24)', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Ana' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Cancelar la reserva de Ana' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancelar la visita' });
+    expect(dialog).toHaveTextContent('La familia recibirá un correo con la cancelación.');
+    expect(within(dialog).queryByRole('button', { name: /^Cancelar$/ })).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Volver' }));
+    expect(api.bookingAction).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Ana' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Cancelar la reserva de Ana' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Cancelar la visita' })).getByRole('button', { name: 'Cancelar la visita' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(1, 'cancel', {}));
+  });
+
   it('«Confirmar» (emails the family) runs once for a double click, and the row stays busy while another row works', async () => {
     let resolveAna: (v: unknown) => void = () => {};
     api.bookingAction.mockImplementationOnce(() => new Promise((r) => { resolveAna = r; }) as never);
@@ -170,6 +204,17 @@ describe('AdminBookings: reservas', () => {
     await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(4, 'attended', { note: 'Llegó tarde' }));
   });
 
+  it('«Deshacer asistencia» returns a marked visit to «Confirmada» with a note and no email (QA 2026-11-24)', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Dani');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Dani' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Deshacer la asistencia de Dani' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Deshacer asistencia' });
+    await userEvent.type(within(dialog).getByLabelText(/Motivo/), 'Marcado por error');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Volver a «Confirmada»' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(4, 'confirm', { note: 'Marcado por error', notify: false }));
+  });
+
   it('shows the server reason when a move is refused (capacity)', async () => {
     api.bookingAction.mockRejectedValueOnce({ isAxiosError: true, response: { status: 400, data: { detail: 'El horario ya no tiene cupo suficiente.' } } });
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
@@ -186,7 +231,8 @@ describe('AdminBookings: reservas', () => {
     await userEvent.click(within(bar).getByRole('button', { name: 'Confirmar' }));
     await waitFor(() => expect(api.bulkBookings).toHaveBeenCalledWith(expect.objectContaining({ action: 'confirm', ids: [1], dry_run: true })));
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Se confirmarán');
+    // One row: the verb agrees (QA 2026-11-24).
+    expect(dialog).toHaveTextContent('Se confirmará 1 reserva.');
     await userEvent.click(within(dialog).getByRole('button', { name: /^Confirmar/ }));
     await waitFor(() => expect(api.bulkBookings).toHaveBeenLastCalledWith(expect.objectContaining({
       action: 'confirm', ids: [1], dry_run: false, payload: expect.objectContaining({ notify: true }),

@@ -267,3 +267,54 @@ class TestDocumentDownload:
         api_client.force_authenticate(AdminFactory())
         resp = api_client.get(reverse('document-download', args=[999999]))
         assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+class TestDocumentUploadContentCheck:
+    """QA sweep 2026-11-24 (round 2): the content must match the extension
+    (an executable renamed «acta.pdf» was accepted)."""
+
+    def _upload(self, api_client, name, content):
+        api_client.force_authenticate(AdminFactory())
+        f = SimpleUploadedFile(name, content, content_type='application/octet-stream')
+        return api_client.post(reverse('register-docs', args=[_reg().id]),
+                               {'file': f, 'doc_type': RegistrationDocument.DocType.BIRTH_CERT},
+                               format='multipart')
+
+    @staticmethod
+    def _image(fmt):
+        import io
+
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new('RGB', (30, 20), (9, 9, 9)).save(buf, format=fmt)
+        return buf.getvalue()
+
+    @pytest.mark.parametrize('name, content', [
+        ('acta.pdf', b'MZ\x90\x00\x03\x00\x00\x00 this program cannot be run in DOS mode'),
+        ('acta.jpg', b'MZ\x90\x00 not an image'),
+        ('foto.png', b'%PDF-1.4 a pdf named png'),
+        ('carta.docx', b'MZ\x90\x00'),
+        ('carta.doc', b'%PDF-1.4'),
+    ])
+    def test_content_not_matching_the_extension_is_400(self, api_client, name, content):
+        resp = self._upload(api_client, name, content)
+        assert resp.status_code == 400
+        assert 'no es un' in resp.data['detail'] and name in resp.data['detail']
+        assert not RegistrationDocument.objects.exists()
+
+    @pytest.mark.parametrize('name, content', [
+        ('acta.pdf', b'%PDF-1.7\n%real'),
+        ('acta.pdf', b'\xef\xbb\xbf\n%PDF-1.4 header after junk bytes'),
+        ('foto.jpg', 'JPEG'),
+        ('foto.jpeg', 'JPEG'),
+        ('foto.png', 'PNG'),
+        ('foto.jpg', b'\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic'),   # iPhone HEIC
+        ('carta.docx', b'PK\x03\x04\x14\x00 zip'),
+        ('carta.doc', b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1 ole2'),
+    ])
+    def test_real_documents_still_upload(self, api_client, name, content):
+        if isinstance(content, str):
+            content = self._image(content)
+        resp = self._upload(api_client, name, content)
+        assert resp.status_code == 201, resp.content

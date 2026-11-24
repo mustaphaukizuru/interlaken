@@ -16,8 +16,11 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, optional, className, id, ...props }, ref) => {
+    // Unique per field (QA 2026-11-24): an id built from the label repeated on
+    // every «Texto» of a list (Navegación had 15 inputs with id "texto"), so
+    // each label pointed at the first one.
     const autoId = useId();
-    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-') ?? autoId;
+    const inputId = id ?? autoId;
     const errorId = `${inputId}-error`;
     const hintId = `${inputId}-hint`;
     const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;

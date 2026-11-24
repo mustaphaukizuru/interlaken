@@ -112,6 +112,34 @@ describe('BookVisitPage', () => {
     expect(await screen.findByText('¡Visita confirmada!')).toBeInTheDocument();
   });
 
+  it('dates read «Lunes 15 de junio» (first letter only), and the slot list refreshes after booking (QA 2026-11-24)', async () => {
+    const user = userEvent.setup();
+    mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);
+    mockedCreate.mockResolvedValue({ data: { id: 1 } } as never);
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /15 de junio/i }));
+    const day = await screen.findByText('Lunes 15 de junio');
+    expect(day).not.toHaveClass('capitalize');
+    await user.click(await screen.findByRole('button', { name: /09:00/i }));
+    const summary = await screen.findByText('15 de junio, 2099');
+    expect(summary).not.toHaveClass('capitalize');
+
+    await user.type(await screen.findByLabelText(/Nombre completo/i), 'Roberto Pérez');
+    await user.type(screen.getByLabelText(/Correo electrónico/i), 'roberto@test.mx');
+    await user.type(screen.getByLabelText(/Teléfono/i), '5551234567');
+    // The slot just taken is gone on the next read.
+    mockedAvail.mockResolvedValue({ data: { results: [] } } as never);
+    const before = mockedAvail.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+    expect(await screen.findByText('¡Visita confirmada!')).toBeInTheDocument();
+    expect(screen.getByText(/^Lunes 15 de junio, 2099/)).toBeInTheDocument();
+    await waitFor(() => expect(mockedAvail.mock.calls.length).toBeGreaterThan(before));
+    await user.click(screen.getByRole('button', { name: 'Agendar otra visita' }));
+    expect(await screen.findByText('Sin horarios disponibles')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /15 de junio/i })).toBeNull();
+  });
+
   it('sends the visit link of the Expediente (?lead=) with the booking and never shows it', async () => {
     const user = userEvent.setup();
     mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);

@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.content.ops import AuditedCrudMixin
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView
 from apps.core.exporting import AdminExportMixin
@@ -21,6 +22,7 @@ from apps.core.filtersets import parse_bool_param
 from apps.core.importing import ImportTemplateView, ImportView
 from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
+from apps.core.plurals import count as plural
 from apps.core.ratelimit import ratelimit
 
 from . import data_ops
@@ -163,6 +165,19 @@ class AvailabilityView(APIView):
                     cursor = slot_end
             current += timedelta(days=1)
 
+        if created:
+            # One summary row per generator run (QA 2026-11-24: none was written).
+            record('create', object_type='bookings.availabilityslot', object_id='generador',
+                   changes={
+                       'created': created, 'skipped': skipped,
+                       'visit_type': d['visit_type'], 'title': d.get('title') or '',
+                       'start_date': d['start_date'].isoformat(),
+                       'end_date': d['end_date'].isoformat(), 'weekdays': list(d['weekdays']),
+                       'window': f"{d['window_start']:%H:%M}-{d['window_end']:%H:%M}",
+                       'interval_minutes': d['interval_minutes'], 'capacity': d['capacity'],
+                       'location': d['location'],
+                   },
+                   actor=request.user, context='bookings: generar horarios')
         return Response(
             {'created': created, 'skipped': skipped,
              'detail': f'{created} horarios generados ({skipped} ya existían).'},
@@ -466,10 +481,11 @@ class AdminWeekView(APIView):
         start_s = request.query_params.get('start')
         try:
             start = datetime.strptime(start_s, '%Y-%m-%d').date() if start_s else timezone.localdate()
-        except ValueError:
+            start = start - timedelta(days=start.weekday())  # Monday
+            end = start + timedelta(days=6)
+        except (ValueError, OverflowError):
+            # OverflowError: the week of 9999-12-31 ends past the last date.
             return Response({'start': ['Fecha no válida.']}, status=status.HTTP_400_BAD_REQUEST)
-        start = start - timedelta(days=start.weekday())  # Monday
-        end = start + timedelta(days=6)
         slots = (AvailabilitySlot.objects.filter(date__range=(start, end)).order_by('date', 'start_time')
                  .prefetch_related('bookings'))
         days = []
@@ -543,12 +559,13 @@ class AdminSlotImportView(ImportView):
     template_url = '/api/v1/bookings/admin/slots/import/template/'
 
 
-class AdminSlotDetailView(generics.RetrieveUpdateDestroyAPIView):
+class AdminSlotDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET/PATCH/DELETE /api/v1/bookings/admin/slots/<id>/ — edit (capacity,
     location, title, is_active) or delete a slot. Deleting is refused when any
     booking references the slot (CASCADE would erase that history); deactivate
-    instead."""
+    instead. Every edit and delete writes an audit row with the changed fields."""
     admin_area = 'visitas'
+    audit_context = 'bookings: horario'
     queryset = AvailabilitySlot.objects.all()
     serializer_class = AdminSlotSerializer
     permission_classes = [IsAdmin]
@@ -559,7 +576,8 @@ class AdminSlotDetailView(generics.RetrieveUpdateDestroyAPIView):
         booked = slot.bookings.count()
         if booked:
             return Response(
-                {'detail': f'No se puede eliminar: {booked} reserva(s) asociada(s). '
+                {'detail': f'No se puede eliminar: '
+                           f'{plural(booked, "reserva asociada", "reservas asociadas")}. '
                            f'Desactive el horario para ocultarlo sin perder el historial.'},
                 status=status.HTTP_400_BAD_REQUEST)
         return super().destroy(request, *args, **kwargs)

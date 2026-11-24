@@ -20,6 +20,28 @@ import type { AuditLogEntry } from '@/types';
 
 const ACTION_OPTIONS = Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }));
 
+/** Spanish names for the keys the server writes most often (QA 2026-11-24:
+ *  the roster sync summary read «errors: 0 · linked: 0 · skipped: 42»). An
+ *  unknown key is shown as written, with underscores as spaces. */
+const CHANGE_KEY_LABEL: Record<string, string> = {
+  errors: 'errores', linked: 'vinculados', created: 'creados', renamed: 'renombrados',
+  skipped: 'omitidos', updated: 'actualizados', unchanged: 'sin cambios', absorbed: 'absorbidos',
+  replayed: 'reaplicados', conflicts: 'conflictos', stale_links: 'vínculos caducos', pending: 'pendientes',
+  credited: 'acreditados', failed: 'fallidos', pushed: 'cargados', waiting: 'en espera',
+  first_name: 'nombre', last_name: 'apellidos', email: 'correo', role: 'rol', is_active: 'activo',
+  balance: 'saldo', amount: 'monto', grade: 'grado', group: 'grupo', status: 'estado',
+  student_id: 'matrícula', loyverse_id: 'Loyverse', puesto: 'puesto', tipo: 'tipo', via: 'vía',
+  staff_areas: 'áreas', staff_title: 'puesto', is_staff: 'consola', is_superuser: 'superusuario',
+};
+const changeKey = (key: string) => CHANGE_KEY_LABEL[key] ?? key.replace(/_/g, ' ');
+const changeValue = (v: unknown): string => {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'sí' : 'no';
+  if (Array.isArray(v)) return v.length ? v.map(changeValue).join(', ') : '—';
+  if (typeof v === 'object') return `${Object.keys(v as object).length} dato(s)`;
+  return String(v);
+};
+
 /** Human summary of one audit row's `changes` payload (reason first). */
 function changesSummary(entry: AuditLogEntry): string {
   const { changes } = entry;
@@ -31,9 +53,9 @@ function changesSummary(entry: AuditLogEntry): string {
   for (const [key, value] of Object.entries(changes)) {
     if (key === 'reason') continue;
     if (Array.isArray(value) && value.length === 2) {
-      parts.push(`${key}: ${value[0] ?? '—'} → ${value[1] ?? '—'}`);
+      parts.push(`${changeKey(key)}: ${changeValue(value[0])} → ${changeValue(value[1])}`);
     } else {
-      parts.push(`${key}: ${String(value)}`);
+      parts.push(`${changeKey(key)}: ${changeValue(value)}`);
     }
   }
   return parts.length ? parts.join(' · ') : '—';

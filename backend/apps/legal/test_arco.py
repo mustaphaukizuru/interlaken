@@ -78,3 +78,20 @@ def test_access_export_returns_only_own_household(api_client):
     assert exported_ids == {kid.student_id}
     # No internal secrets leak into the export.
     assert 'session_token_hash' not in str(resp.data)
+
+
+def test_portal_request_gets_the_acknowledgement_email(api_client, mailoutbox, settings):
+    # QA 2026-11-24 (round 2): only requests the office recorded by hand were
+    # acknowledged; one sent from the family portal got no email.
+    parent = ParentFactory()
+    api_client.force_authenticate(user=parent)
+    resp = api_client.post(reverse('legal-arco'),
+                           {'request_type': 'rectification', 'details': 'Mi apellido está mal.'},
+                           format='json')
+    assert resp.status_code == 201, resp.data
+    arco = ArcoRequest.objects.get(pk=resp.data['id'])
+    [mail] = [m for m in mailoutbox if parent.email in m.to]
+    assert mail.subject.startswith('Recibimos su solicitud ARCO de ')
+    from apps.portal.emailing import long_date
+    assert 'Respuesta a más tardar' in mail.body and long_date(arco.statutory_deadline) in mail.body
+    assert mail.reply_to == [settings.PRIVACY_EMAIL]

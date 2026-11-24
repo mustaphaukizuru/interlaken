@@ -319,7 +319,7 @@ function StudentForm({ student, onClose, onCancel, onDirty, onSaved, qc, default
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input label="Tipo de sangre" value={form.blood_type ?? ''} onChange={(e) => set('blood_type', e.target.value.toUpperCase())} error={errors.blood_type} maxLength={10} placeholder="O+" />
-                <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} error={errors.allergies} hint="Visible en cafetería para evitar incidentes." />
+                <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} error={errors.allergies} hint="Solo la ven los administradores y la familia que autorizó los datos de salud; el personal y la cafetería no la ven." />
               </div>
               <div>
                 <label className="label" htmlFor="sf-med">Notas médicas</label>

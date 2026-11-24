@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  loadsInstantly,
   applyNotice, applyPhrase, applyPhraseShort, formatClock, formatWhatsapp, pendingCoversLowBalance, projectBalance,
   projectionStepLine, projectionSummary, sentence, whatsappHref,
 } from './topupApply';
@@ -49,6 +50,15 @@ describe('topupApply', () => {
     }
   });
 
+  it('asks for the WhatsApp comprobante with «usted», never «tú» (QA 2026-11-24)', () => {
+    const text = applyNotice({ apply_time: '07:30', whatsapp: '5553791188' });
+    expect(text).toBe(
+      'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m. '
+      + 'Si necesita que se aplique de inmediato, para que su hijo use el saldo el mismo día, envíe un mensaje '
+      + 'por WhatsApp al 55 5379 1188 con el comprobante de pago y con gusto le ayudamos.');
+    expect(text).not.toMatch(/\b(necesitas|tu|te)\b/);
+  });
+
   it('drops the WhatsApp sentence when the school has none configured', () => {
     expect(applyNotice({ apply_time: '07:30', whatsapp: '' })).toBe(
       'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m.');
@@ -95,5 +105,20 @@ describe('projectBalance (where a wallet is heading while paid top-ups wait)', (
     expect(applyPhraseShort(MONDAY_0730, new Date('2030-01-07T12:00:00Z'))).toBe('hoy a las 7:30 a.m.');
     expect(applyPhraseShort(MONDAY_0730, now)).toBe('el lunes 7 de enero a las 7:30 a.m.');
     expect(applyPhraseShort(null, now)).toBe('el siguiente día hábil a las 7:30 a.m.');
+  });
+});
+
+describe('loadsInstantly (QA 2026-11-24)', () => {
+  const instant = { auto_load: 'instant' as const, auto_load_max: '1000.00' };
+  it('is true with instant auto-load, for any amount up to the cap or no amount yet', () => {
+    expect(loadsInstantly(instant)).toBe(true);
+    expect(loadsInstantly(instant, 1000)).toBe(true);
+    expect(loadsInstantly(instant, Number.NaN)).toBe(true);
+  });
+  it('is false above the cap, with another mode, a zero cap or no policy', () => {
+    expect(loadsInstantly(instant, 1000.01)).toBe(false);
+    expect(loadsInstantly({ auto_load: 'verified', auto_load_max: '1000.00' })).toBe(false);
+    expect(loadsInstantly({ auto_load: 'instant', auto_load_max: '0.00' })).toBe(false);
+    expect(loadsInstantly(null)).toBe(false);
   });
 });

@@ -142,9 +142,11 @@ export function buildChecks(h: SyncHealth): Check[] {
           : 'El roster nunca se ha sincronizado con Loyverse')
         : `Roster sincronizado ${ago(h.last_roster_sync_at ?? null)}`,
       detail: rosterStale
-        ? 'Debe correr cada madrugada a las 06:07 (sync_roster en el crontab). Los cambios que la '
+        // Plain Spanish for the office (QA 2026-11-24: it said «revise `crontab -l`»).
+        ? 'Debe correr cada madrugada a las 06:07. Los cambios que la '
           + 'oficina hace en Loyverse (grado, nombre, código) no llegan a la app hasta entonces: use '
-          + 'Sincronizar roster ahora y, si mañana sigue en rojo, revise `crontab -l` en el servidor.'
+          + 'Sincronizar roster ahora y, si mañana sigue en rojo, avise a soporte técnico: la tarea '
+          + 'programada del servidor no está corriendo.'
         : 'Grado, nombre y Código Loyverse de cada alumno siguen a Loyverse. Corre cada madrugada '
           + 'a las 06:07, o ahora mismo con el botón.',
     },
@@ -273,7 +275,7 @@ export function buildChecks(h: SyncHealth): Check[] {
         : !drill.ok
           ? `${ago(drill.at)}: ${drill.detail || 'sin detalle'}. Revise /var/log/interlaken/restore-drill.log en el servidor.`
           : drillStale
-            ? `Última prueba ${ago(drill.at)}. Debe correr el primer domingo de cada mes: revise el crontab del servidor.`
+            ? `Última prueba ${ago(drill.at)}. Debe correr el primer domingo de cada mes: avise a soporte técnico para que revise la tarea programada del servidor.`
             : `Se restauró ${drill.dump || 'el respaldo'} en una base aparte`
               + (drill.detail ? `: ${drillCounts(drill.detail)}.` : '.'),
     },

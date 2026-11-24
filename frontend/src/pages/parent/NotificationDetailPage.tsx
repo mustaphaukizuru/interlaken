@@ -1,16 +1,18 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Megaphone } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { ArrowLeft, ArrowRight, BellOff, Megaphone } from 'lucide-react';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { NotificationBody } from '@/components/portal/NotificationBody';
 import { NOTIF_META } from '@/lib/notifications';
+import { apiErrorStatus } from '@/lib/apiErrors';
 import { portalApi } from '@/services/api';
 
 /** Where the notification's subject lives, when it lives somewhere. */
@@ -40,11 +42,14 @@ export default function NotificationDetailPage() {
   const notifId = Number(id);
   const qc = useQueryClient();
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['notification', notifId],
     queryFn: async () => (await portalApi.getNotification(notifId)).data,
     enabled: Number.isFinite(notifId),
   });
+  // An id that is not this account's (404) or not a number: «Reintentar» would
+  // never help, so say the aviso is gone (QA 2026-11-24).
+  const notFound = !Number.isFinite(notifId) || (isError && apiErrorStatus(error) === 404);
 
   const markRead = useMutation({
     mutationFn: () => portalApi.markNotificationRead(notifId),
@@ -52,6 +57,7 @@ export default function NotificationDetailPage() {
       qc.invalidateQueries({ queryKey: ['notifications'] });
       qc.invalidateQueries({ queryKey: ['notifications-page'] });
       qc.invalidateQueries({ queryKey: ['notification', notifId] });
+      qc.invalidateQueries({ queryKey: ['badges'] });
     },
   });
 
@@ -82,7 +88,16 @@ export default function NotificationDetailPage() {
       </Link>
       <PageHeader title="Aviso" breadcrumbs={false} />
 
-      {isError ? (
+      {notFound ? (
+        <Card>
+          <EmptyState
+            icon={BellOff}
+            title="Este aviso no existe o ya no está disponible"
+            description="Puede que el enlace esté incompleto o que el aviso ya no esté en su cuenta."
+            action={<Link to="/portal/notificaciones" className="btn-secondary min-h-[44px]">Ver avisos</Link>}
+          />
+        </Card>
+      ) : isError ? (
         <Card><ErrorState onRetry={() => refetch()} description="No se pudo abrir la notificación. Intente de nuevo." /></Card>
       ) : isLoading || !data ? (
         <Card><ListSkeleton /></Card>
@@ -96,7 +111,7 @@ export default function NotificationDetailPage() {
           {created && (
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
               <time dateTime={data.created_at}>{format(created, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}</time>
-              <span className="text-subtle">· {formatDistanceToNow(created, { addSuffix: true, locale: es })}</span>
+              <span className="text-subtle">· {formatDistanceToNowStrict(created, { addSuffix: true, locale: es })}</span>
             </p>
           )}
 
