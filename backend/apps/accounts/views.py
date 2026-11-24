@@ -115,6 +115,24 @@ def _google_domain_allowed(email: str) -> bool:
     return host in {d.strip().lower() for d in domains if d and d.strip()}
 
 
+GOOGLE_MISMATCH_MESSAGE = ('Esta cuenta del personal ya está vinculada a otra cuenta de Google. '
+                           'Pida a un administrador que la revise.')
+
+
+def _google_id_conflict(user, google_id: str) -> bool:
+    """A staff or admin login already bound to a DIFFERENT Google account.
+
+    Sign-in finds the user by email, so whoever could change a console
+    account's email could then enter as that account with their own Google
+    login (QA 2026-11-24: «Alumnos» staff could re-point an admin's email from
+    the student editor). Families keep the old behaviour (the school may
+    recreate a pupil's Workspace account); a privileged login stays with the
+    Google account it first used until an administrator clears it."""
+    privileged = (user.role in (User.Role.ADMIN, User.Role.STAFF)
+                  or user.is_staff or user.is_superuser)
+    return bool(privileged and google_id and user.google_id and user.google_id != google_id)
+
+
 def _resolve_google_user(email: str, *, defaults: dict) -> User | None:
     """Find an existing user or optionally create one for an allowlisted domain.
 
@@ -207,6 +225,9 @@ class GoogleCallbackView(APIView):
             # Deactivated or archived: the password path already refuses it.
             record_login(request, user=user, method='google', success=False, reason='inactive')
             return redirect(f'{settings.FRONTEND_URL}/login?error=inactive')
+        if _google_id_conflict(user, google_id):
+            record_login(request, user=user, method='google', success=False, reason='google_mismatch')
+            return redirect(f'{settings.FRONTEND_URL}/login?error=google_mismatch')
 
         # Refresh google_id / avatar for returning users.
         updated = False
@@ -283,6 +304,11 @@ class GoogleTokenView(APIView):
 
         # Refresh google_id / avatar for returning users.
         google_id = payload.get('sub', '')
+        if _google_id_conflict(user, google_id):
+            from .security import record_login
+            record_login(request, user=user, method='google', success=False, reason='google_mismatch')
+            return Response(error_body(GOOGLE_MISMATCH_MESSAGE, code='google_mismatch'),
+                            status=status.HTTP_403_FORBIDDEN)
         avatar = _google_avatar(payload.get('picture'))
         dirty = []
         if google_id and user.google_id != google_id:
