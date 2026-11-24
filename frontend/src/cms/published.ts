@@ -23,9 +23,11 @@ export const CMS_TIMEOUT_MS = 8000;
 
 async function request(slug: string): Promise<CmsPagePayload | null> {
   try {
+    // The request first: if it throws at once, no timer is left to reject later, unhandled.
+    const load = contentApi.getPage(slug);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('cms-timeout')), CMS_TIMEOUT_MS); });
-    const page = (await Promise.race([contentApi.getPage(slug), late]).finally(() => clearTimeout(timer))).data as CmsPagePayload;
+    const page = (await Promise.race([load, late]).finally(() => clearTimeout(timer))).data as CmsPagePayload;
     // Generic blocks render from their own chunk: start it with the page data.
     if (page?.blocks?.some((b) => !b.type.includes('.'))) void import('./blocks/generic');
     return page;
