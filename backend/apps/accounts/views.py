@@ -13,6 +13,7 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from google.auth import exceptions as google_auth_exceptions
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from rest_framework import generics, permissions, status
@@ -274,6 +275,13 @@ class GoogleTokenView(APIView):
                 credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
         except ValueError:
             return Response(error_body('El token de Google no es válido o caducó.', code='invalid_token'), status=status.HTTP_401_UNAUTHORIZED)
+        except google_auth_exceptions.TransportError:
+            # Google's signing certificates could not be fetched (network, a
+            # Google outage): not the family's fault, and not a 500. Same code
+            # as the redirect flow (?error=google_unreachable).
+            return Response(error_body('No fue posible comunicarse con Google. Intente de nuevo.',
+                                       code='google_unreachable'),
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         email = payload.get('email')
         if not email:
@@ -443,6 +451,15 @@ class CookieTokenRefreshView(APIView):
         try:
             serializer.is_valid(raise_exception=True)
         except (TokenError, InvalidToken):
+            # A token rotated seconds ago whose answer the browser dropped
+            # (reload or «Atrás» mid-refresh): one fresh session instead of
+            # signing the family out (refresh_grace.py, QA 2026-11-24).
+            from .refresh_grace import user_for_recent_rotation
+            user = user_for_recent_rotation(raw)
+            if user is not None:
+                response = Response()
+                response.data = {'access': issue_session(user, response)}
+                return response
             response = Response({'detail': 'Sesión expirada.'},
                                 status=status.HTTP_401_UNAUTHORIZED)
             clear_auth_cookies(response)
