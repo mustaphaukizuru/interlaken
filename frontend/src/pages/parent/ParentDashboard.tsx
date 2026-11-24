@@ -107,7 +107,10 @@ export default function ParentDashboard() {
   });
   const markRead = useMutation({
     mutationFn: (id: number) => portalApi.markNotificationRead(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['badges'] });
+    },
   });
 
   const nowMs = useNowMs();
@@ -157,7 +160,8 @@ export default function ParentDashboard() {
   }
   // Unread avisos: urgent ones first, one row each; the rest as one row. A
   // «saldo bajo» alert already has its row above.
-  const unread = pinUrgent((notifs ?? []).filter((n) => !n.is_read))
+  const pageUnread = (notifs?.items ?? []).filter((n) => !n.is_read);
+  const unread = pinUrgent(pageUnread)
     .filter((n) => !(lowBalances.length && /saldo bajo/i.test(n.title)));
   const openNotif = (n: Notif) => { markRead.mutate(n.id); };
   const urgent = unread.filter((n) => n.notif_type === 'warning');
@@ -168,8 +172,10 @@ export default function ParentDashboard() {
       action: { label: 'Leer', to: notifDestination(n), aria: `Leer el aviso: ${n.title}`, onClick: () => openNotif(n) },
     });
   }
-  // The bell's list when it loaded, else the dashboard's own count.
-  const restCount = notifsLoaded ? rest.length : (data?.unread_notifications ?? 0);
+  // The bell's list when it loaded (plus the unread ones past its first page,
+  // from the server's total), else the dashboard's own count.
+  const beyondPage = Math.max(0, (notifs?.unread ?? 0) - pageUnread.length);
+  const restCount = notifsLoaded ? rest.length + beyondPage : (data?.unread_notifications ?? 0);
   if (restCount === 1 && rest[0]) {
     const n = rest[0];
     hoy.push({

@@ -510,6 +510,15 @@ describe('ParentDashboard «Hoy» (Phase 6 pilot)', () => {
     expect(screen.queryByText('Ya leído')).toBeNull();
   });
 
+  it('counts the unread avisos past the first page from the server total (QA 2026-11-24: «19» for 75)', async () => {
+    getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [] } } as never);
+    const page = Array.from({ length: 20 }, (_, i) => notif({ id: i + 1, title: `Compra ${i + 1}`, is_read: i === 19 }));
+    getNotifications.mockResolvedValue({ data: { count: 83, results: page, unread_count: 75 } } as never);
+    renderPage();
+    expect(await screen.findByText('75 avisos sin leer')).toBeInTheDocument();
+    expect(screen.queryByText('19 avisos sin leer')).toBeNull();
+  });
+
   it('a single unread aviso gets its own row; opening it marks it read', async () => {
     getDashboard.mockResolvedValue({ data: { ...LINKED_DATA, cafeteria_balances: [] } } as never);
     vi.mocked(portalApi.markNotificationRead).mockResolvedValue({ data: {} } as never);

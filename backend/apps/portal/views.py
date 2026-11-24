@@ -307,7 +307,7 @@ class DashboardView(APIView):
                 announcement=OuterRef('pk'), user=user, acknowledged_at__isnull=False)),
         )[:5]
         data['announcements'] = AnnouncementSerializer(announcements, many=True, context={'request': request}).data
-        data['unread_notifications'] = Notification.objects.filter(user=user, is_read=False).count()
+        data['unread_notifications'] = unread_notification_count(user)
 
         return Response(data)
 
@@ -679,6 +679,29 @@ class NotificationListView(generics.ListAPIView):
             qs = qs.filter(notif_type=t)
         return qs.order_by('-created_at')
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        # The bell and «Hoy» read only the first page (20), so they counted
+        # «19 sin leer» for a family with 75 (QA 2026-11-24): give them the
+        # account's real unread total, counted like the list (in_app only).
+        if isinstance(response.data, dict):
+            response.data['unread_count'] = unread_notification_count(request.user)
+        return response
+
+
+def unread_notification_count(user) -> int:
+    """Unread avisos the account can see in the app: the bell, «Hoy», the
+    sidebar/tab-bar badge and the dashboard all count this one number."""
+    return Notification.objects.filter(user=user, in_app=True, is_read=False).count()
+
+
+def _forget_badges(user) -> None:
+    """The badge counts are cached 30 s per user; a read must show at once."""
+    from django.core.cache import cache
+
+    from apps.core.badges import BADGE_CACHE_KEY
+    cache.delete(BADGE_CACHE_KEY.format(pk=user.pk))
+
 
 class AnnouncementMarkReadView(APIView):
     """
@@ -742,6 +765,7 @@ class NotificationMarkReadView(APIView):
             notif = Notification.objects.get(pk=pk, user=request.user, in_app=True)
             notif.is_read = True
             notif.save(update_fields=['is_read'])
+            _forget_badges(request.user)
             return Response({'detail': 'Marcada como leída.'})
         except Notification.DoesNotExist:
             return Response(error_body('No encontrada.'), status=404)
@@ -761,6 +785,7 @@ class NotificationMarkAllReadView(APIView):
         updated = (Notification.objects
                    .filter(user=request.user, is_read=False, in_app=True)
                    .update(is_read=True))
+        _forget_badges(request.user)
         return Response({'marked': updated})
 
 

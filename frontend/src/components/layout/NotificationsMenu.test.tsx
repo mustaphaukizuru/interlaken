@@ -38,6 +38,22 @@ describe('NotificationsMenu', () => {
     expect(portalApi.markAllNotificationsRead).toHaveBeenCalled();
   });
 
+  it('the bell shows the real unread total of the account, not that of the first page (QA 2026-11-24)', async () => {
+    const page = Array.from({ length: 20 }, (_, i) => ({ ...REPORT, id: i + 1, is_read: i === 19 }));
+    LIST.items = { count: 83, results: page, unread_count: 75 } as never;
+    stubViewport(1280);
+    renderWithProviders(<NotificationsMenu />);
+    expect(await screen.findByRole('button', { name: 'Avisos, 75 sin leer' })).toHaveTextContent('9+');
+  });
+
+  it('«Marcar todo como leído» stays on when the unread ones are past the first page', async () => {
+    LIST.items = { count: 40, results: [{ ...REPORT, is_read: true }], unread_count: 12 } as never;
+    stubViewport(1280);
+    renderWithProviders(<NotificationsMenu />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Avisos, 12 sin leer' }));
+    expect(screen.getByRole('button', { name: 'Marcar todo como leído' })).toBeEnabled();
+  });
+
   it('«Marcar todo como leído» is disabled when nothing is unread', async () => {
     LIST.items = [{ ...REPORT, is_read: true }];
     stubViewport(1280);

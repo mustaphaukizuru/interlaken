@@ -52,6 +52,7 @@ export default function NotificationDetailPage() {
       qc.invalidateQueries({ queryKey: ['notifications'] });
       qc.invalidateQueries({ queryKey: ['notifications-page'] });
       qc.invalidateQueries({ queryKey: ['notification', notifId] });
+      qc.invalidateQueries({ queryKey: ['badges'] });
     },
   });
 
