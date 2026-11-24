@@ -85,8 +85,8 @@ from .models import (
     UnmatchedReceipt,
 )
 from .serializers import (
+    AdminCafeteriaBalanceSerializer,
     BalanceAdjustmentSerializer,
-    CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
     LowBalanceThresholdSerializer,
     LoyverseCustomerSerializer,
@@ -655,7 +655,7 @@ class AdminBalancesView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     """
     admin_area = 'cafeteria'
 
-    serializer_class = CafeteriaBalanceSerializer
+    serializer_class = AdminCafeteriaBalanceSerializer
     filterset_class = BalanceFilter
     ordering = BALANCE_ORDERING
     default_ordering = STUDENT_NAME
@@ -1314,7 +1314,7 @@ class AdminLowBalanceView(CodeSearchMixin, AdminListMixin, generics.ListAPIView)
     """
     admin_area = 'cafeteria'
 
-    serializer_class = CafeteriaBalanceSerializer
+    serializer_class = AdminCafeteriaBalanceSerializer
     filterset_class = BalanceFilter
     ordering = LOW_BALANCE_ORDERING
     default_ordering = "balance"

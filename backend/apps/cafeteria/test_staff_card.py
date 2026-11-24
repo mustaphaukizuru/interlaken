@@ -134,3 +134,21 @@ def test_never_another_familys_child_or_a_staff_account(api_client, settings, tm
     [card] = api_client.get(reverse('cafeteria-cards'), {'student': other.pk}).data
     assert card['can_upload_photo'] is False
     assert _upload(api_client, other.pk).status_code == 403
+
+
+def test_card_photo_refuses_a_pixel_bomb(api_client, settings, tmp_path):
+    # QA sweep 2026-11-24: same pixel cap as the profile photo (store_avatar).
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.accounts.test_avatar import _png_claiming
+    settings.MEDIA_ROOT = tmp_path
+    _switch(True)
+    parent = ParentFactory()
+    child = StudentProfileFactory(parents=[parent], user__avatar='')
+    api_client.force_authenticate(user=parent)
+    bomb = _png_claiming(9400, 9400)
+    assert isinstance(bomb, SimpleUploadedFile)
+    res = api_client.post(reverse('cafeteria-card-photo', args=[child.pk]), {'file': bomb},
+                          format='multipart')
+    assert res.status_code == 400
+    assert 'demasiado grande' in str(res.data)

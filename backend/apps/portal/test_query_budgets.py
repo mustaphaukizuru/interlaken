@@ -81,8 +81,9 @@ DELIVERY_BUDGET = 9
 DELIVERY_EXPORT_BUDGET = 4
 # family comunicados: count + annotated page.
 FAMILY_ANNOUNCEMENTS_BUDGET = 2
-# family notifications: count + page.
-FAMILY_NOTIFICATIONS_BUDGET = 2
+# family notifications: count + page + the account's unread total
+# (``unread_count`` for the bell and «Hoy», 2026-11-24).
+FAMILY_NOTIFICATIONS_BUDGET = 3
 
 
 def _csv_lines(resp) -> list[str]:

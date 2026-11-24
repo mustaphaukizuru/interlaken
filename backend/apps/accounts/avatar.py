@@ -43,9 +43,25 @@ def avatar_url(user: User) -> str:
     return user.avatar or ''
 
 
+# Pixels decoded at full size (PNG, WebP, GIF...). The 5 MB file cap does not
+# bound memory: a 9400x9400 PNG under 5 MB decoded to ~380 MB. A JPEG (every
+# phone photo) is decoded already scaled down (``draft``), so a 24 or 48 MP
+# camera photo still works and costs a few MB.
+MAX_DECODE_PIXELS = 4096 * 4096
+
+
+class ImageTooLarge(ValueError):
+    """The picture has more pixels than ``MAX_DECODE_PIXELS`` after any draft."""
+
+
 def _square_webp(data: bytes) -> bytes:
     from PIL import Image, ImageOps
-    img = Image.open(io.BytesIO(data))
+    img = Image.open(io.BytesIO(data))  # reads the header only
+    # JPEG only: let the decoder scale by 1/2..1/8 to just above what we keep.
+    img.draft(img.mode, (SIZE * 2, SIZE * 2))
+    width, height = img.size
+    if width * height > MAX_DECODE_PIXELS:
+        raise ImageTooLarge(f'{width}x{height}')
     img = ImageOps.exif_transpose(img)
     if img.mode not in ('RGB', 'RGBA'):
         img = img.convert('RGB')
@@ -68,6 +84,10 @@ def store_avatar(user: User, f) -> Response | None:
         return Response({'file': ['Use una imagen JPG, PNG o WebP.']}, status=status.HTTP_400_BAD_REQUEST)
     try:
         data = _square_webp(f.read())
+    except ImageTooLarge:
+        return Response({'file': ['La imagen es demasiado grande (máximo 4096 × 4096 píxeles). '
+                                  'Use una foto más pequeña.']},
+                        status=status.HTTP_400_BAD_REQUEST)
     except Exception:  # noqa: BLE001 - Pillow raises many types for corrupt input
         return Response({'file': ['No se pudo leer la imagen.']}, status=status.HTTP_400_BAD_REQUEST)
     old = user.avatar_file.name if user.avatar_file else ''

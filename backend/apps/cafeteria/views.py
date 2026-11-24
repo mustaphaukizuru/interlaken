@@ -38,6 +38,7 @@ from .models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction, T
 from .serializers import (
     NO_CONSUMPTION,
     AdjustmentInputSerializer,
+    AdminCafeteriaBalanceSerializer,
     BalanceAdjustmentSerializer,
     CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
@@ -1529,7 +1530,9 @@ class AdminStudentDetailView(APIView):
 
         return Response({
             # pending_topups: paid card top-ups still to load into the POS.
-            'balance': CafeteriaBalanceSerializer(
+            # Without the student's personal data (CURP, birth date, emergency
+            # contacts): a «cafetería»-only staff member opens this page.
+            'balance': AdminCafeteriaBalanceSerializer(
                 balance, context={'pending_topups': build_pending_topups_map([student])}).data,
             'parents': parents,
             'transactions': CafeteriaTransactionSerializer(transactions, many=True).data,
@@ -1744,6 +1747,10 @@ class MyStatementPdfView(APIView):
         month = request.query_params.get('month') or timezone.localdate().strftime('%Y-%m')
         try:
             y, m = (int(p) for p in month.split('-'))
+            # The month's end + 1 day (the query bound) overflowed for year
+            # 9999 (500); no statement exists outside these years anyway.
+            if not 1900 <= y <= 2999:
+                raise ValueError(month)
             start = _date(y, m, 1)
             end = _date(y, m, _cal.monthrange(y, m)[1])
         except (ValueError, TypeError):

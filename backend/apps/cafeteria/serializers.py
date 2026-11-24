@@ -243,6 +243,29 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
         return self._spend_since(obj, start)
 
 
+# Student data a cafetería console never needs (QA sweep 2026-11-24): staff
+# with only the «cafetería» area saw the CURP, birth date and emergency
+# contacts in the balance lists and the per-student console. The family views
+# keep the full ``StudentProfileSerializer`` (their own children).
+CONSOLE_HIDDEN_STUDENT_FIELDS = (
+    'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
+    'blood_type', 'allergies', 'medical_notes',
+)
+
+
+class CafeteriaConsoleStudentSerializer(StudentProfileSerializer):
+    class Meta(StudentProfileSerializer.Meta):
+        fields = [f for f in StudentProfileSerializer.Meta.fields
+                  if f not in CONSOLE_HIDDEN_STUDENT_FIELDS]
+
+
+class AdminCafeteriaBalanceSerializer(CafeteriaBalanceSerializer):
+    """``CafeteriaBalanceSerializer`` for the cafetería console (admin/balances,
+    admin/low-balance, admin/student/<pk>): the same wallet fields, the student
+    without personal data."""
+    student = CafeteriaConsoleStudentSerializer(read_only=True)
+
+
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):
     # No source= here: DRF reads ``obj.student_id``, the FK column already on
     # the row. ``source='student.id'`` fetched the whole related object once per
@@ -538,9 +561,16 @@ class AdjustmentInputSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=500)
     request_id = serializers.RegexField(r'^[A-Za-z0-9-]{8,64}$', required=False, allow_blank=True, default='')
 
+    # A manual correction never comes close to this (the largest real ones are
+    # around $9,000); it stops a typo from minting an absurd balance.
+    MAX_ABS_AMOUNT = Decimal('100000.00')
+
     def validate_amount(self, value):
         if value == 0:
             raise serializers.ValidationError('El monto no puede ser cero.')
+        if abs(value) > self.MAX_ABS_AMOUNT:
+            raise serializers.ValidationError(
+                'El monto de un ajuste no puede pasar de $100,000.00 (a favor o en contra).')
         return value
 
 

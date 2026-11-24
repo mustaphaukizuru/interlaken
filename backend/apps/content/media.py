@@ -35,6 +35,30 @@ from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, referenced_med
 MAX_UPLOAD = 10 * 1024 * 1024
 VARIANTS = {'thumb': 320, 'md': 960, 'lg': 1600}
 ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+# What Pillow detects → the type stored and served. MPO is the JPEG variant
+# some phone cameras write.
+PIL_FORMAT_TYPES = {'JPEG': 'image/jpeg', 'MPO': 'image/jpeg', 'PNG': 'image/png',
+                    'WEBP': 'image/webp', 'GIF': 'image/gif'}
+
+
+def sniff_image_type(f) -> str | None:
+    """The real type of an uploaded file, read by Pillow from its content
+    (header + structure, ``verify()``), or None when it is not an accepted
+    image. The declared Content-Type is the browser's (or a script's) word:
+    an HTML or SVG file sent as «image/png» was stored and served from the
+    site's own domain."""
+    try:
+        from PIL import Image
+
+        f.seek(0)
+        with Image.open(f) as img:
+            fmt = img.format
+            img.verify()
+    except Exception:  # noqa: BLE001 - Pillow raises many types for non-images
+        return None
+    finally:
+        f.seek(0)
+    return PIL_FORMAT_TYPES.get(fmt or '')
 
 
 def _upload_to(instance, filename):
@@ -229,6 +253,11 @@ class MediaListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateA
         ctype = f.content_type or mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
         if ctype not in ALLOWED_TYPES:
             return Response({'file': ['Solo imágenes JPG, PNG, WebP o GIF.']}, status=status.HTTP_400_BAD_REQUEST)
+        # Trust the content, not the declared type; store what it really is.
+        ctype = sniff_image_type(f)
+        if ctype is None:
+            return Response({'file': ['El archivo no es una imagen JPG, PNG, WebP o GIF válida.']},
+                            status=status.HTTP_400_BAD_REQUEST)
         digest = hashlib.sha256()
         for chunk in f.chunks():
             digest.update(chunk)

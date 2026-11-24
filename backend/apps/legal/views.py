@@ -66,6 +66,11 @@ class ConsentView(APIView):
     def _student(self, request, sid):
         if not sid:
             return None
+        # ``?student=abc`` reached the ORM and answered 500.
+        try:
+            sid = int(str(sid).strip())
+        except (TypeError, ValueError):
+            raise ValidationError({'student': ['Alumno no válido.']}) from None
         # A guardian may only record/read consent for their own family's children.
         from apps.accounts.family import family_students
 

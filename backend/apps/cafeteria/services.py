@@ -2051,6 +2051,20 @@ class AdjustmentAlreadyApplied(ValueError):
     (a retried bulk top-up, a re-uploaded ajuste masivo). Nothing was applied."""
 
 
+# The wallet columns are DecimalField(max_digits=10, decimal_places=2): a
+# balance above this cannot be stored (the database raised and the request
+# answered 500). Manual adjustments and refunds refuse it with a clean error.
+MAX_WALLET_BALANCE = Decimal('99999999.99')
+
+
+def _check_wallet_ceiling(new_balance, current, action='El ajuste'):
+    if new_balance > MAX_WALLET_BALANCE:
+        raise ValueError(
+            f'{action} dejaría el saldo en ${new_balance:,.2f}; el saldo máximo es '
+            f'${MAX_WALLET_BALANCE:,.2f} (saldo actual ${current:,.2f}).'
+        )
+
+
 class PosDebitBlocked(ValueError):
     """A local debit the POS mirror would credit straight back (see
     ``check_pos_debit``). Nothing was applied."""
@@ -2246,6 +2260,7 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
                 f'El ajuste dejaría el saldo en ${new_balance:.2f}; no se permite un '
                 f'saldo negativo (saldo actual ${current:.2f}).'
             )
+        _check_wallet_ceiling(new_balance, current)
         if amount < 0:
             check_pos_debit(student, new_balance, pos_points)
 
@@ -2575,6 +2590,7 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
                 f'La devolución dejaría el saldo en ${new_balance:.2f}; el alumno ya '
                 f'gastó ese saldo. Saldo actual ${current:.2f}.'
             )
+        _check_wallet_ceiling(new_balance, current, 'La devolución')
 
         cb.balance = new_balance
         cb.last_synced = timezone.now()

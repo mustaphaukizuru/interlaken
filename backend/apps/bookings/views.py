@@ -466,10 +466,11 @@ class AdminWeekView(APIView):
         start_s = request.query_params.get('start')
         try:
             start = datetime.strptime(start_s, '%Y-%m-%d').date() if start_s else timezone.localdate()
-        except ValueError:
+            start = start - timedelta(days=start.weekday())  # Monday
+            end = start + timedelta(days=6)
+        except (ValueError, OverflowError):
+            # OverflowError: the week of 9999-12-31 ends past the last date.
             return Response({'start': ['Fecha no válida.']}, status=status.HTTP_400_BAD_REQUEST)
-        start = start - timedelta(days=start.weekday())  # Monday
-        end = start + timedelta(days=6)
         slots = (AvailabilitySlot.objects.filter(date__range=(start, end)).order_by('date', 'start_time')
                  .prefetch_related('bookings'))
         days = []

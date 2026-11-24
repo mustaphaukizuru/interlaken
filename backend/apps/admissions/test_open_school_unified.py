@@ -73,3 +73,42 @@ class TestOpenSchoolListAndSignup:
         assert booking.parent_email == 'maria@test.mx'
         assert booking.num_attendees == 2
         assert booking.status == Booking.Status.CONFIRMED
+
+    # QA sweep 2026-11-24: the legacy route skipped the booking form's checks.
+    def test_signup_non_numeric_event_is_400_not_500(self, api_client):
+        self._slot()
+        resp = api_client.post(self.url_signup, {
+            'event': 'abc', 'name': 'Ana', 'email': 'ana@test.mx', 'phone': '5551234567',
+        }, format='json')
+        assert resp.status_code == 400
+        assert not Booking.objects.exists()
+
+    def test_signup_without_contact_data_is_400_and_takes_no_seat(self, api_client):
+        slot = self._slot()
+        resp = api_client.post(self.url_signup, {'event': slot.id}, format='json')
+        assert resp.status_code == 400
+        body = resp.json()
+        assert {'parent_name', 'parent_email', 'parent_phone'} <= set(body)
+        assert not Booking.objects.exists()
+
+    def test_signup_bad_email_is_400(self, api_client):
+        slot = self._slot()
+        resp = api_client.post(self.url_signup, {
+            'event': slot.id, 'name': 'Ana', 'email': 'no-es-correo', 'phone': '5551234567',
+        }, format='json')
+        assert resp.status_code == 400
+        assert 'parent_email' in resp.json()
+        assert not Booking.objects.exists()
+
+    def test_signup_non_object_body_is_400(self, api_client):
+        resp = api_client.post(self.url_signup, [1, 2], format='json')
+        assert resp.status_code == 400
+
+    def test_signup_unified_names_still_work(self, api_client):
+        slot = self._slot()
+        resp = api_client.post(self.url_signup, {
+            'slot': str(slot.id), 'parent_name': 'Ana', 'parent_email': 'ana@test.mx',
+            'parent_phone': '5551234567', 'num_attendees': 99,
+        }, format='json')
+        assert resp.status_code == 201, resp.content
+        assert Booking.objects.get().num_attendees == 20   # still clamped

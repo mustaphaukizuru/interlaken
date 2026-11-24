@@ -56,8 +56,20 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
     email            = serializers.EmailField()
     phone            = serializers.CharField(max_length=20)
     how_did_you_hear = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
-    message          = serializers.CharField(required=False, allow_blank=True, default='')
+    # Bounded like the contact form (QA sweep 2026-11-24): it is copied into the
+    # office e-mail.
+    message          = serializers.CharField(max_length=5000, required=False, allow_blank=True,
+                                             default='')
     wants_visit      = serializers.BooleanField(required=False, default=False)
+
+    def validate_child_name(self, value):
+        # Split into first name / last names, each a 100-character column: a
+        # longer part reached the database (500 on PostgreSQL).
+        parts = value.split()
+        if parts and (len(parts[0]) > 100 or len(' '.join(parts[1:])) > 100):
+            raise serializers.ValidationError(
+                'El nombre y los apellidos admiten como máximo 100 caracteres cada uno.')
+        return value
 
     def validate(self, attrs):
         # Age rule (BACKLOG P1-G1): strict on the public form.

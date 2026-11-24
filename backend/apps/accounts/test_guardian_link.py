@@ -199,3 +199,61 @@ class TestGuardianEdit:
         resp = api_client.patch(reverse('student-guardian-detail', args=[student.pk, other.pk]),
                                 {'first_name': 'X'}, format='json')
         assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+class TestGuardianInputHardening:
+    """QA sweep 2026-11-24: mixed-case e-mail, non-text values and values longer
+    than their columns used to answer 500."""
+
+    def _post(self, api_client, student, body):
+        api_client.force_authenticate(AdminFactory())
+        return api_client.post(reverse('student-guardians', kwargs={'pk': student.pk}),
+                               body, format='json')
+
+    def test_mixed_case_existing_parent_is_linked_not_duplicated(self, api_client):
+        parent = ParentFactory(email='Maria.Lopez@Test.mx')
+        student = StudentProfileFactory()
+        resp = self._post(api_client, student, {'email': 'maria.lopez@test.mx'})
+        assert resp.status_code == 201, resp.data
+        assert resp.data['created_user'] is False
+        assert resp.data['guardian']['id'] == parent.pk
+        assert list(student.parents.all()) == [parent]
+        assert User.objects.filter(email__iexact='maria.lopez@test.mx').count() == 1
+
+    def test_non_string_email_is_400(self, api_client):
+        student = StudentProfileFactory()
+        for bad in (['a@b.mx'], {'x': 1}, True):
+            resp = self._post(api_client, student, {'email': bad})
+            assert resp.status_code == 400, bad
+        assert not student.parents.exists()
+
+    def test_non_object_body_is_400(self, api_client):
+        student = StudentProfileFactory()
+        assert self._post(api_client, student, ['x']).status_code == 400
+
+    def test_too_long_phone_is_400(self, api_client):
+        student = StudentProfileFactory()
+        resp = self._post(api_client, student, {'email': 'nuevo@test.mx', 'phone': '5' * 21})
+        assert resp.status_code == 400 and 'phone' in resp.data
+        assert not User.objects.filter(email='nuevo@test.mx').exists()
+
+    def test_numeric_phone_is_read_as_text(self, api_client):
+        student = StudentProfileFactory()
+        resp = self._post(api_client, student, {'email': 'num@test.mx', 'phone': 5512345678})
+        assert resp.status_code == 201, resp.data
+        assert ParentProfile.objects.get(user__email='num@test.mx').phone == '5512345678'
+
+    def test_patch_too_long_whatsapp_and_non_text_name_are_400(self, api_client):
+        parent = ParentFactory(email='mom2@test.mx')
+        student = StudentProfileFactory(parents=[parent])
+        api_client.force_authenticate(AdminFactory())
+        url = reverse('student-guardian-detail', args=[student.pk, parent.pk])
+        resp = api_client.patch(url, {'whatsapp': '1' * 21}, format='json')
+        assert resp.status_code == 400 and 'whatsapp' in resp.data
+        resp = api_client.patch(url, {'first_name': ['x']}, format='json')
+        assert resp.status_code == 400 and 'first_name' in resp.data
+        resp = api_client.patch(url, {'relationship': 'x' * 51}, format='json')
+        assert resp.status_code == 400 and 'relationship' in resp.data
+        parent.refresh_from_db()
+        assert parent.whatsapp != '1' * 21
