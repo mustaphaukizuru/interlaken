@@ -501,6 +501,28 @@ describe('CafeteriaPage has no $1 test top-up (owner, 2026-11-08)', () => {
   });
 });
 
+describe('CafeteriaPage with instant auto-load (production since 2026-11-21)', () => {
+  // QA 2026-11-24: mode stays «scheduled» but the app loads top-ups up to
+  // $1,000 into the cafetería in seconds; the page still promised 7:30 a.m.
+  const policy = { mode: 'scheduled', apply_time: '07:30', whatsapp: '5553791188', next_apply_at: '2030-01-07T13:30:00Z',
+    auto_load: 'instant', auto_load_max: '1000.00' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    vi.mocked(paymentsApi.getAvailability).mockResolvedValue(
+      { data: { online: true, test_mode: false, topup_policy: policy } } as never);
+    mockedBalance.mockResolvedValue({ data: [{ ...account, pending_topups: [] }] } as never);
+  });
+
+  it('the intro says a card top-up reaches the balance in seconds, not at 7:30 a.m.', async () => {
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    expect(await screen.findByText(/se suma al saldo en unos segundos, al confirmarse el pago/)).toBeInTheDocument();
+    expect(screen.queryByText(/días hábiles, 7:30 a\.m\./)).toBeNull();
+  });
+});
+
 describe('CafeteriaPage scheduled application of card top-ups', () => {
   const policy = { mode: 'scheduled', apply_time: '07:30', whatsapp: '5553791188', next_apply_at: '2030-01-07T13:30:00Z' };
 

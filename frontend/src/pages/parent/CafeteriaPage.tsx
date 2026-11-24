@@ -40,7 +40,7 @@ import { LiveBadge } from '@/components/ui/LiveBadge';
 import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import {
-  applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatCents, isScheduled, pendingCoversLowBalance, projectBalance, sentence,
+  applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatCents, isScheduled, loadsInstantly, pendingCoversLowBalance, projectBalance, sentence,
 } from '@/lib/topupApply';
 import { formatMXN } from '@/lib/format';
 
@@ -124,6 +124,9 @@ export default function CafeteriaPage() {
   // school days) unless the server says they are credited on payment.
   const policy = availability?.topup_policy;
   const scheduled = isScheduled(policy);
+  // The app loads card top-ups into the cafetería itself (production since
+  // 2026-11-21): no «7:30 a.m.» promise for those (QA 2026-11-24).
+  const instantLoad = loadsInstantly(policy);
   const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
@@ -345,9 +348,9 @@ export default function CafeteriaPage() {
       done = true;
       setPaying(false);
       void queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
-      toast(scheduled
-        ? 'Cerraste la ventana de pago. Si completaste el pago, aparecerá como «Recarga por aplicar» en unos minutos.'
-        : 'Cerraste la ventana de pago. Si completaste el pago, lo verás reflejado en unos minutos.');
+      toast(scheduled && !loadsInstantly(policy, topupAmountNum)
+        ? 'Cerró la ventana de pago. Si completó el pago, aparecerá como «Recarga por aplicar» en unos minutos.'
+        : 'Cerró la ventana de pago. Si completó el pago, lo verá reflejado en unos minutos.');
     };
     setPaying(true);
     try {
@@ -511,9 +514,11 @@ export default function CafeteriaPage() {
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{ownWallet ? 'Mi cafetería' : 'Cafetería'}</h1>
           <p className="mt-1 text-fluid-sm text-muted">
-            {scheduled
-              ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo cuando el colegio la carga en la caja de cafetería (días hábiles, 7:30 a.m.).'
-              : 'Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo aparece aquí al confirmar el pago; el colegio lo carga en el POS para compras en cafetería.'}
+            {instantLoad
+              ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo en unos segundos, al confirmarse el pago.'
+              : scheduled
+                ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo cuando el colegio la carga en la caja de cafetería (días hábiles, 7:30 a.m.).'
+                : 'Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo aparece aquí al confirmar el pago; el colegio lo carga en el POS para compras en cafetería.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start print:hidden">
@@ -838,9 +843,11 @@ export default function CafeteriaPage() {
                 <span className="block text-xs text-muted">
                   {!onlineAvailable
                     ? 'Muy pronto podrá pagar con tarjeta desde el portal. Mientras tanto, recargue en efectivo en la caja de cafetería.'
-                    : scheduled
-                      ? sentence(`El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
-                      : 'El saldo se aplica en minutos.'}
+                    : loadsInstantly(policy, topupAmountNum)
+                      ? 'El saldo se aplica en unos segundos.'
+                      : scheduled
+                        ? sentence(`El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
+                        : 'El saldo se aplica en minutos.'}
                 </span>
                 {onlineAvailable && (
                   <AmexNotAccepted className="mt-1.5" />
@@ -884,7 +891,7 @@ export default function CafeteriaPage() {
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Titular</dt><dd className="text-right font-medium text-ink">{`${cardholder.first_name} ${cardholder.last_name}`.trim()} · CP {cardholder.postal_code}</dd></div>
-            {scheduled && (
+            {scheduled && !loadsInstantly(policy, topupAmountNum) && (
               <div className="flex justify-between gap-3 px-4 py-3"><dt className="whitespace-nowrap text-muted">Se aplica</dt><dd className="text-right font-medium text-ink">{applyPhrase(policy?.next_apply_at)}</dd></div>
             )}
             <div className="px-4 py-3 text-xs text-muted">

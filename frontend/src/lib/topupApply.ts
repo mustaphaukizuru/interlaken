@@ -124,6 +124,21 @@ export function applyNotice(
 /** True when card top-ups wait for the POS load (the default). */
 export const isScheduled = (policy?: Pick<TopUpPolicy, 'mode'> | null) => (policy?.mode ?? 'scheduled') === 'scheduled';
 
+/**
+ * True when the app itself loads a card top-up into the cafetería in seconds
+ * (`auto_load: 'instant'`), for `amount` when given (up to `auto_load_max`).
+ * Production runs `mode: 'scheduled'` with instant auto-load since 2026-11-21,
+ * and the page still promised «mañana a las 7:30 a.m.» (QA 2026-11-24).
+ */
+export function loadsInstantly(
+  policy?: Pick<TopUpPolicy, 'auto_load' | 'auto_load_max'> | null,
+  amount?: number,
+): boolean {
+  const max = Number(policy?.auto_load_max ?? 0);
+  if (policy?.auto_load !== 'instant' || !(max > 0)) return false;
+  return amount == null || !Number.isFinite(amount) || amount <= max;
+}
+
 /** "123.45" → 12345 (whole cents, so sums never drift). */
 const cents = (value: string | number | null | undefined) => Math.round(Number(value ?? 0) * 100) || 0;
 
