@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -26,6 +27,12 @@ const openStack: object[] = [];
  * Accessible modal dialog: `role="dialog"` + `aria-modal`, focus trap,
  * Escape-to-close, backdrop click, and focus restoration on close.
  * Respects the existing `.card` styling for the panel.
+ *
+ * Rendered into `<body>` (a portal): inside the page, a `space-y-*` parent
+ * gave the fixed backdrop a top margin (the top 24 px stayed uncovered and
+ * the header clickable), and a transformed ancestor would pin it to itself
+ * instead of the screen (QA 2026-11-24). React events still bubble through
+ * the component tree as before.
  */
 export function Modal({ open, onClose, title, children, maxWidth = 384, fullScreenOnPhone = false }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -103,13 +110,13 @@ export function Modal({ open, onClose, title, children, maxWidth = 384, fullScre
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     // Backdrop mousedown-to-dismiss (backdrop only, not children) is a
     // supplementary pointer affordance; keyboard users close via Escape (the
     // document keydown handler above) or the close button.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
-      className="fixed inset-0 z-modal flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
+      className="fixed inset-0 z-modal m-0 flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -140,7 +147,8 @@ export function Modal({ open, onClose, title, children, maxWidth = 384, fullScre
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

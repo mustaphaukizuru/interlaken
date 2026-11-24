@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { formatMXN } from '@/lib/format';
-import { CheckCircle2, XCircle, Clock, Coffee, Download } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Coffee, Download, SearchX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Logo from '@/components/ui/Logo';
@@ -10,10 +10,12 @@ import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { downloadBlob, paymentsApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { PAYMENT_FAILURE } from '@/lib/status/payment';
+import { apiErrorStatus } from '@/lib/apiErrors';
 import { applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatWhatsapp, whatsappHref } from '@/lib/topupApply';
 import type { Payment } from '@/types';
 
-type Outcome = 'loading' | 'success' | 'failed' | 'refunded' | 'pending';
+/** `notfound`: the API does not know this payment for this account (404). */
+type Outcome = 'loading' | 'success' | 'failed' | 'refunded' | 'pending' | 'notfound';
 
 // Banorte's answer is forwarded by the payment page just before it navigates
 // here and can land a beat later, so we poll the payment a few times before
@@ -84,8 +86,14 @@ export default function CafeteriaTopupReturn() {
           setPolledOutcome('failed');
           return;
         }
-      } catch {
+      } catch (err) {
         if (!active) return;
+        // An unknown or another account's payment never turns up: say so at
+        // once instead of «se está procesando» (QA 2026-11-24).
+        if (apiErrorStatus(err) === 404) {
+          setPolledOutcome('notfound');
+          return;
+        }
       }
       attempts += 1;
       if (attempts >= MAX_POLLS) {
@@ -152,12 +160,23 @@ export default function CafeteriaTopupReturn() {
       title: 'Pago devuelto',
       text: 'El colegio devolvió este pago: el cargo se reembolsó a su tarjeta y el saldo de cafetería se ajustó.',
     },
+    // Polling stopped with no answer from the bank (an abandoned checkout, or
+    // a confirmation still on its way): what to do, not «processing» forever.
     pending: {
       icon: <Clock className="h-10 w-10 text-amber" />,
       accent: 'bg-amber/10',
       ring: 'ring-amber/30',
-      title: 'Recarga en proceso',
-      text: 'Su pago se está procesando. Cuando se confirme lo verá en la página de cafetería; el colegio aplica el saldo cuando lo carga en la caja de cafetería.',
+      title: 'Aún sin confirmación del banco',
+      text: 'Si completó el pago, aparecerá en Cafetería y en su historial de pagos en unos minutos. '
+        + 'Si cerró la ventana de Banorte sin terminar, la recarga no se hizo: puede intentarlo de nuevo desde Cafetería. '
+        + `Si ve un cargo y la recarga no aparece, contacte al colegio con el folio ${paymentId ?? ''}.`,
+    },
+    notfound: {
+      icon: <SearchX className="h-10 w-10 text-subtle" />,
+      accent: 'bg-cream',
+      ring: 'ring-line',
+      title: 'No encontramos este pago',
+      text: 'Este enlace no corresponde a un pago de su cuenta. Consulte sus recargas en Cafetería o en su historial de pagos.',
     },
   }[outcome];
 

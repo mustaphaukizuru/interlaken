@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 vi.mock('@/services/api', () => ({
   downloadBlob: vi.fn(),
@@ -710,6 +711,95 @@ describe('CafeteriaPage launch fixes (2026-11-09)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Recargar cafetería' });
     expect(within(dialog).getByLabelText('Alumno')).toHaveValue('12');
     expect(within(dialog).getByLabelText('Monto (MXN)')).toHaveValue(100);
+  });
+
+  it('never opens the top-up for a sibling when the child named cannot take one (QA 2026-11-24)', async () => {
+    // Emma (10) is on the POS; her brother (11) is not: the chip asked for him.
+    useSelectedChildStore.setState({ childId: 10 });
+    mockedBalance.mockResolvedValue({ data: [account, unlinkedAccount] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<><CafeteriaPage /><Toaster /><LocationProbe /></>, { route: '/portal/cafeteria?recarga=200&hijo=11' });
+
+    expect(await screen.findByText(/Por ahora no es posible recargar en línea/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Recargar cafetería' })).toBeNull();
+    // The page is about him (his card says why), and the one-shot params are gone.
+    expect(await screen.findByText(/aún no está vinculado a cafetería\/Loyverse/)).toBeInTheDocument();
+    await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(11));
+    expect(urlParams().get('recarga')).toBeNull();
+    expect(urlParams().get('hijo')).toBeNull();
+  });
+
+  it('a ?recarga link without ?hijo never falls back to a sibling either', async () => {
+    useSelectedChildStore.setState({ childId: 11 });
+    mockedBalance.mockResolvedValue({ data: [account, unlinkedAccount] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+
+    expect(await screen.findByText(/aún no está vinculado a cafetería\/Loyverse/)).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('dialog', { name: 'Recargar cafetería' })).toBeNull();
+  });
+
+  it('an account with no child says «sin alumno vinculado», like Inicio (QA 2026-11-24)', async () => {
+    mockedBalance.mockResolvedValue({ data: [] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    expect(await screen.findByText('Cuenta sin alumno vinculado')).toBeInTheDocument();
+    expect(screen.getByText('El colegio aún no vincula a un alumno con este correo.')).toBeInTheDocument();
+    expect(screen.queryByText(/cafetería de su hijo/)).toBeNull();
+  });
+
+  it('the alert line keeps its spaces: one text run inside the inline-flex button (QA 2026-11-24)', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    const button = await screen.findByRole('button', { name: /Alerta de saldo bajo/ });
+    // Text nodes straight inside a flex box lose their edge spaces («bajo:$50· Cambiar»).
+    expect(Array.from(button.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim())).toHaveLength(0);
+    expect(button).toHaveTextContent('Alerta de saldo bajo: $50 · Cambiar');
+  });
+
+  it('speaks to the family with «usted» in the alert, budget and card notices (QA 2026-11-24)', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    await userEvent.click(await screen.findByRole('button', { name: /Alerta de saldo bajo/ }));
+    const alert = await screen.findByRole('dialog', { name: 'Alerta de saldo bajo' });
+    expect(alert).toHaveTextContent('Le avisaremos cuando el saldo de Emma Quintana baje de este monto.');
+    await userEvent.click(within(alert).getByRole('button', { name: 'Cancelar' }));
+
+    await userEvent.click(screen.getByRole('button', { name: /Establecer presupuesto/ }));
+    const budget = await screen.findByRole('dialog', { name: 'Presupuesto de cafetería' });
+    expect(budget).toHaveTextContent('Establezca cuánto puede gastar Emma Quintana en cafetería. Le avisaremos cuando una compra supere el límite. Deje un campo vacío');
+    expect(budget.textContent).not.toMatch(/\b(Te|Establece|Deja)\b/);
+    await userEvent.click(within(budget).getByRole('button', { name: 'Cancelar' }));
+
+    await userEvent.click(screen.getAllByRole('button', { name: /^Recargar$/ })[0]);
+    const wizard = await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await userEvent.type(within(wizard).getByLabelText('Monto (MXN)'), '100');
+    await userEvent.click(within(wizard).getByRole('button', { name: 'Continuar' }));
+    expect(await within(wizard).findByText(/capturar su tarjeta Visa o Mastercard; su banco/)).toBeInTheDocument();
+    expect(wizard.textContent).not.toMatch(/\b(tu|te|pedirte)\b/);
+  });
+
+  it('a staff wallet is «la cuenta», never «el alumno» (QA 2026-11-24)', async () => {
+    const staff = { ...account, student: { ...account.student, tipo: 'personal', puesto_label: 'Docente', grade: '', group: '' } };
+    const staffUnlinked = { ...staff, id: 9, student: { ...staff.student, id: 19, loyverse_id: '' } };
+    mockedBalance.mockResolvedValue({ data: [staffUnlinked] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    const view = renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    expect(await screen.findByText(/Esta cuenta aún no está vinculada a cafetería\/Loyverse/)).toBeInTheDocument();
+    expect(screen.queryByText(/Este alumno/)).toBeNull();
+    view.unmount();
+
+    mockedBalance.mockResolvedValue({ data: [staff] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100' });
+    const wizard = await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    expect(within(wizard).getByLabelText('Cuenta')).toHaveValue('10');
+    expect(within(wizard).getByText('Cuenta y monto')).toBeInTheDocument();
+    expect(within(wizard).queryByText(/Alumno/)).toBeNull();
   });
 
   it('shows a debit adjustment and a reversed top-up as charges', async () => {

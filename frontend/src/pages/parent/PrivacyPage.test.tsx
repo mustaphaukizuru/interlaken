@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('react-hot-toast', () => ({
@@ -83,5 +83,22 @@ describe('PrivacyPage', () => {
       expect(createArco).toHaveBeenCalledWith('access', 'Quiero una copia de mis datos.');
     });
     expect(toastSuccess).toHaveBeenCalledWith('Solicitud ARCO enviada.');
+  });
+
+  it('a double click files one ARCO request, and the button waits meanwhile (QA 2026-11-24)', async () => {
+    let done: (v: unknown) => void = () => {};
+    createArco.mockImplementationOnce(() => new Promise((r) => { done = r; }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<PrivacyPage />, { route: '/portal/privacidad' });
+
+    await screen.findByText('Solicitud ARCO');
+    await user.type(screen.getByLabelText('Detalle'), 'Quiero una copia de mis datos.');
+    const send = screen.getByRole('button', { name: /Enviar solicitud/i });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    await waitFor(() => expect(send).toBeDisabled());
+    expect(createArco).toHaveBeenCalledTimes(1);
+    await act(async () => done({ data: { id: 1, request_type: 'access', status: 'received' } }));
+    expect(toastSuccess).toHaveBeenCalledTimes(1);
   });
 });

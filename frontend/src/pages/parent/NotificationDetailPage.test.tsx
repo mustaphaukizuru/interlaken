@@ -109,4 +109,26 @@ describe('NotificationDetailPage', () => {
     renderPage();
     expect(await screen.findByText(/No se pudo abrir la notificación/)).toBeInTheDocument();
   });
+
+  it('an unknown or another account’s aviso (404) says so, with the way back, never «Reintentar» (QA 2026-11-24)', async () => {
+    getNotification.mockRejectedValue({ isAxiosError: true, response: { status: 404, data: { detail: 'No encontrado.' } } });
+    renderPage();
+    expect(await screen.findByText('Este aviso no existe o ya no está disponible')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver avisos' })).toHaveAttribute('href', '/portal/notificaciones');
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+    expect(markRead).not.toHaveBeenCalled();
+  });
+
+  it('a malformed id never spins forever', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/portal/notificaciones/abc']}>
+          <Routes><Route path="/portal/notificaciones/:id" element={<NotificationDetailPage />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('Este aviso no existe o ya no está disponible')).toBeInTheDocument();
+    expect(getNotification).not.toHaveBeenCalled();
+  });
 });

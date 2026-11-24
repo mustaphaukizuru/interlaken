@@ -77,6 +77,27 @@ describe('HeaderChildSwitcher', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('a child’s own school login with siblings (role «student») gets it too (QA 2026-11-24)', async () => {
+    stubViewport(1280);
+    useAuthStore.setState({ user: user('student'), accessToken: 't', isAuthenticated: true });
+    getDashboard.mockResolvedValue({ data: FAMILY } as never);
+    renderWithProviders(<HeaderChildSwitcher />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Alumno: Luis López. Cambiar de alumno' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Seleccionar alumno' })).getByRole('button', { name: /Sofía López/ }));
+    expect(useSelectedChildStore.getState().childId).toBe(12);
+  });
+
+  it('a staff member’s own wallet login (one account, «personal») still sees nothing', async () => {
+    useAuthStore.setState({ user: user('student'), accessToken: 't', isAuthenticated: true });
+    getDashboard.mockResolvedValue({ data: {
+      children: [{ id: 21, name: 'Rosa Lince', grade: '', group: '', student_id: 'rlince', tipo: 'personal', puesto_label: 'Docente' }],
+      cafeteria_balances: [{ student: 21, student_name: 'Rosa Lince', balance: '50.00', low: false, last_synced: '' }],
+    } } as never);
+    const { container } = renderWithProviders(<HeaderChildSwitcher />);
+    await vi.waitFor(() => expect(getDashboard).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('never asks for family data in the console', async () => {
     useAuthStore.setState({ user: user('admin'), accessToken: 't', isAuthenticated: true });
     const { container } = renderWithProviders(<HeaderChildSwitcher />);

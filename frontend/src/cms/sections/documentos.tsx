@@ -40,6 +40,11 @@ const DONE: DocStatus[] = ['aprobado', 'entregado_fisico', 'no_aplica'];
 
 const DEFAULT_LIMITS = { max_bytes: 10 * 1024 * 1024, extensions: ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'], max_files: 10 };
 
+/* A link opened without its rid or token. Fixed wording for now: a CMS field
+   would change the block manifest and the editor's help list (QA 2026-11-24). */
+const INCOMPLETE_TEXT = 'Este enlace está incompleto. Ábralo completo desde el correo de admisiones (si lo copia, copie toda la dirección) o pida un nuevo enlace de documentos escribiendo a';
+const INCOMPLETE_TEXT_NO_EMAIL = 'Este enlace está incompleto. Ábralo completo desde el correo de admisiones (si lo copia, copie toda la dirección) o pida a admisiones un nuevo enlace de documentos.';
+
 const sampleItem = (o: Partial<ChecklistItem> & Pick<ChecklistItem, 'key' | 'name' | 'status'>): ChecklistItem => ({
   id: 0, description: '', physical_note: '', kind: 'upload', multiple_files: false, link_url: '', link_label: '',
   status_label: '', satisfied: DONE.includes(o.status), reasons: [], files: [], manual: null,
@@ -185,7 +190,10 @@ function DocumentsView(p: Props) {
   };
 
   const expired = isError && apiErrorStatus(error) === 401;
-  const invalid = !preview && (!rid || linkError || expired || (!token && !session));
+  // Opened without its rid or token (a link cut when pasted): nothing was
+  // used yet, so «ya se usó o caducó» would be wrong (QA 2026-11-24).
+  const incomplete = !preview && (!rid || (!token && !session));
+  const invalid = !preview && (incomplete || linkError || expired);
   const loadFailed = !preview && isError && !expired;
   const email = c('invalidEmail');
   const contact = asLink(p.contactLink);
@@ -200,7 +208,9 @@ function DocumentsView(p: Props) {
           {invalid ? (
             <div className="mt-6 rounded-md bg-danger-bg p-5 text-base text-ink" role="alert">
               <AlertTriangle className="mb-2 h-5 w-5 text-danger" aria-hidden="true" />
-              {c('invalidText')}{email && ' '}
+              {incomplete
+                ? (email ? INCOMPLETE_TEXT : INCOMPLETE_TEXT_NO_EMAIL)
+                : c('invalidText')}{email && ' '}
               {email && <a href={`mailto:${email}`} className="font-semibold text-purple underline">{email}</a>}{email && '.'}
             </div>
           ) : loadFailed ? (

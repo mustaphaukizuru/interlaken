@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { portalApi } from '@/services/api';
 import { NovedadesPanel, readSeen } from './NovedadesPanel';
 
 vi.mock('@/services/api', () => ({
@@ -30,5 +31,17 @@ describe('NovedadesPanel', () => {
   it('announces an unread item to screen readers without a stray aria-label', async () => {
     renderWithProviders(<NovedadesPanel />);
     expect(await screen.findByRole('link', { name: /Junta de padres.*Nuevo/ })).toBeInTheDocument();
+  });
+
+  it('the count in the title is the new rows it lists, never more (QA 2026-11-24: «9» over 8 rows)', async () => {
+    const items = Array.from({ length: 9 }, (_, i) => ({
+      type: 'cafeteria', title: `Consumo ${i + 1}`, text: '', link: '/portal/cafeteria',
+      at: `2026-11-${String(20 - i).padStart(2, '0')}T10:00:00Z`, unread: true,
+    }));
+    vi.mocked(portalApi.novedades).mockResolvedValueOnce({ data: { since: 'x', unread: 9, items } } as never);
+    renderWithProviders(<NovedadesPanel />);
+    expect(await screen.findByText('Novedades (8)')).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Novedades' })).getAllByRole('listitem')).toHaveLength(8);
+    expect(screen.queryByText('Novedades (9)')).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { myFamilyApi, type CodeSent, type MyChild } from '@/services/myFamilyApi';
 
 const gradeLine = (s: { grade: string; group: string }) => `${s.grade}${s.group ? ` ${s.group}` : ''}`;
@@ -42,6 +43,8 @@ export function MyChildren() {
     },
     onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo quitar. Inténtelo de nuevo.')),
   });
+  // One request per confirmation, even for a double click (QA 2026-11-24).
+  const removeOnce = useSingleFlight();
 
   if (isLoading) return <Card title="Mis hijos"><ListSkeleton rows={2} /></Card>;
   if (isError || !data) return <Card title="Mis hijos"><ErrorState onRetry={() => refetch()} /></Card>;
@@ -98,7 +101,7 @@ export function MyChildren() {
       <ConfirmDialog
         open={!!toRemove}
         onClose={() => { if (!remove.isPending) setToRemove(null); }}
-        onConfirm={() => { if (toRemove) remove.mutate(toRemove); }}
+        onConfirm={() => { if (toRemove) removeOnce(() => remove.mutateAsync(toRemove)); }}
         loading={remove.isPending}
         title="Quitar de su cuenta"
         confirmLabel={toRemove ? `Quitar a ${toRemove.first_name || toRemove.name}` : 'Quitar'}
@@ -132,12 +135,16 @@ function AddChild({ onCancel, onDone }: { onCancel: () => void; onDone: (name: s
     onSuccess: (d) => onDone(d.linked),
     onError: (e) => setError(apiErrorMessage(e, 'No se pudo vincular.')),
   });
+  // One request at a time: a double click sent two codes, or confirmed twice
+  // (QA 2026-11-24). `isPending` alone flips a tick too late.
+  const once = useSingleFlight();
+  const sendCode = () => once(() => send.mutateAsync());
 
   if (!sent) {
     return (
       <form
         className="mt-4 space-y-4 rounded-md border border-line p-4"
-        onSubmit={(e) => { e.preventDefault(); if (student.trim()) send.mutate(); }}
+        onSubmit={(e) => { e.preventDefault(); if (student.trim()) sendCode(); }}
         aria-labelledby={`${studentId}-title`}
       >
         <h3 id={`${studentId}-title`} className="font-semibold text-ink">Agregar otro hijo</h3>
@@ -167,15 +174,18 @@ function AddChild({ onCancel, onDone }: { onCancel: () => void; onDone: (name: s
   return (
     <form
       className="mt-4 space-y-4 rounded-md border border-line p-4"
-      onSubmit={(e) => { e.preventDefault(); if (digits.length === 6) confirm.mutate(); }}
+      onSubmit={(e) => { e.preventDefault(); if (digits.length === 6) once(() => confirm.mutateAsync()); }}
       aria-labelledby={`${codeId}-title`}
     >
       <h3 id={`${codeId}-title`} className="font-semibold text-ink">Escriba el código</h3>
+      {/* Neutral on purpose: any matrícula can be typed here, so the other
+          child's name, grade and the guardians' addresses stay hidden until
+          the code proves the family (QA 2026-11-24). */}
       <div className="flex gap-3 rounded-md bg-brand-50 px-3 py-3 text-sm text-brand-700" role="status">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
         <p>
-          Enviamos un código a <strong>{sent.sent_to.join(', ')}</strong>, el correo de{' '}
-          <strong>{sent.student.name}</strong> ({gradeLine(sent.student)}). Vence en {sent.expires_in_minutes} minutos.
+          Enviamos un código al correo registrado del alumno. Escríbalo aquí para confirmar.
+          Vence en {sent.expires_in_minutes} minutos.
         </p>
       </div>
       <div>
@@ -192,12 +202,12 @@ function AddChild({ onCancel, onDone }: { onCancel: () => void; onDone: (name: s
           <Button type="button" variant="ghost" size="sm" onClick={() => { setSent(null); setError(''); }}>
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Cambiar alumno
           </Button>
-          <Button type="button" variant="ghost" size="sm" loading={send.isPending} onClick={() => send.mutate()}>
+          <Button type="button" variant="ghost" size="sm" loading={send.isPending} disabled={confirm.isPending} onClick={sendCode}>
             Enviar otro código
           </Button>
         </div>
-        <Button type="submit" loading={confirm.isPending} disabled={digits.length !== 6 || confirm.isPending}>
-          <Check className="h-4 w-4" aria-hidden="true" /> Agregar a {sent.student.first_name || sent.student.name}
+        <Button type="submit" loading={confirm.isPending} disabled={digits.length !== 6 || confirm.isPending || send.isPending}>
+          <Check className="h-4 w-4" aria-hidden="true" /> Agregar a su cuenta
         </Button>
       </div>
     </form>

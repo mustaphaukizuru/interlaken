@@ -7,7 +7,15 @@
  * Dates are shown in the school's time zone whatever the parent's device says.
  */
 import { formatMXN } from '@/lib/format';
-import type { TopUpPolicy } from '@/types';
+import type { CafeteriaBalance, TopUpPolicy } from '@/types';
+
+/**
+ * A wallet on the POS whose holder still attends: the server refuses an
+ * online top-up for anyone else. The cafetería page and Inicio's «Recarga
+ * rápida» both ask this, so neither offers a top-up the server would refuse.
+ */
+export const canTopUp = (b: Pick<CafeteriaBalance, 'student'>) =>
+  !!b.student.loyverse_id && b.student.is_active !== false;
 
 export const SCHOOL_TZ = 'America/Mexico_City';
 
@@ -116,9 +124,10 @@ export function applyNotice(
   const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const base = sentence(`Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las ${clock}`);
   if (!whatsapp) return base;
-  return `${base} Si necesitas que se aplique de inmediato, para que tu hijo use el saldo el mismo día, `
-    + `favor de mandar un mensaje por WhatsApp al ${formatWhatsapp(whatsapp)} con el comprobante de pago, `
-    + 'para que te ayudemos.';
+  // «usted», never «tú», with families (QA 2026-11-24).
+  return `${base} Si necesita que se aplique de inmediato, para que su hijo use el saldo el mismo día, `
+    + `envíe un mensaje por WhatsApp al ${formatWhatsapp(whatsapp)} con el comprobante de pago `
+    + 'y con gusto le ayudamos.';
 }
 
 /** True when card top-ups wait for the POS load (the default). */

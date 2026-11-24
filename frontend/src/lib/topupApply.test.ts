@@ -50,6 +50,15 @@ describe('topupApply', () => {
     }
   });
 
+  it('asks for the WhatsApp comprobante with «usted», never «tú» (QA 2026-11-24)', () => {
+    const text = applyNotice({ apply_time: '07:30', whatsapp: '5553791188' });
+    expect(text).toBe(
+      'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m. '
+      + 'Si necesita que se aplique de inmediato, para que su hijo use el saldo el mismo día, envíe un mensaje '
+      + 'por WhatsApp al 55 5379 1188 con el comprobante de pago y con gusto le ayudamos.');
+    expect(text).not.toMatch(/\b(necesitas|tu|te)\b/);
+  });
+
   it('drops the WhatsApp sentence when the school has none configured', () => {
     expect(applyNotice({ apply_time: '07:30', whatsapp: '' })).toBe(
       'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m.');
