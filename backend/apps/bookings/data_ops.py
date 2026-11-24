@@ -25,6 +25,7 @@ from django.utils import timezone
 from apps.core.bulk import EMAIL_CHUNK, BulkAction, BulkSkip
 from apps.core.exporting import Col, ExportSpec
 from apps.core.importing import ImportCol, ImportRow, ImportSpec, parse_choice, parse_date_es
+from apps.core.plurals import count as plural
 from apps.core.transitions import is_reverse
 
 from .models import AvailabilitySlot, Booking, VisitType
@@ -220,7 +221,8 @@ def _delete_plan(instance, payload):
     count = instance.bookings.count()
     if count:
         raise BulkSkip(
-            f"Tiene {count} reserva(s); desactívelo para ocultarlo sin perder el historial."
+            f"Tiene {plural(count, 'reserva', 'reservas')}; desactívelo para ocultarlo sin "
+            f"perder el historial."
         )
 
 

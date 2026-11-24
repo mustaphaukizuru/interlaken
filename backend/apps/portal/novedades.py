@@ -31,6 +31,7 @@ def family_students(user):
 
 def build_feed(user, since) -> list[dict]:
     from apps.cafeteria.models import CafeteriaTransaction
+    from apps.cafeteria.services import family_cafeteria_path
     from apps.content.models import SchoolEvent
     from apps.content.pages import Page
     from apps.payments.models import Payment
@@ -50,12 +51,16 @@ def build_feed(user, since) -> list[dict]:
         for t in (CafeteriaTransaction.objects.filter(student__in=students, date__gte=since)
                   .select_related('student__user').order_by('-date')[:10]):
             label = {'purchase': 'Consumo', 'topup': 'Recarga', 'refund': 'Devolución', 'adjustment': 'Ajuste'}.get(t.transaction_type, t.transaction_type)
+            # The link opens THIS child's cafetería, not whichever the portal
+            # had selected (QA 2026-11-24).
             items.append({'type': 'cafeteria', 'title': f'{label} de {t.student.user.first_name}: ${t.amount}', 'text': t.description or '',
-                          'link': '/portal/cafeteria', 'at': t.date.isoformat(), 'unread': True})
+                          'link': family_cafeteria_path(t.student), 'at': t.date.isoformat(), 'unread': True})
         for p in (Payment.objects.filter(Q(user=user) | Q(related_topup__student__in=students), updated_at__gte=since)
-                  .distinct().order_by('-updated_at')[:5]):
+                  .select_related('related_topup__student').distinct().order_by('-updated_at')[:5]):
+            topup = p.related_topup
+            link = family_cafeteria_path(topup.student) if topup is not None else '/portal/cafeteria'
             items.append({'type': 'pago', 'title': f'Pago {p.get_status_display().lower()}: ${p.amount}', 'text': p.get_payment_type_display(),
-                          'link': '/portal/cafeteria', 'at': p.updated_at.isoformat(), 'unread': True})
+                          'link': link, 'at': p.updated_at.isoformat(), 'unread': True})
 
     for pg in Page.objects.filter(status=Page.Status.PUBLISHED, published_at__gte=since).order_by('-published_at')[:5]:
         items.append({'type': 'sitio', 'title': f'Nueva página: {pg.title}', 'text': (pg.seo or {}).get('description', ''),

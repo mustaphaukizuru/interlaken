@@ -19,6 +19,7 @@ from apps.core.exports import as_download, export_filename, fmt_dt
 from apps.core.pdf import simple_document_pdf
 
 from .models import CafeteriaBalance, CafeteriaTransaction
+from .schedule import format_amount
 
 # ── per-student statement ────────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ def student_statement_pdf(student) -> HttpResponse:
 
     lines = [
         f'Alumno: {student.user.full_name}   Matrícula: {student.student_id}',
-        f'Saldo actual: ${Decimal(str(cb.balance)):.2f}',
+        f'Saldo actual: {format_amount(cb.balance)}',
         f'Generado: {fmt_dt(timezone.now())}',
         '',
         _line(header),

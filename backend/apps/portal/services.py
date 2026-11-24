@@ -17,6 +17,8 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
+from apps.core.plurals import count as plural
+
 logger = logging.getLogger(__name__)
 
 # A dropped or timed-out SMTP connection (not a rejected address or a bad
@@ -888,7 +890,7 @@ def _alert_ops_on_failures(failures) -> None:
     lines = [f'- #{n.id} {n.title} → {n.user.email} ({n.last_error})' for n in failures[:50]]
     more = '' if len(failures) <= 50 else f'\n… y {len(failures) - 50} más'
     send_email(
-        f'[Interlaken] {len(failures)} notificación(es) no entregada(s)',
+        f'[Interlaken] {plural(len(failures), "notificación no entregada", "notificaciones no entregadas")}',
         'El despachador agotó los reintentos de correo para:\n\n' + '\n'.join(lines) + more
         + '\n\nRevise la configuración SMTP y la bandeja de Auditoría.',
         [ops], html=False,

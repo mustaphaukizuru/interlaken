@@ -76,8 +76,10 @@ def parse_staff_access(data, *, role, current_title='', current_areas=None):
 
     ``staff_areas`` is a list of area keys; ``puesto`` (secretaria, recepcion,
     cafeteria) fills both from the preset, and an explicit ``staff_title`` or
-    ``staff_areas`` in the same body wins. An admin keeps no stored areas: it
-    uses all of them.
+    ``staff_areas`` in the same body wins. An admin uses every area, so its
+    stored areas are ignored, but kept as they were: a staff member promoted
+    to admin and later returned to Personal gets their console back (QA
+    2026-11-24: the promotion used to wipe them).
     """
     errors = {}
     title = current_title
@@ -100,7 +102,7 @@ def parse_staff_access(data, *, role, current_title='', current_areas=None):
             except ValueError as exc:
                 errors['staff_areas'] = [str(exc)]
     if role != User.Role.STAFF:
-        areas = []
+        areas = list(current_areas or [])
     return title, areas, errors
 
 

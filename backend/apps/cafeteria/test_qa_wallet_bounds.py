@@ -94,3 +94,20 @@ class TestBulkTopUpCeiling:
         assert resp.data["credited"] == 1
         assert [f["id"] for f in resp.data["failed"]] == [full.pk]
         assert CafeteriaBalance.objects.get(student=ok).balance == Decimal("10.00")
+
+
+class TestMovimientosSignedAmounts:
+    """QA sweep 2026-11-24 (round 2): the school-wide Movimientos list carries
+    ``adjustment_amount``, so a deduction reads apart from a credit."""
+
+    def test_adjustments_carry_their_sign(self, api_client):
+        student = StudentProfileFactory(loyverse_id="")
+        _wallet(student, "100")
+        services.adjust_balance(student, Decimal("-12.50"), "Cobro duplicado", notify=False)
+        services.adjust_balance(student, Decimal("20.00"), "Cortesía", notify=False)
+        api_client.force_authenticate(user=AdminFactory())
+        rows = api_client.get(reverse("admin-transactions")).data["results"]
+        by_reason = {r["description"]: r for r in rows}
+        assert by_reason["Ajuste manual: Cobro duplicado"]["amount"] == "12.50"
+        assert by_reason["Ajuste manual: Cobro duplicado"]["adjustment_amount"] == "-12.50"
+        assert by_reason["Ajuste manual: Cortesía"]["adjustment_amount"] == "20.00"

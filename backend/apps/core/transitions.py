@@ -57,8 +57,10 @@ TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
         "pending": frozenset({"confirmed", "cancelled", "no_show", "attended"}),
         "confirmed": frozenset({"attended", "no_show", "cancelled"}),
         "cancelled": frozenset({"pending"}),
-        "attended": frozenset({"no_show"}),
-        "no_show": frozenset({"attended"}),
+        # Back to «Confirmada» undoes an attendance marked by mistake (a visit
+        # marked before it happened stayed stuck: no cancel, no reschedule).
+        "attended": frozenset({"no_show", "confirmed"}),
+        "no_show": frozenset({"attended", "confirmed"}),
     },
     "cafeteria.topuprequest": {
         # paid: card approved, waiting for its POS load (scheduled apply mode).
@@ -115,6 +117,8 @@ REVERSE_TRANSITIONS: frozenset[tuple[str, str, str]] = frozenset(
         ("bookings.booking", "cancelled", "pending"),
         ("bookings.booking", "attended", "no_show"),
         ("bookings.booking", "no_show", "attended"),
+        ("bookings.booking", "attended", "confirmed"),
+        ("bookings.booking", "no_show", "confirmed"),
         ("cafeteria.topuprequest", "failed", "pending"),
         ("legal.arcorequest", "resolved", "in_review"),
         ("legal.arcorequest", "rejected", "in_review"),

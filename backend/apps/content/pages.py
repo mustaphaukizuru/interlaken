@@ -37,7 +37,7 @@ from rest_framework.views import APIView
 from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 from apps.core.listing import AdminListMixin
-from apps.core.permissions import IsAdmin, IsAdminOrStaff
+from apps.core.permissions import IsAdmin
 
 from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, tri_state
 from .table_block import table_problem
@@ -769,7 +769,7 @@ class PageListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAP
     """GET/POST /content/admin/pages/ — Data Ops list contract (``q`` title/slug,
     ``status``, ``template``, ``review``; ordering keys in ``PAGE_ORDERING``)."""
 
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
     serializer_class = PageAdminSerializer
     search_fields = ("title", "slug")
     ordering = PAGE_ORDERING
@@ -795,7 +795,7 @@ def draft_conflict_payload(page: Page) -> dict:
 
 
 class PageDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
 
     serializer_class = PageAdminSerializer
     queryset = Page.objects.select_related("published_version", "draft_updated_by")
@@ -1027,7 +1027,7 @@ class PageChecksView(APIView):
 
     Answers ``{ok, errors, warnings, issues, changes, baseline}``.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
 
     def _report(self, page, blocks=None, seo=None):
         from .publish_checks import review
@@ -1061,7 +1061,7 @@ class PagesChecksSummaryView(APIView):
     what the site shows), ``unpublished_since``. One context for all pages,
     so the queries do not grow with the number of pages.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
 
     def get(self, request):
         from .publish_checks import pages_context, review, summarize
@@ -1091,7 +1091,7 @@ class PageDiscardView(APIView):
     draft save it bumps the revision; with ``draft_revision`` it answers 409
     ``draft_conflict`` when someone saved in between. Nothing is published.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
 
     def post(self, request, pk):
         with transaction.atomic():
@@ -1125,9 +1125,10 @@ class PageDiscardView(APIView):
 
 class PageReviewView(APIView):
     """POST /content/admin/pages/<pk>/review/ {"action": "request"|"reject", "note"?}.
-    Staff request approval (Dirección gets an in-app + email notice with the preview
-    link); admins reject with a note (requester is notified). Publishing clears it."""
-    permission_classes = [IsAdminOrStaff]
+    An editor requests approval (Dirección gets an in-app + email notice with the
+    preview link); Dirección rejects with a note (requester is notified).
+    Publishing clears it. Admin-only since 2026-11-24, like all site content."""
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
 
     def post(self, request, pk):
         page = Page.objects.filter(pk=pk).first()
@@ -1171,7 +1172,7 @@ class PageReviewView(APIView):
 
 class PagePreviewTokenView(APIView):
     """POST /content/admin/pages/<pk>/preview-token/ — shareable 7-day preview link (P3-10)."""
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]  # site content: admin-only (QA 2026-11-24)
 
     def post(self, request, pk):
         page = Page.objects.filter(pk=pk).first()

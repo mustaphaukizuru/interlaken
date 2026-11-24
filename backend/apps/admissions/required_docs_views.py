@@ -520,6 +520,44 @@ def _bad(message: str):
     return Response(error_body(message), status=status.HTTP_400_BAD_REQUEST)
 
 
+# What the file really is, by its first bytes (QA 2026-11-24: an executable
+# renamed «acta.pdf» was accepted on the extension alone).
+_OLE2 = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # .doc (Word 97-2003)
+_HEIF_BRANDS = (b"heic", b"heix", b"hevc", b"heim", b"heis", b"mif1", b"msf1")
+_KIND_LABEL = {".pdf": "PDF", ".jpg": "imagen", ".jpeg": "imagen", ".png": "imagen",
+               ".doc": "documento de Word", ".docx": "documento de Word"}
+
+
+def document_content_ok(f, ext: str) -> bool:
+    """True when the upload's content matches its extension: ``%PDF`` near the
+    start of a PDF (the header may follow a few junk bytes), an image Pillow
+    reads (a phone's HEIC named .jpg passes too), a Word file's OLE2 / ZIP
+    signature. The file position is left at the start."""
+    try:
+        f.seek(0)
+        head = f.read(1024)
+        if ext == ".pdf":
+            return b"%PDF" in head
+        if ext == ".doc":
+            return head.startswith(_OLE2)
+        if ext == ".docx":
+            return head.startswith(b"PK\x03\x04")
+        if ext in (".jpg", ".jpeg", ".png"):
+            if head[4:8] == b"ftyp" and head[8:12] in _HEIF_BRANDS:
+                return True
+            from PIL import Image
+
+            f.seek(0)
+            with Image.open(f) as img:
+                img.verify()
+            return True
+        return False
+    except Exception:  # noqa: BLE001 - Pillow raises many types for non-images
+        return False
+    finally:
+        f.seek(0)
+
+
 @method_decorator(
     ratelimit("registration-upload", "20/m", key="ip", method="POST"), name="dispatch"
 )
@@ -562,6 +600,11 @@ class DocumentUploadView(APIView):
             if f.size > max_size:
                 return _bad(
                     f"El archivo excede el tamaño máximo de {max_size // (1024 * 1024)} MB."
+                )
+            if not document_content_ok(f, ext):
+                return _bad(
+                    f"El archivo «{f.name}» no es un {_KIND_LABEL.get(ext, 'archivo')} válido. "
+                    f"Guárdelo o escanéelo de nuevo e intente otra vez."
                 )
 
         reg = Registration.objects.prefetch_related("documents", "document_states").get(pk=reg.pk)

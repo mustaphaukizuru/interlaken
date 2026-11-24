@@ -85,6 +85,52 @@ def reminder_content(booking):
     return 'Recordatorio: su visita es mañana', content
 
 
+def cancellation_content(booking):
+    """``(subject, EmailContent)`` of the cancellation sent when the school
+    cancels a visit from the console (pure; render_emails can preview it)."""
+    from apps.portal.emailing import EmailContent, long_date
+
+    slot = booking.slot
+    content = EmailContent(
+        category='Visitas', tone='warning',
+        title='Su visita fue cancelada',
+        intro=(f'Estimado/a {booking.parent_name}: su visita al Colegio Interlaken del '
+               f'{long_date(slot.date)} a las {slot.start_time:%H:%M} quedó cancelada.'),
+        details=_visit_details(booking),
+        note=('Si desea agendar otra fecha, responda a este correo o escríbanos por WhatsApp. '
+              'Con gusto le ayudamos.'),
+        signoff='Equipo de Admisiones',
+        reason=VISIT_REASON,
+    )
+    return 'Su visita al Colegio Interlaken fue cancelada', content
+
+
+def send_booking_cancellation(booking):
+    """Tell the family their visit was cancelled. When the confirmation went
+    out (it carries the .ics invite), attach the cancellation of that same
+    event (same UID, ``METHOD:CANCEL``) so it leaves their calendar.
+
+    Best-effort like the confirmation: never raises, returns True when sent.
+    """
+    from apps.portal.services import build_email
+
+    subject, content = cancellation_content(booking)
+    email = build_email(subject, '', [booking.parent_email], reply_to=settings.ADMISSIONS_EMAIL,
+                        content=content)
+    if booking.confirmation_sent:
+        try:
+            email.attach('visita-interlaken.ics', build_ics(booking, cancel=True),
+                         'text/calendar; charset=utf-8; method=CANCEL')
+        except Exception as exc:  # pragma: no cover - defensive; never block on ics
+            logger.warning('No se pudo generar el .ics de cancelación de la reserva %s: %s',
+                           booking.pk, exc)
+    delivered = bool(email.send(fail_silently=True))
+    if not delivered:
+        logger.warning('No se pudo enviar la cancelación de la reserva %s a %s',
+                       booking.pk, booking.parent_email)
+    return delivered
+
+
 def send_booking_confirmation(booking):
     """Send a Spanish confirmation email (with a .ics calendar invite) for a
     booking and flag it as sent.

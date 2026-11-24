@@ -28,7 +28,7 @@ from apps.core.audit import record
 from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 from apps.core.listing import AdminListMixin, apply_date_range
-from apps.core.permissions import IsAdminOrStaff
+from apps.core.permissions import IsAdmin
 
 from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, referenced_media_ids, tri_state
 
@@ -225,8 +225,14 @@ MEDIA_ORDERING = {
 class MediaListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
     """GET /content/admin/media/?q=&type=&from=&to=&unreferenced=&ordering=
     POST multipart {file, alt, caption, tags}; an identical file (sha256) → 409
-    ``{detail, existing}`` so the uploader can reuse the asset instead."""
-    permission_classes = [IsAdminOrStaff]
+    ``{detail, existing}`` so the uploader can reuse the asset instead.
+
+    Admins, plus staff holding the «comunicados» area: a comunicado's
+    attachments are picked and uploaded here (AttachmentsField → MediaPicker).
+    Editing, deleting and exporting the library stay admin-only (QA 2026-11-24:
+    any staff account could)."""
+    permission_classes = [IsAdmin]
+    admin_area = 'comunicados'
     serializer_class = MediaAssetSerializer
     parser_classes = [MultiPartParser, FormParser]
     search_fields = ('filename', 'alt', 'caption', 'tags')
@@ -299,7 +305,7 @@ class MediaInUse(APIException):
 
 
 class MediaDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]
     serializer_class = MediaAssetSerializer
     queryset = MediaAsset.objects.all()
     audit_context = 'cms.media'
@@ -334,6 +340,7 @@ class MediaExportView(AdminExportMixin, MediaListCreateView):
     """GET /content/admin/media/export/?fmt=csv|xlsx|pdf&…list filters…"""
     http_method_names = ['get', 'head', 'options']
     export_spec = MEDIA_EXPORT
+    admin_area = None  # the list's «comunicados» grant is for picking, not exports
 
 
 def _add_tag_plan(asset, payload):
@@ -359,7 +366,7 @@ def _add_tag(asset, payload, actor):
 class MediaBulkView(AdminBulkView):
     """POST /content/admin/media/bulk/ — ``delete`` (unreferenced only) and
     ``add_tag`` (payload ``tag``). Staff manage media like admins do."""
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdmin]
     entity = 'content.mediaasset'
     list_view_class = MediaListCreateView
     actions = {

@@ -16,6 +16,7 @@ from apps.admissions.process_fixtures import (
     make_lead,
     make_payment,
     make_registration,
+    make_slot,
     staff_client,
 )
 from apps.bookings.models import Booking
@@ -242,7 +243,7 @@ def test_informes_no_interesa_needs_a_reason(admin_client):
 # ── Visita guiada ─────────────────────────────────────────────────────────
 def test_visit_attended_and_books_the_exam(admin_client):
     lead = at_stage(make_lead(), Stage.VISITA)
-    booking = make_booking(lead)
+    booking = make_booking(lead, slot=make_slot(days=-1))  # the visit already happened
     r = admin_client.patch(
         card(lead, "visita"),
         {"outcome": "agenda_examen", "note": "Le gustó el patio"},
@@ -256,7 +257,7 @@ def test_visit_attended_and_books_the_exam(admin_client):
 
 def test_visit_no_show_reschedules_or_closes(admin_client):
     lead = at_stage(make_lead(), Stage.VISITA)
-    booking = make_booking(lead)
+    booking = make_booking(lead, slot=make_slot(days=-1))  # the visit already happened
     r = admin_client.patch(
         card(lead, "visita"), {"outcome": "no_asistio", "reschedule": True}, format="json"
     )

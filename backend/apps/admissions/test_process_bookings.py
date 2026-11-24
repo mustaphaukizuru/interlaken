@@ -8,7 +8,7 @@ from django.apps import apps as django_apps
 from django.urls import reverse
 
 from apps.admissions.models import PreRegistration
-from apps.admissions.process_fixtures import at_stage, make_booking, make_lead
+from apps.admissions.process_fixtures import at_stage, make_booking, make_lead, make_slot
 from apps.admissions.services import RETENTION_PLACEHOLDER
 from apps.bookings.models import Booking
 from apps.core.models import AuditLog
@@ -43,10 +43,17 @@ def test_backfill_links_existing_bookings_to_the_latest_lead_by_email():
     assert got[b4.pk] is None and purged.pk not in got.values()
 
 
+def _visited(lead=None, **kw):
+    """A booking whose visit already happened: its result can be recorded
+    (attendance is refused before the visit starts, QA 2026-11-24)."""
+    kw["slot"] = kw.get("slot") or make_slot(days=-1)
+    return make_booking(lead, **kw)
+
+
 def test_outcome_uses_the_fk_before_the_email(admin_client):
     linked = make_lead(parent_email="otra@ejemplo.test")
     by_email = make_lead(parent_email="marta@ejemplo.test")  # newest lead with the booking's email
-    booking = make_booking(linked, parent_email="marta@ejemplo.test")
+    booking = _visited(linked, parent_email="marta@ejemplo.test")
     r = outcome(admin_client, booking, "interested")
     assert r.status_code == 200 and r.data["pre_registration"]["id"] == linked.pk
     linked.refresh_from_db()
@@ -56,7 +63,7 @@ def test_outcome_uses_the_fk_before_the_email(admin_client):
 
 def test_outcome_falls_back_to_email_and_attaches_the_fk(admin_client):
     lead = make_lead()
-    booking = make_booking(None)
+    booking = _visited(None)
     r = outcome(admin_client, booking, "enrolling")
     assert r.status_code == 200 and r.data["pre_registration"]["stage"] == "examen"
     booking.refresh_from_db()
@@ -65,7 +72,7 @@ def test_outcome_falls_back_to_email_and_attaches_the_fk(admin_client):
 
 def test_declined_closes_the_case_with_the_visit_note(admin_client):
     lead = at_stage(make_lead(), Stage.VISITA)
-    booking = make_booking(lead)
+    booking = _visited(lead)
     r = outcome(admin_client, booking, "declined", note="Busca horario vespertino")
     assert r.status_code == 200 and r.data["pre_registration"]["changed"] is True
     lead.refresh_from_db()
@@ -84,13 +91,13 @@ def test_declined_closes_the_case_with_the_visit_note(admin_client):
 
 def test_outcome_never_moves_a_case_back_or_an_enrolled_one(admin_client):
     ahead = at_stage(make_lead(), Stage.DOCUMENTACION)
-    r = outcome(admin_client, make_booking(ahead), "interested")
+    r = outcome(admin_client, _visited(ahead), "interested")
     assert r.data["pre_registration"]["changed"] is False
     ahead.refresh_from_db()
     assert ahead.stage == "documentacion"
     enrolled = at_stage(make_lead(parent_email="e@ejemplo.test"), Stage.INSCRITO)
     r = outcome(
-        admin_client, make_booking(enrolled, slot=None, parent_email="e@ejemplo.test"), "declined"
+        admin_client, _visited(enrolled, slot=None, parent_email="e@ejemplo.test"), "declined"
     )
     assert (
         r.data["pre_registration"]["changed"] is False and "skipped" in r.data["pre_registration"]
@@ -101,7 +108,7 @@ def test_outcome_never_moves_a_case_back_or_an_enrolled_one(admin_client):
 
 def test_case_history_includes_the_visit(admin_client):
     lead = at_stage(make_lead(), Stage.VISITA)
-    booking = make_booking(lead)
+    booking = _visited(lead)
     outcome(admin_client, booking, "enrolling")
     history = admin_client.get(reverse("case-detail", args=[lead.pk])).data["history"]
     kinds = {(h["object_label"], h["object_id"]) for h in history}

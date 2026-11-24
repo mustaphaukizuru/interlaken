@@ -21,6 +21,16 @@ def staff_client(api_client, db):
     return api_client
 
 
+@pytest.fixture
+def editor_client(api_client, db):
+    """Another admin who edits and asks Dirección to approve: since 2026-11-24
+    site content is admin-only, so the review flow runs between admins."""
+    u = User.objects.create_user(email='editora@test.mx', password='x-pass-1234', first_name='Sol', last_name='Staff', role=User.Role.ADMIN)
+    api_client.force_authenticate(u)
+    api_client.user = u
+    return api_client
+
+
 OK_BLOCKS = [{'id': 'a', 'type': 'rich_text', 'props': {'html': '<p>Hola</p>'}}]
 
 
@@ -31,16 +41,13 @@ def _cache():
 
 @pytest.mark.django_db
 class TestApproval:
-    def test_staff_edits_and_requests_review_admin_publishes(self, staff_client, admin_user, settings):
+    def test_editor_requests_review_director_rejects_then_publishes(self, editor_client, admin_user, settings):
         settings.EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+        staff_client = editor_client
         r = staff_client.post(reverse('admin-pages'), {'slug': 'verano', 'title': 'Verano', 'draft_blocks': [{'id': 'a', 'type': 'rich_text', 'props': {'html': '<p>Hola</p>'}}], 'seo': {}}, format='json')
         assert r.status_code == 201
         pk = r.data['id']
         assert staff_client.patch(reverse('admin-page-detail', args=[pk]), {'title': 'Curso de verano'}, format='json').status_code == 200
-        # staff cannot publish, delete or roll back
-        assert staff_client.post(reverse('admin-page-publish', args=[pk]), {'action': 'publish'}, format='json').status_code == 403
-        assert staff_client.delete(reverse('admin-page-detail', args=[pk])).status_code == 403
-        assert staff_client.get(reverse('admin-page-versions', args=[pk])).status_code == 403
         # request approval: admins notified with preview link
         r = staff_client.post(reverse('admin-page-review', args=[pk]), {'action': 'request'}, format='json')
         assert r.status_code == 200 and r.data['review_requested_at'] and r.data['review_requested_by_name'] == 'Sol Staff'
@@ -53,7 +60,7 @@ class TestApproval:
         staff_client.force_authenticate(admin_user)
         r = staff_client.post(reverse('admin-page-review', args=[pk]), {'action': 'reject', 'note': 'Falta el precio.'}, format='json')
         assert r.status_code == 200 and r.data['review_requested_at'] is None and r.data['review_note'] == 'Falta el precio.'
-        assert Notification.objects.filter(user__email='staff@test.mx', message='Falta el precio.').exists()
+        assert Notification.objects.filter(user__email='editora@test.mx', message='Falta el precio.').exists()
         assert staff_client.post(reverse('admin-page-publish', args=[pk]), {'action': 'publish'}, format='json').status_code == 200
         assert Page.objects.get(pk=pk).review_note == ''
 
@@ -98,28 +105,19 @@ class TestSchedule:
 
 @pytest.mark.django_db
 class TestStaffCannotScheduleOrMove:
-    def test_staff_patch_admin_only_fields_is_403(self, staff_client):
+    def test_staff_cannot_edit_or_create_pages_at_all(self, staff_client):
+        # Site content is admin-only since 2026-11-24 (it used to be field by field).
         p = Page.objects.create(slug='talleres', title='Talleres', draft_blocks=OK_BLOCKS)
         url = reverse('admin-page-detail', args=[p.pk])
         soon = (timezone.now() + dt.timedelta(hours=1)).isoformat()
         assert staff_client.patch(url, {'publish_at': soon}, format='json').status_code == 403
-        assert staff_client.patch(url, {'unpublish_at': soon}, format='json').status_code == 403
-        assert staff_client.patch(url, {'slug': 'otra-cosa'}, format='json').status_code == 403
+        assert staff_client.patch(url, {'title': 'Talleres 2026'}, format='json').status_code == 403
         p.refresh_from_db()
-        assert p.slug == 'talleres' and p.publish_at is None and p.unpublish_at is None
-        # resending the unchanged values (the editor autosave does) is fine
-        ok = staff_client.patch(url, {'title': 'Talleres 2026', 'slug': 'talleres', 'publish_at': None,
-                                      'unpublish_at': None}, format='json')
-        assert ok.status_code == 200 and ok.data['title'] == 'Talleres 2026'
-
-    def test_staff_create_cannot_schedule(self, staff_client):
-        soon = (timezone.now() + dt.timedelta(hours=1)).isoformat()
-        r = staff_client.post(reverse('admin-pages'), {'slug': 'nueva', 'title': 'Nueva', 'draft_blocks': OK_BLOCKS,
-                                                       'publish_at': soon}, format='json')
+        assert p.title == 'Talleres' and p.publish_at is None
+        r = staff_client.post(reverse('admin-pages'), {'slug': 'nueva', 'title': 'Nueva', 'draft_blocks': OK_BLOCKS},
+                              format='json')
         assert r.status_code == 403
-        ok = staff_client.post(reverse('admin-pages'), {'slug': 'nueva', 'title': 'Nueva', 'draft_blocks': OK_BLOCKS},
-                               format='json')
-        assert ok.status_code == 201
+        assert not Page.objects.filter(slug='nueva').exists()
 
     def test_admin_can_schedule(self, admin_client):
         p = Page.objects.create(slug='admin-sched', title='A', draft_blocks=OK_BLOCKS)

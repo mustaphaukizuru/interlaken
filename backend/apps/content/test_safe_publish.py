@@ -37,8 +37,9 @@ def _clear_cache():
 
 
 @pytest.fixture
-def staff_user(db):
-    return User.objects.create_user(email='staff@test.mx', password='x-pass-1234', first_name='Sol', last_name='Staff', role=User.Role.STAFF)
+def editor(db):
+    # A second admin edits: site content is admin-only (QA 2026-11-24).
+    return User.objects.create_user(email='editora@test.mx', password='x-pass-1234', first_name='Sol', last_name='Staff', role=User.Role.ADMIN)
 
 
 # ── C1: old generic drafts ──────────────────────────────────────────────────
@@ -109,9 +110,9 @@ def test_schedule_never_publishes_legacy(admin_user):
     assert 'Publicadas 1, bloqueadas por revisión 1' in out.getvalue()
 
 
-def test_review_request_of_legacy_needs_confirmation_and_warns_direction(api_client, staff_user, admin_user):
+def test_review_request_of_legacy_needs_confirmation_and_warns_direction(api_client, editor, admin_user):
     page = Page.objects.create(slug='costos', title='Costos', draft_blocks=GENERIC)
-    api_client.force_authenticate(staff_user)
+    api_client.force_authenticate(editor)
     url = reverse('admin-page-review', args=[page.pk])
     r = api_client.post(url, {'action': 'request'}, format='json')
     assert r.status_code == 409 and r.data['code'] == 'legacy_seed_draft'
@@ -141,10 +142,10 @@ def test_draft_revision_bumps_on_every_save(admin_client, admin_user):
     assert r.data['page']['draft_revision'] == 4
 
 
-def test_stale_save_gets_409_with_who_and_when(api_client, admin_user, staff_user):
+def test_stale_save_gets_409_with_who_and_when(api_client, admin_user, editor):
     page = Page.objects.create(slug='verano', title='Verano', draft_blocks=GENERIC)
     url = reverse('admin-page-detail', args=[page.pk])
-    api_client.force_authenticate(staff_user)
+    api_client.force_authenticate(editor)
     rev = api_client.get(url).data['draft_revision']
     assert api_client.patch(url, {'title': 'Sol escribió', 'draft_revision': rev}, format='json').status_code == 200
     # Dirección still holds the old revision: refused, nothing overwritten.

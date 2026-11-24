@@ -53,6 +53,7 @@ from .exceptions import PayloadTooLarge, cap_message, error_response
 from .exporting import CONTENT_TYPES, csv_safe, xlsx_bytes
 from .exports import as_download, export_filename
 from .permissions import IsAdmin
+from .plurals import count as plural
 from .throttling import SharedScopedRateThrottle
 
 logger = logging.getLogger(__name__)
@@ -746,8 +747,8 @@ class ImportView(APIView):
         if report.has_errors and not only_valid:
             counts = report.counts
             return error_response(
-                f'El archivo tiene {counts["error"]} fila(s) con error. Corríjalas o marque '
-                f"«Importar solo las filas válidas».",
+                f'El archivo tiene {plural(counts["error"], "fila", "filas")} con error. '
+                f"Corríjalas o marque «Importar solo las filas válidas».",
                 counts=counts,
             )
 

@@ -22,6 +22,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.core.models import OpsStatus
+from apps.core.plurals import count as plural
 from apps.payments import ops_alerts
 
 ALERT_KEY = 'wallet_drift_alert'
@@ -47,22 +48,23 @@ class Command(BaseCommand):
         drift_total = Decimal(str(audit.get('drift_total') or 0))
         problems = []
         if drifting:
-            problems.append(f'{drifting} alumno(s) con saldo local por encima de Loyverse '
+            problems.append(f'{plural(drifting, "alumno", "alumnos")} con saldo local por encima de Loyverse '
                             f'(diferencia total ${drift_total.copy_abs():.2f})')
         if stale:
-            problems.append(f'{stale} alumno(s) cuyo cliente ya no existe en Loyverse')
+            problems.append(f'{plural(stale, "alumno", "alumnos")} cuyo cliente ya no existe en Loyverse')
         if unlinked:
-            problems.append(f'{unlinked} cliente(s) de Loyverse con matrícula de alumno sin vincular')
+            problems.append(f'{plural(unlinked, "cliente", "clientes")} de Loyverse con matrícula de alumno '
+                            f'sin vincular')
         if parked:
-            problems.append(f'{parked} recibo(s) del monedero sin alumno asignado')
+            problems.append(f'{plural(parked, "recibo", "recibos")} del monedero sin alumno asignado')
         held = int(audit.get('held_paid') or 0)
         if held:
-            problems.append(f'{held} alumno(s) con más saldo en Loyverse que en la app y una '
+            problems.append(f'{plural(held, "alumno", "alumnos")} con más saldo en Loyverse que en la app y una '
                             f'recarga en línea por aplicar que no coincide con esa diferencia '
                             f'(revise POS Loyverse → Por aplicar)')
         unverified = int(audit.get('held_unverified') or 0)
         if unverified:
-            problems.append(f'{unverified} alumno(s) con una recarga con tarjeta ya cargada en '
+            problems.append(f'{plural(unverified, "alumno", "alumnos")} con una recarga con tarjeta ya cargada en '
                             f'Loyverse que falta verificar en MultiCobros: no se suma al saldo '
                             f'hasta verificarla (POS Loyverse → Por aplicar → «Verificar en '
                             f'MultiCobros»)')

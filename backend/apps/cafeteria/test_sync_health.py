@@ -47,7 +47,10 @@ class TestSyncHealth:
 
         assert resp.status_code == 200
         assert resp.json()['loyverse_ok'] is False
-        assert '401' in resp.json()['loyverse_error']
+        # Spanish for the office (QA 2026-11-24), the raw text stays in the log.
+        assert resp.json()['loyverse_error'] == (
+            'Loyverse rechazó la clave de acceso de la app (caducó o se revocó). '
+            'Avise a soporte técnico.')
 
     def test_counts_linked_vs_active_so_unmatched_receipts_have_an_explanation(
             self, api_client, monkeypatch):

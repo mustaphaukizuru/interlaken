@@ -164,10 +164,12 @@ _MONTHS = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agos
 
 
 def format_amount(value) -> str:
-    """``$1,234.50`` (es-MX money for messages)."""
+    """``$1,234.50`` (es-MX money for messages); a negative reads ``-$99,746.50``
+    (never ``$-99746.50``)."""
     from decimal import Decimal
 
-    return f'${Decimal(str(value or 0)):,.2f}'
+    amount = Decimal(str(value or 0))
+    return f'{"-" if amount < 0 else ""}${abs(amount):,.2f}'
 
 
 def format_apply_at(when: datetime) -> str:

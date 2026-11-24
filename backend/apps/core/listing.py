@@ -76,18 +76,85 @@ def _register_unaccent():
         _unaccent_registered = True
 
 
-def search_lookup(field: str) -> str:
-    """``field__icontains`` on SQLite; ``field__unaccent__icontains`` on Postgres.
+# Accents folded with plain ``REPLACE`` (every database has it; no extension,
+# no migration): «hernandez» finds «Hernández», «sofia» finds «Sofía», «pena»
+# finds «Peña». Both cases are listed because SQLite's LOWER/LIKE only fold
+# ASCII; the result is lower-case ASCII for these letters, so ``icontains``
+# does the rest.
+_FOLD_PAIRS = tuple(
+    (accented, plain)
+    for plain, letters in (
+        ("a", "áàäâÁÀÄÂ"), ("e", "éèëêÉÈËÊ"), ("i", "íìïîÍÌÏÎ"),
+        ("o", "óòöôÓÒÖÔ"), ("u", "úùüûÚÙÜÛ"), ("n", "ñÑ"), ("c", "çÇ"),
+    )
+    for accented in letters
+)
 
-    ``unaccent`` is created by ``core.0004_pg_extensions`` and wrapped by
-    ``core.0006`` (both guarded, Postgres only), so "Lucia" finds "Lucía" and
-    vice versa in production while the SQLite test suite keeps plain
-    ``icontains``.
+
+class FoldAccentsTransform(Transform):
+    """``REPLACE(REPLACE(col, 'á', 'a'), ...)``; bilateral, so the search term
+    is folded by the same SQL. Used where ``immutable_unaccent`` cannot fold:
+    SQLite, and a PostgreSQL without the ``unaccent`` extension (the
+    ``core.0006`` wrapper is then the identity)."""
+
+    bilateral = True
+    lookup_name = "foldaccents"
+
+    def as_sql(self, compiler, connection):
+        sql, params = compiler.compile(self.lhs)
+        params = list(params)
+        for accented, plain in _FOLD_PAIRS:
+            sql = f"REPLACE({sql}, %s, %s)"
+            params += [accented, plain]
+        return sql, params
+
+
+_fold_registered = False
+
+
+def _register_fold():
+    global _fold_registered
+    if not _fold_registered:
+        CharField.register_lookup(FoldAccentsTransform)
+        TextField.register_lookup(FoldAccentsTransform)
+        _fold_registered = True
+
+
+_pg_unaccent_folds: bool | None = None
+
+
+def _postgres_unaccent_folds() -> bool:
+    """True when ``public.immutable_unaccent`` really folds accents (the
+    ``unaccent`` extension is installed). Checked once per process, in a
+    savepoint so a missing function never breaks the request's transaction."""
+    global _pg_unaccent_folds
+    if _pg_unaccent_folds is None:
+        from django.db import transaction
+
+        try:
+            with transaction.atomic(), connection.cursor() as cursor:
+                cursor.execute("SELECT public.immutable_unaccent(%s)", ["Hernández"])
+                _pg_unaccent_folds = cursor.fetchone()[0] == "Hernandez"
+        except Exception:  # noqa: BLE001 - no wrapper: fall back to REPLACE
+            _pg_unaccent_folds = False
+    return _pg_unaccent_folds
+
+
+def search_lookup(field: str) -> str:
+    """An accent- and case-insensitive ``contains`` for ``field``.
+
+    PostgreSQL with the ``unaccent`` extension: ``field__unaccent__icontains``
+    (``immutable_unaccent``, the expression the trigram indexes of
+    ``core.0006`` cover). Anywhere else (SQLite, or PostgreSQL without the
+    extension): ``field__foldaccents__icontains``. Either way «Lucia» finds
+    «Lucía» and the reverse (QA 2026-11-24: on SQLite, and on a database
+    without the extension, «hernandez» found nobody).
     """
-    if connection.vendor == "postgresql":
+    if connection.vendor == "postgresql" and _postgres_unaccent_folds():
         _register_unaccent()
         return f"{field}__unaccent__icontains"
-    return f"{field}__icontains"
+    _register_fold()
+    return f"{field}__foldaccents__icontains"
 
 
 def split_terms(raw: str) -> list[str]:

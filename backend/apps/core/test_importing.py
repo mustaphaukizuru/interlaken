@@ -382,7 +382,7 @@ class TestImportView:
     def test_commit_refuses_error_rows_unless_only_valid(self):
         resp = _post({"file": _upload(CSV), "dry_run": "0"})
         assert resp.status_code == 400
-        assert "fila(s) con error" in resp.data["detail"]
+        assert "tiene 1 fila con error" in resp.data["detail"]
         assert ContactMessage.objects.count() == 0
         resp = _post({"file": _upload(CSV), "dry_run": "0", "only_valid": "1"})
         assert resp.status_code == 200 and resp.data["dry_run"] is False
