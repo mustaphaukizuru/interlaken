@@ -42,15 +42,17 @@ export const BOOKING_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   pending: ['confirmed', 'cancelled', 'no_show', 'attended'],
   confirmed: ['attended', 'no_show', 'cancelled'],
   cancelled: ['pending'],
-  attended: ['no_show'],
-  no_show: ['attended'],
+  // Back to «Confirmada» undoes an attendance marked by mistake (QA 2026-11-24).
+  attended: ['no_show', 'confirmed'],
+  no_show: ['attended', 'confirmed'],
 };
 
 /** Reverse moves need a note (audited with it). */
 export function needsNote(from: BookingStatus, to: BookingStatus): boolean {
   return (from === 'cancelled' && to === 'pending')
     || (from === 'attended' && to === 'no_show')
-    || (from === 'no_show' && to === 'attended');
+    || (from === 'no_show' && to === 'attended')
+    || ((from === 'attended' || from === 'no_show') && to === 'confirmed');
 }
 
 export function canMove(from: string, to: BookingStatus): boolean {

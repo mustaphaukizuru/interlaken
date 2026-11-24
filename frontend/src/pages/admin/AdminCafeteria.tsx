@@ -1210,7 +1210,7 @@ function LowBalanceTab() {
 
   return (
     <Card>
-      {count > 0 && <p className="mb-3 text-sm text-muted">{count} persona(s) activa(s) por debajo del umbral.</p>}
+      {count > 0 && <p className="mb-3 text-sm text-muted">{count} {count === 1 ? 'persona activa' : 'personas activas'} por debajo del umbral.</p>}
       <DataTable<CafeteriaBalance>
         tableId="cafeteria-low-balance"
         columns={balanceColumns('Saldo').map((c) => (c.id === 'threshold' ? { ...c, defaultHidden: false } : c.id === 'balance' ? { ...c, className: 'font-semibold text-amber' } : c))}

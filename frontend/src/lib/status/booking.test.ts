@@ -7,14 +7,13 @@ describe('booking status vocabulary', () => {
       pending: ['confirmed', 'cancelled', 'no_show', 'attended'],
       confirmed: ['attended', 'no_show', 'cancelled'],
       cancelled: ['pending'],
-      attended: ['no_show'],
-      no_show: ['attended'],
+      attended: ['no_show', 'confirmed'],
+      no_show: ['attended', 'confirmed'],
     });
   });
 
-  it('never re-confirms a cancelled or no-show booking', () => {
+  it('never re-confirms a cancelled booking (an attendance undo goes back to Confirmada with a note)', () => {
     expect(canMove('cancelled', 'confirmed')).toBe(false);
-    expect(canMove('no_show', 'confirmed')).toBe(false);
     expect(canMove('pending', 'confirmed')).toBe(true);
     expect(canMove('unknown', 'confirmed')).toBe(false);
   });
@@ -24,6 +23,8 @@ describe('booking status vocabulary', () => {
     expect(needsNote('attended', 'no_show')).toBe(true);
     expect(needsNote('no_show', 'attended')).toBe(true);
     expect(needsNote('pending', 'attended')).toBe(false);
+    expect(needsNote('attended', 'confirmed')).toBe(true);
+    expect(needsNote('no_show', 'confirmed')).toBe(true);
   });
 
   it('a visit has started from its start time in Mexico City, whatever the device zone (QA 2026-11-24)', () => {

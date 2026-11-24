@@ -204,6 +204,17 @@ describe('AdminBookings: reservas', () => {
     await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(4, 'attended', { note: 'Llegó tarde' }));
   });
 
+  it('«Deshacer asistencia» returns a marked visit to «Confirmada» with a note and no email (QA 2026-11-24)', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Dani');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Dani' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Deshacer la asistencia de Dani' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Deshacer asistencia' });
+    await userEvent.type(within(dialog).getByLabelText(/Motivo/), 'Marcado por error');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Volver a «Confirmada»' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(4, 'confirm', { note: 'Marcado por error', notify: false }));
+  });
+
   it('shows the server reason when a move is refused (capacity)', async () => {
     api.bookingAction.mockRejectedValueOnce({ isAxiosError: true, response: { status: 400, data: { detail: 'El horario ya no tiene cupo suficiente.' } } });
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });

@@ -399,7 +399,7 @@ const BOOKING_BULK: BulkActionDef[] = [
 /** "Ana López (12 dic 2026)": how the bulk results name a reservation. */
 const bookingName = (b: Booking) => `${b.parent_name} (${fmtDate(b.slot_date)})`;
 
-interface NoteAsk { booking: Booking; act: BookingAction; title: string; message: string; confirmLabel: string }
+interface NoteAsk { booking: Booking; act: BookingAction; title: string; message: string; confirmLabel: string; notify?: boolean }
 
 /** Row actions: only the moves the transition table allows from the row's status.
  *  Wide screens show the row's next step as an icon and every other move in
@@ -423,7 +423,8 @@ function BookingRowActions({
   // before): no «Asistió» / «No asistió» on a visit still to come (QA 2026-11-24).
   const started = visitStarted(booking.slot_date, booking.slot_start_time);
   const moves: RowMove[] = [];
-  if (canMove(s, 'confirmed')) {
+  const isMarked = s === 'attended' || s === 'no_show';
+  if (canMove(s, 'confirmed') && !isMarked) {
     moves.push({ act: 'confirm', label: 'Confirmar', ariaLabel: `Confirmar la reserva de ${who}`, Icon: Check,
       tone: 'hover:bg-green-50 hover:text-green-600', run: () => onAct(booking, 'confirm') });
   }
@@ -445,10 +446,18 @@ function BookingRowActions({
     moves.push({ act: 'cancel', label: 'Cancelar', ariaLabel: `Cancelar la reserva de ${who}`, Icon: X, danger: true,
       tone: 'hover:bg-coral-50 hover:text-coral-600', run: () => onCancel(booking) });
   }
+  if (canMove(s, 'confirmed') && isMarked) {
+    // Undo an attendance marked by mistake (QA 2026-11-24), last in the list:
+    // back to «Confirmada» with a note, and no «visita confirmada» email again.
+    moves.push({ act: 'confirm', label: 'Deshacer asistencia', ariaLabel: `Deshacer la asistencia de ${who}`, Icon: RotateCcw,
+      tone: 'hover:bg-brand-50 hover:text-brand-600',
+      run: () => onNote({ booking, act: 'confirm', notify: false, title: 'Deshacer asistencia', confirmLabel: 'Volver a «Confirmada»',
+        message: `La visita de ${who} volverá a «Confirmada». Indique por qué se corrige. La familia no recibe ningún correo.` }) });
+  }
   if (canMove(s, 'pending')) {
     moves.push({ act: 'reopen', label: 'Reabrir', ariaLabel: `Reabrir la reserva de ${who}`, Icon: RotateCcw,
       tone: 'hover:bg-brand-50 hover:text-brand-600',
-      run: () => onNote({ booking, act: 'reopen', title: 'Reabrir reserva', confirmLabel: 'Reabrir', message: `La reserva de ${who} volverá a «Pendiente» si el horario aún tiene cupo para ${booking.num_attendees} persona(s).` }) });
+      run: () => onNote({ booking, act: 'reopen', title: 'Reabrir reserva', confirmLabel: 'Reabrir', message: `La reserva de ${who} volverá a «Pendiente» si el horario aún tiene cupo para ${booking.num_attendees} ${booking.num_attendees === 1 ? 'persona' : 'personas'}.` }) });
   }
   return (
     <RowMoves
@@ -569,11 +578,11 @@ function BookingsView() {
   // click on another row must not re-enable this row's button mid-request.
   const rowsInFlight = useRef(new Set<number>());
   const [busyRows, setBusyRows] = useState<Record<number, BookingAction>>({});
-  const act = (b: Booking, a: BookingAction, note?: string) => {
+  const act = (b: Booking, a: BookingAction, note?: string, notify?: boolean) => {
     if (rowsInFlight.current.has(b.id)) return;
     rowsInFlight.current.add(b.id);
     setBusyRows((m) => ({ ...m, [b.id]: a }));
-    action.mutateAsync({ id: b.id, act: a, note })
+    action.mutateAsync({ id: b.id, act: a, note, notify })
       .then(() => { toast.success('Reserva actualizada.'); setCancelFor(null); setNoteAsk(null); })
       .catch((e: unknown) => toast.error(apiErrorMessage(e, 'No fue posible actualizar la reserva.')))
       .finally(() => {
@@ -685,7 +694,7 @@ function BookingsView() {
         confirmLabel={noteAsk?.confirmLabel ?? 'Guardar'}
         loading={action.isPending}
         onClose={() => setNoteAsk(null)}
-        onConfirm={(note) => noteAsk && act(noteAsk.booking, noteAsk.act, note)}
+        onConfirm={(note) => noteAsk && act(noteAsk.booking, noteAsk.act, note, noteAsk.notify)}
       />
     </Card>
   );

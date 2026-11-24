@@ -337,7 +337,7 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
           },
         ]}
       />
-      {visible.length < rows.length && <p className="text-xs text-subtle">{visible.length} de {rows.length} persona(s).</p>}
+      {visible.length < rows.length && <p className="text-xs text-subtle">{visible.length} de {rows.length} {rows.length === 1 ? 'persona' : 'personas'}.</p>}
 
       <div className="flex flex-col-reverse gap-2 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-subtle">
