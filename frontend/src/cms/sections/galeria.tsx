@@ -13,10 +13,22 @@ const section = sectionsOf('galeria');
 /** The filter key that shows every photo. */
 const ALL = 'todas';
 
+/**
+ * Tile width in the masonry grid (max-w-6xl, px-4/sm:px-6, gap-4): 2 columns on
+ * phones, 3 from 640 px, 4 from 1024 px (264 px once the container stops growing).
+ */
+const TILE_SIZES =
+  '(min-width: 1152px) 264px, (min-width: 1024px) calc((100vw - 96px) / 4), (min-width: 640px) calc((100vw - 80px) / 3), calc((100vw - 48px) / 2)';
+/** The lightbox photo: up to max-w-4xl (896 px) inside the p-4 backdrop. */
+const LIGHTBOX_SIZES = '(min-width: 928px) 896px, calc(100vw - 32px)';
+
 interface Photo {
   /** Short description shown on the card and in the lightbox (BACKLOG P2-10). */
   caption: string;
   src: string;
+  /** Smaller files for the grid tiles; `full` adds the large one for the lightbox. */
+  srcSet?: string;
+  fullSrcSet?: string;
   alt: string;
   cat: string;
   /** Position in the full list: a stable key across filters. */
@@ -126,6 +138,8 @@ function Lightbox({
         <div className="flex h-[82vh] items-center justify-center">
           <img
             src={photos[index].src}
+            srcSet={photos[index].fullSrcSet}
+            sizes={LIGHTBOX_SIZES}
             alt={photos[index].alt}
             className="max-h-full max-w-full rounded-md object-contain"
           />
@@ -170,8 +184,12 @@ function GaleriaGridView(p: GridProps) {
     .map((x, id) => {
       const caption = t(x.caption);
       const cat = (x.category ?? '').trim();
-      // Grid and lightbox use the full-size file (library images: the large variant).
-      return { id, src: imageSrc(x.image), caption, cat, alt: caption || altOf(x.image, altFor(cat)) };
+      // Tiles pick from the -480/-960 files (library images: thumb/md), so a phone
+      // no longer downloads every full-size photo; the lightbox may use the large one.
+      return {
+        id, src: imageSrc(x.image), srcSet: imageSrcSet(x.image), fullSrcSet: imageSrcSet(x.image, { full: true }),
+        caption, cat, alt: caption || altOf(x.image, altFor(cat)),
+      };
     });
   // A filter the editor just removed falls back to the first one.
   const active = filters.some((x) => x.key === filter) ? filter : (filters[0]?.key ?? ALL);
@@ -218,6 +236,8 @@ function GaleriaGridView(p: GridProps) {
               >
                 <img
                   src={photo.src}
+                  srcSet={photo.srcSet}
+                  sizes={TILE_SIZES}
                   alt={photo.alt}
                   loading={i < 6 ? 'eager' : 'lazy'}
                   width={480}
@@ -225,13 +245,22 @@ function GaleriaGridView(p: GridProps) {
                   className="w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   onError={(e) => (((e.target as HTMLImageElement).closest('button') as HTMLButtonElement).style.display = 'none')}
                 />
-                {/* Hover affordance: gradient wash + an «Ampliar» tag (an action hint, not a status badge: radius-sm, decision 0002) */}
+                {/* Hover affordance: gradient wash + an «Ampliar» tag (an action hint, not a status badge: radius-sm, decision 0002).
+                    Below lg both are always shown: with a caption at the bottom, the tag is an icon in the top corner
+                    so the two never overlap (QA 2026-11-24: «Ampliar» sat on top of every caption on phones). */}
                 <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/0 to-ink/0 opacity-100 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100" />
-                <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-sm bg-white/95 px-3 py-1 text-xs font-bold text-ink opacity-100 shadow-sm transition-all duration-300 lg:translate-y-1.5 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 motion-reduce:transition-none">
-                  <Maximize2 size={14} aria-hidden="true" className="text-green-dark" /> {copy.zoomLabel}
+                <span
+                  aria-hidden="true"
+                  data-zoom-tag
+                  className={`pointer-events-none absolute inline-flex items-center gap-1.5 rounded-sm bg-white/95 text-xs font-bold text-ink opacity-100 shadow-sm transition-all duration-300 lg:bottom-3 lg:left-3 lg:right-auto lg:top-auto lg:translate-y-1.5 lg:px-3 lg:py-1 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 motion-reduce:transition-none ${
+                    photo.caption ? 'right-2 top-2 p-1.5' : 'bottom-3 left-3 px-3 py-1'
+                  }`}
+                >
+                  <Maximize2 size={14} aria-hidden="true" className="text-green-dark" />
+                  <span className={photo.caption ? 'hidden lg:inline' : undefined}>{copy.zoomLabel}</span>
                 </span>
                 {photo.caption && (
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-3 pb-2.5 pt-8 text-left text-[12.5px] font-semibold text-white opacity-90 transition-opacity group-hover:opacity-0">
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-3 pb-2.5 pt-8 text-left text-[12.5px] font-semibold text-white opacity-90 transition-opacity lg:group-hover:opacity-0">
                     {photo.caption}
                   </span>
                 )}

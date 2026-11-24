@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { assetSrcSet } from '@/lib/images';
 import { Blob } from '@/components/ui/Blob';
 import { useSiteTexts } from '@/hooks/useSiteSettings';
 
@@ -45,6 +46,8 @@ interface FunnelHeroProps {
   subtitle?: string;
   /** Optional campus photo under the dark wash */
   imageSrc?: string;
+  /** Its smaller files (library images); site photos get their -480/-960 files by default. */
+  imageSrcSet?: string;
   /** Badge above the title; defaults to the cycle badge, '' hides it (CMS). */
   label?: string;
 }
@@ -59,6 +62,7 @@ export function FunnelHero({
   title,
   subtitle,
   imageSrc = '/assets/hopscotch.webp',
+  imageSrcSet,
   label = `Ciclo Escolar ${CURRENT_CYCLE} · Admisiones`,
 }: FunnelHeroProps) {
   const active = STEP_INDEX[step];
@@ -68,6 +72,8 @@ export function FunnelHero({
     <section className="relative overflow-hidden bg-dark text-white">
       <img
         src={imageSrc}
+        srcSet={imageSrcSet ?? assetSrcSet(imageSrc, { full: true })}
+        sizes="100vw"
         alt=""
         className="absolute inset-0 h-full w-full object-cover opacity-30"
         loading="eager"

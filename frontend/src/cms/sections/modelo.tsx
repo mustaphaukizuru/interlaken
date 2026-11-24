@@ -10,12 +10,19 @@
 import { ArrowRight, BookOpenCheck, Globe2, HeartHandshake, Laptop, Leaf, Trophy } from 'lucide-react';
 import { Reveal } from '@/components/ui/Reveal';
 import { Illustration, wash } from '@/components/ui/Illustration';
-import { CARD_SIZES } from '@/lib/images';
 import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import { resolveIllustration } from '@/lib/illustrationTopics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asList, CmsAnchor, defineModule, f, Lines, sectionsOf } from './kit';
+
+/**
+ * Level photos: a 112 px (w-28) thumbnail on phones; from sm a card in a 3-column
+ * (2 with fewer links) grid inside the dark box (measured 2026-11-24: 220 px at 820,
+ * 331 px from 1280 with 3 columns).
+ */
+const thumbSizes = (cols: number) =>
+  cols === 3 ? '(min-width: 1024px) 340px, (min-width: 640px) 30vw, 112px' : '(min-width: 1024px) 500px, (min-width: 640px) 45vw, 112px';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ BookOpenCheck, Globe2, HeartHandshake, Laptop, Leaf, Trophy });
@@ -126,7 +133,7 @@ function ModeloPillarsView(p: PillarsProps) {
                         >
                           {image && (
                             <span className="relative block w-28 shrink-0 overflow-hidden sm:aspect-[16/9] sm:w-auto">
-                              <img src={imageSrc(image, 'md')} srcSet={imageSrcSet(image)} sizes={CARD_SIZES} alt={altOf(image)} width={400} height={225} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                              <img src={imageSrc(image, 'md')} srcSet={imageSrcSet(image)} sizes={thumbSizes(links.length >= 3 ? 3 : 2)} alt={altOf(image)} width={400} height={225} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                             </span>
                           )}
                           <span className="flex min-h-[88px] flex-1 items-center justify-between gap-3 border-l-4 px-5 py-4 sm:min-h-0 sm:border-l-0 sm:border-t-4" style={{ borderColor: color }}>
