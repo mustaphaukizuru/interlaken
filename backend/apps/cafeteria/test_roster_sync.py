@@ -429,3 +429,60 @@ class TestSearchesAcceptBothSpellings:
         assert ids('ci09940') == {'uuid-bare'}                  # bare card, prefixed search
         assert ids('09940') == {'uuid-bare'}
         assert bare.loyverse_id == 'uuid-bare'
+
+
+# ── Speed: an unchanged roster writes nothing (QA 2026-11-24) ────────────────
+
+
+class TestUnchangedRosterCostsNoWrites:
+    """Production's database is remote, and five round trips per student made
+    «Sincronizar roster ahora» run ~90 s, past the 60 s request limit, on a
+    roster where nothing had changed. A second written import of the same
+    store must cost a fixed number of queries, whatever the roster size."""
+
+    def _store(self, n, base=10000):
+        return [cust(f'ci{base + i:05d}', f'Apellido Uno Nombre{i}-4PRI', address='4PRI', points=50)
+                for i in range(n)]
+
+    def _second_run_queries(self, n, base=10000):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        store = self._store(n, base)
+        first = S.import_students_from_loyverse(store, commit=True)
+        assert first['created'] == n
+        with CaptureQueriesContext(connection) as ctx:
+            again = S.import_students_from_loyverse(store, commit=True)
+        assert again['unchanged'] == n and again['updated'] == 0 and again['created'] == 0
+        return len(ctx.captured_queries)
+
+    def test_query_count_does_not_grow_with_the_roster(self):
+        small = self._second_run_queries(3, base=10000)
+        large = self._second_run_queries(30, base=20000)
+        assert large == small, (small, large)
+        assert large <= 6
+
+    def test_the_fast_path_leaves_the_same_state_as_the_full_write(self):
+        store = self._store(2)
+        S.import_students_from_loyverse(store, commit=True)
+        S.import_students_from_loyverse(store, commit=True)
+        for s in StudentProfile.objects.filter(student_id__in=['10000', '10001']):
+            assert s.parents.filter(pk=s.user_id).exists()
+            assert CafeteriaBalance.objects.get(student=s).balance == Decimal('50')
+            assert LoyverseProfile.objects.get(student=s).applied_name.startswith('Apellido Uno')
+
+    def test_a_student_who_lost_the_own_guardian_link_gets_it_back(self):
+        store = self._store(1)
+        S.import_students_from_loyverse(store, commit=True)
+        s = StudentProfile.objects.get(student_id='10000')
+        s.parents.clear()
+        S.import_students_from_loyverse(store, commit=True)
+        assert s.parents.filter(pk=s.user_id).exists()
+
+    def test_an_unseeded_balance_is_still_seeded(self):
+        store = self._store(1)
+        S.import_students_from_loyverse(store, commit=True)
+        s = StudentProfile.objects.get(student_id='10000')
+        CafeteriaBalance.objects.filter(student=s).update(last_synced=None, balance=0, seeded_at=None)
+        S.import_students_from_loyverse(store, commit=True)
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('50')

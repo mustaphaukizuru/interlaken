@@ -3758,6 +3758,19 @@ def _stamp_snapshot(profile, c, snapshot, incoming_name):
     return snapshot
 
 
+def _snapshot_current(snapshot, profile, c, incoming_name) -> bool:
+    """True when ``_stamp_snapshot`` would write nothing for this customer."""
+    from apps.cafeteria.loyverse_profile import parse_customer_snapshot
+
+    if snapshot is None or snapshot.student_id != profile.pk:
+        return False
+    fresh = parse_customer_snapshot(c)
+    return (snapshot.customer_code == fresh['customer_code']
+            and snapshot.name == fresh['name']
+            and snapshot.address_code == fresh['address_code']
+            and snapshot.applied_name == incoming_name)
+
+
 def import_students_from_loyverse(customers, *, commit=False, seed_balances=True) -> dict:
     """Create/refresh StudentProfiles from Loyverse customers (students only).
 
@@ -3805,6 +3818,22 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
         p.loyverse_id: p for p in LoyverseProfile.objects
         .filter(loyverse_id__in={c.get('id') for c in pupils if c.get('id')})
     }
+    # Two more for the written run, so a student whose row would not change
+    # costs no query at all. Production's database is remote (~40 ms a round
+    # trip) and five per student made «Sincronizar roster ahora» run ~90 s,
+    # past the 60 s request limit, on a roster where nothing had changed
+    # (QA 2026-11-24).
+    existing_pks = [s.pk for s in existing_by_code.values()]
+    own_guardian = set(
+        StudentProfile.parents.through.objects
+        .filter(studentprofile_id__in=existing_pks)
+        .values_list('studentprofile_id', 'user_id')
+    ) if commit else set()
+    seeded = set(
+        CafeteriaBalance.objects
+        .filter(student_id__in=existing_pks, last_synced__isnull=False)
+        .values_list('student_id', flat=True)
+    ) if commit else set()
 
     seen_codes = set()
     for c in customers:
@@ -3857,6 +3886,16 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
                 _note_change(report, matricula=code, name=display_name if is_new else
                              existing.user.full_name, field=field, before=before,
                              after=after, action='crear' if is_new else 'actualizar')
+
+            if (commit and not is_new and not diffs and not rename
+                    and (existing.pk, existing.user_id) in own_guardian
+                    and (not uuid or _snapshot_current(snapshot, existing, c, incoming_name))
+                    and not (seed_balances and points > 0 and existing.pk not in seeded)):
+                # Nothing to write: the very state the block below would leave.
+                if uuid:
+                    snapshots[uuid] = snapshot
+                report['unchanged'] += 1
+                continue
 
             if not commit:
                 if is_new:
