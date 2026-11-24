@@ -4,16 +4,11 @@
  * one below, so the site never renders a blank button. Mirrors
  * backend/apps/content/navigation.py validate_chrome.
  */
-/** Where a header button shows: everywhere (default), or `mobile_icon`: only as
- *  an icon in the phone and tablet bar next to the menu button, not on laptops
- *  and up and not in the mobile menu (owner, 2026-11-23: «Colegiaturas»). */
-export type ButtonPlacement = 'all' | 'mobile_icon';
-
 /** `icon` names a lucide icon from the public menu's set (PublicLayout ICONS); unknown names draw none. */
-export interface ChromeButton { label: string; href: string; primary?: boolean; icon?: string; placement?: ButtonPlacement }
+export interface ChromeButton { label: string; href: string; primary?: boolean; icon?: string }
 
-/** A button that shows only as an icon in the phone/tablet bar (needs an icon to draw). */
-export const isMobileIcon = (b: ChromeButton) => b.placement === 'mobile_icon' && !!b.icon;
+/** The tuition site (Servo Escolar): «Colegiaturas» in the header, the menu and /pagos. */
+export const SERVO_ESCOLAR_URL = 'https://interlaken.servoescolar.mx/';
 
 export interface SiteChrome {
   header_buttons: ChromeButton[];
@@ -22,22 +17,28 @@ export interface SiteChrome {
   footer_note: string;
   sticky_label: string;
   sticky_href: string;
+  /** The phone bar button's icon (a name from ChromeLink's set); blank = from its link. */
+  sticky_icon: string;
 }
 
 export const CHROME_DEFAULTS: SiteChrome = {
-  // Owner, 2026-11-22 (after #292): back to two buttons, «Portal Cafetería»
-  // and «Agendar visita»; «Colegiaturas» is no longer a header button (the
-  // «Familias» menu keeps «Colegiaturas y cafetería»). Up to 4 fit
-  // (navigation.validate_chrome).
+  // Header version 3 (school, 2026-11-23): the two family payment links. From
+  // 1024 px they are the header buttons (a signed-in visitor gets the avatar
+  // in place of «Portal Cafetería»); on phones and tablets they open the menu
+  // under «Pagos de familias». «Agendar visita» left the header: it is the
+  // pill in the purple top bar and the button under that block in the menu.
+  // Up to 4 fit (navigation.validate_chrome).
   header_buttons: [
     { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
-    { label: 'Agendar visita', href: '/agendar-visita', primary: true },
+    { label: 'Colegiaturas', href: SERVO_ESCOLAR_URL, icon: 'CreditCard' },
   ],
   footer_tagline: 'Educación bilingüe de excelencia para el desarrollo integral de sus hijos. Tlalnepantla, Estado de México.',
   footer_copyright: '© {{anio}} Colegio Interlaken · Todos los derechos reservados',
   footer_note: 'Reconocimiento de validez oficial · SEP',
-  sticky_label: 'Agendar visita',
-  sticky_href: '/agendar-visita',
+  // The phone bar's button, also the one button of the tablet header (version 3: «Pagos»).
+  sticky_label: 'Pagos',
+  sticky_href: '/pagos',
+  sticky_icon: '',
 };
 
 const text = (v: unknown, fallback: string) => (typeof v === 'string' && v.trim() ? v.trim() : fallback);
@@ -55,6 +56,7 @@ export function resolveChrome(c: Partial<SiteChrome> | null | undefined): SiteCh
     footer_note: text(c?.footer_note, CHROME_DEFAULTS.footer_note),
     sticky_label: text(c?.sticky_label, CHROME_DEFAULTS.sticky_label),
     sticky_href: text(c?.sticky_href, CHROME_DEFAULTS.sticky_href),
+    sticky_icon: typeof c?.sticky_icon === 'string' ? c.sticky_icon.trim() : '',
   };
 }
 
@@ -94,7 +96,7 @@ export type SiteTextKey =
   | 'cookie_text' | 'cookie_link' | 'cookie_decline' | 'cookie_accept'
   | 'wa_admissions' | 'wa_visit' | 'wa_float' | 'wa_password' | 'wa_estimator'
   | 'float_whatsapp' | 'float_visit' | 'float_password'
-  | 'nav_contact' | 'footer_contact' | 'skip_link'
+  | 'nav_contact' | 'footer_contact' | 'skip_link' | 'nav_payments'
   | 'privacy_note' | 'privacy_link'
   | 'funnel_1' | 'funnel_2' | 'funnel_3' | 'funnel_4' | 'funnel_now' | 'funnel_done' | 'funnel_next'
   | 'offline_title' | 'offline_accent' | 'offline_text' | 'offline_retry' | 'offline_home';
@@ -108,7 +110,14 @@ export const LAYOUT_TEXT_DEFAULTS = {
   nav_contact: 'Contacto',
   footer_contact: 'Contacto',
   skip_link: 'Saltar al contenido',
+  // Header version 3: the label over the payment links in the phone/tablet
+  // menu. «Agendar visita» (top bar pill, menu button) is the bubble's
+  // float_visit text, so the three always say the same.
+  nav_payments: 'Pagos de familias',
 } as const;
+
+/** «Agendar visita»: the purple top bar's pill and the menu button (header version 3). */
+export const VISIT_HREF = '/agendar-visita';
 
 /** Footer bottom-bar links when Navegación has none. */
 export const LEGAL_LINKS_DEFAULT: FooterLink[] = [{ label: 'Aviso de Privacidad', href: '/aviso-de-privacidad' }];

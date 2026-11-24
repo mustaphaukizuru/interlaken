@@ -1,8 +1,5 @@
 """Header buttons in SiteSettings.chrome keep their optional icon (menu «Opción 3», 2026-11-20)."""
 
-import pytest
-from rest_framework import serializers
-
 from apps.content.navigation import validate_chrome
 
 
@@ -26,27 +23,18 @@ def test_header_button_icon_is_trimmed_to_40_chars():
     assert out["header_buttons"][0]["icon"] == "A" * 40
 
 
-def test_mobile_icon_placement_is_kept():
-    """«Colegiaturas» (owner, 2026-11-23): only an icon in the phone/tablet bar."""
-    out = validate_chrome(
-        {
-            "header_buttons": [
-                {"label": "Colegiaturas", "href": "https://interlaken.servoescolar.mx", "icon": "CircleDollarSign", "placement": "mobile_icon"},
-                {"label": "Agendar visita", "href": "/agendar-visita", "primary": True, "placement": "all"},
-            ]
-        }
-    )
-    assert out["header_buttons"] == [
-        {"label": "Colegiaturas", "href": "https://interlaken.servoescolar.mx", "primary": False, "icon": "CircleDollarSign", "placement": "mobile_icon"},
-        {"label": "Agendar visita", "href": "/agendar-visita", "primary": True},
-    ]
+def test_old_placement_key_is_dropped():
+    """Header version 3 (2026-11-23) has no «Solo ícono en celular y tableta» button: a saved `placement` goes away on save."""
+    out = validate_chrome({"header_buttons": [{"label": "Colegiaturas", "href": "https://interlaken.servoescolar.mx/", "icon": "CreditCard", "placement": "mobile_icon"}]})
+    assert out["header_buttons"] == [{"label": "Colegiaturas", "href": "https://interlaken.servoescolar.mx/", "primary": False, "icon": "CreditCard"}]
 
 
-def test_mobile_icon_placement_needs_an_icon():
-    with pytest.raises(serializers.ValidationError):
-        validate_chrome({"header_buttons": [{"label": "Colegiaturas", "href": "/pagos", "placement": "mobile_icon"}]})
+def test_header_v3_texts_are_kept():
+    out = validate_chrome({"nav_payments": "  Pagos de familias ", "sticky_icon": "CreditCard"})
+    assert out["nav_payments"] == "Pagos de familias"
+    assert out["sticky_icon"] == "CreditCard"
 
 
-def test_unknown_placement_is_refused():
-    with pytest.raises(serializers.ValidationError):
-        validate_chrome({"header_buttons": [{"label": "X", "href": "/x", "icon": "Coffee", "placement": "footer"}]})
+def test_visit_label_is_the_bubble_text():
+    """«Agendar visita» has one text (float_visit) for the pill, the menu and the bubble."""
+    assert "nav_visit" not in validate_chrome({"nav_visit": "Visítenos"})

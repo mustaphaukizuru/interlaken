@@ -42,10 +42,12 @@ describe('resolveMenu', () => {
     const adminShape = ADMIN_DEFAULT_MENU.map((g) => [g.label, g.items.map((i) => [i.label, i.to])]);
     expect(adminShape).toEqual(publicShape);
   });
-  it('header buttons are «Portal Cafetería» and «Agendar visita», no «Colegiaturas» (owner, 2026-11-22)', () => {
+  it('header buttons are the family payments, «Portal Cafetería» and «Colegiaturas» (header version 3, 2026-11-23)', () => {
     expect(CHROME_DEFAULTS.header_buttons).toEqual([
       { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
-      { label: 'Agendar visita', href: '/agendar-visita', primary: true },
+      { label: 'Colegiaturas', href: 'https://interlaken.servoescolar.mx/', icon: 'CreditCard' },
     ]);
+    // The phone bar's button (also the tablet header's) is «Pagos».
+    expect([CHROME_DEFAULTS.sticky_label, CHROME_DEFAULTS.sticky_href]).toEqual(['Pagos', '/pagos']);
   });
 });

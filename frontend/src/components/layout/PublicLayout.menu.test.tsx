@@ -1,8 +1,10 @@
 /**
  * The public menu as a visitor meets it. «Opción 3» (2026-11-20): «Familias»
- * replaces «Pagos». 2026-11-22: two header buttons (Portal Cafetería /
- * Agendar visita; the owner removed «Colegiaturas») and a single tuition entry
- * in «Familias» («Colegiaturas y cafetería», whose page links to the tuition site).
+ * replaces «Pagos». 2026-11-22: a single tuition entry in «Familias»
+ * («Colegiaturas y cafetería», whose page links to the tuition site). Header
+ * version 3 (2026-11-23): the header buttons are «Portal Cafetería» and
+ * «Colegiaturas»; «Agendar visita» moved to the purple top bar and the menu
+ * (PublicLayout.v3.test.tsx).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
@@ -24,17 +26,17 @@ describe('PublicLayout menu', () => {
     for (const cls of ['sticky', 'top-0', 'z-header', 'bg-white']) expect(header).toHaveClass(cls);
   });
 
-  it('shows «Portal Cafetería» and «Agendar visita», and no «Colegiaturas» or «Pagos» button', () => {
+  it('shows «Portal Cafetería» and «Colegiaturas», and no «Agendar visita» button in the header', () => {
     renderWithProviders(<PublicLayout />);
     const header = screen.getByRole('banner');
     const cafe = within(header).getAllByRole('link', { name: 'Portal Cafetería' });
     expect(cafe[0]).toHaveAttribute('href', '/login');
     // Two buttons fit with their names at every desktop width (no icon-only mode).
     expect(cafe[0].querySelector('.sr-only')).toBeNull();
-    expect(within(header).queryByRole('link', { name: /^Colegiaturas$/ })).not.toBeInTheDocument();
-    expect(within(header).getByRole('link', { name: 'Agendar visita' })).toHaveAttribute('href', '/agendar-visita');
-    expect(within(header).queryByRole('link', { name: /^Pagos$/ })).not.toBeInTheDocument();
-    expect(within(header).queryByRole('button', { name: 'Pagos' })).not.toBeInTheDocument();
+    expect(within(header).getByRole('link', { name: 'Colegiaturas (se abre en otra pestaña)' })).toHaveAttribute('href', 'https://interlaken.servoescolar.mx/');
+    expect(within(header).queryByRole('link', { name: 'Agendar visita' })).not.toBeInTheDocument();
+    // «Pagos» is the tablet's one button (and the phone bar's), not a laptop one.
+    expect(within(header).getByRole('link', { name: 'Pagos' })).toHaveClass('md:inline-flex');
   });
 
   it('«Familias» lists Colegiaturas y cafetería, Facturación and Plataformas, without a second tuition link', async () => {

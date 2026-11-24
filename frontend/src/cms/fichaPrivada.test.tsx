@@ -23,7 +23,7 @@ import { SITE_FORMS } from './editor/fields/FormSelect';
 import { DEFAULT_MENU } from '@/components/layout/PublicLayout';
 import { FUNNEL_DEFAULTS } from '@/components/admissions/FunnelHero';
 import { PRICING_COPY } from '@/components/public/PricingSections';
-import { CHROME_DEFAULTS } from '@/lib/siteChrome';
+import { CHROME_DEFAULTS, VISIT_HREF } from '@/lib/siteChrome';
 import { ROUTE_META } from '@/lib/routeMeta';
 
 const MIGRATION = readFileSync(resolve(process.cwd(), '../backend/apps/content/migrations/0033_ficha_privada_links.py'), 'utf8');
@@ -49,7 +49,8 @@ describe('the private ficha: public defaults', () => {
 
   it('the calls to action are «Agendar visita» and «Solicitar informes» (WhatsApp)', async () => {
     await loadAllGroups();
-    expect(defaultsOf('home.hero').primary).toEqual(VISIT_CTA);
+    // Header version 3 (2026-11-23): the home hero leads to the admission process (the visit is one of its steps).
+    expect(defaultsOf('home.hero')).toMatchObject({ primary: { label: 'Proceso de admisión', href: '/admisiones' }, secondary: { label: 'Ver costos', href: '/admisiones/costos' } });
     expect(defaultsOf('home.cta')).toMatchObject({ primary: VISIT_CTA, secondary: INFORMES_CTA });
     expect(defaultsOf('about.cta')).toMatchObject({ primary: VISIT_CTA, secondary: INFORMES_CTA });
     expect(defaultsOf('admisiones.docs_cta')).toMatchObject({ primary: VISIT_CTA, secondary: INFORMES_CTA });
@@ -73,7 +74,9 @@ describe('the private ficha: public defaults', () => {
     expect(menu).not.toContain('/pre-registro');
     expect(menu).toContain('/agendar-visita');
     expect(CHROME_DEFAULTS.header_buttons.map((b) => b.href)).not.toContain('/pre-registro');
-    expect(CHROME_DEFAULTS.sticky_href).toBe('/agendar-visita');
+    // Header version 3 (2026-11-23): the phone bar is «Pagos»; the visit is the top bar pill and the menu button.
+    expect(CHROME_DEFAULTS.sticky_href).toBe('/pagos');
+    expect(VISIT_HREF).toBe('/agendar-visita');
     expect([PRICING_COPY.ctaPrimary.href, PRICING_COPY.ctaSecondary.href]).not.toContain('/pre-registro');
     // The process as families walk it: visit, exam, inscripción, welcome.
     expect([FUNNEL_DEFAULTS.funnel_1, FUNNEL_DEFAULTS.funnel_2, FUNNEL_DEFAULTS.funnel_3, FUNNEL_DEFAULTS.funnel_4])

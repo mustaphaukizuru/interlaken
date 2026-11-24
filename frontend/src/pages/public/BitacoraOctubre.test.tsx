@@ -28,9 +28,10 @@ describe('Bitácora 13/10/2026', () => {
   it('ref. 6 · Pagos: colegiaturas y boletas (ServoEscolar) and cafetería, no top card', async () => {
     renderWithProviders(<PagosPage />);
     expect(await screen.findByRole('heading', { name: 'Colegiaturas y boletas' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Cafetería' })).toBeInTheDocument();
+    // Header version 3 (2026-11-23): the card has the header button's name.
+    expect(screen.getByRole('heading', { name: 'Portal Cafetería' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ir a colegiaturas y boletas/ })).toHaveAttribute('href', 'https://interlaken.servoescolar.mx/');
-    expect(screen.getByRole('link', { name: /Entrar a Cafetería/ })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: /Entrar al Portal Cafetería/ })).toHaveAttribute('href', '/login');
     expect(screen.queryByText('ServoEscolar')).not.toBeInTheDocument();
   });
 
@@ -39,7 +40,7 @@ describe('Bitácora 13/10/2026', () => {
     for (const name of ['Google Classroom', 'Gmail institucional', 'Mosyle — registro de iPad', 'Educar es Padre']) {
       expect(await screen.findByRole('heading', { name })).toBeInTheDocument();
     }
-    expect(screen.queryByRole('heading', { name: 'Cafetería' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Cafetería/ })).not.toBeInTheDocument();
   });
 
   it('ref. 8 · Facturación: the 7 official fields, all required, and the payments-portal link', async () => {

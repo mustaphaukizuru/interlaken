@@ -19,8 +19,10 @@ import { siteText } from './siteChrome';
 export const WA_DEFAULTS = {
   /** Admissions general — "Informes" step and generic admissions CTAs. */
   wa_admissions: 'Hola, me gustaría recibir informes de admisión del Colegio Interlaken para el ciclo {{ciclo}}.',
-  /** Visit-oriented CTAs (sticky bar next to «Agendar visita»). */
-  wa_visit: 'Hola, quiero agendar una visita al colegio.',
+  /** The phone bar's WhatsApp button. Since header version 3 (2026-11-23) it
+   *  sits next to «Pagos», so it opens with the general question, as the
+   *  bubble does (the key keeps its old name: saved texts still apply). */
+  wa_visit: 'Hola, me gustaría obtener más información sobre el Colegio Interlaken.',
   /** The cost estimator, per section ({seccion} = the section chosen). */
   wa_estimator: 'Hola, me interesa información de {seccion} para el ciclo {{ciclo}}.',
 } as const;

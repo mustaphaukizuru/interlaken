@@ -15,7 +15,7 @@ export const COOKIE_DEFAULTS = {
 } as const;
 
 /**
- * Lift above the public sticky «Agendar visita» bar only where that bar is
+ * Lift above the public phone bar («Pagos» + WhatsApp) only where that bar is
  * on screen (phones, on pages that show it: PublicLayout marks it with
  * `data-sticky-cta`). Elsewhere the banner sits on the bottom edge.
  */

@@ -66,3 +66,14 @@ describe('MobileTabBar', () => {
     expect(marker().style.transform).toBe('translateX(400%)');
   });
 });
+
+describe('MobileTabBar on a phone held sideways', () => {
+  it('shows only the icons (the names stay for screen readers) and a shorter bar', () => {
+    useAuthStore.setState({ user: parent, accessToken: 't', isAuthenticated: true });
+    renderWithProviders(<MobileTabBar role="parent" />, { route: '/portal' });
+    const tab = screen.getByRole('link', { name: 'Inicio' });
+    const LANDSCAPE = '[@media(orientation:landscape)_and_(max-height:500px)]';
+    expect(tab.className).toContain(`${LANDSCAPE}:min-h-[48px]`);
+    expect(within(tab).getByText('Inicio').className).toContain(`${LANDSCAPE}:sr-only`);
+  });
+});

@@ -84,7 +84,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
               end={end}
               aria-label={count > 0 ? `${label}, ${count} pendientes` : undefined}
               className={({ isActive }) =>
-                `tabbar-item group flex min-h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm pb-2 pt-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
+                `tabbar-item group flex min-h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm pb-2 pt-2.5 [@media(orientation:landscape)_and_(max-height:500px)]:min-h-[48px] [@media(orientation:landscape)_and_(max-height:500px)]:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
                   isActive ? 'text-purple' : 'text-ink/75 hover:text-ink'
                 }`
               }
@@ -100,7 +100,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
                     )}
                   </span>
                   {/* 10 px on the narrowest phones, 10.5 px from 360 px: «Comunicados» and «Admisiones» fit whole. */}
-                  <span className={`w-full truncate px-px text-center text-[10px] leading-none tracking-[-0.03em] min-[360px]:text-[10.5px] min-[360px]:tracking-[-0.01em] ${isActive ? 'font-bold text-purple' : 'font-medium text-subtle group-hover:text-ink'}`}>{label}</span>
+                  <span className={`w-full truncate px-px text-center text-[10px] leading-none tracking-[-0.03em] min-[360px]:text-[10.5px] min-[360px]:tracking-[-0.01em] [@media(orientation:landscape)_and_(max-height:500px)]:sr-only ${isActive ? 'font-bold text-purple' : 'font-medium text-subtle group-hover:text-ink'}`}>{label}</span>
                 </>
               )}
             </NavLink>

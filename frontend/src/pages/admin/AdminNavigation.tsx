@@ -29,7 +29,7 @@ import { contentApi, type BulkActionDef, type SiteRedirect } from '@/services/ap
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
-import { copyrightWithToken, fixedCopyrightYear, resolveChrome, type SiteChrome } from '@/lib/siteChrome';
+import { CHROME_DEFAULTS, copyrightWithToken, fixedCopyrightYear, resolveChrome, VISIT_HREF, type SiteChrome } from '@/lib/siteChrome';
 import { CHROME_KEYS, mergeChrome } from '@/lib/chromeMerge';
 import { SiteTextsEditor } from '@/components/admin/SiteTextsEditor';
 import { apiFieldErrors } from '@/lib/apiErrors';
@@ -49,6 +49,22 @@ export const DEFAULT_MENU: MenuGroup[] = [
   { label: 'Admisiones', items: [{ label: 'Proceso de Inscripción', to: '/admisiones', icon: 'ClipboardList' }, { label: 'Documentación', to: '/admisiones/documentacion', icon: 'FileText' }, { label: 'Costos', to: '/admisiones/costos', icon: 'CircleDollarSign' }, { label: 'Agendar visita', to: '/agendar-visita', icon: 'CalendarDays' }] },
   { label: 'Familias', items: [{ label: 'Colegiaturas y cafetería', to: '/pagos', icon: 'CircleDollarSign' }, { label: 'Facturación', to: '/comunidad/facturacion', icon: 'Receipt' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
 ];
+
+/** From 1024 px the header row fits two buttons with their full names; a third one only just. */
+const MAX_HEADER_BUTTONS = 3;
+
+/**
+ * What the saved header still has from before version 3 (school, 2026-11-23):
+ * «Agendar visita» as a header button (it is the purple top bar pill and the
+ * menu button now), more than two buttons, or the phone bar still on the visit.
+ */
+export function headerV3Gaps(c: SiteChrome): string[] {
+  const gaps: string[] = [];
+  if (c.header_buttons.some((b) => b.href.trim() === VISIT_HREF)) gaps.push('«Agendar visita» ya está en la barra morada de arriba y en el menú: quítelo de los botones del encabezado.');
+  if (c.header_buttons.length > 2) gaps.push('Con más de dos botones el encabezado queda muy justo en computadoras de 1024 px.');
+  if (c.sticky_href.trim() === VISIT_HREF) gaps.push('La barra del celular todavía lleva a «Agendar visita»; la versión 3 lleva a «Pagos» (/pagos).');
+  return gaps;
+}
 
 function moveAt<T>(list: T[], i: number, d: -1 | 1): T[] {
   const j = i + d;
@@ -96,11 +112,22 @@ function ChromeEditor() {
   });
   if (isLoading) return <Card><ListSkeleton /></Card>;
   if (isError && !data) return <Card><ErrorState title="No se pudo cargar el encabezado y pie de página" onRetry={() => refetch()} /></Card>;
+  const gaps = headerV3Gaps(value);
+  const useV3 = () => set({ header_buttons: CHROME_DEFAULTS.header_buttons.map((b) => ({ ...b })), sticky_label: CHROME_DEFAULTS.sticky_label, sticky_href: CHROME_DEFAULTS.sticky_href, sticky_icon: '' });
   return (
     <Card title="Encabezado, pie de página y barra móvil">
       <form className="space-y-5" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(value); }}>
+        {gaps.length > 0 && (
+          <div role="status" data-header-v3-notice="" className="space-y-2 rounded-sm bg-warning-bg p-3 text-sm text-ink">
+            <p className="font-semibold text-warning">El encabezado aún no está como la versión 3 aprobada</p>
+            <ul className="list-disc space-y-1 pl-5">{gaps.map((g) => <li key={g}>{g}</li>)}</ul>
+            <Button type="button" size="sm" variant="secondary" onClick={useV3}>Usar la versión 3</Button>
+            <p className="text-xs text-muted">Deja «Portal Cafetería» y «Colegiaturas» en el encabezado y «Pagos» en la barra del celular. Revise y luego toque «Guardar».</p>
+          </div>
+        )}
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-ink">Botones del encabezado (también en el menú móvil)</legend>
+          <p className="text-xs text-muted">En computadoras se ven junto al menú. En celular y tableta van dentro del menú, bajo «Pagos de familias».</p>
           {value.header_buttons.map((b, i) => (
             <div key={i} className="space-y-2 rounded-sm bg-cream-2 p-2">
               <div className="grid items-end gap-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
@@ -109,30 +136,13 @@ function ChromeEditor() {
                 <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={!!b.primary} onChange={(e) => setButton(i, { primary: e.target.checked })} /> Destacado</label>
                 <Button type="button" size="sm" variant="ghost" aria-label={`Quitar botón ${b.label}`} onClick={() => set({ header_buttons: value.header_buttons.filter((_, j) => j !== i) })}><Trash2 size={14} aria-hidden="true" /></Button>
               </div>
-              <div className="grid items-end gap-2 sm:grid-cols-[auto_1fr]">
-                <IconField id={`chrome-btn-icon-${i}`} label="Ícono" value={b.icon ?? ''} onChange={(icon) => setButton(i, { icon: icon || undefined, ...(icon ? {} : { placement: undefined }) })} choices={NAV_ICON_CHOICES} allowNone compact />
-                <div>
-                  <label className="label" htmlFor={`chrome-btn-where-${i}`}>Dónde se muestra</label>
-                  <select
-                    id={`chrome-btn-where-${i}`}
-                    className="input-field"
-                    value={b.placement === 'mobile_icon' ? 'mobile_icon' : 'all'}
-                    onChange={(e) => setButton(i, { placement: e.target.value === 'mobile_icon' ? 'mobile_icon' : undefined })}
-                    aria-describedby={`chrome-btn-where-hint-${i}`}
-                  >
-                    <option value="all">Encabezado y menú del celular</option>
-                    <option value="mobile_icon" disabled={!b.icon}>Solo ícono en celular y tableta</option>
-                  </select>
-                  <p id={`chrome-btn-where-hint-${i}`} className="mt-1 text-xs text-muted">
-                    {b.placement === 'mobile_icon'
-                      ? 'No aparece en computadoras: en celular y tableta se ve solo el ícono, junto al botón del menú.'
-                      : b.icon ? 'Se ve en el encabezado de computadoras y dentro del menú del celular.' : 'Elija un ícono para poder mostrarlo solo como ícono en celular y tableta.'}
-                  </p>
-                </div>
-              </div>
+              <IconField id={`chrome-btn-icon-${i}`} label="Ícono" value={b.icon ?? ''} onChange={(icon) => setButton(i, { icon: icon || undefined })} choices={NAV_ICON_CHOICES} allowNone compact />
             </div>
           ))}
-          {value.header_buttons.length < 4 && (
+          {value.header_buttons.length > 2 && (
+            <p className="text-xs text-warning" role="status">Con {value.header_buttons.length} botones el encabezado queda muy justo en computadoras de 1024 px. Lo recomendado son dos.</p>
+          )}
+          {value.header_buttons.length < MAX_HEADER_BUTTONS && (
             <Button type="button" size="sm" variant="secondary" onClick={() => set({ header_buttons: [...value.header_buttons, { label: '', href: '' }] })}><Plus size={14} aria-hidden="true" /> Agregar botón</Button>
           )}
         </fieldset>
@@ -153,8 +163,9 @@ function ChromeEditor() {
             )}
           </div>
           <Input label="Nota legal del pie" value={value.footer_note} onChange={(e) => set({ footer_note: e.target.value })} />
-          <Input label="Botón de la barra móvil" value={value.sticky_label} onChange={(e) => set({ sticky_label: e.target.value })} />
+          <Input label="Botón de la barra móvil" value={value.sticky_label} onChange={(e) => set({ sticky_label: e.target.value })} hint="La barra de abajo en celulares, junto a WhatsApp. En tabletas es el botón del encabezado." />
           <HrefInput id="chrome-sticky" label="Destino del botón de la barra móvil" value={value.sticky_href} onChange={(href) => set({ sticky_href: href })} />
+          <IconField id="chrome-sticky-icon" label="Ícono del botón de la barra móvil" value={value.sticky_icon} onChange={(icon) => set({ sticky_icon: icon })} choices={NAV_ICON_CHOICES} allowNone compact hint="Sin elegir: una tarjeta si lleva a /pagos, un calendario si lleva a la visita." />
         </div>
         {error && <p className="text-sm text-coral-600" role="alert">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2">

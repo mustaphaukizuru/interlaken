@@ -232,13 +232,23 @@ def table_part(problem: str) -> str:
     return ''
 
 
+# Props whose editor field was retired: the next save of a draft drops them
+# (published versions keep theirs until the next publish). Header version 3
+# (2026-11-23): the home hero has no logo switch and no third button.
+RETIRED_PROPS = {'home.hero': ('showLogo', 'tertiary')}
+
+
 def validate_blocks(blocks) -> list[dict]:
     detail, _errors = block_errors(blocks)
     if detail:
         raise serializers.ValidationError({'blocks': detail})
     out = []
     for b in blocks:
-        block = {'id': str(b.get('id') or uuid.uuid4().hex[:8])[:40], 'type': b['type'], 'props': b.get('props') or {}}
+        props = b.get('props') or {}
+        retired = RETIRED_PROPS.get(b['type'])
+        if retired and isinstance(props, dict):
+            props = {k: v for k, v in props.items() if k not in retired}
+        block = {'id': str(b.get('id') or uuid.uuid4().hex[:8])[:40], 'type': b['type'], 'props': props}
         if b.get('hidden') is True:
             block['hidden'] = True
         out.append(block)

@@ -16,8 +16,7 @@ vi.mock('@/services/api', () => ({
         chrome: {
           header_buttons: [
             { label: 'Portal Cafetería', href: '/login', icon: 'Coffee', primary: false },
-            { label: 'Colegiaturas', href: 'https://interlaken.servoescolar.mx', icon: 'CircleDollarSign', primary: false, placement: 'mobile_icon' },
-            { label: 'Agendar visita', href: '/agendar-visita', primary: true },
+            { label: 'Colegiaturas', href: 'https://interlaken.servoescolar.mx/', icon: 'CreditCard', primary: false },
           ],
         },
       },
@@ -53,7 +52,7 @@ describe('public header when signed in', () => {
     // Initials in the thin ring while there is no photo.
     expect(menus[0]).toHaveTextContent('AL');
     expect(menus[0].querySelector('.rounded-full.border.p-0\\.5')).not.toBeNull();
-    await within(header).findByRole('link', { name: 'Agendar visita' });
+    await within(header).findByRole('link', { name: 'Colegiaturas (se abre en otra pestaña)' });
     expect(within(header).queryByRole('link', { name: 'Portal Cafetería' })).not.toBeInTheDocument();
   });
 
@@ -68,14 +67,16 @@ describe('public header when signed in', () => {
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
   });
 
-  it('the phone menu no longer offers «Portal Cafetería»', async () => {
+  it('the phone menu keeps the whole «Pagos de familias» block (version 3: the avatar is in the bar)', async () => {
     useAuthStore.setState({ user: parent, accessToken: 't', isAuthenticated: true });
     renderWithProviders(<PublicLayout />);
     const header = screen.getByRole('banner');
     await within(header).findAllByRole('button', { name: 'Cuenta' });
     await userEvent.click(within(header).getByRole('button', { name: 'Abrir menú' }));
     const panel = screen.getByRole('dialog', { name: 'Menú de navegación' });
-    expect(within(panel).queryByRole('link', { name: 'Portal Cafetería' })).not.toBeInTheDocument();
+    const block = await within(panel).findByRole('group', { name: 'Pagos de familias' });
+    // A signed-in family goes straight to its cafetería (not to /login and its redirect).
+    expect(within(block).getByRole('link', { name: 'Portal Cafetería' })).toHaveAttribute('href', '/portal/cafeteria');
     expect(within(panel).getByRole('link', { name: 'Agendar visita' })).toBeInTheDocument();
   });
 });
