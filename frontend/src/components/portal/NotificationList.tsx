@@ -1,5 +1,5 @@
 import { Bell } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { groupNotifs, NOTIF_META, pinUrgent, type Notif } from '@/lib/notifications';
 import { notifPreview } from '@/lib/notificationText';
@@ -44,7 +44,7 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin avisos
               const m = NOTIF_META[n.notif_type] ?? NOTIF_META.info;
               const Icon = m.icon;
               const preview = notifPreview(n.message);
-              const when = formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: es });
+              const when = formatDistanceToNowStrict(new Date(n.created_at), { addSuffix: true, locale: es });
               return (
                 <li key={n.id} className="border-b border-line last:border-0">
                   <button

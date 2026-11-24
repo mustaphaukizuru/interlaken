@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Megaphone } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -97,7 +97,7 @@ export default function NotificationDetailPage() {
           {created && (
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
               <time dateTime={data.created_at}>{format(created, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}</time>
-              <span className="text-subtle">· {formatDistanceToNow(created, { addSuffix: true, locale: es })}</span>
+              <span className="text-subtle">· {formatDistanceToNowStrict(created, { addSuffix: true, locale: es })}</span>
             </p>
           )}
 

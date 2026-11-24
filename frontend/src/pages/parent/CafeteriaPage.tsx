@@ -888,7 +888,7 @@ export default function CafeteriaPage() {
         {topupStep === 4 && (
           <dl className="divide-y divide-line rounded-md border border-line text-sm">
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
-            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">{formatMXN(topupAmountNum)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Titular</dt><dd className="text-right font-medium text-ink">{`${cardholder.first_name} ${cardholder.last_name}`.trim()} · CP {cardholder.postal_code}</dd></div>
             {scheduled && !loadsInstantly(policy, topupAmountNum) && (
@@ -1158,7 +1158,7 @@ export default function CafeteriaPage() {
                   <span className={`text-sm font-semibold ${
                     txSign(tx) === '+' ? 'text-green-700' : 'text-ink'
                   }`}>
-                    {txSign(tx)}${parseFloat(tx.amount).toFixed(2)}
+                    {txSign(tx)}{formatMXN(Math.abs(parseFloat(tx.amount)))}
                   </span>
                   {tx.applied === false && (
                     // History only: a purchase older than the opening balance, or a
@@ -1169,7 +1169,7 @@ export default function CafeteriaPage() {
                     </p>
                   )}
                   {tx.balance_after != null && (
-                    <p className="text-xs text-subtle sm:mt-0.5">Saldo ${parseFloat(tx.balance_after).toFixed(2)}</p>
+                    <p className="text-xs text-subtle sm:mt-0.5">Saldo {formatMXN(tx.balance_after)}</p>
                   )}
                 </div>
               </div>
