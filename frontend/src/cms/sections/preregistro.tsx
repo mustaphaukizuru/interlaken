@@ -48,7 +48,7 @@ const useView = () => useSyncExternalStore(subscribe, () => view, () => 'start' 
 interface HeroProps { label?: string; title?: string; subtitle?: string; image?: number | string }
 function PreRegisterHeroView(p: HeroProps) {
   const t = useTokens();
-  const img = useCmsImage(p.image);
+  const img = useCmsImage(p.image, '', { full: true });
   if (useView() === 'other') return null;
   return (
     <FunnelHero
@@ -57,6 +57,7 @@ function PreRegisterHeroView(p: HeroProps) {
       title={t(p.title)}
       subtitle={p.subtitle ? t(p.subtitle) : undefined}
       imageSrc={img.src || undefined}
+      imageSrcSet={img.srcSet}
     />
   );
 }

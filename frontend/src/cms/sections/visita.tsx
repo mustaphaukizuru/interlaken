@@ -45,7 +45,7 @@ const ART_HINT = 'Sin elegir, se muestra la de siempre. «Sin ilustración» la 
 interface HeroProps { label?: string; title?: string; subtitle?: string; image?: number | string }
 function VisitHeroView(p: HeroProps) {
   const t = useTokens();
-  const img = useCmsImage(p.image);
+  const img = useCmsImage(p.image, '', { full: true });
   return (
     <FunnelHero
       step="agendar-visita"
@@ -53,6 +53,7 @@ function VisitHeroView(p: HeroProps) {
       title={t(p.title)}
       subtitle={p.subtitle ? t(p.subtitle) : undefined}
       imageSrc={img.src || undefined}
+      imageSrcSet={img.srcSet}
     />
   );
 }
