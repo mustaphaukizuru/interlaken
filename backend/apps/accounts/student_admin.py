@@ -209,6 +209,20 @@ def _link_on_save(profile, actor) -> dict:
                            'próxima sincronización.'}
 
 
+def _is_admin_login(user) -> bool:
+    return bool(getattr(user, 'role', None) == User.Role.ADMIN or getattr(user, 'is_superuser', False))
+
+
+def _may_change_login_email(requester, target) -> bool:
+    """Families' logins: anyone with «Alumnos». A staff login: an administrator.
+    An administrator's login: never from the student editor."""
+    if _is_admin_login(target):
+        return False
+    if target.role == User.Role.STAFF or target.is_staff:
+        return _is_admin_login(requester)
+    return True
+
+
 class AdminStudentCreateView(APIView):
     """POST /api/v1/accounts/admin/students/ — create a student (admin).
 
@@ -235,6 +249,11 @@ class AdminStudentCreateView(APIView):
         attach = User.objects.filter(email__iexact=email).first() if personal else None
         if attach is None and User.objects.filter(email__iexact=email).exists():
             return Response({'email': ['Ese correo ya está registrado.']}, status=status.HTTP_400_BAD_REQUEST)
+        if attach is not None and _is_admin_login(attach) and not _is_admin_login(request.user):
+            # QA 2026-11-24: attaching a cafetería account to an administrator's
+            # login handed «Alumnos» staff a record whose email they could edit.
+            return Response({'email': ['Solo un administrador puede crear la cuenta de cafetería '
+                                       'de otro administrador.']}, status=status.HTTP_403_FORBIDDEN)
 
         with transaction.atomic():
             if attach is not None:
@@ -289,6 +308,18 @@ class AdminStudentUpdateView(APIView):
                 d.pop(f)
         if not d:
             return Response(_student_payload(profile, request.user))
+
+        new_email = (d.get('email') or '').strip().lower()
+        if new_email and new_email != (profile.user.email or '').lower() and not _may_change_login_email(
+                request.user, profile.user):
+            # QA 2026-11-24: the email IS the login (Google sign-in matches it),
+            # so changing a console account's email here let «Alumnos» staff
+            # sign in as an administrator. Like passwords (admin_password.py),
+            # a staff login's email is changed by an administrator, and an
+            # administrator's never from the student editor.
+            return Response({'email': ['El correo de una cuenta del personal solo lo cambia un administrador, '
+                                       'y el de un administrador no se cambia desde aquí.']},
+                            status=status.HTTP_403_FORBIDDEN)
 
         before = _snapshot(profile)
         old_loyverse_id = profile.loyverse_id or ''

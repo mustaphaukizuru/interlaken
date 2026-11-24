@@ -243,7 +243,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   token_exchange_failed: 'errTokenExchange', userinfo_failed: 'errUserinfo',
   google_unreachable: 'errGoogleUnreachable', google_unavailable: 'errGoogleUnavailable',
   not_invited: 'errNotInvited', inactive: 'errInactive', email_unverified: 'errEmailUnverified',
-  backend_unreachable: 'errBackendUnreachable',
+  backend_unreachable: 'errBackendUnreachable', google_mismatch: 'errGoogleMismatch',
 };
 
 function LoginLogic({ c, p }: { c: Copy; p: LoginProps }) {
@@ -416,6 +416,7 @@ export const sections = [
         f.text('errUserinfo', 'Google: sin perfil'), f.text('errGoogleUnreachable', 'Google: sin respuesta'),
         f.text('errGoogleUnavailable', 'Google: no disponible'), f.text('errNotInvited', 'Correo sin cuenta en el colegio'),
         f.text('errInactive', 'Cuenta desactivada'), f.text('errEmailUnverified', 'Correo de Google sin verificar'),
+        f.text('errGoogleMismatch', 'Personal: otra cuenta de Google'),
         f.text('errBackendUnreachable', 'Servidor no disponible'), f.text('errOther', 'Otro error'),
       ]),
     ],
@@ -450,6 +451,7 @@ export const sections = [
       errNotInvited: 'No hay una cuenta registrada con este correo. Pida al colegio que lo invite o vincule como tutor.',
       errInactive: 'Esta cuenta está desactivada. Si cree que es un error, contacte al colegio.',
       errEmailUnverified: 'Su correo de Google no está verificado. Verifíquelo e intente de nuevo.',
+      errGoogleMismatch: 'Esta cuenta del personal ya está vinculada a otra cuenta de Google. Pida a un administrador que la revise.',
       errBackendUnreachable: 'El servicio no está disponible en este momento. Intente más tarde.',
       errOther: 'Ocurrió un error. Intente de nuevo.',
     },
