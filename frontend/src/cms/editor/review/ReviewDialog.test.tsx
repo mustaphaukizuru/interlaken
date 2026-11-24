@@ -102,3 +102,29 @@ describe('ReviewDialog («Revisión antes de publicar»)', () => {
     expect(violations).toEqual([]);
   });
 });
+
+describe('ReviewDialog: a suggestion with a quick fix (QA 2026-11-23)', () => {
+  const HERO: ReviewReport['suggestions'][number] = {
+    level: 'warning', code: 'hero_repeats_header', key: 'hero_repeats_header:h:primary', acknowledge: false,
+    block_index: 0, block_id: 'h', block_label: 'Inicio · Portada',
+    message: 'Sección 1 (Inicio · Portada), campo «Botón principal»: repite un botón del encabezado.',
+    field: 'primary', field_label: 'Botón principal', field_message: 'Repite un botón del encabezado.',
+    value: { label: 'Agendar visita', href: '/agendar-visita' }, preview: 'Agendar visita',
+    fix: { kind: 'restore', label: 'Usar «Proceso de admisión»', value: { label: 'Proceso de admisión', href: '/admisiones' }, preview: 'Proceso de admisión' },
+  };
+
+  it('shows the fix button, open, and applies it; publishing needs no tick', async () => {
+    const { dialog, props } = renderDialog(report({ errors: [], warnings: [], suggestions: [HERO], changes: [] }));
+    const fix = within(dialog).getByRole('button', { name: 'Usar «Proceso de admisión»' });
+    expect(fix).toBeVisible();
+    await userEvent.click(fix);
+    expect(props.onFix).toHaveBeenCalledWith(HERO);
+    expect(within(dialog).queryByRole('checkbox', { name: 'Entiendo las advertencias' })).not.toBeInTheDocument();
+  });
+
+  it('a suggestion without a fix stays a plain line, closed', () => {
+    const { dialog } = renderDialog(report({ errors: [], warnings: [], suggestions: [SEO_ADVICE], changes: [] }));
+    expect(dialog.querySelector('details')).not.toHaveAttribute('open');
+    expect(within(dialog).queryByRole('button', { name: /Usar/ })).not.toBeInTheDocument();
+  });
+});

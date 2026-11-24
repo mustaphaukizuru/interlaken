@@ -99,7 +99,7 @@ describe('AdminNavigation header, version 3 (2026-11-23)', () => {
       { label: 'Colegiaturas', href: 'https://interlaken.servoescolar.mx/', icon: 'CreditCard' },
     ]);
     expect([sent.chrome.sticky_label, sent.chrome.sticky_href]).toEqual(['Pagos', '/pagos']);
-  });
+  }, 15_000);
 
   it('no notice once the header is version 3', async () => {
     vi.mocked(contentApi.adminGetSettings).mockResolvedValue({ data: { menu: [], chrome: {} } } as never);

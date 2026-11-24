@@ -596,9 +596,11 @@ def hero_preload(blocks) -> dict | None:
         if not isinstance(src, str) or not _ASSET_WEBP.match(src) or re.search(r'-(480|960)\.webp$', src):
             return None
         base = src[:-len('.webp')]
-        srcset = (f'{base}-480.webp 480w, {src} 960w' if base in _NO_960
-                  else f'{base}-480.webp 480w, {base}-960.webp 960w, {src} 1600w')
-        return {'href': src, 'srcset': srcset, 'sizes': HOME_HERO_SIZES}
+        # A space separates srcset candidates: «interlaken-image (1).webp» must be encoded.
+        u = lambda path: path.replace(' ', '%20')  # noqa: E731
+        srcset = (f'{u(base)}-480.webp 480w, {u(src)} 960w' if base in _NO_960
+                  else f'{u(base)}-480.webp 480w, {u(base)}-960.webp 960w, {u(src)} 1600w')
+        return {'href': u(src), 'srcset': srcset, 'sizes': HOME_HERO_SIZES}
     return None
 
 

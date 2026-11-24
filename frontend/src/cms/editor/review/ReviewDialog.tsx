@@ -90,7 +90,8 @@ function ReviewBody({ pageTitle, report, loading, onClose, onFix, onJump, canPub
         <IssueGroup title="Advertencias" hint="Pueden publicarse, pero casi siempre son un descuido." tone="warning" issues={warnings} onFix={onFix} onJump={onJump} busy={loading} />
       )}
       {suggestions.length > 0 && (
-        <details className="group rounded-md bg-white p-3 shadow-card">
+        // Opens by itself when a suggestion can be fixed in one click.
+        <details className="group rounded-md bg-white p-3 shadow-card" open={suggestions.some((s) => s.fix) || undefined}>
           <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink sm:min-h-[32px]">
             <ChevronDown size={16} className="shrink-0 -rotate-90 transition-transform group-open:rotate-0" aria-hidden="true" />
             <Lightbulb size={16} className="shrink-0 text-subtle" aria-hidden="true" />
@@ -98,7 +99,9 @@ function ReviewBody({ pageTitle, report, loading, onClose, onFix, onJump, canPub
             <span className="font-normal text-subtle">· no impiden publicar</span>
           </summary>
           <ul className="mt-2 space-y-1.5 text-sm">
-            {suggestions.map((s) => <li key={s.key} className="text-ink">{s.message}</li>)}
+            {suggestions.map((s) => (s.fix
+              ? <IssueItem key={s.key} issue={s} box="border-line bg-white" icon={<Lightbulb size={17} className="mt-0.5 shrink-0 text-subtle" aria-label="Sugerencia" />} onFix={onFix} onJump={onJump} busy={loading} />
+              : <li key={s.key} className="text-ink">{s.message}</li>))}
           </ul>
         </details>
       )}

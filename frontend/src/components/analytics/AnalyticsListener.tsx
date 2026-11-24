@@ -28,7 +28,7 @@ export function AnalyticsListener() {
   // Report a page view on every route change (including the initial load).
   useEffect(() => {
     // Skip the very first render only if consent isn't granted yet; the
-    // CookieConsent accept handler tracks the initial view once granted.
+    // consent listener above reports the current page once it is granted.
     if (firstRun.current) {
       firstRun.current = false;
       if (!hasAnalyticsConsent()) return;

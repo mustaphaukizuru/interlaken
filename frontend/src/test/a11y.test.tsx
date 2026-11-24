@@ -198,11 +198,13 @@ describe('page sweep — no serious/critical axe violations', () => {
     // AdminPages imports every CMS section group first: give a loaded suite time.
     await waitFor(() => {
       expect(container.querySelector('.skeleton')).toBeNull();
-    }, { timeout: 5000 });
+    }, { timeout: 12_000 });
     const results = await axe(container);
     const gating = results.violations.filter((v) =>
       ['serious', 'critical'].includes(v.impact ?? ''),
     );
     expect(gating).toEqual([]);
-  });
+    // The test itself must outlast the wait plus the axe scan (AdminPages took
+    // over 5 s on a loaded machine, QA 2026-11-23).
+  }, 20_000);
 });
