@@ -2,8 +2,10 @@
 A family adds another child itself, without the office (2026-11-13).
 
     GET  /accounts/me/family/          the children this login sees + whether it may add one
-    POST /accounts/me/family/add/      {student}  (school email or matrícula) → sends a code
+    POST /accounts/me/family/add/      {student}  (school email or matrícula) → sends a code;
+                                       answers only {sent_count, expires_in_minutes}
     POST /accounts/me/family/confirm/  {student, code} → links the child to the family
+                                       (the child's name comes back only here)
     POST /accounts/me/family/remove/   {student}  (id) → takes a sibling out of the family
 
 Proof of the relationship: a 6-digit code goes to the other child's mailboxes
@@ -210,10 +212,12 @@ class MyFamilyAddView(APIView):
         if not sent:
             return _bad('No se pudo enviar el correo con el código. Inténtelo de nuevo en unos minutos.',
                         'send_failed', status.HTTP_503_SERVICE_UNAVAILABLE)
+        # Nothing about the child before the code proves the family: anyone
+        # signed in can type a matrícula here, so no name, grade, group or
+        # (even masked) mailbox leaves the server. MyFamilyConfirmView names
+        # the child once the code is right (QA 2026-11-24).
         return Response({
-            'sent_to': [mask_email(m) for m in mailboxes],
-            'student': {'name': child.user.full_name, 'first_name': child.user.first_name,
-                        'grade': child.grade, 'group': child.group},
+            'sent_count': len(mailboxes),
             'expires_in_minutes': int(CODE_TTL.total_seconds() // 60),
         })
 

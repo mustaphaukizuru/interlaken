@@ -72,6 +72,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     # leaves every list and cannot sign in; its history stays. None = on the lists.
     archived_at = models.DateTimeField('Archivado', null=True, blank=True, db_index=True)
 
+    # Set when an administrator generates or sets a temporary password for this
+    # account; cleared when the person creates their own (POST /me/password/)
+    # or signs in with Google (the temporary one is then made unusable). While
+    # it is set the API answers 403 ``password_change_required`` to everything
+    # but a short allowlist (apps/accounts/authentication.py).
+    password_change_required = models.BooleanField('Debe crear su contraseña', default=False)
+
     @property
     def mailboxes(self) -> list[str]:
         """Where this account's emails go: its own address (unless synthetic)

@@ -3,6 +3,8 @@ accounts/staff_users.py — portal staff-user management (BACKLOG P1-H1, AF-4 ga
 
 GET   /accounts/admin/staff/            list admin + staff accounts (archived ones: ?activo=archivadas)
 POST  /accounts/admin/staff/            invite: create with a generated password (returned once)
+                                        and email the person where to sign in (never the
+                                        password); ``invite_email_sent`` says if it left
 PATCH /accounts/admin/staff/<pk>/       role / active / name / email
 POST  /accounts/admin/staff/<pk>/reset-password/   new generated password (returned once)
 GET   /accounts/admin/staff/<pk>/activity/         the account and its last actions in Auditoría
@@ -17,6 +19,9 @@ would own that account, the same rule ``admin_password`` and
 """
 from __future__ import annotations
 
+import logging
+
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.db import transaction
@@ -42,11 +47,60 @@ from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 
 from .account_removal import archive_account, has_history, restore_account
-from .admin_password import generate_temporary_password, revoke_refresh_tokens
+from .admin_password import (
+    generate_temporary_password,
+    revoke_refresh_tokens,
+    set_temporary_password,
+)
 from .filters import StaffFilterSet
 from .models import User
 
+logger = logging.getLogger(__name__)
+
 STAFF_ROLES = (User.Role.ADMIN, User.Role.STAFF)
+
+
+def invite_email(user: User):
+    """``(subject, EmailContent)`` telling a new staff member where to sign in.
+
+    It never carries the password: the school hands the temporary one over in
+    person, and the console asks to replace it at the first sign-in.
+    """
+    from apps.portal.emailing import EmailContent
+
+    login_url = f"{(settings.FRONTEND_URL or '').rstrip('/')}/login"
+    created = 'creó una cuenta para usted en la consola del personal.'
+    content = EmailContent(
+        category='Consola del colegio',
+        title='Se creó su cuenta en la consola del Colegio Interlaken',
+        intro=(f'Hola {user.first_name}: el colegio {created}' if user.first_name
+               else f'El colegio {created}'),
+        preheader='Su cuenta está lista. Le decimos cómo entrar.',
+        details=[('Su correo de acceso', user.email), ('Dónde entrar', login_url)],
+        paragraphs=[
+            'Puede entrar con «Continuar con Google» usando este mismo correo.',
+            'También puede entrar con la contraseña temporal que el colegio le entregará en persona. '
+            'La primera vez que entre se le pedirá crear su propia contraseña.',
+        ],
+        cta_label='Entrar a la consola',
+        cta_url=login_url,
+        note=('Por seguridad, este correo no incluye ninguna contraseña. Si no esperaba esta cuenta, '
+              'avise al colegio.'),
+        reason='Recibe este correo porque un administrador del Colegio Interlaken creó una cuenta con esta dirección.',
+    )
+    return 'Su cuenta en la consola del Colegio Interlaken', content
+
+
+def send_invite_email(user: User) -> bool:
+    """Best effort: a mail problem never undoes the invitation."""
+    from apps.portal.services import send_email
+
+    try:
+        subject, content = invite_email(user)
+        return bool(send_email(subject=subject, message='', recipients=[user.email], content=content))
+    except Exception:  # noqa: BLE001 - the account exists either way
+        logger.warning('Staff invite email failed for user #%s', user.pk, exc_info=True)
+        return False
 
 
 class StaffUserSerializer(serializers.ModelSerializer):
@@ -161,14 +215,18 @@ class StaffListCreateView(AdminListMixin, generics.ListAPIView):
 
         password = generate_temporary_password()
         with transaction.atomic():
+            # A temporary password: the person creates their own at the first sign-in.
             user = User.objects.create_user(email=email, password=password, first_name=first, last_name=last,
                                             role=role, is_staff=(role == User.Role.ADMIN),
-                                            staff_title=title, staff_areas=areas)
+                                            staff_title=title, staff_areas=areas,
+                                            password_change_required=True)
             record('create', user, {'via': 'portal', 'role': role, 'staff_title': title,
                                     'staff_areas': areas},
                    actor=request.user, context='portal: alta de personal')
         data = StaffUserSerializer(user).data
         data['temporary_password'] = password  # shown once
+        # Where to sign in, by email (never the password, handed over in person).
+        data['invite_email_sent'] = send_invite_email(user)
         return Response(data, status=status.HTTP_201_CREATED)
 
 
@@ -324,8 +382,7 @@ class StaffResetPasswordView(APIView):
             return Response({'detail': ADMIN_RESET_REFUSED}, status=status.HTTP_403_FORBIDDEN)
         password = generate_temporary_password()
         with transaction.atomic():
-            target.set_password(password)
-            target.save(update_fields=['password'])
+            set_temporary_password(target, password)
             revoked = revoke_refresh_tokens(target)
             record('permission', target, {'password': ['[redacted]', '[redacted]'], 'sessions_revoked': revoked},
                    actor=request.user, context='accounts.staff_set_password')

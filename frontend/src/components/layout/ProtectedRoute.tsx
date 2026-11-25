@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { CreatePasswordScreen } from '@/components/portal/CreatePasswordScreen';
 import type { ReactNode } from 'react';
 import type { User } from '@/types';
 
@@ -14,6 +15,13 @@ export function ProtectedRoute({ children, roles }: Props) {
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // A temporary password from the school: «Cree su contraseña» before any
+  // portal or console page. Once saved, this same route renders the page the
+  // person was going to (the login's destination or a deep link).
+  if (user.password_change_required) {
+    return <CreatePasswordScreen />;
   }
 
   if (roles && !roles.includes(user.role)) {

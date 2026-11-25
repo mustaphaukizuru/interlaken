@@ -67,9 +67,7 @@ class TestAddAndConfirm:
         api_client.force_authenticate(olivia.user)
         resp = api_client.post(ADD, {'student': 'CI09628@interlaken.com.mx'}, format='json')
         assert resp.status_code == 200, resp.data
-        assert resp.data['sent_to'] == ['ci…@interlaken.com.mx']
-        assert resp.data['student']['name'] == 'Alejandro Alvarado Felix'
-        assert 'code' not in resp.data
+        assert resp.data == {'sent_count': 1, 'expires_in_minutes': 15}
         row = FamilyLinkCode.objects.get()
         code = _code_from(mailoutbox, 'ci09628@interlaken.com.mx')
         assert code not in row.code_hash  # only a hash is stored
@@ -78,6 +76,8 @@ class TestAddAndConfirm:
             done = api_client.post(CONFIRM, {'student': 'ci09628@interlaken.com.mx', 'code': f'{code[:3]} {code[3:]}'},
                                    format='json')
         assert done.status_code == 200, done.data
+        # The child is named only now, after the code proved the family.
+        assert done.data['linked'] == 'Alejandro Alvarado Felix'
         assert sorted(c['id'] for c in done.data['children']) == sorted([olivia.pk, alejandro.pk])
         # Both logins now see both children.
         for login in (olivia.user, alejandro.user):
@@ -88,6 +88,21 @@ class TestAddAndConfirm:
         assert AuditLog.objects.filter(context='familia: vinculada por la familia').exists()
         row.refresh_from_db()
         assert row.used_at is not None
+
+    def test_sending_the_code_reveals_nothing_about_the_child(self, api_client, kids, mailoutbox):
+        """Anyone signed in can type a matrícula: before the code proves the
+        family, the answer carries no name, grade, group or mailbox (QA 2026-11-24)."""
+        olivia, alejandro = kids
+        mom = ParentFactory(email='mama.alvarado@correo.mx', first_name='Marta')
+        alejandro.parents.add(mom)
+        api_client.force_authenticate(olivia.user)
+        resp = api_client.post(ADD, {'student': '09628'}, format='json')
+        assert resp.status_code == 200, resp.data
+        assert set(resp.data) == {'sent_count', 'expires_in_minutes'}
+        assert resp.data['sent_count'] == 2  # the school address and the guardian's
+        body = resp.content.decode()
+        for leak in ('Alejandro', 'Alvarado', 'Secundaria', 'ci09628', 'ci…', 'mama', 'correo.mx', '09628'):
+            assert leak not in body, leak
 
     def test_by_matricula_in_the_loyverse_spelling(self, api_client, kids, mailoutbox):
         olivia, _ = kids

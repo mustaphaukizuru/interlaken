@@ -22,6 +22,9 @@ const alejandro = {
   own: false, removable: true,
 };
 
+// What the server answers once the code left: nothing about the child (QA 2026-11-24).
+const CODE_SENT = { sent_count: 2, expires_in_minutes: 15 };
+
 const get = vi.mocked(myFamilyApi.get);
 const add = vi.mocked(myFamilyApi.add);
 const confirm = vi.mocked(myFamilyApi.confirm);
@@ -34,10 +37,7 @@ describe('MyChildren (Mi perfil → Mis hijos)', () => {
   });
 
   it('lists the children and adds another one with the emailed code', async () => {
-    add.mockResolvedValue({ data: {
-      sent_to: ['ci…@interlaken.com.mx'], expires_in_minutes: 15,
-      student: { name: 'Alejandro Alvarado Felix', first_name: 'Alejandro', grade: '1° Secundaria', group: 'A' },
-    } } as never);
+    add.mockResolvedValue({ data: CODE_SENT } as never);
     confirm.mockResolvedValue({ data: { linked: 'Alejandro Alvarado Felix', children: [olivia, alejandro] } } as never);
 
     renderWithProviders(<MyChildren />);
@@ -73,10 +73,7 @@ describe('MyChildren (Mi perfil → Mis hijos)', () => {
   });
 
   it('a wrong code keeps the person on the code step with the message', async () => {
-    add.mockResolvedValue({ data: {
-      sent_to: ['ci…@interlaken.com.mx'], expires_in_minutes: 15,
-      student: { name: 'Alejandro Alvarado Felix', first_name: 'Alejandro', grade: '1° Secundaria', group: 'A' },
-    } } as never);
+    add.mockResolvedValue({ data: CODE_SENT } as never);
     confirm.mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { detail: 'El código no coincide. Le quedan 4 intentos.' } } });
     renderWithProviders(<MyChildren />);
     await userEvent.click(await screen.findByRole('button', { name: /Agregar otro hijo/ }));
@@ -102,10 +99,7 @@ describe('MyChildren (Mi perfil → Mis hijos)', () => {
     fireEvent.click(send);
     await waitFor(() => expect(send).toBeDisabled());
     expect(add).toHaveBeenCalledTimes(1);
-    await act(async () => sendDone({ data: {
-      sent_to: ['ci…@interlaken.com.mx'], expires_in_minutes: 15,
-      student: { name: 'Alejandro Alvarado Felix', first_name: 'Alejandro', grade: '1° Secundaria', group: 'A' },
-    } }));
+    await act(async () => sendDone({ data: CODE_SENT }));
 
     await userEvent.type(await screen.findByLabelText('Código de 6 números'), '123456');
     const submit = screen.getByRole('button', { name: 'Agregar a su cuenta' });

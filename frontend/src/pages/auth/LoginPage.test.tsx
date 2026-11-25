@@ -23,6 +23,7 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import LoginPage from './LoginPage';
+import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { api, authApi, bootstrapSession } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 
@@ -99,6 +100,35 @@ describe('LoginPage email/password submit', () => {
     expect(useAuthStore.getState().accessToken).toBe('acc');
     expect(localStorage.getItem('access_token')).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
+
+  // 2026-11-24: an admin-invited account with a temporary password that also
+  // turned on TOTP: the code first, then «Cree su contraseña» before the console.
+  it('temporary password + TOTP: the code step, then «Cree su contraseña» instead of the console', async () => {
+    mockedPost
+      .mockRejectedValueOnce({ response: { status: 401, data: { totp_required: true, detail: 'Ingrese el código de su app de autenticación.' } } })
+      .mockResolvedValueOnce({ data: { access: 'acc', password_change_required: true } } as never);
+    mockedMe.mockResolvedValueOnce({ data: {
+      id: 5, email: 'parent@test.mx', role: 'admin', full_name: 'Nueva Admin', first_name: 'Nueva', last_name: 'Admin',
+      avatar: '', whatsapp: '', staff_areas: [], password_change_required: true,
+    } } as never);
+    render(providers(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin" element={<ProtectedRoute roles={['admin']}><div>ADMIN CONSOLE</div></ProtectedRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    ));
+    await fillAndSubmit();
+    const code = await screen.findByLabelText(/Código de verificación/);
+    await userEvent.type(code, '123456');
+    await userEvent.click(screen.getByRole('button', { name: /ingresar/i }));
+    await waitFor(() => expect(mockedPost).toHaveBeenLastCalledWith('/accounts/token/', {
+      email: 'parent@test.mx', password: 's3cret', totp: '123456',
+    }));
+    expect(await screen.findByRole('heading', { name: 'Cree su contraseña' })).toBeInTheDocument();
+    expect(screen.queryByText('ADMIN CONSOLE')).toBeNull();
   });
 
   it('shows an error message on invalid credentials', async () => {

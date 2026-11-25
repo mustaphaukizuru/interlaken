@@ -197,7 +197,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # ── REST FRAMEWORK ────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # SimpleJWT's bearer JWT plus the «Cree su contraseña» gate: an account
+        # with a temporary password gets 403 password_change_required.
+        'apps.accounts.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
