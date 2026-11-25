@@ -63,7 +63,15 @@ def _square_webp(data: bytes) -> bytes:
     if width * height > MAX_DECODE_PIXELS:
         raise ImageTooLarge(f'{width}x{height}')
     img = ImageOps.exif_transpose(img)
-    if img.mode not in ('RGB', 'RGBA'):
+    # Photos are always opaque: transparency (a PNG cut-out, or a crop dragged
+    # past the frame by an older page) is flattened onto white. A transparent
+    # band rendered as an empty patch on the printed credencial.
+    if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+        rgba = img.convert('RGBA')
+        flat = Image.new('RGB', rgba.size, (255, 255, 255))
+        flat.paste(rgba, mask=rgba.getchannel('A'))
+        img = flat
+    elif img.mode != 'RGB':
         img = img.convert('RGB')
     img = ImageOps.fit(img, (SIZE, SIZE), Image.LANCZOS, centering=(0.5, 0.5))
     out = io.BytesIO()
