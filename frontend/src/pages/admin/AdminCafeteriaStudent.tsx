@@ -21,6 +21,7 @@ import type { CafeteriaStudentDetail } from '@/types';
 import { DataTable } from '@/components/ui/DataTable';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
+import { AllergyNotice } from '@/components/admin/CafeteriaAllergy';
 import { isCardTopUp, movementSign } from '@/lib/status/cafeteria';
 import { MovementAmount } from '@/components/admin/MovementAmount';
 import { useAdjustmentsList, useTransactionsList, CAF_MONEY_VIEWS } from '@/hooks/queries/cafeteria';
@@ -207,6 +208,9 @@ export default function AdminCafeteriaStudent() {
           </Button>
         </div>
       </div>
+
+      {/* Allergies, only under the school's switch (Ajustes) and the family's authorisation. */}
+      <AllergyNotice student={balance.student} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>

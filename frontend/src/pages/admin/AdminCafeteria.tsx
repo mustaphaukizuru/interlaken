@@ -33,6 +33,7 @@ import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
 import { MulticobrosUploadButton } from '@/components/admin/MulticobrosUploadButton';
 import { AppliedTodayList, ApplyPaidDialog, PaidTopUpQueue } from '@/components/admin/PaidTopUpQueue';
 import { PersonalTag } from '@/components/admin/PersonalTag';
+import { AllergyTag } from '@/components/admin/CafeteriaAllergy';
 import { RowActionsMenu, type RowMenuItem } from '@/components/admin/RowActionsMenu';
 import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
@@ -258,6 +259,7 @@ function balanceColumns(name: string): Column<CafeteriaBalance>[] {
         <span className="flex flex-wrap items-center gap-1.5">
           <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>
           {b.student.tipo === 'personal' && <PersonalTag />}
+          <AllergyTag student={b.student} />
         </span>
       ),
     },

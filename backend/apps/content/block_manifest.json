@@ -1786,7 +1786,16 @@
         "loadError": "No se pudo cargar la lista",
         "retryLabel": "Botón «Reintentar»",
         "invalidText": "Enlace usado o caducado",
-        "invalidEmail": "Correo para escribir"
+        "invalidEmail": "Correo para escribir",
+        "newLinkTitle": "Enlace nuevo: título",
+        "newLinkText": "Enlace nuevo: explicación",
+        "newLinkEmailLabel": "Enlace nuevo: campo de correo",
+        "newLinkButton": "Enlace nuevo: botón",
+        "newLinkSending": "Enlace nuevo: botón mientras se envía",
+        "newLinkDone": "Enlace nuevo: confirmación",
+        "newLinkBadEmail": "Enlace nuevo: correo no válido",
+        "newLinkTooMany": "Enlace nuevo: demasiadas solicitudes",
+        "newLinkError": "Enlace nuevo: no se pudo enviar"
       },
       "kinds": {
         "label": "text",
@@ -1827,7 +1836,16 @@
         "loadError": "text",
         "retryLabel": "text",
         "invalidText": "textarea",
-        "invalidEmail": "text"
+        "invalidEmail": "text",
+        "newLinkTitle": "text",
+        "newLinkText": "textarea",
+        "newLinkEmailLabel": "text",
+        "newLinkButton": "text",
+        "newLinkSending": "text",
+        "newLinkDone": "textarea",
+        "newLinkBadEmail": "text",
+        "newLinkTooMany": "text",
+        "newLinkError": "text"
       },
       "defaults": {
         "label": "Admisiones",
@@ -1871,7 +1889,16 @@
         "loadError": "No se pudo cargar la lista de documentos. Revise su conexión e intente de nuevo.",
         "retryLabel": "Reintentar",
         "invalidText": "Este enlace ya se usó o caducó. Pida a admisiones un nuevo enlace de documentos, o escriba a",
-        "invalidEmail": "{{correo}}"
+        "invalidEmail": "{{correo}}",
+        "newLinkTitle": "Pedir un enlace nuevo",
+        "newLinkText": "Escriba el correo con el que hizo la solicitud de inscripción. Si coincide, le enviaremos a ese correo un enlace nuevo para subir los documentos.",
+        "newLinkEmailLabel": "Correo electrónico",
+        "newLinkButton": "Pedir un enlace nuevo",
+        "newLinkSending": "Enviando…",
+        "newLinkDone": "Si el correo coincide con una solicitud en curso, le enviaremos un enlace nuevo en unos minutos. Revise también su carpeta de spam.",
+        "newLinkBadEmail": "Escriba un correo electrónico válido.",
+        "newLinkTooMany": "Ya pidió varios enlaces. Espere una hora e intente de nuevo, o escriba a admisiones.",
+        "newLinkError": "No se pudo enviar la solicitud. Revise su conexión e intente de nuevo."
       }
     },
     "facturacion.download": {

@@ -252,18 +252,80 @@ CONSOLE_HIDDEN_STUDENT_FIELDS = (
     'blood_type', 'allergies', 'medical_notes',
 )
 
+# Context key: {student pk: allergies} for the rows being serialized, or None
+# when the school's switch is off (see ``console_allergies``).
+CONSOLE_ALLERGIES = 'console_allergies'
+_NOT_LOOKED_UP = object()
+
+
+def cafeteria_shows_allergies() -> bool:
+    """Ajustes → «La cafetería ve las alergias» (off by default). Read without
+    ``SiteSettings.load()``: a read must never create the row."""
+    from apps.content.models import SiteSettings
+
+    return bool(SiteSettings.objects.filter(pk=1)
+                .values_list('cafeteria_shows_allergies', flat=True).first())
+
+
+def console_allergies(students) -> dict[int, str] | None:
+    """What the cafetería console may show of these students' health data.
+
+    ``None`` while the school's switch is off: no allergy key reaches the
+    console at all. On: ``{pk: allergies}`` for the students whose family
+    authorised health data (``accounts.medical.family_authorised_ids``, the
+    guardian rule); the others are left out. Only ``allergies``, never blood
+    type, medical notes, CURP or birth date.
+    """
+    if not cafeteria_shows_allergies():
+        return None
+    from apps.accounts.medical import family_authorised_ids
+
+    students = list(students)
+    allowed = family_authorised_ids(students)
+    return {s.pk: (s.allergies or '').strip() for s in students if s.pk in allowed}
+
 
 class CafeteriaConsoleStudentSerializer(StudentProfileSerializer):
+    """The student as the cafetería console sees it: no personal data. With
+    the allergies switch on, ``allergies_shared`` says whether the family
+    authorised health data and, when it did, ``allergies`` carries that one
+    field (may be empty: none recorded)."""
+
     class Meta(StudentProfileSerializer.Meta):
         fields = [f for f in StudentProfileSerializer.Meta.fields
                   if f not in CONSOLE_HIDDEN_STUDENT_FIELDS]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        shared = self.context.get(CONSOLE_ALLERGIES, _NOT_LOOKED_UP)
+        if shared is _NOT_LOOKED_UP:  # a single row (the per-student page): look it up
+            shared = console_allergies([instance])
+        if shared is not None:
+            data['allergies_shared'] = instance.pk in shared
+            if instance.pk in shared:
+                data['allergies'] = shared[instance.pk]
+        return data
+
+
+class _ConsoleBalanceListSerializer(serializers.ListSerializer):
+    """A page of console balances: the allergies of the whole page in one go
+    (the switch, the family links and the consents: a fixed number of reads)."""
+
+    def to_representation(self, data):
+        rows = list(data.all() if hasattr(data, 'all') else data)
+        if CONSOLE_ALLERGIES not in self.context:  # the root's context: every row reads it
+            self.context[CONSOLE_ALLERGIES] = console_allergies([b.student for b in rows])
+        return super().to_representation(rows)
 
 
 class AdminCafeteriaBalanceSerializer(CafeteriaBalanceSerializer):
     """``CafeteriaBalanceSerializer`` for the cafetería console (admin/balances,
     admin/low-balance, admin/student/<pk>): the same wallet fields, the student
-    without personal data."""
+    without personal data (allergies only under the school's switch, above)."""
     student = CafeteriaConsoleStudentSerializer(read_only=True)
+
+    class Meta(CafeteriaBalanceSerializer.Meta):
+        list_serializer_class = _ConsoleBalanceListSerializer
 
 
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):

@@ -12,6 +12,7 @@ import { invalidateStudents, studentDetailKey } from '@/hooks/queries/studentKey
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import { PUESTO_OPTIONS } from '@/lib/people';
 import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import type { LoyverseLinkOutcome, PersonTipo, StudentProfile } from '@/types';
 
 interface Props {
@@ -111,6 +112,11 @@ export function StudentFormModal({ open, onClose, student, onSaved, defaultTipo 
 
 const MEDICAL_KEYS: ReadonlyArray<keyof StudentWrite> = ['blood_type', 'allergies', 'medical_notes'];
 
+/* Who really sees the allergies (apps/accounts/medical.py): it follows Ajustes →
+   «La cafetería ve las alergias» (off by default). */
+const ALLERGY_HINT_OFF = 'Solo la ven los administradores y la familia que autorizó los datos de salud; el personal y la cafetería no la ven.';
+const ALLERGY_HINT_ON ='La ven los administradores y la familia que autorizó los datos de salud. Si la familia lo autorizó, la cafetería también la ve al atender al alumno; el resto del personal no la ve.';
+
 /** The record the server says already holds this matrícula (archived ones included). */
 interface ExistingStudent { id: number; name: string; student_id: string; status: string; archived: boolean }
 
@@ -125,6 +131,7 @@ function StudentForm({ student, onClose, onCancel, onDirty, onSaved, qc, default
   const editing = !!student;
   // Masked for this account (staff, by role): the values are «●●●», never real.
   const medicalLocked = !!student?.medical_masked;
+  const cafeteriaSeesAllergies = useSiteSettings().cafeteria_shows_allergies === true;
   const [start] = useState<StudentWrite>(() => initial(student, defaultTipo));
   const [form, setForm] = useState<StudentWrite>(start);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -319,7 +326,7 @@ function StudentForm({ student, onClose, onCancel, onDirty, onSaved, qc, default
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input label="Tipo de sangre" value={form.blood_type ?? ''} onChange={(e) => set('blood_type', e.target.value.toUpperCase())} error={errors.blood_type} maxLength={10} placeholder="O+" />
-                <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} error={errors.allergies} hint="Solo la ven los administradores y la familia que autorizó los datos de salud; el personal y la cafetería no la ven." />
+                <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} error={errors.allergies} hint={cafeteriaSeesAllergies ? ALLERGY_HINT_ON : ALLERGY_HINT_OFF} />
               </div>
               <div>
                 <label className="label" htmlFor="sf-med">Notas médicas</label>
