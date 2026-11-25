@@ -341,6 +341,70 @@ def request_missing_documents(
     return {"missing": missing, "text": text, "sent_to": reg.parent1_email}
 
 
+# ── «Pedir un enlace nuevo»: the family, from a used or expired documents link ──
+FAMILY_LINK_MESSAGE = (
+    "Si el correo coincide con una solicitud en curso, le enviaremos un enlace nuevo en "
+    "unos minutos. Revise también su carpeta de spam."
+)
+FAMILY_LINK_ACTOR = "La familia (pidió un enlace nuevo)"
+FAMILY_LINK_CONTEXT = "admissions: enlace de documentos pedido por la familia"
+# The newest registrations of one address that may get a link per request.
+FAMILY_LINK_LIMIT = 3
+
+
+def family_link_candidates(email: str, registration: int | None = None) -> list[int]:
+    """Registrations whose parent 1 address is ``email`` (any letter case):
+    the address the staff send uses. ``registration`` (the rid of the page
+    the family is on) narrows it to that one."""
+    email = (email or "").strip()
+    if not email or email == RETENTION_PLACEHOLDER:
+        return []
+    # Self-service never reopens a finished process: a rejected or completed
+    # registration, or one whose admission case was closed, needs the school.
+    regs = (
+        Registration.objects.filter(parent1_email__iexact=email)
+        .exclude(status__in=[Registration.Status.REJECTED, Registration.Status.COMPLETE])
+        .exclude(pre_registration__closed_at__isnull=False)
+    )
+    if registration:
+        regs = regs.filter(pk=registration)
+    return list(regs.order_by("-updated_at", "-pk").values_list("pk", flat=True)[:FAMILY_LINK_LIMIT])
+
+
+def send_family_documents_links(reg_ids, email: str) -> list[int]:
+    """A fresh documents link for each registration of ``reg_ids`` that the
+    staff reminder would serve (``request_missing_documents``: the ficha is
+    sent and something is missing), emailed to the address on file only.
+
+    The same function as «Enviar recordatorio de faltantes» issues the link,
+    so it is single-use, expires alike and cancels the family's older link.
+    Recorded in the registration's history like the staff send, marked as
+    the family's request. Returns the ids that got a link.
+    """
+    wanted = (email or "").strip().lower()
+    sent = []
+    for reg in Registration.objects.filter(pk__in=list(reg_ids)).order_by("pk"):
+        # Only to the address already on file, and only when it is the one the
+        # family typed (letter case aside).
+        if not wanted or (reg.parent1_email or "").strip().lower() != wanted:
+            continue
+        try:
+            out = request_missing_documents(reg, None, audit=False)
+        except FichaPending:
+            continue
+        if not out["missing"]:
+            continue
+        record(
+            "update",
+            reg,
+            {"requested_docs": out["missing"], "requested_by": "familia"},
+            actor_label=FAMILY_LINK_ACTOR,
+            context=FAMILY_LINK_CONTEXT,
+        )
+        sent.append(reg.pk)
+    return sent
+
+
 def email_rejected_documents(reg: Registration, docs: list[RegistrationDocument]):
     """One email per registration listing every rejected document with its note."""
     if not docs:

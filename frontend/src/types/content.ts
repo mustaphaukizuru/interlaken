@@ -30,5 +30,7 @@ export interface SiteSettings {
   pricing_years?: Partial<Record<string, number>>;
   /** Ajustes «Fotos de la credencial» (admin settings only): families may upload their child's photo. */
   families_upload_photos?: boolean;
+  /** Ajustes «Alergias en la cafetería» (also public: the texts on who sees allergies follow it). Off by default. */
+  cafeteria_shows_allergies?: boolean;
   updated_at?: string;
 }

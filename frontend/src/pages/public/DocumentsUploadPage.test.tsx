@@ -148,6 +148,73 @@ describe('DocumentsUploadPage (family)', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  describe('«Pedir un enlace nuevo» on a used or expired link', () => {
+    const DONE = 'Si el correo coincide con una solicitud en curso, le enviaremos un enlace nuevo en unos minutos. Revise también su carpeta de spam.';
+    const expired = async () => {
+      exchange.mockRejectedValue({ response: { status: 401 } });
+      post.mockReset();
+      render();
+      return screen.findByRole('form', { name: 'Pedir un enlace nuevo' });
+    };
+
+    it('asks with the email and the page rid, then shows the same answer whatever the match', async () => {
+      const form = await expired();
+      post.mockResolvedValue({ data: { detail: DONE } } as never);
+      await userEvent.type(within(form).getByLabelText('Correo electrónico'), '  Tutora@Ejemplo.mx ');
+      await userEvent.click(within(form).getByRole('button', { name: 'Pedir un enlace nuevo' }));
+      expect(await screen.findByText(DONE)).toBeInTheDocument();
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(post).toHaveBeenCalledWith('/admissions/documents/new-link/', { email: 'Tutora@Ejemplo.mx', registration: 7 });
+      expect(screen.queryByRole('form', { name: 'Pedir un enlace nuevo' })).toBeNull();
+      // The used-link notice stays: the family can still write to admisiones.
+      expect(screen.getByRole('alert')).toHaveTextContent('Este enlace ya se usó o caducó');
+    });
+
+    it('sends one request on a double click and waits meanwhile', async () => {
+      let resolve: (v: unknown) => void = () => {};
+      const form = await expired();
+      post.mockImplementation((() => new Promise((r) => { resolve = r; })) as never);
+      await userEvent.type(within(form).getByLabelText('Correo electrónico'), 'tutora@ejemplo.mx');
+      const button = within(form).getByRole('button', { name: 'Pedir un enlace nuevo' });
+      await userEvent.dblClick(button);
+      await userEvent.type(within(form).getByLabelText('Correo electrónico'), '{Enter}');
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(within(form).getByRole('button', { name: 'Enviando…' })).toBeDisabled();
+      resolve({ data: { detail: DONE } });
+      expect(await screen.findByText(DONE)).toBeInTheDocument();
+      expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it('checks the address before sending', async () => {
+      const form = await expired();
+      const input = within(form).getByLabelText('Correo electrónico');
+      await userEvent.type(input, 'no-es-correo');
+      await userEvent.click(within(form).getByRole('button', { name: 'Pedir un enlace nuevo' }));
+      expect(await within(form).findByText('Escriba un correo electrónico válido.')).toBeInTheDocument();
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input).toHaveAttribute('aria-describedby', 'docs-new-link-error');
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    it('says when to try again after too many requests or a failed send', async () => {
+      const form = await expired();
+      post.mockRejectedValueOnce({ response: { status: 429 } }).mockRejectedValueOnce({ response: { status: 500 } });
+      await userEvent.type(within(form).getByLabelText('Correo electrónico'), 'tutora@ejemplo.mx');
+      const button = within(form).getByRole('button', { name: 'Pedir un enlace nuevo' });
+      await userEvent.click(button);
+      expect(await within(form).findByText(/Ya pidió varios enlaces\. Espere una hora/)).toBeInTheDocument();
+      await userEvent.click(button);
+      expect(await within(form).findByText('No se pudo enviar la solicitud. Revise su conexión e intente de nuevo.')).toBeInTheDocument();
+      expect(screen.queryByText(DONE)).toBeNull();
+    });
+
+    it('is not offered on a cut link (its own link may still work)', async () => {
+      renderWithProviders(<DocumentsUploadPage />, { route: '/inscripcion/documentos' });
+      await screen.findByRole('alert');
+      expect(screen.queryByRole('form', { name: 'Pedir un enlace nuevo' })).toBeNull();
+    });
+  });
+
   it('a link without its token says it is incomplete, not «ya se usó» (QA 2026-11-24)', async () => {
     renderWithProviders(<DocumentsUploadPage />, { route: '/inscripcion/documentos' });
     const alert = await screen.findByRole('alert');

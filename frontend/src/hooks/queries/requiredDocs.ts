@@ -157,6 +157,10 @@ export const requiredDocsApi = {
       },
     });
   },
+  /** «Pedir un enlace nuevo» from a used or expired link: always the same answer;
+   *  a link goes only to the address on file (`registration` = the page's rid). */
+  requestNewLink: (email: string, registration?: number | null) =>
+    api.post<{ detail: string }>('/admissions/documents/new-link/', registration ? { email, registration } : { email }),
 };
 
 export const REQUIRED_DOCS_ENTITY = 'required-documents';

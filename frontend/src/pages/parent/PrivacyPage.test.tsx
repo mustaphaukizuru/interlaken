@@ -14,11 +14,12 @@ vi.mock('@/services/api', () => ({
     createArco: vi.fn(),
     exportMyData: vi.fn(),
   },
+  contentApi: { getSettings: vi.fn() },
 }));
 
 import toast from 'react-hot-toast';
 import PrivacyPage from './PrivacyPage';
-import { legalApi } from '@/services/api';
+import { contentApi, legalApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const getConsent = vi.mocked(legalApi.getConsent);
@@ -50,6 +51,19 @@ describe('PrivacyPage', () => {
     createArco.mockResolvedValue({
       data: { id: 1, request_type: 'access', status: 'received' },
     } as never);
+    vi.mocked(contentApi.getSettings).mockResolvedValue({ data: { cafeteria_shows_allergies: false } } as never);
+  });
+
+  it('says who sees the health data, following the school\'s cafetería switch', async () => {
+    const { unmount } = renderWithProviders(<PrivacyPage />, { route: '/portal/privacidad' });
+    const medical = await screen.findByLabelText('Datos de salud');
+    expect(medical).toHaveAccessibleDescription('Alergias, tipo de sangre y notas médicas de sus hijos. La cafetería no los ve.');
+    unmount();
+
+    vi.mocked(contentApi.getSettings).mockResolvedValue({ data: { cafeteria_shows_allergies: true } } as never);
+    renderWithProviders(<PrivacyPage />, { route: '/portal/privacidad' });
+    expect(await screen.findByText(/Con esta autorización, la cafetería ve sus alergias \(solo las alergias\) al atenderlos\./)).toBeInTheDocument();
+    expect(screen.queryByText(/La cafetería no los ve/)).toBeNull();
   });
 
   it('shows needs_acceptance banner and saves consent toggles', async () => {

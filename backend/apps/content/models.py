@@ -86,6 +86,16 @@ class SiteSettings(models.Model):
     # the family portal's credential page.
     families_upload_photos = models.BooleanField(
         'Las familias pueden subir la foto de la credencial', default=False)
+    # Allergies at the cafetería (2026-11-24): a school decision, off by
+    # default. Off: no cafetería screen receives a child's allergies. On: the
+    # cafetería console shows the allergies (that field only, never the rest
+    # of the health data) of the children whose family authorised health data
+    # (accounts.medical.family_authorised_ids).
+    cafeteria_shows_allergies = models.BooleanField(
+        'La cafetería ve las alergias', default=False,
+        help_text=('Encendido: la consola de cafetería muestra las alergias de los alumnos cuya familia '
+                   'autorizó los datos de salud (solo las alergias). Encenderlo puede requerir '
+                   'actualizar el aviso de privacidad.'))
 
     # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
     tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')

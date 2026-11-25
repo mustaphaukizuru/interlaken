@@ -22,6 +22,8 @@ GET  /admissions/register/<pk>/documents/list/  the family's checklist (session 
 POST /admissions/register/<pk>/documents/       upload: ``required_key`` (or the legacy
                                                 ``doc_type``), one or more ``file``,
                                                 optional ``replaces`` (a file id)
+POST /admissions/documents/new-link/            {email, registration?}: «Pedir un enlace
+                                                nuevo» (always the same 200 answer)
 """
 
 from __future__ import annotations
@@ -514,6 +516,66 @@ class DocumentListView(APIView):
                 ).data,
             }
         )
+
+
+class _NewLinkIn(serializers.Serializer):
+    email = serializers.EmailField(
+        max_length=254,
+        error_messages={
+            "invalid": "Escriba un correo electrónico válido.",
+            "blank": "Escriba su correo electrónico.",
+            "required": "Escriba su correo electrónico.",
+        },
+    )
+    # The rid of the page the family is on: only that registration is renewed.
+    registration = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+
+
+def _new_link_email_key(group, request) -> str:
+    """The per-address bucket of «Pedir un enlace nuevo»: the typed address, lower case."""
+    data = request.data if hasattr(request.data, "get") else {}
+    email = str(data.get("email") or "").strip().lower()[:254]
+    return f"email:{email}"
+
+
+# Each accepted call may email a link: slow per network and per address.
+@method_decorator(ratelimit("documents-new-link-ip", "10/h", key="ip", method="POST"), name="post")
+@method_decorator(
+    ratelimit("documents-new-link-email", "3/h", key=_new_link_email_key, method="POST"), name="post"
+)
+class DocumentsNewLinkView(APIView):
+    """POST /admissions/documents/new-link/ ``{email, registration?}`` — «Pedir un enlace nuevo».
+
+    From a used or expired documents link. Always the same 200 answer whether
+    or not the address matches a registration, or the registration is at the
+    documents step (no enumeration); the matching work and the email run in a
+    background thread, so the response time does not tell either. A link goes
+    out only where the staff reminder would send one (ficha sent, documents
+    missing) and only to the address on file (``send_family_documents_links``).
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from functools import partial
+
+        from apps.portal import services as portal_services
+
+        from .services import (
+            FAMILY_LINK_MESSAGE,
+            family_link_candidates,
+            send_family_documents_links,
+        )
+
+        data = _NewLinkIn(data=request.data)
+        data.is_valid(raise_exception=True)
+        email = data.validated_data["email"]
+        ids = family_link_candidates(email, data.validated_data.get("registration"))
+        if ids:
+            portal_services.run_in_background(
+                partial(send_family_documents_links, ids, email), name="admissions-docs-new-link"
+            )
+        return Response({"detail": FAMILY_LINK_MESSAGE})
 
 
 def _bad(message: str):
