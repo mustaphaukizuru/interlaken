@@ -160,6 +160,46 @@ describe('BookVisitPage', () => {
     expect(container.innerHTML).not.toContain('1tTEST');
   });
 
+  it('asks for an empty e-mail and phone, and refuses letters in the phone (QA 2026-11-24)', async () => {
+    const user = userEvent.setup();
+    mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: /15 de junio/i }));
+    await user.click(await screen.findByRole('button', { name: /09:00/i }));
+    await user.type(await screen.findByLabelText(/Nombre completo/i), 'Marta Ejemplo');
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+    expect(await screen.findByText('Escriba su correo.')).toBeInTheDocument();
+    expect(screen.getByText('Escriba su teléfono.')).toBeInTheDocument();
+    expect(screen.queryByText(/inválido/)).toBeNull();
+
+    await user.type(screen.getByLabelText(/Correo electrónico/i), 'marta@ejemplo.test');
+    await user.type(screen.getByLabelText(/Teléfono/i), '55 1234 abcd');
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+    expect(await screen.findByText(/Revise el teléfono: solo números/)).toBeInTheDocument();
+    expect(mockedCreate).not.toHaveBeenCalled();
+
+    // Spaces, dashes, parentheses and + are fine.
+    await user.clear(screen.getByLabelText(/Teléfono/i));
+    await user.type(screen.getByLabelText(/Teléfono/i), '+52 (55) 1234-5678');
+    mockedCreate.mockResolvedValue({ data: { id: 1 } } as never);
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ parent_phone: '+52 (55) 1234-5678' })));
+  });
+
+  it('shows the server reason for a refused phone instead of the generic message', async () => {
+    const user = userEvent.setup();
+    mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);
+    mockedCreate.mockRejectedValue({ response: { status: 400, data: { parent_phone: ['El número debe tener de 10 a 15 dígitos.'] } } });
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: /15 de junio/i }));
+    await user.click(await screen.findByRole('button', { name: /09:00/i }));
+    await user.type(await screen.findByLabelText(/Nombre completo/i), 'Marta Ejemplo');
+    await user.type(screen.getByLabelText(/Correo electrónico/i), 'marta@ejemplo.test');
+    await user.type(screen.getByLabelText(/Teléfono/i), '5512345678');
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+    expect(await screen.findByText('El número debe tener de 10 a 15 dígitos.')).toBeInTheDocument();
+  });
+
   it('books without a token when the page has none', async () => {
     const user = userEvent.setup();
     mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);

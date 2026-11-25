@@ -93,7 +93,12 @@ class CardholderSerializer(serializers.Serializer):
         return digits
 
     def validate_phone(self, value):
+        from apps.core.phones import MSG_PHONE_CHARS, phone_problem
+
         digits = _digits(value)
+        if phone_problem(value) == MSG_PHONE_CHARS:
+            # «55 1234 abcd»: letters used to be dropped silently.
+            raise serializers.ValidationError(MSG_PHONE_CHARS)
         if not 10 <= len(digits) <= 15:
             raise serializers.ValidationError('Escriba un teléfono de 10 dígitos (solo números).')
         return digits

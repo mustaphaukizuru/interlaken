@@ -73,4 +73,4 @@ def test_plain_output_lists_findings(without_unique_constraints):
     code, out = _run()
     assert code == 1
     assert "StudentProfile.loyverse_id duplicado: 1" in out
-    assert "dup-2" in out and "1 hallazgo(s)." in out
+    assert "dup-2" in out and "1 hallazgo." in out

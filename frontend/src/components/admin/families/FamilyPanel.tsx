@@ -12,8 +12,8 @@ import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
 import { apiErrorMessage, apiFieldErrors } from '@/lib/apiErrors';
 import type { FamilyDetail, FamilyLogin, FamilyStudent } from '@/services/familiesApi';
 import { gradeLine, initial, lastLoginLabel } from './familyUtils';
+import { plural } from '@/lib/plural';
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** Who reaches the family in the portal (each child's school address, any tutor). */
 export function LoginList({ logins }: { logins: FamilyLogin[] }) {

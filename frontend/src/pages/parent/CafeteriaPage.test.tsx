@@ -821,3 +821,49 @@ describe('CafeteriaPage launch fixes (2026-11-09)', () => {
     expect(screen.getAllByText('Ajuste').length).toBeGreaterThan(0);
   });
 });
+
+describe('CafeteriaPage family limits (QA 2026-11-24)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+  });
+
+  it('the low-balance alert stops at the largest top-up ($1,000), here and on the server', async () => {
+    const user = userEvent.setup();
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    vi.mocked(cafeteriaApi.updateLowBalanceThreshold).mockResolvedValue({ data: account } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    await user.click(await screen.findByRole('button', { name: /Alerta de saldo bajo: \$50/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Alerta de saldo bajo' });
+    const amount = within(dialog).getByLabelText('Monto de alerta (MXN)');
+    await user.clear(amount);
+    await user.type(amount, '99999');
+    expect(within(dialog).getByText('El monto máximo de la alerta es $1,000.')).toBeInTheDocument();
+    expect(amount).toHaveAttribute('aria-invalid', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    await user.clear(amount);
+    await user.type(amount, '1000');
+    expect(within(dialog).queryByText(/monto máximo/)).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(cafeteriaApi.updateLowBalanceThreshold).toHaveBeenCalledWith(10, 1000));
+  });
+
+  it('a daily budget above the weekly one is refused before saving', async () => {
+    const user = userEvent.setup();
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    vi.mocked(cafeteriaApi.updateSpendLimits).mockResolvedValue({ data: account } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    await user.click(await screen.findByRole('button', { name: /Establecer presupuesto/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Presupuesto de cafetería' });
+    await user.type(within(dialog).getByLabelText('Límite diario (MXN)'), '500');
+    await user.type(within(dialog).getByLabelText('Límite semanal (MXN)'), '100');
+    expect(within(dialog).getByText('El límite diario no puede ser mayor que el semanal.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    await user.clear(within(dialog).getByLabelText('Límite semanal (MXN)'));
+    await user.type(within(dialog).getByLabelText('Límite semanal (MXN)'), '600');
+    expect(within(dialog).queryByText(/no puede ser mayor/)).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(cafeteriaApi.updateSpendLimits).toHaveBeenCalledWith(10, { daily_spend_limit: 500, weekly_spend_limit: 600 }));
+  });
+});

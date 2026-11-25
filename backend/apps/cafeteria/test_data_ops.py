@@ -202,6 +202,13 @@ class TestBalancesBulk:
             format="json",
         )
         assert bad.status_code == 400
+        # The family's own cap applies to the bulk change too (QA 2026-11-24).
+        too_high = api_client.post(
+            url,
+            {"action": "set_threshold", "ids": [a.id], "payload": {"threshold": "99999"}},
+            format="json",
+        )
+        assert too_high.status_code == 400 and "threshold" in too_high.json()
         resp = api_client.post(
             url,
             {"action": "set_threshold", "ids": [a.id, b.id], "payload": {"threshold": "80"}},

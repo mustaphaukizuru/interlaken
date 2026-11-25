@@ -26,6 +26,7 @@ import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { apiErrorMessage, apiErrorStatus } from '@/lib/apiErrors';
 import { formatDateTime } from '@/lib/format';
 import { checkMediaFile, formatBytes } from '@/lib/status/AdminContentStatus';
+import { plural } from '@/lib/plural';
 
 const TYPE_OPTIONS = [
   { value: 'jpeg', label: 'JPG' }, { value: 'png', label: 'PNG' }, { value: 'webp', label: 'WebP' }, { value: 'gif', label: 'GIF' },
@@ -118,7 +119,7 @@ export default function AdminMedia() {
     }
     setUploading(false);
     if (ok) {
-      toast.success(`${ok} imagen(es) subida(s). Agregue el texto alternativo.`);
+      toast.success(`${plural(ok, 'imagen subida', 'imágenes subidas')}. Agregue el texto alternativo.`);
       invalidate();
     }
   };

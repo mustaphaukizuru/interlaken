@@ -49,6 +49,19 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
             out.append({'level': level, 'label': str(label).strip()[:200]})
         return out
 
+    def validate_phone_e164(self, value):
+        return self._phone(value, 'phone_e164')
+
+    def validate_whatsapp_number(self, value):
+        return self._phone(value, 'whatsapp_number')
+
+    def _phone(self, value, field):
+        # The dialled number and the wa.me number follow core.phones; the
+        # saved value is accepted as it is (the form sends every field).
+        from apps.core.phones import check_phone
+
+        return check_phone(value, current=getattr(self.instance, field, None))
+
     def validate_menu(self, value):
         from .navigation import validate_menu
         return validate_menu(value)

@@ -438,7 +438,7 @@ describe('AdminCafeteria Clientes Loyverse tab (every card, not only pupils)', (
     const table = screen.getByRole('table');
     expect(within(table).getByText('Personal')).toBeInTheDocument();
     expect(within(table).getAllByText('$178.00')).toHaveLength(2);
-    expect(screen.getByText(/2 tarjeta\(s\) en Loyverse/)).toBeInTheDocument();
+    expect(screen.getByText(/2 tarjetas en Loyverse/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver alumno' })).toHaveAttribute('href', '/admin/cafeteria/7');
     expect(api.customers).toHaveBeenCalledWith(expect.objectContaining({ page_size: 50, kind: 'nonstudent' }));
   });

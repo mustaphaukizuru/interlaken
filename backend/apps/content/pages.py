@@ -10,6 +10,7 @@ Blocks        [{id, type, props, hidden?}] validated against BLOCK_SCHEMAS (the
               and checked for drift by cms/manifest.test.ts).
 
 Public:  GET /content/pages/<slug>/               published blocks, cached + ETag
+                                                  (204 for a designed page with none)
          GET /content/pages/<id>/preview/?token=   draft, signed token (1 h)
 Admin:   CRUD /content/admin/pages/, POST .../publish/, POST .../rollback/{version}
 """
@@ -671,7 +672,25 @@ def _public_payload(page: Page, blocks, seo) -> dict:
 # ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
+def _not_published(slug: str) -> Response:
+    """A designed page of the site with no published version: 204, the browser
+    renders it from code (the normal state of most pages, not an error; it used
+    to be a 404 for every visit, hundreds a day in the logs and red in the
+    console). An unknown slug is still a 404."""
+    from .page_templates import has_template
+
+    if not has_template(slug):
+        raise Http404
+    resp = Response(status=status.HTTP_204_NO_CONTENT)
+    resp['Cache-Control'] = 'public, no-cache'
+    return resp
+
+
 class PublicPageView(APIView):
+    """GET /content/pages/<slug>/: the published version of a page (cached, ETag).
+
+    204 No Content for a designed page that has none (``_not_published``),
+    404 for a slug the site does not know."""
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, slug):
@@ -681,10 +700,10 @@ class PublicPageView(APIView):
             try:
                 page = Page.objects.select_related('published_version').get(slug=slug, status=Page.Status.PUBLISHED)
             except Page.DoesNotExist:
-                raise Http404 from None
+                return _not_published(slug)
             if page.unpublish_at and page.unpublish_at <= timezone.now():
                 page.unpublish(None)
-                raise Http404
+                return _not_published(slug)
             v = page.published_version
             payload = _public_payload(page, v.blocks if v else [], v.seo if v else page.seo)
             cache.set(key, payload, 300)

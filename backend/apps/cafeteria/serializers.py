@@ -523,18 +523,43 @@ class BalanceAdjustmentSerializer(serializers.ModelSerializer):
         ]
 
 
+def low_balance_threshold_max() -> Decimal:
+    """The highest saldo-bajo alert level: the largest single top-up
+    (``topup_max_amount()``, $1,000). Above it one top-up from zero could not
+    lift the wallet over the alert, so it would warn after every recarga
+    (QA 2026-11-24 found $99,999 accepted)."""
+    return topup_max_amount()
+
+
+def threshold_max_message(top: Decimal) -> str:
+    return f'El monto máximo de la alerta es ${top:,.0f}.'
+
+
 class LowBalanceThresholdSerializer(serializers.Serializer):
-    """Validates a family-set low-balance (saldo bajo) warning level."""
+    """Validates a low-balance (saldo bajo) warning level: $0 to
+    ``low_balance_threshold_max()``. Only the threshold endpoints use it, so a
+    wallet that already holds a higher level keeps it until someone changes it."""
     threshold = serializers.DecimalField(
         max_digits=8, decimal_places=2,
         min_value=Decimal('0.00'), max_value=Decimal('100000.00'))
+
+    def validate_threshold(self, value):
+        top = low_balance_threshold_max()
+        if value > top:
+            raise serializers.ValidationError(threshold_max_message(top))
+        return value
+
+
+MSG_DAILY_OVER_WEEKLY = 'El límite diario no puede ser mayor que el semanal.'
 
 
 class SpendLimitsSerializer(serializers.Serializer):
     """Validates a family-set daily/weekly cafeteria spend budget (F13).
 
     Both fields are optional; 0 disables that cap. Either may be sent alone so a
-    parent can set just a daily or just a weekly limit.
+    parent can set just a daily or just a weekly limit. When both caps end up
+    set, the daily one may not exceed the weekly one; a field not sent keeps the
+    wallet's current value (``context['balance']``) for that comparison.
     """
     daily_spend_limit = serializers.DecimalField(
         max_digits=8, decimal_places=2, required=False,
@@ -547,6 +572,18 @@ class SpendLimitsSerializer(serializers.Serializer):
         if 'daily_spend_limit' not in attrs and 'weekly_spend_limit' not in attrs:
             raise serializers.ValidationError(
                 'Envíe daily_spend_limit y/o weekly_spend_limit.')
+        balance = self.context.get('balance')
+
+        def resulting(field):
+            if field in attrs:
+                return attrs[field]
+            return getattr(balance, field, None) or Decimal('0')
+
+        daily, weekly = resulting('daily_spend_limit'), resulting('weekly_spend_limit')
+        if daily > 0 and weekly > 0 and daily > weekly:
+            # On the field the person sent (the daily one when both came).
+            field = 'daily_spend_limit' if 'daily_spend_limit' in attrs else 'weekly_spend_limit'
+            raise serializers.ValidationError({field: [MSG_DAILY_OVER_WEEKLY]})
         return attrs
 
 

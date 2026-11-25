@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { portalApi, type GuardianWrite } from '@/services/api';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
+import { emailProblem, phoneProblem } from '@/lib/validators';
 import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 
 export interface GuardianEditTarget {
@@ -26,6 +27,8 @@ interface Props {
 }
 
 const RELATIONSHIPS = ['Padre', 'Madre', 'Padre/Madre', 'Tutor', 'Abuelo/a', 'Otro'];
+/** The office types someone else's address: «el correo», not «su correo». */
+const GUARDIAN_EMAIL = { empty: 'Escriba el correo.', invalid: 'Revise el correo: debe ser como nombre@ejemplo.com.' };
 
 /** Edit a linked guardian's identity and contact data (BACKLOG P1-A3). */
 export function GuardianEditModal({ studentId, guardian, onClose }: Props) {
@@ -81,8 +84,17 @@ function GuardianForm({ studentId, guardian, onClose, onCancel, onDirty }: {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!form.first_name.trim()) { setErrors({ first_name: 'Requerido.' }); return; }
-    if (!form.email.includes('@')) { setErrors({ email: 'Correo inválido.' }); return; }
+    const next: typeof errors = {};
+    if (!form.first_name.trim()) next.first_name = 'Requerido.';
+    // Checked when typed: the saved address (and the family login, not editable here) never blocks a save.
+    const email = guardian.is_self || form.email === start.email ? null : emailProblem(form.email, { messages: GUARDIAN_EMAIL });
+    if (email) next.email = email;
+    // A number saved before the phone rule is sent back as it is (phoneProblem's `saved`).
+    const whatsapp = phoneProblem(form.whatsapp, start.whatsapp);
+    if (whatsapp) next.whatsapp = whatsapp;
+    const phone = phoneProblem(form.phone, start.phone);
+    if (phone) next.phone = phone;
+    if (Object.keys(next).length) { setErrors(next); return; }
     mutation.mutate();
   };
 

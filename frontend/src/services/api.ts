@@ -26,8 +26,12 @@ export interface NotifyEmailState { email: string; verified: boolean; sent?: boo
 export type NotifyEmailLinkState = 'ready' | 'confirmed' | 'expired' | 'invalid' | 'superseded';
 export interface NotifyEmailLink {
   state: NotifyEmailLinkState;
-  /** Who the avisos are about: «Carla R.» + «1° Secundaria · Grupo A» for a student. */
-  account?: { name: string; detail: string; is_student: boolean };
+  /**
+   * Who the avisos are about: «Carla R.» + «1° Secundaria · Grupo A» for a pupil,
+   * «Personal del colegio» for a staff cafetería account. `kind` (since
+   * 2026-11-24) says which; `is_student` stays for older answers.
+   */
+  account?: { name: string; detail: string; is_student: boolean; kind?: 'alumno' | 'personal' | 'cuenta' };
   /** Masked: «mu…@gmail.com». */
   email?: string;
   expires_at?: string | null;

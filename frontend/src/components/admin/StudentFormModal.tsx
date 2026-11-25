@@ -10,9 +10,11 @@ import { portalApi, type StudentWrite, type StudentStatus } from '@/services/api
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { invalidateStudents, studentDetailKey } from '@/hooks/queries/studentKeys';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
+import { phoneProblem } from '@/lib/validators';
 import { PUESTO_OPTIONS } from '@/lib/people';
 import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import type { LoyverseLinkOutcome, PersonTipo, StudentProfile } from '@/types';
+import { plural } from '@/lib/plural';
 
 interface Props {
   open: boolean;
@@ -213,6 +215,9 @@ function StudentForm({ student, onClose, onCancel, onDirty, onSaved, qc, default
     if (!form.last_name.trim()) next.last_name = 'Requerido.';
     if (!form.student_id.trim()) next.student_id = 'Requerido.';
     if (!staff && !form.grade.trim()) next.grade = 'Requerido.';
+    // The number on file before the phone rule is sent back as it is.
+    const emergencyPhone = phoneProblem(form.emergency_phone ?? '', start.emergency_phone);
+    if (emergencyPhone) next.emergency_phone = emergencyPhone;
     if (Object.keys(next).length) { setErrors(next); return; }
     mutation.mutate();
   };
@@ -304,7 +309,7 @@ function StudentForm({ student, onClose, onCancel, onDirty, onSaved, qc, default
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Contacto de emergencia</legend>
           <div className="grid gap-4 sm:grid-cols-3">
             <Input label="Nombre" value={form.emergency_name ?? ''} onChange={(e) => set('emergency_name', e.target.value)} />
-            <Input label="Teléfono" inputMode="tel" value={form.emergency_phone ?? ''} onChange={(e) => set('emergency_phone', e.target.value)} />
+            <Input label="Teléfono" inputMode="tel" value={form.emergency_phone ?? ''} onChange={(e) => set('emergency_phone', e.target.value)} error={errors.emergency_phone} />
             <Input label="Parentesco" value={form.emergency_rel ?? ''} onChange={(e) => set('emergency_rel', e.target.value)} />
           </div>
         </fieldset>
@@ -395,7 +400,7 @@ function LinkResult({ saved, link, editing, onClose }: {
           {ok && link.customer_code && (
             <p className="mt-0.5 text-xs text-muted">
               Cliente {link.customer_code}{link.matched_by ? ` (por ${link.matched_by})` : ''}
-              {link.replayed ? ` · ${link.replayed} compra(s) anteriores agregadas a su historial` : ''}
+              {link.replayed ? ` · ${plural(link.replayed, 'compra anterior agregada', 'compras anteriores agregadas')} a su historial` : ''}
             </p>
           )}
         </div>

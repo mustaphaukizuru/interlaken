@@ -32,6 +32,7 @@ import { legalNoticesApi, type NoticeStatus, type NoticeVersion } from '@/servic
 import { withDefaults } from '@/cms/blocks/specs';
 import { usePublishedPage } from '@/cms/published';
 import aviso, { AvisoHero, AvisoNoticeBody, sectionIcon, type PrivacyNotice } from '@/cms/sections/aviso';
+import { plural } from '@/lib/plural';
 
 const BASE = '/admin/aviso-privacidad';
 const LIST_KEY = ['legal-notices'] as const;
@@ -48,7 +49,6 @@ function longDate(iso: string | null | undefined): string {
   if (!m) return '';
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
 }
-const plural = (n: number, one: string, many: string) => `${n.toLocaleString('es-MX')} ${n === 1 ? one : many}`;
 
 export default function AdminPrivacyNotice() {
   const { id } = useParams();
@@ -375,7 +375,7 @@ function DraftEditor({ notice }: { notice: NoticeVersion }) {
               <Button type="button" variant="secondary" className="min-h-[44px]" onClick={() => setT({ ...text, sections: [...text.sections, { title: '', text: '' }] })}>
                 <Plus size={16} aria-hidden="true" /> Agregar apartado
               </Button>
-              {text.sections.length < MIN_PARTS && text.sections.length > 0 && <p className="text-xs text-subtle">Faltan {MIN_PARTS - text.sections.length} apartado(s) para que la página muestre el aviso por secciones.</p>}
+              {text.sections.length < MIN_PARTS && text.sections.length > 0 && <p className="text-xs text-subtle">{MIN_PARTS - text.sections.length === 1 ? 'Falta' : 'Faltan'} {plural(MIN_PARTS - text.sections.length, 'apartado', 'apartados')} para que la página muestre el aviso por secciones.</p>}
             </div>
           </Card>
 

@@ -353,7 +353,9 @@ class UpdateSpendLimitsView(APIView):
         elif user.role != User.Role.ADMIN:
             return Response(error_body('No autorizado.'), status=403)
 
-        serializer = SpendLimitsSerializer(data=request.data)
+        # The wallet's current caps decide «daily ≤ weekly» for a field not sent.
+        serializer = SpendLimitsSerializer(data=request.data, context={
+            'balance': CafeteriaBalance.objects.filter(student=student).first()})
         serializer.is_valid(raise_exception=True)
         balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
         updated = []

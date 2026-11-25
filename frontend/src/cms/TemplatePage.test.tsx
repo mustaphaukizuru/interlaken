@@ -49,6 +49,21 @@ describe('TemplatePage and the published copy', () => {
     expect(screen.getByText('Texto integrado')).toBeInTheDocument();
   });
 
+  it('a 204 (nothing published, no body) renders the built-in copy, like the old 404 did', async () => {
+    // The server answers 204 for a page of the site with no published version
+    // (it used to be a 404: red in every visitor's console).
+    getPage.mockResolvedValue({ status: 204, data: '' } as never);
+    const { container } = renderWithProviders(<TemplatePage template={PAGE} />);
+    expect(await screen.findByText('Texto integrado')).toBeInTheDocument();
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('an old server’s 404 still renders the built-in copy', async () => {
+    getPage.mockRejectedValue({ response: { status: 404, data: { detail: 'No encontrado.' } } });
+    renderWithProviders(<TemplatePage template={PAGE} />);
+    expect(await screen.findByText('Texto integrado')).toBeInTheDocument();
+  });
+
   it('any other page holds its paint until it knows whether a published version exists', async () => {
     getPage.mockResolvedValue(published('pagina-prueba', 'Texto editado') as never);
     const { container } = renderWithProviders(<TemplatePage template={PAGE} />);

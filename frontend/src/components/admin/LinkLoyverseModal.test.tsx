@@ -145,7 +145,7 @@ describe('LinkLoyverseModal: when a baja does not go through', () => {
   it('says so when only part of the selection was applied', async () => {
     bulkStudents.mockResolvedValueOnce({ data: { updated: 1, failed: [{ id: 12, error: 'x' }], skipped: [] } } as never);
     await pickAllAndConfirm();
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('1 dado(s) de baja; 1 sin aplicar.'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('1 dado de baja; 1 sin aplicar.'));
     expect(toast.success).not.toHaveBeenCalled();
   });
 });

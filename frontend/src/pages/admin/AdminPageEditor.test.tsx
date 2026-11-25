@@ -312,42 +312,55 @@ describe('AdminPageEditor contract C1 (old generic seed drafts)', () => {
 });
 
 describe('AdminPageEditor contract C2 (two people on one page)', () => {
-  const CONFLICT = { code: 'draft_conflict', draft_revision: 5, draft_updated_by: 'Ana Ruiz', draft_updated_at: new Date(Date.now() - 120_000).toISOString() };
+  // Built when the save is refused, not when the file loads: under the full
+  // suite this describe runs well over 30 s after collection, and a date fixed
+  // at load time then read «hace 3 min» (the flaky failure).
+  const conflict = () => ({ code: 'draft_conflict', draft_revision: 5, draft_updated_by: 'Ana Ruiz', draft_updated_at: new Date(Date.now() - 120_000).toISOString() });
+  /** The conflict banner, found by its own words once the autosave (1.5 s after the edit) is refused. */
+  const conflictBanner = async () => {
+    const line = await screen.findByText(/Ana Ruiz guardó cambios en esta página/, {}, { timeout: 8000 });
+    return line.closest('[role="alert"]') as HTMLElement;
+  };
 
   it('sends draft_revision, pauses on a conflict and «Conservar los míos» overwrites with the new revision', async () => {
     vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: { ...PAGE, draft_revision: 3 } } as never);
     vi.mocked(contentApi.adminUpdatePage)
-      .mockRejectedValueOnce(httpError(409, CONFLICT))
+      .mockImplementationOnce(async () => { throw httpError(409, conflict()); })
       .mockImplementation(async (_id, data) => ({ data: { ...PAGE, ...data, draft_revision: 6 } }) as never);
     renderEditor();
     await userEvent.click(await screen.findByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }));
-    const banner = await screen.findByRole('alert', {}, { timeout: 4000 });
+    const banner = await conflictBanner();
     expect(banner).toHaveTextContent('Ana Ruiz guardó cambios en esta página hace 2 min');
     expect(vi.mocked(contentApi.adminUpdatePage).mock.calls[0][1]).toMatchObject({ draft_revision: 3 });
-    // Autosave is paused: another edit is kept locally, not sent.
+    // Autosave is paused: another edit is kept locally, not sent. The status
+    // stays «en pausa» (an edit would read «Cambios sin guardar» otherwise)...
     await userEvent.click(screen.getByRole('button', { name: 'Mostrar en el sitio' }));
     await userEvent.click(screen.getByRole('button', { name: 'Ocultar del sitio' }));
+    expect(screen.getAllByText(/Guardado en pausa/).length).toBeGreaterThan(0);
+    // ...and nothing goes out once the autosave delay (1.5 s) has passed.
     await act(() => new Promise((r) => setTimeout(r, 1800)));
     expect(contentApi.adminUpdatePage).toHaveBeenCalledTimes(1);
     await userEvent.click(within(banner).getByRole('button', { name: /Conservar los míos/ }));
-    await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalledTimes(2));
+    // The overwrite is saved right away; its confirmation is the real end of it.
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Se guardaron sus cambios.'), { timeout: 8000 });
+    expect(contentApi.adminUpdatePage).toHaveBeenCalledTimes(2);
     expect(lastPatch()).toMatchObject({ draft_revision: 5, draft_blocks: [{ ...BLOCKS[0], hidden: true }] });
     await waitFor(() => expect(screen.queryByText(/guardó cambios en esta página/)).not.toBeInTheDocument());
     // The next save starts from the revision the server returned.
     await userEvent.click(screen.getByRole('button', { name: 'Mostrar en el sitio' }));
-    await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalledTimes(3), { timeout: 4000 });
+    await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalledTimes(3), { timeout: 8000 });
     expect(lastPatch()).toMatchObject({ draft_revision: 6 });
-  }, 20_000);
+  }, 40_000);
 
   it('«Ver sus cambios (recargar)» loads theirs and keeps a copy of mine to recover', async () => {
     const theirs = [{ id: 'z', type: 'rich_text', props: { html: '<p>De Ana</p>' } }];
     vi.mocked(contentApi.adminGetPage)
       .mockResolvedValueOnce({ data: { ...PAGE, draft_revision: 3 } } as never)
       .mockResolvedValue({ data: { ...PAGE, draft_revision: 5, draft_blocks: theirs } } as never);
-    vi.mocked(contentApi.adminUpdatePage).mockRejectedValueOnce(httpError(409, CONFLICT));
+    vi.mocked(contentApi.adminUpdatePage).mockImplementationOnce(async () => { throw httpError(409, conflict()); });
     renderEditor();
     await userEvent.click(await screen.findByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }));
-    const banner = await screen.findByRole('alert', {}, { timeout: 4000 });
+    const banner = await conflictBanner();
     await userEvent.click(within(banner).getByRole('button', { name: /Ver sus cambios/ }));
     expect(await screen.findByRole('button', { name: /^1\. Texto.*De Ana/ })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -366,10 +379,10 @@ describe('AdminPageEditor contract C2 (two people on one page)', () => {
 
   it('does not publish over a conflict', async () => {
     vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: { ...PAGE, draft_revision: 3 } } as never);
-    vi.mocked(contentApi.adminUpdatePage).mockRejectedValue(httpError(409, CONFLICT));
+    vi.mocked(contentApi.adminUpdatePage).mockImplementation(async () => { throw httpError(409, conflict()); });
     renderEditor();
     await userEvent.click(await screen.findByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }));
-    await screen.findByRole('alert', {}, { timeout: 4000 });
+    await conflictBanner();
     await publishFromReview();
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('otra persona guardó cambios')));
     expect(publishPage).not.toHaveBeenCalled();

@@ -246,7 +246,7 @@ class OpenSchoolSignupTests(APITestCase):
             fake_time.time.return_value = frozen
             codes = [self.client.post(
                 reverse('open-school-signup'),
-                {'slot': slot.id, 'name': f'P{i}', 'email': f'p{i}@x.mx', 'phone': '5'},
+                {'slot': slot.id, 'name': f'P{i}', 'email': f'p{i}@x.mx', 'phone': '5512345678'},
             ).status_code for i in range(12)]
         self.assertIn(429, codes)                 # the shared limit engaged
         self.assertEqual(codes[:10], [201] * 10)  # first 10 allowed

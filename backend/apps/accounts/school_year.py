@@ -119,12 +119,19 @@ class SchoolYearRunView(APIView):
             return Response({'new_cycle': [f'El ciclo {new_cycle} ya fue aplicado.']}, status=status.HTTP_400_BAD_REQUEST)
         reset_threshold = request.data.get('reset_threshold')
         if reset_threshold not in (None, ''):
+            from apps.cafeteria.serializers import low_balance_threshold_max, threshold_max_message
+
             try:
                 reset_threshold = Decimal(str(reset_threshold))
-                if reset_threshold < 0 or reset_threshold > 5000:
+                if reset_threshold < 0:
                     raise ValueError
             except Exception:  # noqa: BLE001
                 return Response({'reset_threshold': ['Monto no válido.']}, status=status.HTTP_400_BAD_REQUEST)
+            # The same ceiling as the family's own alert (was $5,000).
+            top = low_balance_threshold_max()
+            if reset_threshold > top:
+                return Response({'reset_threshold': [threshold_max_message(top)]},
+                                status=status.HTTP_400_BAD_REQUEST)
         else:
             reset_threshold = None
 

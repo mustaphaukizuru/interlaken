@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { portalApi } from '@/services/api';
 import { announcementsAdminApi } from '@/services/AdminContentApi';
+import { plural } from '@/lib/plural';
 
 interface Props {
   announcementId: number | null;
@@ -32,7 +33,7 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
   const resend = useMutation({
     mutationFn: () => portalApi.resendAnnouncementFailed(announcementId!),
     onSuccess: ({ data: r }) => {
-      toast.success(`${r.requeued} correo(s) en cola para reintento.`);
+      toast.success(`${plural(r.requeued, 'correo', 'correos')} en cola para reintento.`);
       // Returned: the button stays busy until the failed list is fresh, so a
       // second click can not re-queue the same emails.
       return qc.invalidateQueries({ queryKey: ['announcement-delivery', announcementId] });
@@ -56,7 +57,7 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
           {data.failed.length > 0 && (
             <div className="rounded-md border border-coral/30 bg-coral-50/50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-coral-dark">{data.failed.length} correo(s) no entregado(s)</p>
+                <p className="text-sm font-semibold text-coral-dark">{plural(data.failed.length, 'correo no entregado', 'correos no entregados')}</p>
                 <Button size="sm" variant="secondary" loading={resend.isPending} onClick={() => resend.mutate()}>
                   <RefreshCw className="h-4 w-4" aria-hidden="true" /> Reintentar fallidos
                 </Button>

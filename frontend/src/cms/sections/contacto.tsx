@@ -61,9 +61,10 @@ function ContactHeroView(p: HeroProps) {
 
 /* ── Información y formulario (bloqueado) ───────────────────────────────── */
 // Rules stay in code; each message is the prop that words it (errName...).
+// An empty e-mail asks for it (errEmailEmpty); only a typed one can be wrong (errEmail).
 const schema = z.object({
   name:    z.string().min(2, 'errName'),
-  email:   z.string().email('errEmail'),
+  email:   z.string().trim().min(1, 'errEmailEmpty').pipe(z.email('errEmail')),
   subject: z.string().min(2, 'errSubject'),
   message: z.string().min(10, 'errMessage'),
 });
@@ -480,7 +481,7 @@ export const sections = [
       ...grouped('Mensajes', [
         f.text('success', 'Mensaje al enviar'),
         f.text('error', 'Mensaje si falla el envío'),
-        f.text('errName', 'Falta el nombre'), f.text('errEmail', 'Correo no válido'),
+        f.text('errName', 'Falta el nombre'), f.text('errEmailEmpty', 'Falta el correo'), f.text('errEmail', 'Correo no válido'),
         f.text('errSubject', 'Falta el asunto'), f.text('errMessage', 'Mensaje demasiado corto'),
       ]),
     ],
@@ -494,7 +495,7 @@ export const sections = [
       emailLabel: 'Correo electrónico', emailPlaceholder: 'correo@ejemplo.com',
       subjectLabel: 'Asunto', subjectPlaceholder: '¿En qué le podemos ayudar?',
       messageLabel: 'Mensaje', messagePlaceholder: 'Describa su consulta…', sending: 'Enviando…',
-      errName: 'Nombre requerido', errEmail: 'Correo electrónico inválido',
+      errName: 'Nombre requerido', errEmailEmpty: 'Escriba su correo.', errEmail: 'Revise el correo: debe ser como nombre@ejemplo.com.',
       errSubject: 'Asunto requerido', errMessage: 'El mensaje es demasiado corto',
     },
   }),

@@ -17,6 +17,7 @@ import { useAuditExport, useAuditList, type AuditListParams } from '@/hooks/quer
 import { auditObjectLink, splitChanges } from '@/lib/auditDiff';
 import { ACTION_LABEL, ACTION_VARIANT, actionLabel, actorLabel } from '@/components/admin/auditLabels';
 import type { AuditLogEntry } from '@/types';
+import { plural } from '@/lib/plural';
 
 const ACTION_OPTIONS = Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }));
 
@@ -38,7 +39,7 @@ const changeValue = (v: unknown): string => {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'sí' : 'no';
   if (Array.isArray(v)) return v.length ? v.map(changeValue).join(', ') : '—';
-  if (typeof v === 'object') return `${Object.keys(v as object).length} dato(s)`;
+  if (typeof v === 'object') return plural(Object.keys(v as object).length, 'dato', 'datos');
   return String(v);
 };
 

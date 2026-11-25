@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { api } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { formatMXN } from '@/lib/format';
+import { plural } from '@/lib/plural';
 
 type Action = 'crear' | 'vincular_cuenta' | 'vincular' | 'al_dia' | 'convertir' | 'conflicto' | 'omitir';
 type Flag = 'sin_actividad' | 'sin_correo' | 'codigo_distinto' | 'consola';
@@ -282,7 +283,7 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
               <span className="block">
                 {r.total_visits} visita{r.total_visits === 1 ? '' : 's'}
                 <span className="block text-subtle">Última: {fmtDay(r.last_visit)}</span>
-                {r.pending_receipts > 0 && <span className="block text-purple">{r.pending_receipts} compra(s) por recuperar</span>}
+                {r.pending_receipts > 0 && <span className="block text-purple">{plural(r.pending_receipts, 'compra', 'compras')} por recuperar</span>}
               </span>
             )),
           },
@@ -361,13 +362,13 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
 function ImportResult({ result, onClose }: { result: StaffImportReport; onClose: () => void }) {
   const skipped = result.skipped ?? 0;
   const errors = result.errors.length;
-  const lines = [
-    [result.created, 'creado(s)'],
-    [result.attached, 'agregado(s) a una cuenta existente'],
-    [result.linked, 'vinculado(s)'],
-    [result.converted, 'convertido(s) a Personal'],
-    [skipped, 'omitido(s)'],
-  ].filter(([n]) => Number(n) > 0) as [number, string][];
+  const lines = ([
+    [result.created, 'creado', 'creados'],
+    [result.attached, 'agregado a una cuenta existente', 'agregados a una cuenta existente'],
+    [result.linked, 'vinculado', 'vinculados'],
+    [result.converted, 'convertido a Personal', 'convertidos a Personal'],
+    [skipped, 'omitido', 'omitidos'],
+  ] as [number, string, string][]).filter(([n]) => Number(n) > 0);
   // Every outcome with its number, zeros included: what was written and what was not.
   const stats: { label: string; value: number; tone: 'primary' | 'muted' | 'warn' }[] = [
     { label: 'Creados', value: result.created, tone: result.created ? 'primary' : 'muted' },
@@ -382,8 +383,8 @@ function ImportResult({ result, onClose }: { result: StaffImportReport; onClose:
       <div role="status" className="flex items-start gap-2.5 rounded-md border border-green-600/25 bg-green-50 px-4 py-3 text-sm text-green-800">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
         <div className="space-y-1">
-          <p className="font-semibold">{lines.length ? lines.map(([n, w]) => `${n} ${w}`).join(', ') : 'Nada que importar'}.</p>
-          <p>{result.recovered_receipts} compra(s) anteriores ahora aparecen en su historial (antes «sin alumno vinculado»).</p>
+          <p className="font-semibold">{lines.length ? lines.map(([n, one, many]) => plural(n, one, many)).join(', ') : 'Nada que importar'}.</p>
+          <p>{plural(result.recovered_receipts, 'compra anterior ahora aparece', 'compras anteriores ahora aparecen')} en su historial (antes «sin alumno vinculado»).</p>
           <p>Saldo inicial copiado de Loyverse: {formatMXN(result.balance_seeded)}.</p>
         </div>
       </div>

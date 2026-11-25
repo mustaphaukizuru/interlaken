@@ -154,12 +154,33 @@ class TestPublicConfirmation:
         assert r.status_code == 200
         body = r.json()
         assert body['state'] == 'ready'
-        assert body['account'] == {'name': 'Carla R.', 'detail': '1° Secundaria · Grupo A', 'is_student': True}
+        assert body['account'] == {'name': 'Carla R.', 'detail': '1° Secundaria · Grupo A', 'is_student': True,
+                                   'kind': 'alumno'}
         assert body['email'] == 'ma…@familia.mx'
         assert body['expires_at']
         assert body['separate_account'] is False
         student.refresh_from_db()
         assert student.notify_email_verified_at is None  # a GET (email scanners) never confirms
+
+    def test_a_staff_cafeteria_account_is_never_called_a_pupil(self, api_client, auth_client):
+        # QA 2026-11-24: /confirmar-correo labelled a staff wallet «Alumno».
+        staff = StudentUserFactory(first_name='Rosa', last_name='Méndez Ortiz')
+        StudentProfileFactory(user=staff, tipo='personal', grade='', group='')
+        auth_client.force_authenticate(staff)
+        mail.outbox.clear()
+        token = self._ask(auth_client)
+        body = api_client.get(CONFIRM, {'token': token}).json()
+        assert body['account'] == {'name': 'Rosa M.', 'detail': 'Personal del colegio', 'is_student': False,
+                                   'kind': 'personal'}
+        # The email names it as an account of the staff, not as a pupil.
+        sent = mail.outbox[-1].body
+        assert 'Alumno' not in sent
+        assert 'Personal del colegio' in sent
+
+    def test_a_parent_login_is_an_account(self, api_client, auth_client, parent_user):
+        token = self._ask(auth_client)
+        account = api_client.get(CONFIRM, {'token': token}).json()['account']
+        assert account['kind'] == 'cuenta' and account['is_student'] is False
 
     def test_post_confirms_signed_out_and_is_idempotent(self, api_client, auth_client, parent_user):
         token = self._ask(auth_client)

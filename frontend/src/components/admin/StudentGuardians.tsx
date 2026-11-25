@@ -16,6 +16,7 @@ import {
 } from '@/components/admin/ResetPasswordDialog';
 import { portalApi } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { phoneProblem } from '@/lib/validators';
 
 interface Guardian {
   id: number;
@@ -60,6 +61,7 @@ export function StudentGuardians({ studentId }: Props) {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [relationship, setRelationship] = useState('Padre/Madre');
   const [open, setOpen] = useState(false);
   const [toUnlink, setToUnlink] = useState<Guardian | null>(null);
@@ -194,6 +196,11 @@ export function StudentGuardians({ studentId }: Props) {
               toast.error('Indique el correo del tutor.');
               return;
             }
+            const problem = phoneProblem(phone);
+            if (problem) {
+              setPhoneError(problem);
+              return;
+            }
             link.mutate({
               email: email.trim(),
               full_name: fullName.trim() || undefined,
@@ -220,8 +227,9 @@ export function StudentGuardians({ studentId }: Props) {
           <Input
             label="Teléfono / WhatsApp"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => { setPhone(e.target.value); setPhoneError(''); }}
             inputMode="tel"
+            error={phoneError || undefined}
           />
           <Input
             label="Parentesco"

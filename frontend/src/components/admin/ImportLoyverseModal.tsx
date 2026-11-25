@@ -8,6 +8,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { portalApi, type RosterChange } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { plural } from '@/lib/plural';
 
 interface ImportReport {
   total_customers: number;
@@ -118,9 +119,9 @@ function ImportLoyverseBody({ onClose, onImported }: {
       const imp = data.import;
       const link = data.link;
       toast.success(
-        `Importación: ${imp.created} creado(s), ${imp.updated} actualizado(s)`
-        + (imp.renamed ? `, ${imp.renamed} nombre(s)` : '')
-        + `; ${link.linked} vinculado(s).`,
+        `Importación: ${plural(imp.created, 'creado', 'creados')}, ${plural(imp.updated, 'actualizado', 'actualizados')}`
+        + (imp.renamed ? `, ${plural(imp.renamed, 'nombre', 'nombres')}` : '')
+        + `; ${plural(link.linked, 'vinculado', 'vinculados')}.`,
       );
       onImported?.();
       onClose();
@@ -235,7 +236,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
                 ]}
               />
               {visible.length < changes.length && (
-                <p className="text-xs text-subtle">{visible.length} de {changes.length} cambio(s).</p>
+                <p className="text-xs text-subtle">{visible.length} de {plural(changes.length, 'cambio', 'cambios')}.</p>
               )}
             </section>
           )}
@@ -243,7 +244,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
           {imp.skipped?.length > 0 && (
             <details className="rounded-md border border-line px-3 py-2 text-xs text-muted">
               <summary className="cursor-pointer font-semibold text-subtle">
-                {imp.skipped_non_student + (imp.skipped_duplicate ?? 0)} cliente(s) de Loyverse omitidos: ver motivos
+                {plural(imp.skipped_non_student + (imp.skipped_duplicate ?? 0), 'cliente de Loyverse omitido', 'clientes de Loyverse omitidos')}: ver motivos
               </summary>
               <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto">
                 {imp.skipped.map((s) => (
@@ -258,7 +259,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
           {imp.errors.length > 0 && (
             <p className="flex items-start gap-1.5 text-xs text-amber">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {imp.errors.length} error(es) en filas: se omitirán al aplicar.
+              {plural(imp.errors.length, 'error en una fila', 'errores en filas')}: {imp.errors.length === 1 ? 'se omitirá' : 'se omitirán'} al aplicar.
             </p>
           )}
 
@@ -272,7 +273,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
               <Button variant="secondary" onClick={onClose}>Cerrar</Button>
               {wouldChange > 0 && (
                 <Button onClick={commit}>
-                  <Download className="h-4 w-4" /> Importar {wouldChange} cambio(s)
+                  <Download className="h-4 w-4" /> Importar {plural(wouldChange, 'cambio', 'cambios')}
                 </Button>
               )}
             </div>

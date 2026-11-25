@@ -22,6 +22,7 @@ import re
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.core.plurals import count
 from apps.payments import ops_alerts
 from apps.payments.gateways.banorte import BanorteConfig
 from apps.payments.gateways.base import LiveCheckoutNotConfigured
@@ -56,9 +57,11 @@ class Command(BaseCommand):
         if live and open_to_all:
             stage = "abierto: cargos reales para todas las familias"
         elif live:
-            stage = f"certificación: cargos reales solo para {len(testers)} cuenta(s) de prueba"
+            stage = f"certificación: cargos reales solo para {count(len(testers), 'cuenta', 'cuentas')} de prueba"
         else:
-            stage = f"simulación: solo {len(testers)} cuenta(s) de prueba, sin cargos"
+            stage = (
+                f"simulación: solo {count(len(testers), 'cuenta', 'cuentas')} de prueba, sin cargos"
+            )
         self.stdout.write(f"Etapa: {stage}")
         self.stdout.write(f"Modo Payworks efectivo: {config.effective_mode()}")
         self.stdout.write(f'Afiliación: {config.merchant_id or "(sin configurar)"}')
