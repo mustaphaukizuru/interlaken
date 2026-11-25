@@ -10,6 +10,21 @@ import { Avatar } from '@/components/ui/Avatar';
 
 const OUT = 512;
 
+type Size = { width: number; height: number };
+
+/**
+ * Keep the photo covering the whole frame: the drag can move it only as far
+ * as its own edge. Without this limit a photo dragged past the frame left an
+ * empty (transparent) band in the saved picture, shown blank on the credencial.
+ */
+export function clampOffset(img: Size, zoom: number, offset: { x: number; y: number }, box: number): { x: number; y: number } {
+  const base = Math.max(box / img.width, box / img.height); // cover
+  const maxX = Math.max(0, (img.width * base * zoom - box) / 2);
+  const maxY = Math.max(0, (img.height * base * zoom - box) / 2);
+  const clamp = (v: number, m: number) => Math.min(m, Math.max(-m, v)) || 0; // never -0
+  return { x: clamp(offset.x, maxX), y: clamp(offset.y, maxY) };
+}
+
 /** Compute the square crop of `img` shown in a `box`-px viewport with `zoom` and `offset` (px). */
 export function cropToSquare(img: HTMLImageElement, zoom: number, offset: { x: number; y: number }, box: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -21,9 +36,13 @@ export function cropToSquare(img: HTMLImageElement, zoom: number, offset: { x: n
   const scale = base * zoom;
   const drawW = img.width * scale;
   const drawH = img.height * scale;
-  const x = (box - drawW) / 2 + offset.x;
-  const y = (box - drawH) / 2 + offset.y;
+  const safe = clampOffset(img, zoom, offset, box);
+  const x = (box - drawW) / 2 + safe.x;
+  const y = (box - drawH) / 2 + safe.y;
   const k = OUT / box;
+  // White underneath: a transparent pixel can never reach the saved photo.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, OUT, OUT);
   ctx.drawImage(img, x * k, y * k, drawW * k, drawH * k);
   return canvas;
 }
@@ -69,7 +88,7 @@ export function AvatarUpload() {
   });
 
   const onPointerDown = (e: ReactPointerEvent) => { drag.current = { x: e.clientX - offset.x, y: e.clientY - offset.y }; (e.target as HTMLElement).setPointerCapture(e.pointerId); };
-  const onPointerMove = (e: ReactPointerEvent) => { if (drag.current) setOffset({ x: e.clientX - drag.current.x, y: e.clientY - drag.current.y }); };
+  const onPointerMove = (e: ReactPointerEvent) => { if (drag.current && img) setOffset(clampOffset(img, zoom, { x: e.clientX - drag.current.x, y: e.clientY - drag.current.y }, BOX)); };
   const onPointerUp = () => { drag.current = null; };
 
   const base = img ? Math.max(BOX / img.width, BOX / img.height) : 1;
@@ -107,7 +126,7 @@ export function AvatarUpload() {
               style={{ width: img.width * base * zoom, height: img.height * base * zoom, left: (BOX - img.width * base * zoom) / 2 + offset.x, top: (BOX - img.height * base * zoom) / 2 + offset.y }} />
           )}
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm text-muted"><ZoomIn size={16} aria-hidden="true" /><input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="flex-1" aria-label="Acercar" /></label>
+        <label className="mt-3 flex items-center gap-2 text-sm text-muted"><ZoomIn size={16} aria-hidden="true" /><input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => { const z = Number(e.target.value); setZoom(z); if (img) setOffset((o) => clampOffset(img, z, o, BOX)); }} className="flex-1" aria-label="Acercar" /></label>
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => { setSrc(null); setImg(null); }}>Cancelar</Button>
           <Button type="button" onClick={() => upload.mutate()} loading={upload.isPending}>Guardar foto</Button>

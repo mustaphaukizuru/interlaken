@@ -93,3 +93,23 @@ def test_normal_png_at_the_cap_still_works(admin_client, settings, tmp_path):
     settings.MEDIA_ROOT = str(tmp_path)
     r = admin_client.post(reverse('my-avatar'), {'file': _png(1290, 2796)}, format='multipart')
     assert r.status_code == 200, r.data
+
+
+def test_transparent_parts_are_flattened_onto_white():
+    """A photo with an empty band (a crop dragged past the frame) is saved
+    opaque: no transparent pixel can reach the credencial (QA 2026-11-24)."""
+    from PIL import Image
+
+    from apps.accounts.avatar import _square_webp
+
+    img = Image.new('RGBA', (300, 300), (30, 60, 90, 255))
+    for y in range(225, 300):  # the bottom quarter left empty
+        for x in range(300):
+            img.putpixel((x, y), (0, 0, 0, 0))
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    out = Image.open(io.BytesIO(_square_webp(buf.getvalue())))
+    assert out.mode == 'RGB'
+    assert out.getpixel((128, 250)) == (255, 255, 255) or min(out.getpixel((128, 250))) > 245
+    r, g, b = out.getpixel((128, 60))
+    assert abs(r - 30) < 12 and abs(g - 60) < 12 and abs(b - 90) < 12
