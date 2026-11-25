@@ -16,6 +16,8 @@ const API = 'http://localhost:8800/api/v1/';
 // Shares nothing with the generated names («Hermanos<run> Ruiz», Ana, Luis): Django's
 // similarity validator rejected the old 'Hermanos-E2E-2026!' on some runs (flaky).
 const FAMILY_PASSWORD = 'Lluvia-Azul-7319!';
+// The family's own password after the first sign-in (same rule: nothing in common with the names).
+const FAMILY_OWN_PASSWORD = 'Brisa-Verde-5826!';
 const SHOTS = process.env.FAMILY_SHOTS;
 
 /** Desktop and phone screenshots for a design review (local only, FAMILY_SHOTS set). */
@@ -106,6 +108,14 @@ test.describe('Familias (hermanos)', () => {
     const family = await browser.newContext();
     const fpage = await family.newPage();
     await login(fpage, { email: ana.email, password: FAMILY_PASSWORD });
+    // An admin set this password, so it is temporary: the first sign-in asks
+    // the family to create its own before anything else (accounts/authentication.py).
+    await expect(fpage.getByRole('heading', { name: 'Cree su contraseña' })).toBeVisible();
+    await fpage.getByLabel('Contraseña temporal', { exact: true }).fill(FAMILY_PASSWORD);
+    await fpage.getByLabel('Contraseña nueva', { exact: true }).fill(FAMILY_OWN_PASSWORD);
+    await fpage.getByLabel('Confirme la contraseña nueva', { exact: true }).fill(FAMILY_OWN_PASSWORD);
+    await fpage.getByRole('button', { name: 'Guardar y continuar' }).click();
+    await expect(fpage.getByRole('heading', { name: 'Cree su contraseña' })).toBeHidden();
     await fpage.goto('/portal');
     await expect(fpage.getByText(/Luis/).first()).toBeVisible();
     await expect(fpage.getByText(/Ana/).first()).toBeVisible();

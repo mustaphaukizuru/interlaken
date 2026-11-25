@@ -127,7 +127,7 @@ class TestBalancesList:
     def test_query_budget_is_constant(self, api_client, admin, django_assert_num_queries, n):
         for _ in range(n):
             _balance(StudentProfileFactory(), 20)
-        with django_assert_num_queries(2):  # count + page (user + loyverse profile joined)
+        with django_assert_num_queries(3):  # count + page (user + loyverse profile joined) + the allergies switch
             resp = api_client.get(reverse("admin-balances"), {"q": "User"})
         assert resp.json()["count"] == n
 

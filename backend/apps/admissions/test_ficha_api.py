@@ -215,11 +215,15 @@ class TestPublicStart:
         )
         assert resp.status_code == 400 and "child_dob" in resp.data
 
-    def test_rate_limited(self, api_client, settings):
+    def test_rate_limited(self, api_client, settings, monkeypatch):
         from django.core.cache import cache
+        from django_ratelimit import core as ratelimit_core
 
         settings.RATELIMIT_ENABLE = True
         cache.clear()
+        # A fixed clock: six requests that straddled a minute boundary landed in
+        # two rate-limit windows and the sixth got 201 (flaky on slow CI).
+        monkeypatch.setattr(ratelimit_core.time, "time", lambda: 1_800_000_030.0)
         codes = [
             api_client.post(
                 START, start_payload(contact_email=f"f{i}@ejemplo.test"), format="json"
