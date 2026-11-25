@@ -425,9 +425,21 @@ not wired in, so events arrive minified until you add it.
 **Logs** — JSON lines on stdout, one object per record with `ts`, `level`,
 `logger`, `message` and `request_id`; every response carries `X-Request-ID`
 (inbound ids from Caddy are propagated) so a request can be traced end to end.
-`LOG_LEVEL` (default `INFO`) adjusts verbosity. Read them with
-`docker compose logs -f app` — the json-file driver is capped at 3 × 10 MB per
-container, so logs cannot fill the disk.
+`LOG_LEVEL` (default `INFO`) adjusts verbosity. The app container logs to the
+host journal (journald driver), which survives deploys: a json-file log is
+deleted with its container, and every deploy recreates the container. The
+journal is persistent and capped by `SystemMaxUse` in
+`/etc/systemd/journald.conf` (1 GB on this box), so logs cannot fill the disk.
+`docker compose logs -f app` shows the current container; earlier ones:
+`journalctl -t interlaken-app --since "2026-11-24 06:00"` (add `| grep ERROR`).
+
+**Error alert emails**: with `ERROR_ALERT_EMAILS` set in `.env` (comma
+separated), every unhandled exception and every ERROR from the project's own
+code (cron jobs, webhooks) also sends a short email: exception type, masked
+message, method and path without query string, request id and code locations.
+At most one email per distinct error per hour and 10 per hour in total, per
+worker. It needs no third-party account; Sentry stays the better tool once a
+DSN exists (`apps/core/error_alerts.py`).
 
 **Database** — `CONN_MAX_AGE` (default `60`) keeps connections warm. With the
 database container on the same private network there is no pooler and no TLS

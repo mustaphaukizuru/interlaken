@@ -540,6 +540,13 @@ if SENTRY_DSN:
         traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='') or 0.0),
     )
 
+# ── ERROR ALERT EMAILS ────────────────────────────────────
+# Comma-separated addresses that get a short, masked email when the live site
+# logs an error (a 500, a failed job). Needs no third-party account; empty =
+# off. production.py attaches the handler; what it sends and how it is
+# throttled is in apps/core/error_alerts.py.
+ERROR_ALERT_EMAILS = env.list('ERROR_ALERT_EMAILS', default=[])
+
 # ── CACHE ─────────────────────────────────────────────────
 # Per-process in-memory cache. Today it backs the 60s micro-cache on the
 # staff analytics endpoint (apps/portal/analytics.py); each gunicorn worker

@@ -42,6 +42,11 @@ pip install -r requirements.txt
 export DJANGO_SETTINGS_MODULE=config.settings.development
 export SQLITE_LOCAL=1
 
+# Even without SQLITE_LOCAL, development settings never use a database on
+# another machine or the live Loyverse/Calendar/WhatsApp/push/Banorte keys from
+# .env unless you opt in for one command with DEV_ALLOW_REMOTE_DB=1 or
+# DEV_LIVE_INTEGRATIONS=1 (config/settings/local_safety.py).
+
 python manage.py migrate
 python manage.py createsuperuser        # create your admin login
 python manage.py runserver 0.0.0.0:8000

@@ -40,7 +40,16 @@ services:
         VITE_GIT_SHA: ${VITE_GIT_SHA:-}
     restart: unless-stopped
     env_file: .env
-    logging: *logging
+    logging:
+      # journald, not json-file: Docker deletes a container's json-file log when
+      # the container is recreated, which every deploy does, so an error from
+      # the morning was gone after an afternoon deploy. The host journal is
+      # persistent and capped (SystemMaxUse in /etc/systemd/journald.conf), and
+      # `docker compose logs app` still shows the current container. Earlier
+      # containers: journalctl -t interlaken-app --since "2026-11-24 06:00"
+      driver: journald
+      options:
+        tag: interlaken-app
     security_opt:
       - no-new-privileges:true
     cap_drop:
