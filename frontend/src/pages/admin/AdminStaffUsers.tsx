@@ -1,7 +1,7 @@
 import { Fragment, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserCog, Plus, KeyRound, Copy, Check, FileUp, UserX, UserCheck, ShieldCheck, Pencil, History } from 'lucide-react';
+import { UserCog, Plus, KeyRound, Copy, Check, FileUp, UserX, UserCheck, ShieldCheck, Pencil, History, MailCheck, MailWarning } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -66,7 +66,7 @@ export default function AdminStaffUsers() {
   const [toToggle, setToToggle] = useState<StaffUser | null>(null);
   const [toReset, setToReset] = useState<StaffUser | null>(null);
   const [toAccess, setToAccess] = useState<StaffUser | null>(null);
-  const [revealed, setRevealed] = useState<{ user: StaffUser; password: string } | null>(null);
+  const [revealed, setRevealed] = useState<Revealed | null>(null);
   const [confirming, setConfirming] = useState<{ action: BulkActionDef; one?: StaffUser } | null>(null);
   const [toEdit, setToEdit] = useState<StaffUser | null>(null);
   const [toView, setToView] = useState<StaffUser | null>(null);
@@ -374,7 +374,7 @@ export default function AdminStaffUsers() {
   );
 }
 
-function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () => void; onInvited: (r: { user: StaffUser; password: string }) => void }) {
+function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () => void; onInvited: (r: Revealed) => void }) {
   const guard = useDirtyCloseGuard(onClose);
   return (
     <>
@@ -392,7 +392,7 @@ const ACCESS_START: StaffAccess = { staff_title: PUESTOS[0].label, staff_areas: 
 
 function InviteForm({ onClose, onCancel, onDirty, onInvited }: {
   onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
-  onInvited: (r: { user: StaffUser; password: string }) => void;
+  onInvited: (r: Revealed) => void;
 }) {
   const [form, setForm] = useState(INVITE_START);
   const [access, setAccess] = useState<StaffAccess>(ACCESS_START);
@@ -402,7 +402,7 @@ function InviteForm({ onClose, onCancel, onDirty, onInvited }: {
   useReportDirty(valuesDiffer(form, INVITE_START) || valuesDiffer(sorted(access), sorted(ACCESS_START)), onDirty);
   const invite = useMutation({
     mutationFn: () => portalApi.inviteStaff(form.role === 'staff' ? { ...form, ...access } : form),
-    onSuccess: ({ data }) => { onInvited({ user: data, password: data.temporary_password }); onClose(); },
+    onSuccess: ({ data }) => { onInvited({ user: data, password: data.temporary_password, emailSent: data.invite_email_sent }); onClose(); },
     onError: (e: unknown) => { const f = fieldErrorsOrNull(e); if (f && Object.keys(f).length) setErrors(f); else toast.error('No se pudo crear la cuenta.'); },
   });
   const submit = (e: FormEvent) => { e.preventDefault(); invite.mutate(); };
@@ -422,6 +422,7 @@ function InviteForm({ onClose, onCancel, onDirty, onInvited }: {
       </div>
       {form.role === 'staff' && <StaffAccessFields value={access} onChange={setAccess} idPrefix="invite" />}
       {errors.staff_areas && <p className="text-xs text-coral">{errors.staff_areas}</p>}
+      <p className="text-sm text-muted">Le enviaremos un correo con el enlace para entrar, sin la contraseña. La contraseña temporal aparece al crear la cuenta: entréguela en persona.</p>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
         <Button type="submit" loading={invite.isPending} className="min-h-[44px]"><UserCog className="h-4 w-4" aria-hidden="true" /> Crear cuenta</Button>
@@ -430,16 +431,33 @@ function InviteForm({ onClose, onCancel, onDirty, onInvited }: {
   );
 }
 
-function RevealModal({ data, onClose }: { data: { user: StaffUser; password: string } | null; onClose: () => void }) {
+/** A temporary password shown once; `emailSent` only for an invitation (a reset sends no email). */
+interface Revealed { user: StaffUser; password: string; emailSent?: boolean }
+
+function RevealModal({ data, onClose }: { data: Revealed | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   if (!data) return null;
   const copy = async () => {
     try { await navigator.clipboard.writeText(data.password); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { toast.error('No se pudo copiar.'); }
   };
+  const loginUrl = `${window.location.origin}/login`;
   return (
     <Modal open onClose={onClose} title="Contraseña temporal" maxWidth={460}>
-      <p className="text-sm text-muted">Entregue este acceso a <strong>{data.user.email}</strong>. No se volverá a mostrar.</p>
+      <p className="text-sm text-muted">Entregue este acceso a <strong className="break-all">{data.user.email}</strong> en persona. No se volverá a mostrar.</p>
       <div className="rounded-md bg-cream/70 p-4 text-center"><code className="select-all break-all font-mono text-xl font-bold text-ink">{data.password}</code></div>
+      <p className="text-sm text-muted">Es temporal: la primera vez que entre se le pedirá crear su propia contraseña.</p>
+      {data.emailSent === true && (
+        <p role="status" className="flex items-start gap-2 rounded-md bg-success-bg px-3 py-2 text-sm text-success">
+          <MailCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>Le enviamos un correo con el enlace para entrar. El correo no incluye la contraseña.</span>
+        </p>
+      )}
+      {data.emailSent === false && (
+        <p role="status" className="flex items-start gap-2 rounded-md bg-warning-bg px-3 py-2 text-sm text-warning">
+          <MailWarning className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>No se pudo enviar el correo de bienvenida. La cuenta sí quedó creada: avísele que entre en <span className="break-all font-semibold">{loginUrl}</span> con este correo.</span>
+        </p>
+      )}
       <Button variant="secondary" className="w-full" onClick={copy}>{copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />} Copiar</Button>
       <Button className="w-full" onClick={onClose}>Listo</Button>
     </Modal>

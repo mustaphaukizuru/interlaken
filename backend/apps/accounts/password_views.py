@@ -1,10 +1,14 @@
 """Notification preference endpoints.
 
-School policy (2026-08-22): there is NO self-service password reset or change.
-Families request a new password by WhatsApp or email and an admin sets it via
+School policy (2026-08-22): there is NO self-service password reset. Families
+request a new password by WhatsApp or email and an admin sets it via
 ``AdminSetPasswordView`` (apps.accounts.admin_password). The former
 ``password-reset/``, ``password-reset/confirm/`` and ``set-password/``
 endpoints were removed on purpose; do not reintroduce them.
+
+Since 2026-11-24 a signed-in person replaces a password by proving the current
+one (``me/password/``, apps.accounts.own_password): a password an admin hands
+out is temporary and must be replaced at the next sign-in.
 """
 from rest_framework import permissions
 from rest_framework.response import Response

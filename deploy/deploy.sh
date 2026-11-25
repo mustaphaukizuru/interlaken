@@ -79,6 +79,13 @@ if [[ "$host_tz" != "America/Mexico_City" ]]; then
   echo "           Fix once: sudo timedatectl set-timezone America/Mexico_City && sudo systemctl restart cron"
 fi
 
+# The app container logs to the host journal (docker-compose.yml). Without
+# /var/log/journal, journald keeps logs in memory only and a reboot loses them.
+if [[ ! -d /var/log/journal ]]; then
+  echo "  WARNING: the system journal is not persistent, so app logs are lost on reboot."
+  echo "           Fix once: sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald"
+fi
+
 # ── Rollback point ──────────────────────────────────────────────────────────
 # Tag the currently-running image before rebuilding, so a bad deploy has
 # somewhere to go back to. Without this the rebuild plus `image prune` destroys

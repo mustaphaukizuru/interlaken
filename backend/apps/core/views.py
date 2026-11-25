@@ -196,15 +196,19 @@ class FacturacionRequestView(APIView):
             try:
                 validate_email(d['email'])
             except DjangoValidationError:
-                errors['email'] = ['Correo inválido.']
+                errors['email'] = ['Revise el correo.']
         if d['rfc'] and not (12 <= len(d['rfc']) <= 13):
             errors['rfc'] = ['El RFC debe tener 12 o 13 caracteres.']
         if d['cp'] and not (d['cp'].isdigit() and len(d['cp']) == 5):
             errors['cp'] = ['El código postal debe tener 5 dígitos.']
         if d['regimen'] and d['regimen'] not in self.REGIMENES:
             errors['regimen'] = ['Seleccione un régimen fiscal de la lista.']
+        from .phones import MSG_PHONE_CHARS, phone_problem
+
         phone_digits = ''.join(ch for ch in d['phone'] if ch.isdigit())
-        if d['phone'] and len(phone_digits) != 10:
+        if d['phone'] and phone_problem(d['phone']) == MSG_PHONE_CHARS:
+            errors['phone'] = [MSG_PHONE_CHARS]
+        elif d['phone'] and len(phone_digits) != 10:
             errors['phone'] = ['Escriba el teléfono a 10 dígitos: (00) 0000-0000.']
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)

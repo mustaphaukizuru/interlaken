@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { legalApi } from '@/services/api';
 import { ARCO_STATUS_META, ARCO_TYPE_LABEL } from '@/lib/status/arco';
 import { useSingleFlight } from '@/hooks/useSingleFlight';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 const PURPOSE_LABELS: Record<string, string> = {
   academic_processing: 'Tratamiento académico',
@@ -24,6 +25,11 @@ const PURPOSE_LABELS: Record<string, string> = {
   medical_data: 'Datos de salud',
 };
 
+/* Who sees the allergies follows Ajustes → «La cafetería ve las alergias» (off by
+   default): with it on, this authorisation also shows them to the cafetería. */
+const MEDICAL_HELP_OFF = 'Alergias, tipo de sangre y notas médicas de sus hijos. La cafetería no los ve.';
+const MEDICAL_HELP_ON = 'Alergias, tipo de sangre y notas médicas de sus hijos. Con esta autorización, la cafetería ve sus alergias (solo las alergias) al atenderlos.';
+
 
 type ConsentState = Record<string, boolean>;
 
@@ -32,6 +38,7 @@ export default function PrivacyPage() {
   const [arcoType, setArcoType] = useState('access');
   const [arcoDetails, setArcoDetails] = useState('');
   const [draft, setDraft] = useState<ConsentState | null>(null);
+  const cafeteriaSeesAllergies = useSiteSettings().cafeteria_shows_allergies === true;
 
   const consentQ = useQuery({
     queryKey: ['legal-consent'],
@@ -136,11 +143,19 @@ export default function PrivacyPage() {
                   key={key}
                   className="flex min-h-[44px] items-center justify-between gap-3 text-sm text-ink"
                 >
-                  <span>{PURPOSE_LABELS[key]}</span>
+                  <span className="min-w-0">
+                    {PURPOSE_LABELS[key]}
+                    {key === 'medical_data' && (
+                      <span id="consent-medical-help" className="mt-0.5 block text-xs text-muted">
+                        {cafeteriaSeesAllergies ? MEDICAL_HELP_ON : MEDICAL_HELP_OFF}
+                      </span>
+                    )}
+                  </span>
                   <input
                     type="checkbox"
-                    className="h-5 w-5"
+                    className="h-5 w-5 shrink-0"
                     aria-label={PURPOSE_LABELS[key]}
+                    aria-describedby={key === 'medical_data' ? 'consent-medical-help' : undefined}
                     checked={!!state[key]}
                     onChange={(e) => toggle(key, e.target.checked)}
                   />

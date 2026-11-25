@@ -21,19 +21,28 @@ export interface CmsPagePayload {
 /** A CMS answer slower than this counts as «no published page»: the template renders. */
 export const CMS_TIMEOUT_MS = 8000;
 
+/** A published page in the answer (a 204 has an empty body: nothing published). */
+export function isPagePayload(data: unknown): data is CmsPagePayload {
+  return !!data && typeof data === 'object' && Array.isArray((data as CmsPagePayload).blocks);
+}
+
 async function request(slug: string): Promise<CmsPagePayload | null> {
   try {
     // The request first: if it throws at once, no timer is left to reject later, unhandled.
     const load = contentApi.getPage(slug);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('cms-timeout')), CMS_TIMEOUT_MS); });
-    const page = (await Promise.race([load, late]).finally(() => clearTimeout(timer))).data as CmsPagePayload;
+    const res = await Promise.race([load, late]).finally(() => clearTimeout(timer));
+    // 204 (no body): a page of the site the school has not published; the
+    // template renders with the code defaults. The normal answer, not an error.
+    const page = isPagePayload(res.data) ? res.data : null;
     // Generic blocks render from their own chunk: start it with the page data.
     if (page?.blocks?.some((b) => !b.type.includes('.'))) void import('./blocks/generic');
     return page;
   } catch {
-    // 404 = never published (the template renders); a server or network error,
-    // or no answer within CMS_TIMEOUT_MS, degrades the same way.
+    // 404 (a slug the site does not know, or a server older than the 204), a
+    // server or network error, or no answer within CMS_TIMEOUT_MS: the
+    // template renders, as with no published page.
     return null;
   }
 }

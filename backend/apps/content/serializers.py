@@ -20,7 +20,10 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
             'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'chrome', 'sep_incorporations', 'school_year',
-            'admissions_next_from_month', 'pricing_years', 'updated_at',
+            'admissions_next_from_month', 'pricing_years',
+            # Public on purpose: the texts that say who sees a child's
+            # allergies (family privacy page, student form) follow it.
+            'cafeteria_shows_allergies', 'updated_at',
         ]
         read_only_fields = fields
 
@@ -33,7 +36,8 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
             'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'chrome', 'sep_incorporations', 'school_year',
-            'admissions_public_start', 'admissions_next_from_month', 'pricing_years', 'families_upload_photos', 'updated_at',
+            'admissions_public_start', 'admissions_next_from_month', 'pricing_years', 'families_upload_photos',
+            'cafeteria_shows_allergies', 'updated_at',
         ]
         # The price years change only through «Costos y precios» (audited, per group).
         read_only_fields = ['pricing_years', 'updated_at']
@@ -48,6 +52,19 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('Cada registro necesita nivel (Preescolar/Primaria/Secundaria) y texto.')
             out.append({'level': level, 'label': str(label).strip()[:200]})
         return out
+
+    def validate_phone_e164(self, value):
+        return self._phone(value, 'phone_e164')
+
+    def validate_whatsapp_number(self, value):
+        return self._phone(value, 'whatsapp_number')
+
+    def _phone(self, value, field):
+        # The dialled number and the wa.me number follow core.phones; the
+        # saved value is accepted as it is (the form sends every field).
+        from apps.core.phones import check_phone
+
+        return check_phone(value, current=getattr(self.instance, field, None))
 
     def validate_menu(self, value):
         from .navigation import validate_menu

@@ -36,6 +36,23 @@ describe('Contacto · formulario', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('an empty e-mail asks for it; only a typed one is «revise» (QA 2026-11-24: it said «inválido»)', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await user.type(screen.getByLabelText('Nombre'), 'Marta Ejemplo');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    const email = screen.getByLabelText('Correo electrónico');
+    await waitFor(() => expect(email).toHaveFocus());
+    expect(screen.getByText('Escriba su correo.')).toBeInTheDocument();
+    expect(screen.queryByText(/inválido/)).toBeNull();
+
+    await user.type(email, 'marta@');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    expect(await screen.findByText('Revise el correo: debe ser como nombre@ejemplo.com.')).toBeInTheDocument();
+    expect(screen.queryByText('Escriba su correo.')).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('shows the answer inline: the confirmation replaces the form; a failure sits above the button', async () => {
     const user = userEvent.setup();
     send.mockRejectedValueOnce(new Error('red'));

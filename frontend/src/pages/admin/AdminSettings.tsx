@@ -4,6 +4,7 @@ import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCar
 import { AdmissionsPublicStartCard } from '@/components/admin/AdmissionsPublicStartCard';
 import { SchoolCycleCard } from '@/components/admin/SchoolCycleCard';
 import { CredentialPhotosCard } from '@/components/admin/CredentialPhotosCard';
+import { CafeteriaAllergiesCard } from '@/components/admin/CafeteriaAllergiesCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -16,6 +17,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { contentApi } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
+import { phoneProblem } from '@/lib/validators';
 import { socialEntries } from '@/lib/siteContact';
 import type { SiteSettings } from '@/types/content';
 
@@ -218,6 +220,17 @@ export default function AdminSettings() {
   const save = useMutation({
     mutationFn: () => {
       if (!loaded) return Promise.reject(new Error('settings-not-loaded'));
+      // The dialled and the WhatsApp numbers follow the site's phone rule; a value
+      // saved before it is sent back as it is (the whole form is sent).
+      const phoneErrors: FieldErrors = {};
+      for (const key of ['phone_e164', 'whatsapp_number'] as const) {
+        const problem = phoneProblem(form[key] ?? '', data?.[key]);
+        if (problem) phoneErrors[key] = problem;
+      }
+      if (Object.keys(phoneErrors).length > 0) {
+        setFieldErrors(phoneErrors);
+        return Promise.reject(new Error('settings-invalid'));
+      }
       setFieldErrors({});
       // Fields owned by other screens (menu → /admin/navegacion, school_year →
       // /admin/nuevo-ciclo) are never sent: PATCHing the fetched snapshot
@@ -242,6 +255,10 @@ export default function AdminSettings() {
     onError: (err: unknown) => {
       if (err instanceof Error && err.message === 'settings-not-loaded') {
         toast.error('Espere a que carguen los ajustes.');
+        return;
+      }
+      if (err instanceof Error && err.message === 'settings-invalid') {
+        toast.error('Revise los campos marcados e intente de nuevo.');
         return;
       }
       const next = settingsFieldErrors(err);
@@ -366,6 +383,8 @@ export default function AdminSettings() {
             <AdmissionsPublicStartCard value={data?.admissions_public_start} loaded={loaded} />
 
             <CredentialPhotosCard value={data?.families_upload_photos} loaded={loaded} />
+
+            <CafeteriaAllergiesCard value={data?.cafeteria_shows_allergies} loaded={loaded} />
 
             <AdmissionTemplatesCard />
 

@@ -11,7 +11,6 @@ from django.contrib.auth import logout
 from django.db.models import DecimalField, F, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import redirect
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from google.auth import exceptions as google_auth_exceptions
 from google.auth.transport import requests as google_requests
@@ -134,6 +133,33 @@ def _google_id_conflict(user, google_id: str) -> bool:
     return bool(privileged and google_id and user.google_id and user.google_id != google_id)
 
 
+def _retire_temporary_password(user) -> bool:
+    """A Google sign-in by someone still holding a temporary password.
+
+    They proved the address with Google, so the temporary password the school
+    handed out is never going to be replaced through «Cree su contraseña»: it
+    is made unusable instead of staying valid forever, the flag is cleared,
+    and any session opened with it is closed (it may not have been theirs).
+    Runs only after the ``google_mismatch`` guard, so a different Google
+    account never retires anything. Audited; returns whether it ran.
+    """
+    if not user.password_change_required:
+        return False
+    from apps.core.audit import record
+
+    from .admin_password import revoke_refresh_tokens
+
+    user.set_unusable_password()
+    user.password_change_required = False
+    user.save(update_fields=['password', 'password_change_required'])
+    revoked = revoke_refresh_tokens(user)
+    record('permission', user, {'password': ['[redacted]', '[unusable]'],
+                                'password_change_required': [True, False],
+                                'via': 'google', 'sessions_revoked': revoked},
+           actor=user, context='accounts.temporary_password_retired')
+    return True
+
+
 def _resolve_google_user(email: str, *, defaults: dict) -> User | None:
     """Find an existing user or optionally create one for an allowlisted domain.
 
@@ -229,6 +255,7 @@ class GoogleCallbackView(APIView):
         if _google_id_conflict(user, google_id):
             record_login(request, user=user, method='google', success=False, reason='google_mismatch')
             return redirect(f'{settings.FRONTEND_URL}/login?error=google_mismatch')
+        _retire_temporary_password(user)
 
         # Refresh google_id / avatar for returning users.
         updated = False
@@ -317,6 +344,7 @@ class GoogleTokenView(APIView):
             record_login(request, user=user, method='google', success=False, reason='google_mismatch')
             return Response(error_body(GOOGLE_MISMATCH_MESSAGE, code='google_mismatch'),
                             status=status.HTTP_403_FORBIDDEN)
+        _retire_temporary_password(user)
         avatar = _google_avatar(payload.get('picture'))
         dirty = []
         if google_id and user.google_id != google_id:
@@ -347,6 +375,8 @@ class LogoutView(APIView):
     un-revoked. The CSRF double-submit + the httpOnly cookie identify the session.
     """
     permission_classes = [permissions.AllowAny]
+    # «Cree su contraseña» offers «Salir» (apps/accounts/authentication.py).
+    password_change_allowed = True
 
     def post(self, request):
         if not csrf_ok(request):
@@ -362,6 +392,23 @@ class LogoutView(APIView):
         clear_auth_cookies(response)
         logout(request)
         return response
+
+
+TOTP_MESSAGES = {
+    'totp_required': 'Ingrese el código de su app de autenticación.',
+    'bad_totp': 'Código incorrecto.',
+    'reused_totp': 'Ese código ya se usó. Espere el siguiente código de su app.',
+}
+
+
+def _discard_refresh(raw) -> None:
+    """Blacklist a refresh token that was minted but never handed out."""
+    if not raw:
+        return
+    try:
+        RefreshToken(raw).blacklist()
+    except TokenError:
+        pass
 
 
 @method_decorator(ratelimit('login', '10/m', key='ip', method='POST'), name='dispatch')
@@ -389,7 +436,7 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
         return self.login_serializer
 
     def post(self, request, *args, **kwargs):
-        from .security import record_login, totp_enabled, verify_totp
+        from .security import record_login, totp_enabled, use_totp
         email = str(request.data.get('email') or '').strip()[:254]
         try:
             response = super().post(request, *args, **kwargs)
@@ -405,20 +452,21 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
         user = self.login_serializer.user
         if totp_enabled(user):
             code = str(request.data.get('totp') or '')
-            if not code:
-                record_login(request, user=user, success=False, reason='totp_required')
-                return Response({'totp_required': True, 'detail': 'Ingrese el código de su app de autenticación.'},
+            failure = 'totp_required' if not code else use_totp(user.totp, code)
+            if failure:
+                # SimpleJWT already minted a pair: it never leaves, so it must
+                # not count as an open session in Seguridad for 7 days.
+                _discard_refresh(response.data.get('refresh'))
+                record_login(request, user=user, success=False, reason=failure)
+                return Response({'totp_required': True, 'detail': TOTP_MESSAGES[failure]},
                                 status=status.HTTP_401_UNAUTHORIZED)
-            if not verify_totp(user.totp.secret, code):
-                record_login(request, user=user, success=False, reason='bad_totp')
-                return Response({'totp_required': True, 'detail': 'Código incorrecto.'}, status=status.HTTP_401_UNAUTHORIZED)
-            user.totp.last_used_at = timezone.now()
-            user.totp.save(update_fields=['last_used_at'])
         record_login(request, user=user, email=email)
         if response.status_code == status.HTTP_200_OK:
             refresh = response.data.get('refresh')
             access = response.data.get('access')
-            response.data = {'access': access}
+            # The SPA shows «Cree su contraseña» before any portal page.
+            response.data = {'access': access,
+                             'password_change_required': user.password_change_required}
             if refresh:
                 # Cookies + last_login, like every other sign-in.
                 start_session(user, response, refresh)
@@ -434,6 +482,7 @@ class CookieTokenRefreshView(APIView):
     cookie, and returns a fresh in-memory access token.
     """
     permission_classes = [permissions.AllowAny]
+    password_change_allowed = True  # the session lives on while the password is created
 
     def post(self, request):
         if not csrf_ok(request):
@@ -476,6 +525,9 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
     """GET/PATCH /api/v1/accounts/me/"""
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # Readable while «Cree su contraseña» is pending (it says so: the SPA
+    # shows that step); editing the profile waits for the new password.
+    password_change_allowed = permissions.SAFE_METHODS
 
     def get_object(self):
         return self.request.user

@@ -664,6 +664,37 @@ class TestSpendingBudgets:
         assert not SpendLimitsSerializer(data={}).is_valid()
         assert SpendLimitsSerializer(data={"daily_spend_limit": "20"}).is_valid()
 
+    def test_daily_budget_cannot_exceed_the_weekly_one(self, api_client):
+        # QA 2026-11-24: a $500 daily cap with a $100 weekly one was accepted.
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        api_client.force_authenticate(user=parent)
+        url = reverse("cafeteria-budget", args=[student.id])
+        resp = api_client.patch(url, {"daily_spend_limit": "500", "weekly_spend_limit": "100"}, format="json")
+        assert resp.status_code == 400
+        assert resp.data["daily_spend_limit"] == ["El límite diario no puede ser mayor que el semanal."]
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert (cb.daily_spend_limit, cb.weekly_spend_limit) == (Decimal("0"), Decimal("0"))
+        # Equal is fine, and 0 (no cap) on either side never conflicts.
+        for daily, weekly in (("100", "100"), ("500", "0"), ("0", "100")):
+            resp = api_client.patch(url, {"daily_spend_limit": daily, "weekly_spend_limit": weekly}, format="json")
+            assert resp.status_code == 200, (daily, weekly, resp.data)
+
+    def test_daily_over_weekly_uses_the_saved_cap_for_a_field_not_sent(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"),
+                                        daily_spend_limit=Decimal("50"), weekly_spend_limit=Decimal("200"))
+        api_client.force_authenticate(user=parent)
+        url = reverse("cafeteria-budget", args=[student.id])
+        resp = api_client.patch(url, {"daily_spend_limit": "250"}, format="json")
+        assert resp.status_code == 400 and "daily_spend_limit" in resp.data
+        resp = api_client.patch(url, {"weekly_spend_limit": "40"}, format="json")
+        assert resp.status_code == 400 and "weekly_spend_limit" in resp.data
+        assert api_client.patch(url, {"weekly_spend_limit": "0"}, format="json").status_code == 200
+        assert api_client.patch(url, {"daily_spend_limit": "250"}, format="json").status_code == 200
+
 
 class TestSpendingCategories:
     """F14: coarse category breakdown from line-item names."""

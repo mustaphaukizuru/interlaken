@@ -113,6 +113,29 @@ describe('AdminCafeteriaStudent money actions', () => {
     refundTransaction.mockResolvedValue({ data: {} } as never);
   });
 
+  it('shows the allergies only when the API sends them (school switch + family authorisation)', async () => {
+    const withStudent = (extra: Record<string, unknown>) => ({
+      data: { ...DETAIL, transactions: [], adjustments: [],
+        balance: { ...DETAIL.balance, student: { ...DETAIL.balance.student, ...extra } } },
+    });
+    getStudentDetail.mockResolvedValue(withStudent({ allergies_shared: true, allergies: 'Cacahuate' }) as never);
+    const on = renderPage();
+    expect(await screen.findByRole('note', { name: 'Alergias' })).toHaveTextContent('Alergias: Cacahuate');
+    on.unmount();
+
+    // Switch off: the API sends no allergy key and the page says nothing about them.
+    getStudentDetail.mockResolvedValue(withStudent({}) as never);
+    const off = renderPage();
+    await screen.findByRole('heading', { name: 'Luis López' });
+    expect(screen.queryByRole('note', { name: 'Alergias' })).toBeNull();
+    expect(screen.queryByText(/alergias/i)).toBeNull();
+    off.unmount();
+
+    getStudentDetail.mockResolvedValue(withStudent({ allergies_shared: false }) as never);
+    renderPage();
+    expect(await screen.findByText(/La familia no ha autorizado compartir los datos de salud/)).toBeInTheDocument();
+  });
+
   it('renders balance, movements, and adjustment history', async () => {
     renderPage();
 

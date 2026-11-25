@@ -842,7 +842,7 @@ class TestAdminAlerts:
         assert approved.control_number not in text
         reports = [m for m in mailoutbox if "por revisar en MultiCobros" in m.subject]
         assert len(reports) == 1
-        assert "2 pago(s)" in reports[0].subject
+        assert "2 pagos Banorte por revisar" in reports[0].subject
         assert "direccion@interlaken.test" in reports[0].to
 
     def test_pending_report_skips_simulations_and_stays_quiet(

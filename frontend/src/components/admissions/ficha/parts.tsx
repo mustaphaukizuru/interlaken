@@ -17,7 +17,8 @@ export const StepHeading = forwardRef<HTMLHeadingElement, { title: string; intro
   ({ title, intro, eyebrow, level = 2 }, ref) => {
     const H = level === 1 ? 'h1' : 'h2';
     return (
-      <header className="mb-6">
+      // break-words: a long title from Contenido (one long word too) wraps at 390 px instead of leaving the card.
+      <header className="mb-6 break-words">
         {eyebrow ? <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-pink">{eyebrow}</p> : null}
         <H ref={ref} tabIndex={-1} className="scroll-mt-28 font-head text-fluid-xl font-bold text-ink focus:outline-none">{title}</H>
         {intro ? <p className="mt-1.5 text-base leading-relaxed text-muted">{intro}</p> : null}
@@ -161,7 +162,9 @@ export function Panel({ icon, tone = 'neutral', title, children, after, headingR
 }) {
   const H = level === 1 ? 'h1' : 'h2';
   return (
-    <div className="card p-6 sm:p-10">
+    // break-words: the family's e-mail in «Guardamos su avance» (and any long word) used to run
+    // past the card and the screen at 390 px; now it wraps inside the card.
+    <div className="card break-words p-6 sm:p-10">
       <div className="text-center">
         <div className={clsx('mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-sm', {
           'bg-cream text-purple': tone === 'neutral',

@@ -67,6 +67,33 @@ describe('ConfirmNotifyEmailPage (/confirmar-correo, owner 2026-11-08)', () => {
     expect(screen.getByRole('link', { name: 'Ir al Portal de Familias' })).toBeInTheDocument();
   });
 
+  it('a staff cafetería account is named as an account, never «Alumno» (QA 2026-11-24)', async () => {
+    api.previewNotifyEmailLink.mockResolvedValue({ data: {
+      ...READY, account: { name: 'Rosa M.', detail: 'Personal del colegio', is_student: false, kind: 'personal' },
+    } } as never);
+    open();
+    expect(await screen.findByText('Rosa M. · Personal del colegio')).toBeInTheDocument();
+    expect(screen.getByText('Cuenta')).toBeInTheDocument();
+    expect(screen.queryByText('Alumno')).toBeNull();
+    expect(screen.getByText(/Los avisos de su cuenta llegarán también a/)).toBeInTheDocument();
+  });
+
+  it('the kind decides over is_student when both come', async () => {
+    api.previewNotifyEmailLink.mockResolvedValue({ data: {
+      ...READY, account: { name: 'Rosa M.', detail: '', is_student: true, kind: 'personal' },
+    } } as never);
+    open();
+    expect(await screen.findByText('Cuenta')).toBeInTheDocument();
+    expect(screen.queryByText('Alumno')).toBeNull();
+  });
+
+  it('a pupil still reads «Alumno» and «de Carla R.»', async () => {
+    api.previewNotifyEmailLink.mockResolvedValue({ data: { ...READY, account: { ...READY.account, kind: 'alumno' } } } as never);
+    open();
+    expect(await screen.findByText('Alumno')).toBeInTheDocument();
+    expect(screen.getByText(/Los avisos de Carla R\. llegarán también a/)).toBeInTheDocument();
+  });
+
   it('a link that expired between opening and clicking shows the server answer', async () => {
     api.previewNotifyEmailLink.mockResolvedValue({ data: READY } as never);
     api.confirmNotifyEmailLink.mockRejectedValue({ response: { data: { state: 'expired', detail: 'El enlace venció. Pida uno nuevo.' } } });

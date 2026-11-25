@@ -1,4 +1,5 @@
 import time
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -41,7 +42,11 @@ def test_password_login_records_history_and_requires_totp(api_client, admin_user
     assert r.status_code == 401 and r.data['totp_required'] is True
     r = api_client.post(url, {'email': admin_user.email, 'password': 'admin-pass-123', 'totp': '123456'}, format='json')
     assert r.status_code == 401 and LoginEvent.objects.filter(reason='bad_totp').exists()
-    r = api_client.post(url, {'email': admin_user.email, 'password': 'admin-pass-123', 'totp': totp_code(setup.data['secret'])}, format='json')
+    # The code that turned it on is spent (RFC 6238 §5.2): the next one signs in.
+    later = time.time() + 30
+    with patch('apps.accounts.security.time.time', return_value=later):
+        r = api_client.post(url, {'email': admin_user.email, 'password': 'admin-pass-123',
+                                  'totp': totp_code(setup.data['secret'], at=later)}, format='json')
     assert r.status_code == 200
     sessions = api_client.get(reverse('my-sessions'), HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
     assert sessions.data['totp_enabled'] is True and sessions.data['history'][0]['success'] is True

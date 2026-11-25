@@ -5,10 +5,12 @@ import { siteText } from '@/lib/siteChrome';
 import { PASSWORD_REQUEST_MESSAGE } from '@/lib/passwordRequest';
 
 /**
- * School policy (2026-08-22): families and students NEVER reset or change
- * their own password. They ask the school (WhatsApp or email) and an admin
- * sets a new one from the portal. This block is the single place that
- * explains it, used on the login page and in "Mi información".
+ * School policy (2026-08-22): families and students never reset their own
+ * password. They ask the school (WhatsApp or email) and an admin sets a new
+ * one from the portal; since 2026-11-24 that password is temporary and the
+ * portal asks for their own at the next sign-in («Cree su contraseña»). This
+ * block is the single place that explains it, used on the login page and in
+ * "Mi información".
  */
 export { PASSWORD_REQUEST_MESSAGE };
 
@@ -55,9 +57,9 @@ export function PasswordHelp({ variant = 'card', email, copy }: Props) {
         <KeyRound className="h-4 w-4 text-purple" aria-hidden="true" /> Contraseña
       </h2>
       <p className="text-sm text-muted">
-        Por seguridad, las contraseñas del portal las asigna el colegio y no se pueden cambiar
-        desde el portal. Si necesita que se la recuerden o restablezcan, solicítelo y un
-        administrador le enviará una nueva por el mismo medio.
+        La contraseña que le da el colegio es temporal: la primera vez que entra, el portal le
+        pide crear la suya. Si la olvida, solicítela y un administrador le enviará una nueva
+        por el mismo medio.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
         {wa && (

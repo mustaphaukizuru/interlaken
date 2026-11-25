@@ -26,6 +26,19 @@ AUTH_COOKIE_SECURE = True
 # request's lines can be correlated. Dev keeps the readable console format.
 LOGGING['handlers']['console']['formatter'] = 'json'
 
+# ── Error alert emails ────────────────────────────────────────────────────
+# With ERROR_ALERT_EMAILS set, unhandled exceptions (django.request 5xx) and
+# ERROR records from the project's own code (cron jobs, webhooks) also go out
+# as a short, masked, throttled email (apps/core/error_alerts.py).
+if ERROR_ALERT_EMAILS:
+    LOGGING['handlers']['error_alert'] = {
+        'class': 'apps.core.error_alerts.ErrorAlertHandler',
+        'level': 'ERROR',
+        'filters': ['request_id'],
+    }
+    for _logger in ('django.request', 'apps'):
+        LOGGING['loggers'][_logger]['handlers'] = [*LOGGING['loggers'][_logger]['handlers'], 'error_alert']
+
 # ── Rate-limit counter store ──────────────────────────────────────────────
 # django-ratelimit counts in the cache; the default LocMemCache is per-process,
 # so under gunicorn's multiple worker processes each worker keeps its OWN

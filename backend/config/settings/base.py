@@ -197,7 +197,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # ── REST FRAMEWORK ────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # SimpleJWT's bearer JWT plus the «Cree su contraseña» gate: an account
+        # with a temporary password gets 403 password_change_required.
+        'apps.accounts.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -539,6 +541,13 @@ if SENTRY_DSN:
         # env.float('') raises at import: a blank line in .env must mean 0.
         traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='') or 0.0),
     )
+
+# ── ERROR ALERT EMAILS ────────────────────────────────────
+# Comma-separated addresses that get a short, masked email when the live site
+# logs an error (a 500, a failed job). Needs no third-party account; empty =
+# off. production.py attaches the handler; what it sends and how it is
+# throttled is in apps/core/error_alerts.py.
+ERROR_ALERT_EMAILS = env.list('ERROR_ALERT_EMAILS', default=[])
 
 # ── CACHE ─────────────────────────────────────────────────
 # Per-process in-memory cache. Today it backs the 60s micro-cache on the

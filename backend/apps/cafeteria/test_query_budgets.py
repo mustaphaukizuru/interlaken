@@ -94,8 +94,10 @@ class TestTopUpLogBudget:
 # are counted.
 # pagination count + page rows (admin joined).
 ADJUSTMENTS_BUDGET = 2
-# pagination count + page rows (student/user/profile joined).
-LOW_BALANCE_BUDGET = 2
+# pagination count + page rows (student/user/profile joined) + the «La
+# cafetería ve las alergias» switch (off here; on, the family links and the
+# consents of the whole page add a fixed handful: test_console_allergies).
+LOW_BALANCE_BUDGET = 3
 # count + page + unmatched-receipt counts + summary per kind + missing count.
 CUSTOMERS_BUDGET = 5
 # count + page (user, profile and balance joined) + the three POS-queue reads

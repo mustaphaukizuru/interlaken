@@ -34,6 +34,9 @@ urlpatterns = [
     path('register/<int:pk>/documents/list/', required_docs_views.DocumentListView.as_view(),
          name='register-docs-list'),
     path('register/<int:pk>/documents-link/', views.DocumentsLinkView.as_view(),   name='register-docs-link'),
+    # «Pedir un enlace nuevo» (public, from a used or expired documents link).
+    path('documents/new-link/', required_docs_views.DocumentsNewLinkView.as_view(),
+         name='documents-new-link'),
     path('documents/<int:pk>/verify/', views.DocumentVerifyView.as_view(),          name='document-verify'),
     path('documents/<int:pk>/download/', views.DocumentDownloadView.as_view(),      name='document-download'),
     path('admin/pre-registrations/bulk/', PreRegistrationBulkView.as_view(),         name='pre-register-bulk'),

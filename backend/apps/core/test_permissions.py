@@ -1,10 +1,10 @@
 """
 apps.core.permissions — the shared rules (Data Ops Phase 10 consolidation).
 
-The three local duplicates (``IsParentOrAdmin`` in cafetería, ``IsStaffOrAdmin``
-in portal analytics, ``_is_staff`` in admissions) moved here unchanged; this
-table pins each rule per role and per Django ``is_staff`` flag so the move
-cannot drift.
+The local duplicates (``IsParentOrAdmin`` in cafetería, ``_is_staff`` in
+admissions) moved here unchanged; this table pins each rule per role and per
+Django ``is_staff`` flag so the move cannot drift. ``IsAdminOrStaff`` and
+``IsStaffOrAdmin`` were removed on 2026-11-24 (no endpoint used them).
 """
 
 import pytest
@@ -13,26 +13,25 @@ from rest_framework.test import APIRequestFactory
 
 from apps.accounts.factories import UserFactory
 from apps.accounts.models import User
+from apps.core import permissions as core_permissions
 from apps.core.permissions import (
     IsAdmin,
-    IsAdminOrStaff,
     IsParentOrAdmin,
     IsParentOrAdminOrAccountHolder,
-    IsStaffOrAdmin,
     is_admin_or_django_staff,
 )
 
 pytestmark = pytest.mark.django_db
 
-# role, is_staff flag → (IsAdmin, IsAdminOrStaff, IsStaffOrAdmin, IsParentOrAdmin, admin_or_django_staff)
+# role, is_staff flag → (IsAdmin, IsParentOrAdmin, admin_or_django_staff)
 MATRIX = [
-    (User.Role.ADMIN, True, (True, True, True, True, True)),
-    (User.Role.ADMIN, False, (True, True, True, True, True)),
-    (User.Role.STAFF, False, (False, True, True, False, False)),
-    (User.Role.STAFF, True, (False, True, True, False, True)),
-    (User.Role.PARENT, False, (False, False, False, True, False)),
-    (User.Role.PARENT, True, (False, False, True, True, True)),
-    (User.Role.STUDENT, False, (False, False, False, True, False)),
+    (User.Role.ADMIN, True, (True, True, True)),
+    (User.Role.ADMIN, False, (True, True, True)),
+    (User.Role.STAFF, False, (False, False, False)),
+    (User.Role.STAFF, True, (False, False, True)),
+    (User.Role.PARENT, False, (False, True, False)),
+    (User.Role.PARENT, True, (False, True, True)),
+    (User.Role.STUDENT, False, (False, True, False)),
 ]
 
 
@@ -47,8 +46,6 @@ def test_rules_per_role(role, is_staff, expected):
     user = UserFactory(role=role, is_staff=is_staff)
     got = (
         _allowed(IsAdmin, user),
-        _allowed(IsAdminOrStaff, user),
-        _allowed(IsStaffOrAdmin, user),
         _allowed(IsParentOrAdmin, user),
         is_admin_or_django_staff(user),
     )
@@ -57,10 +54,16 @@ def test_rules_per_role(role, is_staff, expected):
 
 def test_anonymous_is_refused_everywhere():
     anon = AnonymousUser()
-    for cls in (IsAdmin, IsAdminOrStaff, IsStaffOrAdmin, IsParentOrAdmin):
+    for cls in (IsAdmin, IsParentOrAdmin):
         assert _allowed(cls, anon) is False
     assert is_admin_or_django_staff(anon) is False
     assert is_admin_or_django_staff(None) is False
+
+
+def test_any_staff_classes_are_gone():
+    # Removed 2026-11-24: every staff endpoint goes through IsAdmin and its areas.
+    assert not hasattr(core_permissions, "IsAdminOrStaff")
+    assert not hasattr(core_permissions, "IsStaffOrAdmin")
 
 
 def test_views_use_the_shared_classes():

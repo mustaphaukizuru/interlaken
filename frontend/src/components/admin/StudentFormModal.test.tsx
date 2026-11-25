@@ -5,11 +5,17 @@ import userEvent from '@testing-library/user-event';
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/services/api', () => ({
   portalApi: { createStudent: vi.fn(), updateStudent: vi.fn(), studentsBulk: vi.fn(), getStudent: vi.fn() },
+  // The allergy hint follows the public site settings (Ajustes → «La cafetería ve las alergias»).
+  contentApi: { getSettings: vi.fn() },
 }));
 
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { StudentFormModal } from './StudentFormModal';
-import { portalApi } from '@/services/api';
+import { contentApi, portalApi } from '@/services/api';
+
+beforeEach(() => {
+  vi.mocked(contentApi.getSettings).mockReset().mockResolvedValue({ data: { cafeteria_shows_allergies: false } } as never);
+});
 
 const createStudent = vi.mocked(portalApi.createStudent);
 
@@ -139,6 +145,16 @@ describe('StudentFormModal never overwrites medical data it did not show (launch
 
     await waitFor(() => expect(portalApi.updateStudent).toHaveBeenCalledTimes(1));
     expect(vi.mocked(portalApi.updateStudent).mock.calls[0]).toEqual([7, { group: 'B' }]);
+  });
+
+  it('says the cafetería sees the allergies when the school turned that on', async () => {
+    vi.mocked(contentApi.getSettings).mockResolvedValue({ data: { cafeteria_shows_allergies: true } } as never);
+    vi.mocked(portalApi.getStudent).mockResolvedValue({ data: { ...rosterRow, allergies: 'Nuez' } } as never);
+    renderWithProviders(<StudentFormModal open onClose={() => {}} student={rosterRow as never} />);
+    expect(await screen.findByText(
+      'La ven los administradores y la familia que autorizó los datos de salud. Si la familia lo autorizó, la cafetería también la ve al atender al alumno; el resto del personal no la ve.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/el personal y la cafetería no la ven/)).toBeNull();
   });
 
   it('shows a lock instead of masked values and never sends them', async () => {

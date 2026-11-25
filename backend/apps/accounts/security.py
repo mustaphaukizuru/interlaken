@@ -13,7 +13,9 @@ TOTP (RFC 6238, stdlib HMAC, no extra dependency):
              POST /accounts/me/totp/disable/  {code}
              Password login for a user with TOTP enabled must include "totp" in
              the body; otherwise 401 {"totp_required": true}. Google sign-in
-             carries Google's own second factor and is not gated here.
+             carries Google's own second factor and is not gated here. A code
+             accepted once (to enable or to sign in) is never accepted again
+             for a sign-in (``use_totp``, RFC 6238 §5.2).
 Idle timeout lives in the SPA (PortalLayout) for admin/staff: 30 min.
 """
 from __future__ import annotations
@@ -35,6 +37,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.core.exceptions import error_body
 from apps.core.fields import EncryptedTextField
 
 from .models import User
@@ -56,12 +59,42 @@ def totp_code(secret: str, at: float | None = None, step: int = 30, digits: int 
     return str(code).zfill(digits)
 
 
-def verify_totp(secret: str, code: str, window: int = 1) -> bool:
+def totp_step(secret: str, code: str, window: int = 1, step: int = 30) -> int | None:
+    """The 30-second time step ``code`` belongs to (now ± ``window`` steps), or None."""
     code = (code or '').strip().replace(' ', '')
     if not secret or not code.isdigit():
-        return False
-    now = time.time()
-    return any(hmac.compare_digest(totp_code(secret, now + i * 30), code) for i in range(-window, window + 1))
+        return None
+    now = int(time.time() // step)
+    for counter in range(now - window, now + window + 1):
+        if hmac.compare_digest(totp_code(secret, counter * step), code):
+            return counter
+    return None
+
+
+def verify_totp(secret: str, code: str, window: int = 1) -> bool:
+    return totp_step(secret, code, window) is not None
+
+
+def use_totp(device, code: str) -> str | None:
+    """Check a sign-in code against ``device``: ``None`` when it is accepted.
+
+    RFC 6238 §5.2: a code already accepted is never accepted again, so a code
+    seen over someone's shoulder (or replayed from a captured request) cannot
+    sign in again during the 90 seconds it stays valid. Otherwise the reason:
+    ``'bad_totp'`` or ``'reused_totp'``. An accepted code stores its step.
+    """
+    counter = totp_step(device.secret, code)
+    if counter is None:
+        return 'bad_totp'
+    now = timezone.now()
+    # One conditional UPDATE: two sign-ins racing with the same code, one wins.
+    won = (TotpDevice.objects.filter(pk=device.pk)
+           .filter(models.Q(last_step__isnull=True) | models.Q(last_step__lt=counter))
+           .update(last_step=counter, last_used_at=now))
+    if not won:
+        return 'reused_totp'
+    device.last_step, device.last_used_at = counter, now
+    return None
 
 
 def otpauth_url(secret: str, email: str) -> str:
@@ -80,7 +113,7 @@ class LoginEvent(models.Model):
     email = models.CharField(max_length=254, blank=True)
     method = models.CharField(max_length=10, choices=Method.choices)
     success = models.BooleanField(default=True)
-    reason = models.CharField(max_length=40, blank=True)   # bad_password, totp_required, bad_totp, inactive
+    reason = models.CharField(max_length=40, blank=True)   # bad_password, totp_required, bad_totp, reused_totp, inactive
     ip = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=300, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -97,6 +130,8 @@ class TotpDevice(models.Model):
     confirmed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
+    # Time step of the last accepted code (``use_totp``): never accepted twice.
+    last_step = models.BigIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Segundo factor (TOTP)'
@@ -177,10 +212,15 @@ class TotpSetupView(APIView):
         if dev.confirmed:
             return Response({'detail': 'El segundo factor ya está activo.'}, status=status.HTTP_400_BAD_REQUEST)
         dev.secret = new_secret()
-        dev.save(update_fields=['secret'])
+        dev.last_step = None
+        dev.save(update_fields=['secret', 'last_step'])
         return Response({'secret': dev.secret, 'otpauth_url': otpauth_url(dev.secret, request.user.email)})
 
 
+# A wrong code answers ``{"detail", "code": "bad_totp"}`` (apps.core.exceptions):
+# it used to be ``{"code": ["…"]}``, a field named like the machine ``code``
+# key, so the SPA's error mapper skipped it and never showed «Revise la hora
+# del teléfono».
 class TotpEnableView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -188,11 +228,15 @@ class TotpEnableView(APIView):
         dev = TotpDevice.objects.filter(user=request.user).first()
         if dev is None:
             return Response({'detail': 'Primero genere la clave.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not verify_totp(dev.secret, str(request.data.get('code', ''))):
-            return Response({'code': ['Código incorrecto. Revise la hora del teléfono.']}, status=status.HTTP_400_BAD_REQUEST)
+        counter = totp_step(dev.secret, str(request.data.get('code', '')))
+        if counter is None:
+            return Response(error_body('Código incorrecto. Revise la hora del teléfono.', code='bad_totp'),
+                            status=status.HTTP_400_BAD_REQUEST)
         dev.confirmed = True
         dev.last_used_at = timezone.now()
-        dev.save(update_fields=['confirmed', 'last_used_at'])
+        # The code that turned it on cannot also sign in (use_totp).
+        dev.last_step = counter
+        dev.save(update_fields=['confirmed', 'last_used_at', 'last_step'])
         return Response({'totp_enabled': True})
 
 
@@ -204,6 +248,6 @@ class TotpDisableView(APIView):
         if dev is None:
             return Response({'detail': 'El segundo factor no está activo.'}, status=status.HTTP_400_BAD_REQUEST)
         if not verify_totp(dev.secret, str(request.data.get('code', ''))):
-            return Response({'code': ['Código incorrecto.']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(error_body('Código incorrecto.', code='bad_totp'), status=status.HTTP_400_BAD_REQUEST)
         dev.delete()
         return Response({'totp_enabled': False})

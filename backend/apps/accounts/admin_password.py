@@ -61,7 +61,17 @@ def generate_temporary_password() -> str:
     return '-'.join(raw[i:i + _GROUP] for i in range(0, _GENERATED_CHARS, _GROUP))
 
 
-def revoke_refresh_tokens(user) -> int:
+def set_temporary_password(user, password: str) -> None:
+    """Give ``user`` a password someone else chose (an administrator, the
+    admissions conversion): they must create their own at the next sign-in
+    (``User.password_change_required``, enforced by
+    ``apps.accounts.authentication``). The caller revokes sessions and audits."""
+    user.set_password(password)
+    user.password_change_required = True
+    user.save(update_fields=['password', 'password_change_required'])
+
+
+def revoke_refresh_tokens(user, *, keep_jti: str | None = None) -> int:
     """Blacklist every outstanding refresh token for ``user``; return how many.
 
     ``rest_framework_simplejwt.token_blacklist`` is installed and rotation
@@ -69,6 +79,8 @@ def revoke_refresh_tokens(user) -> int:
     session the user holds has an ``OutstandingToken`` row. Blacklisting them
     all means an attacker holding a stolen refresh cookie cannot outlive the
     reset. Access tokens are not revocable by design; they expire in 15 min.
+    ``keep_jti`` spares one token: the browser of a person changing their own
+    password keeps its session.
     """
     from rest_framework_simplejwt.token_blacklist.models import (
         BlacklistedToken,
@@ -76,7 +88,10 @@ def revoke_refresh_tokens(user) -> int:
     )
 
     revoked = 0
-    for token in OutstandingToken.objects.filter(user=user).only('id'):
+    tokens = OutstandingToken.objects.filter(user=user)
+    if keep_jti:
+        tokens = tokens.exclude(jti=keep_jti)
+    for token in tokens.only('id'):
         _, created = BlacklistedToken.objects.get_or_create(token=token)
         revoked += int(created)
     return revoked
@@ -167,8 +182,9 @@ class AdminSetPasswordView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            target.set_password(password)
-            target.save(update_fields=['password'])
+            # Generated or typed by the admin, it is someone else's choice:
+            # the family creates its own at the next sign-in.
+            set_temporary_password(target, password)
             # Inside the transaction on purpose: a reset that sets a new
             # password but leaves old sessions alive is worse than no reset.
             revoked = revoke_refresh_tokens(target)

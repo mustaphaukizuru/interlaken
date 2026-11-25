@@ -26,8 +26,12 @@ export interface NotifyEmailState { email: string; verified: boolean; sent?: boo
 export type NotifyEmailLinkState = 'ready' | 'confirmed' | 'expired' | 'invalid' | 'superseded';
 export interface NotifyEmailLink {
   state: NotifyEmailLinkState;
-  /** Who the avisos are about: «Carla R.» + «1° Secundaria · Grupo A» for a student. */
-  account?: { name: string; detail: string; is_student: boolean };
+  /**
+   * Who the avisos are about: «Carla R.» + «1° Secundaria · Grupo A» for a pupil,
+   * «Personal del colegio» for a staff cafetería account. `kind` (since
+   * 2026-11-24) says which; `is_student` stays for older answers.
+   */
+  account?: { name: string; detail: string; is_student: boolean; kind?: 'alumno' | 'personal' | 'cuenta' };
   /** Masked: «mu…@gmail.com». */
   email?: string;
   expires_at?: string | null;
@@ -163,7 +167,7 @@ export interface StudentWrite {
 
 export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';
 
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore, type User as AuthUser } from '@/store/authStore';
 
 // Relative by default so the SPA is same-origin with the API (prod: served by
 // Django; dev: via the Vite proxy) — required for the auth cookies to be sent.
@@ -225,12 +229,32 @@ function coalescedRefresh(): Promise<string> {
   return refreshing;
 }
 
+/** The server's refusal while a temporary password is in use (accounts/authentication.py). */
+export const PASSWORD_CHANGE_REQUIRED = 'password_change_required';
+
+export function isPasswordChangeRequired(error: unknown): boolean {
+  const res = (error as { response?: { status?: number; data?: { code?: unknown } } } | undefined)?.response;
+  return res?.status === 403 && res.data?.code === PASSWORD_CHANGE_REQUIRED;
+}
+
 // Silent refresh on 401.
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
     const url: string = original?.url || '';
+    // An administrator gave this account a temporary password (maybe while it
+    // was signed in): flag it, and ProtectedRoute swaps the page for «Cree su
+    // contraseña». The request stays pending instead of failing, so the page
+    // that asked shows no error toast on its way out (CreatePasswordScreen
+    // resets those queries once the password is saved).
+    if (isPasswordChangeRequired(error)) {
+      const { user, setUser } = useAuthStore.getState();
+      if (user) {
+        if (!user.password_change_required) setUser({ ...user, password_change_required: true });
+        return new Promise(() => {});
+      }
+    }
     if (
       error.response?.status === 401 &&
       !original._retry &&
@@ -290,6 +314,14 @@ export const authApi = {
     window.location.href = `${API_BASE}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
+  /**
+   * Replace one's own password, proving the current one (a temporary one first:
+   * «Cree su contraseña»). Other sessions close; this one stays. 400 answers
+   * carry `current_password` / `new_password` messages (Django's rules).
+   */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post<{ detail: string; sessions_revoked: number; user: AuthUser }>(
+      '/accounts/me/password/', { current_password: currentPassword, new_password: newPassword }),
   /** Security (BACKLOG P4-7). */
   sessions: () => api.get<SessionsInfo>('/accounts/me/sessions/'),
   closeOtherSessions: () => api.post<{ closed: number }>('/accounts/me/sessions/close-others/', {}, { headers: csrfHeader() }),
@@ -1180,8 +1212,13 @@ export const portalApi = {
   exportStaff: (params: ExportParams) =>
     api.get<Blob>('/accounts/admin/staff/export/', { params, responseType: 'blob' }),
   staffBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/staff/bulk/', body),
+  /**
+   * Creates the account with a temporary password (shown once, to hand over in
+   * person) and emails the person where to sign in, never the password.
+   * `invite_email_sent` says whether that email left.
+   */
   inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role']; staff_title?: string; staff_areas?: string[] }) =>
-    api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
+    api.post<StaffUser & { temporary_password: string; invite_email_sent: boolean }>('/accounts/admin/staff/', data),
   updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name' | 'email' | 'staff_title' | 'staff_areas'>>) =>
     api.patch<StaffUser>(`/accounts/admin/staff/${id}/`, data),
   /** The account and its last 20 actions in Auditoría. */

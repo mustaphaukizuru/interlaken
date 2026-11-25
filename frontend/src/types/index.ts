@@ -9,6 +9,8 @@ export interface User {
   avatar: string;
   whatsapp: string;
   has_usable_password?: boolean;
+  /** Still on a temporary password: «Cree su contraseña» first (ProtectedRoute). */
+  password_change_required?: boolean;
   notif_prefs?: {
     email_enabled: boolean;
     in_app_enabled: boolean;
@@ -84,6 +86,13 @@ export interface StudentProfile {
   blood_type?: string;
   allergies?: string;
   medical_notes?: string;
+  /**
+   * Cafetería console only, present while the school's «La cafetería ve las
+   * alergias» switch is on: true = the family authorised health data and
+   * `allergies` carries that one field (may be empty); false = not authorised,
+   * nothing is shown. Absent = the switch is off.
+   */
+  allergies_shared?: boolean;
   /** The inscripción the student came from (convert); its ficha can be downloaded. */
   registration?: number | null;
 }

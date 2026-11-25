@@ -75,6 +75,23 @@ class TestUpdate:
                                            context='portal: edición de alumno').exists()
 
 
+    def test_emergency_phone_follows_the_phone_rule_but_keeps_a_stored_one(self, admin_client):
+        # QA 2026-11-24: phones accepted letters. A number saved before the rule
+        # is sent back by the form on every save and must not block it.
+        p = StudentProfileFactory(grade='1° Primaria', emergency_phone='55 ext 12')
+        url = reverse('admin-student-update', args=[p.pk])
+        resp = admin_client.patch(url, {'first_name': 'Otro', 'emergency_phone': '55 ext 12'}, format='json')
+        assert resp.status_code == 200, resp.data
+        resp = admin_client.patch(url, {'emergency_phone': '55 1234 abcd'}, format='json')
+        assert resp.status_code == 400 and 'emergency_phone' in resp.data
+        resp = admin_client.patch(url, {'emergency_phone': '(55) 1234-5678'}, format='json')
+        assert resp.status_code == 200, resp.data
+        p.refresh_from_db()
+        assert p.emergency_phone == '(55) 1234-5678'
+        resp = admin_client.patch(url, {'emergency_phone': ''}, format='json')
+        assert resp.status_code == 200, resp.data
+
+
 class TestExtendedFile:
     """P1-A2: extended data editable; medical fields gated to admin/own family and redacted in audit."""
 

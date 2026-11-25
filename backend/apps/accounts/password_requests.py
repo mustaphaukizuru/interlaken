@@ -26,7 +26,12 @@ from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 from apps.core.transitions import assert_transition
 
-from .admin_password import _audit_set_password, generate_temporary_password, revoke_refresh_tokens
+from .admin_password import (
+    _audit_set_password,
+    generate_temporary_password,
+    revoke_refresh_tokens,
+    set_temporary_password,
+)
 from .filters import PasswordRequestFilterSet
 from .models import PasswordRequest, User
 
@@ -43,7 +48,7 @@ def delivery_templates(user: User, password: str) -> dict:
         f'Usuario: {user.email}\n'
         f'Contraseña: {password}\n'
         f'Ingrese en: {login_url}\n\n'
-        'Guarde esta contraseña: por seguridad no se puede cambiar desde el portal. '
+        'Es una contraseña temporal: la primera vez que entre, el portal le pedirá crear la suya. '
         f'Si la olvida, solicítela de nuevo por WhatsApp o a {support}.\n\n'
         'Colegio Interlaken'
     )
@@ -248,8 +253,7 @@ class PasswordRequestDetailView(APIView):
 
             delivered_via = request.data.get('delivered_via') or req.channel
             password = generate_temporary_password()
-            target.set_password(password)
-            target.save(update_fields=['password'])
+            set_temporary_password(target, password)
             revoked = revoke_refresh_tokens(target)
             req.user = target
             req.status = PasswordRequest.Status.RESOLVED

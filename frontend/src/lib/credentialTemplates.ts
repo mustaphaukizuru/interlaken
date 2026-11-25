@@ -21,7 +21,8 @@ export function credentialTemplate(opts: {
     `Usuario: ${opts.email}\n` +
     `Contraseña: ${opts.password}\n` +
     `Ingrese en: ${origin}/login\n\n` +
-    'Guarde esta contraseña: por seguridad no se puede cambiar desde el portal. ' +
+    // Temporary since 2026-11-24: the portal asks for a new one at the first sign-in.
+    'Es una contraseña temporal: la primera vez que entre, el portal le pedirá crear la suya. ' +
     `Si la olvida, solicítela de nuevo por WhatsApp o a ${opts.supportEmail}.\n\n` +
     'Colegio Interlaken';
   return { whatsapp_text: body, email_subject: 'Acceso al Portal de Familias - Colegio Interlaken', email_body: body };

@@ -40,7 +40,8 @@ export function FichaDone({ copy, childName, headingRef, download }: {
   const primary = copy.link('donePrimary');
   const secondary = copy.link('doneSecondary');
   return (
-    <div className="card p-6 sm:p-10">
+    // break-words: a long name (or a long word in the school's copy) wraps inside the card at 390 px.
+    <div className="card break-words p-6 sm:p-10">
       <div className="text-center">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-sm bg-success-bg text-success" aria-hidden="true">
           <CheckCircle2 className="h-8 w-8" />

@@ -107,3 +107,31 @@ def test_publish_blocks_images_without_alt(admin_client, settings, tmp_path):
     assert resp.status_code == 409 and 'texto alternativo' in resp.data['detail']
     admin_client.patch(reverse('admin-media-detail', args=[asset['id']]), {'alt': 'Campus'}, format='json')
     assert admin_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').status_code == 200
+
+
+def test_designed_page_without_published_content_is_204_not_404(api_client):
+    # Production logs showed hundreds of 404s a day (plataformas, galeria,
+    # primaria, iniciar-sesion...): every visit asks whether the school
+    # published a version, and «no» is the normal answer. A page the site
+    # knows answers 204 (the browser renders it from code); an unknown slug
+    # is still a 404.
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    for slug in ('galeria', 'plataformas', 'primaria', 'iniciar-sesion', 'inicio'):
+        resp = api_client.get(reverse('cms-page', args=[slug]))
+        assert resp.status_code == 204, slug
+        assert resp.content == b''
+        assert resp['Cache-Control'] == 'public, no-cache'
+    # A draft that was never published is still «nothing published».
+    Page.objects.create(slug='galeria', title='Galería', draft_blocks=BLOCKS)
+    assert api_client.get(reverse('cms-page', args=['galeria'])).status_code == 204
+    # A designed page whose withdrawal date passed, too.
+    Page.objects.create(slug='nosotros', title='Nosotros', draft_blocks=BLOCKS, status=Page.Status.PUBLISHED,
+                        unpublish_at=timezone.now() - timedelta(minutes=1))
+    assert api_client.get(reverse('cms-page', args=['nosotros'])).status_code == 204
+    # Unknown or custom slugs without a published page: 404 as before.
+    assert api_client.get(reverse('cms-page', args=['no-existe'])).status_code == 404
+    Page.objects.create(slug='verano', title='Verano', draft_blocks=BLOCKS)
+    assert api_client.get(reverse('cms-page', args=['verano'])).status_code == 404

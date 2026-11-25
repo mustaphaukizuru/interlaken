@@ -252,18 +252,80 @@ CONSOLE_HIDDEN_STUDENT_FIELDS = (
     'blood_type', 'allergies', 'medical_notes',
 )
 
+# Context key: {student pk: allergies} for the rows being serialized, or None
+# when the school's switch is off (see ``console_allergies``).
+CONSOLE_ALLERGIES = 'console_allergies'
+_NOT_LOOKED_UP = object()
+
+
+def cafeteria_shows_allergies() -> bool:
+    """Ajustes → «La cafetería ve las alergias» (off by default). Read without
+    ``SiteSettings.load()``: a read must never create the row."""
+    from apps.content.models import SiteSettings
+
+    return bool(SiteSettings.objects.filter(pk=1)
+                .values_list('cafeteria_shows_allergies', flat=True).first())
+
+
+def console_allergies(students) -> dict[int, str] | None:
+    """What the cafetería console may show of these students' health data.
+
+    ``None`` while the school's switch is off: no allergy key reaches the
+    console at all. On: ``{pk: allergies}`` for the students whose family
+    authorised health data (``accounts.medical.family_authorised_ids``, the
+    guardian rule); the others are left out. Only ``allergies``, never blood
+    type, medical notes, CURP or birth date.
+    """
+    if not cafeteria_shows_allergies():
+        return None
+    from apps.accounts.medical import family_authorised_ids
+
+    students = list(students)
+    allowed = family_authorised_ids(students)
+    return {s.pk: (s.allergies or '').strip() for s in students if s.pk in allowed}
+
 
 class CafeteriaConsoleStudentSerializer(StudentProfileSerializer):
+    """The student as the cafetería console sees it: no personal data. With
+    the allergies switch on, ``allergies_shared`` says whether the family
+    authorised health data and, when it did, ``allergies`` carries that one
+    field (may be empty: none recorded)."""
+
     class Meta(StudentProfileSerializer.Meta):
         fields = [f for f in StudentProfileSerializer.Meta.fields
                   if f not in CONSOLE_HIDDEN_STUDENT_FIELDS]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        shared = self.context.get(CONSOLE_ALLERGIES, _NOT_LOOKED_UP)
+        if shared is _NOT_LOOKED_UP:  # a single row (the per-student page): look it up
+            shared = console_allergies([instance])
+        if shared is not None:
+            data['allergies_shared'] = instance.pk in shared
+            if instance.pk in shared:
+                data['allergies'] = shared[instance.pk]
+        return data
+
+
+class _ConsoleBalanceListSerializer(serializers.ListSerializer):
+    """A page of console balances: the allergies of the whole page in one go
+    (the switch, the family links and the consents: a fixed number of reads)."""
+
+    def to_representation(self, data):
+        rows = list(data.all() if hasattr(data, 'all') else data)
+        if CONSOLE_ALLERGIES not in self.context:  # the root's context: every row reads it
+            self.context[CONSOLE_ALLERGIES] = console_allergies([b.student for b in rows])
+        return super().to_representation(rows)
 
 
 class AdminCafeteriaBalanceSerializer(CafeteriaBalanceSerializer):
     """``CafeteriaBalanceSerializer`` for the cafetería console (admin/balances,
     admin/low-balance, admin/student/<pk>): the same wallet fields, the student
-    without personal data."""
+    without personal data (allergies only under the school's switch, above)."""
     student = CafeteriaConsoleStudentSerializer(read_only=True)
+
+    class Meta(CafeteriaBalanceSerializer.Meta):
+        list_serializer_class = _ConsoleBalanceListSerializer
 
 
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):
@@ -523,18 +585,43 @@ class BalanceAdjustmentSerializer(serializers.ModelSerializer):
         ]
 
 
+def low_balance_threshold_max() -> Decimal:
+    """The highest saldo-bajo alert level: the largest single top-up
+    (``topup_max_amount()``, $1,000). Above it one top-up from zero could not
+    lift the wallet over the alert, so it would warn after every recarga
+    (QA 2026-11-24 found $99,999 accepted)."""
+    return topup_max_amount()
+
+
+def threshold_max_message(top: Decimal) -> str:
+    return f'El monto máximo de la alerta es ${top:,.0f}.'
+
+
 class LowBalanceThresholdSerializer(serializers.Serializer):
-    """Validates a family-set low-balance (saldo bajo) warning level."""
+    """Validates a low-balance (saldo bajo) warning level: $0 to
+    ``low_balance_threshold_max()``. Only the threshold endpoints use it, so a
+    wallet that already holds a higher level keeps it until someone changes it."""
     threshold = serializers.DecimalField(
         max_digits=8, decimal_places=2,
         min_value=Decimal('0.00'), max_value=Decimal('100000.00'))
+
+    def validate_threshold(self, value):
+        top = low_balance_threshold_max()
+        if value > top:
+            raise serializers.ValidationError(threshold_max_message(top))
+        return value
+
+
+MSG_DAILY_OVER_WEEKLY = 'El límite diario no puede ser mayor que el semanal.'
 
 
 class SpendLimitsSerializer(serializers.Serializer):
     """Validates a family-set daily/weekly cafeteria spend budget (F13).
 
     Both fields are optional; 0 disables that cap. Either may be sent alone so a
-    parent can set just a daily or just a weekly limit.
+    parent can set just a daily or just a weekly limit. When both caps end up
+    set, the daily one may not exceed the weekly one; a field not sent keeps the
+    wallet's current value (``context['balance']``) for that comparison.
     """
     daily_spend_limit = serializers.DecimalField(
         max_digits=8, decimal_places=2, required=False,
@@ -547,6 +634,18 @@ class SpendLimitsSerializer(serializers.Serializer):
         if 'daily_spend_limit' not in attrs and 'weekly_spend_limit' not in attrs:
             raise serializers.ValidationError(
                 'Envíe daily_spend_limit y/o weekly_spend_limit.')
+        balance = self.context.get('balance')
+
+        def resulting(field):
+            if field in attrs:
+                return attrs[field]
+            return getattr(balance, field, None) or Decimal('0')
+
+        daily, weekly = resulting('daily_spend_limit'), resulting('weekly_spend_limit')
+        if daily > 0 and weekly > 0 and daily > weekly:
+            # On the field the person sent (the daily one when both came).
+            field = 'daily_spend_limit' if 'daily_spend_limit' in attrs else 'weekly_spend_limit'
+            raise serializers.ValidationError({field: [MSG_DAILY_OVER_WEEKLY]})
         return attrs
 
 

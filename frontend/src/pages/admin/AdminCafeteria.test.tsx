@@ -127,6 +127,18 @@ describe('AdminCafeteria people filters and staff accounts (A8 + A9, 2026-11-18)
     expect(screen.getByText('Docente')).toBeInTheDocument();
   });
 
+  it('marks the child whose family authorised allergies, only when the API sends them (2026-11-24)', async () => {
+    const withAllergy = (row: ReturnType<typeof balanceRow>, extra: Record<string, unknown>) => ({ ...row, student: { ...row.student, ...extra } });
+    api.balances.mockResolvedValue(page([
+      withAllergy(balanceRow(1, ['Ana', 'Alvarez'], '20.00'), { allergies_shared: true, allergies: 'Nueces' }),
+      withAllergy(balanceRow(2, ['Beto', 'Bravo'], '80.00'), { allergies_shared: false }),
+      balanceRow(3, ['Caro', 'Cruz'], '90.00'),
+    ]));
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria' });
+    expect(await screen.findByText('Alergias: Nueces')).toBeInTheDocument();
+    expect(screen.getAllByText(/^Alergias:/)).toHaveLength(1);
+  });
+
   it('«Todos los estados» and «Solo personal» reach the API', async () => {
     renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?estado=todos&persona=personal' });
     await waitFor(() => expect(api.balances).toHaveBeenCalled());
@@ -438,7 +450,7 @@ describe('AdminCafeteria Clientes Loyverse tab (every card, not only pupils)', (
     const table = screen.getByRole('table');
     expect(within(table).getByText('Personal')).toBeInTheDocument();
     expect(within(table).getAllByText('$178.00')).toHaveLength(2);
-    expect(screen.getByText(/2 tarjeta\(s\) en Loyverse/)).toBeInTheDocument();
+    expect(screen.getByText(/2 tarjetas en Loyverse/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver alumno' })).toHaveAttribute('href', '/admin/cafeteria/7');
     expect(api.customers).toHaveBeenCalledWith(expect.objectContaining({ page_size: 50, kind: 'nonstudent' }));
   });

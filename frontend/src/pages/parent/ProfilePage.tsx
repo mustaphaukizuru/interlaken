@@ -18,6 +18,9 @@ import { SecurityPanel } from '@/components/portal/SecurityPanel';
 import { authApi } from '@/services/api';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
 import { NotifyEmailCard } from '@/components/portal/NotifyEmailCard';
+import { phoneProblem } from '@/lib/validators';
+import { apiFieldErrors } from '@/lib/apiErrors';
+import { pluralWord } from '@/lib/plural';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',
@@ -56,12 +59,13 @@ export default function ProfilePage() {
     { ok: !!user?.first_name && !!user?.last_name, label: 'Nombre completo' },
     { ok: !!user?.whatsapp, label: 'WhatsApp para avisos' },
     { ok: !!user?.notif_prefs, label: 'Preferencias de avisos revisadas' },
-    ...(isFamily ? [{ ok: children.length > 0, label: 'Alumno(s) vinculado(s)' }] : []),
+    ...(isFamily ? [{ ok: children.length > 0, label: pluralWord(children.length, 'Alumno vinculado', 'Alumnos vinculados') }] : []),
   ];
   const completeness = Math.round((checks.filter((c) => c.ok).length / checks.length) * 100);
   const [firstName, setFirstName] = useState(user?.first_name ?? '');
   const [lastName, setLastName] = useState(user?.last_name ?? '');
   const [whatsapp, setWhatsapp] = useState(user?.whatsapp ?? '');
+  const [whatsappError, setWhatsappError] = useState('');
   const [emailOn, setEmailOn] = useState(user?.notif_prefs?.email_enabled ?? true);
   const [inAppOn, setInAppOn] = useState(user?.notif_prefs?.in_app_enabled ?? true);
   const [pushOn, setPushOn] = useState(user?.notif_prefs?.push_enabled ?? true);
@@ -79,7 +83,11 @@ export default function ProfilePage() {
       setUser(data as User);
       toast.success('Información actualizada correctamente.');
     },
-    onError: () => toast.error('No se pudo guardar. Intente de nuevo.'),
+    onError: (err) => {
+      const fields = apiFieldErrors(err);
+      if (fields.whatsapp) setWhatsappError(fields.whatsapp);
+      toast.error(fields.whatsapp ? 'Revise el número de WhatsApp.' : 'No se pudo guardar. Intente de nuevo.');
+    },
   });
 
   const prefsMutation = useMutation({
@@ -123,7 +131,11 @@ export default function ProfilePage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!locked && firstName.trim() && lastName.trim()) mutation.mutate();
+    if (locked || !firstName.trim() || !lastName.trim()) return;
+    // The number saved before the phone rule is sent back as it is.
+    const problem = phoneProblem(whatsapp, user?.whatsapp ?? '');
+    if (problem) { setWhatsappError(problem); return; }
+    mutation.mutate();
   };
 
   return (
@@ -188,7 +200,9 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="label" htmlFor="pf-wa">WhatsApp</label>
-              <input id="pf-wa" type="tel" inputMode="tel" className={`input-field min-h-[44px] text-base ${locked ? 'bg-cream' : ''}`} value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder={locked ? 'Sin registrar' : 'Ej. 5512345678'} disabled={locked} />
+              <input id="pf-wa" type="tel" inputMode="tel" className={`input-field min-h-[44px] text-base ${locked ? 'bg-cream' : ''}`} value={whatsapp} onChange={(e) => { setWhatsapp(e.target.value); setWhatsappError(''); }} placeholder={locked ? 'Sin registrar' : 'Ej. 5512345678'} disabled={locked}
+                aria-invalid={whatsappError ? true : undefined} aria-describedby={whatsappError ? 'pf-wa-error' : undefined} />
+              {whatsappError && <p id="pf-wa-error" className="mt-1.5 text-xs text-coral-600">{whatsappError}</p>}
               <p className="mt-1 text-xs text-subtle">Se usa para avisos y recordatorios del colegio.</p>
             </div>
             {!locked && <div className="flex justify-end pt-1">

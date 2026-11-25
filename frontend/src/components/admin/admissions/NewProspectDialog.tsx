@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StageChip } from '@/components/admin/admissions/StageChip';
 import type { FieldErrorMap } from '@/lib/apiErrors';
+import { PHONE_MESSAGES, phoneProblem } from '@/lib/validators';
 import { fmtDay } from '@/lib/caseStages';
 import { casesApi, storeCase, type CaseRow, type ProspectInput } from '@/hooks/queries/cases';
 import { ChoiceGroup, ErrorSummary, SelectField, errorsFrom } from './case/formKit';
@@ -46,7 +47,8 @@ function validate(f: Form): FieldErrorMap {
   const e: FieldErrorMap = {};
   if (!f.child_name.trim()) e.child_name = 'Escriba el nombre del alumno.';
   if (!f.parent_name.trim()) e.parent_name = 'Escriba el nombre del tutor.';
-  if (f.parent_phone.replace(/\D/g, '').length < 10) e.parent_phone = 'Escriba un celular de 10 dígitos.';
+  if (phoneProblem(f.parent_phone) === PHONE_MESSAGES.chars) e.parent_phone = PHONE_MESSAGES.chars;
+  else if (f.parent_phone.replace(/\D/g, '').length < 10) e.parent_phone = 'Escriba un celular de 10 dígitos.';
   if (!f.grade_applying) e.grade_applying = 'Elija el grado.';
   if (f.child_age && (Number(f.child_age) < 0 || Number(f.child_age) > 25)) e.child_age = 'Escriba una edad de 0 a 25.';
   if (f.parent_email && !/^\S+@\S+\.\S+$/.test(f.parent_email.trim())) e.parent_email = 'Revise el correo.';

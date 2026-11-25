@@ -152,8 +152,8 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
             <AlertTriangle className="h-4 w-4 shrink-0 text-coral-600" aria-hidden="true" />
             <p>
               Esta contraseña <strong>no se volverá a mostrar</strong>. Envíela a la familia por
-              WhatsApp o correo antes de cerrar. Por política del colegio la familia no puede
-              cambiarla; si la olvida, la solicitará de nuevo. Las sesiones abiertas se cerraron.
+              WhatsApp o correo antes de cerrar. Es temporal: la primera vez que entre, el portal le
+              pedirá crear la suya. Las sesiones abiertas se cerraron.
             </p>
           </div>
           <Button type="button" className="w-full" onClick={onClose}>
@@ -172,7 +172,7 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
           <p className="text-sm text-subtle">
             {mode === 'generate'
               ? 'Se generará una contraseña temporal que se mostrará una sola vez.'
-              : 'Se guardará la contraseña que usted escribió.'}
+              : 'Se guardará la contraseña que usted escribió. Es temporal: la primera vez que entre, el portal le pedirá crear la suya.'}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
             <Button

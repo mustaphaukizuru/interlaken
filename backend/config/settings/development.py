@@ -5,6 +5,7 @@ import environ
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *
+from .local_safety import blank_live_integrations, is_remote_database
 
 DEBUG = True
 ALLOWED_HOSTS = ['*']
@@ -35,13 +36,35 @@ if _TEST_DATABASE_URL:
             'TEST_DATABASE_URL must point at a local or CI PostgreSQL '
             f'({", ".join(_TEST_DB_HOSTS)}): the tests create and drop a database there.')
     DATABASES = {'default': _test_db}
-elif os.getenv('SQLITE_LOCAL') or _RUNNING_TESTS:
-    DATABASES = {
+else:
+    _SQLITE = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': os.path.join(BASE_DIR.parent, 'db_local.sqlite3'),
         }
     }
+    if os.getenv('SQLITE_LOCAL') or _RUNNING_TESTS:
+        DATABASES = _SQLITE
+    elif is_remote_database(DATABASES['default']) and os.getenv('DEV_ALLOW_REMOTE_DB') != '1':
+        # The .env names a database on another machine (on a developer laptop
+        # that is production). Never use it by accident: see local_safety.py.
+        sys.stderr.write(
+            'Seguridad local: DB_HOST apunta a otra máquina; se usa db_local.sqlite3. '
+            'Para usar esa base a propósito, ejecute el comando con DEV_ALLOW_REMOTE_DB=1.\n'
+        )
+        DATABASES = _SQLITE
+
+# Live integrations (Loyverse points, the school calendar, push, WhatsApp,
+# Banorte, the backup and media buckets) stay off on a developer machine unless
+# DEV_LIVE_INTEGRATIONS=1 is set for that command (see local_safety.py).
+if os.getenv('DEV_LIVE_INTEGRATIONS') != '1':
+    _cleared = blank_live_integrations(globals())
+    if _cleared and not _RUNNING_TESTS:
+        sys.stderr.write(
+            'Seguridad local: se ignoran las llaves en vivo '
+            + ', '.join(_cleared)
+            + '. Para usarlas, ejecute el comando con DEV_LIVE_INTEGRATIONS=1.\n'
+        )
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 CORS_ALLOW_ALL_ORIGINS = True

@@ -8,7 +8,7 @@ import { CmsMediaProvider } from './runtime';
 import { CmsPreviewProvider } from './preview';
 import { absoluteImageUrl } from './media';
 import { SITE_URL } from '@/lib/siteMeta';
-import type { CmsPagePayload } from './published';
+import { isPagePayload } from './published';
 
 export { BlockRenderer } from './BlockRenderer';
 export type { CmsPagePayload } from './published';
@@ -21,9 +21,11 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
   const slug = slugProp ?? routeSlug ?? window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
   const { data, isLoading, isError } = useQuery({
     queryKey: ['cms-page', slug, preview],
-    queryFn: async () => (preview
-      ? (await contentApi.getPagePreviewBySlug(slug, preview)).data
-      : (await contentApi.getPage(slug)).data) as CmsPagePayload,
+    queryFn: async () => {
+      const { data: body } = preview ? await contentApi.getPagePreviewBySlug(slug, preview) : await contentApi.getPage(slug);
+      // A 204 (a page of the site with nothing published) has no body: null, as published.ts answers.
+      return isPagePayload(body) ? body : null;
+    },
     retry: false,
     staleTime: 60_000,
   });

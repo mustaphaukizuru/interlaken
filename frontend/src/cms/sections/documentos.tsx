@@ -11,7 +11,7 @@
  * (sessionStorage, keyed by the link), so a reload after the camera opens
  * keeps working. The editor preview shows a sample list instead.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Camera, CheckCircle2, FileText, Package, RefreshCw, UploadCloud } from 'lucide-react';
@@ -21,6 +21,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { DocStatusChip } from '@/components/admissions/DocStatusChip';
 import { exchangeOnce } from '@/lib/inviteExchange';
 import { apiErrorMessage, apiErrorStatus } from '@/lib/apiErrors';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { requiredDocsApi, type ChecklistFile, type ChecklistItem, type DocStatus, type FamilyChecklist } from '@/hooks/queries/requiredDocs';
 import { useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
@@ -206,13 +207,17 @@ function DocumentsView(p: Props) {
           <h1 className="mt-2 font-head text-fluid-3xl font-black tracking-[-0.02em] text-ink">{c('title')}</h1>
           <p className="sr-only" aria-live="polite" role="status">{live}</p>
           {invalid ? (
-            <div className="mt-6 rounded-md bg-danger-bg p-5 text-base text-ink" role="alert">
-              <AlertTriangle className="mb-2 h-5 w-5 text-danger" aria-hidden="true" />
-              {incomplete
-                ? (email ? INCOMPLETE_TEXT : INCOMPLETE_TEXT_NO_EMAIL)
-                : c('invalidText')}{email && ' '}
-              {email && <a href={`mailto:${email}`} className="font-semibold text-purple underline">{email}</a>}{email && '.'}
-            </div>
+            <>
+              <div className="mt-6 rounded-md bg-danger-bg p-5 text-base text-ink" role="alert">
+                <AlertTriangle className="mb-2 h-5 w-5 text-danger" aria-hidden="true" />
+                {incomplete
+                  ? (email ? INCOMPLETE_TEXT : INCOMPLETE_TEXT_NO_EMAIL)
+                  : c('invalidText')}{email && ' '}
+                {email && <a href={`mailto:${email}`} className="font-semibold text-purple underline">{email}</a>}{email && '.'}
+              </div>
+              {/* Used or expired (not a cut link, whose own link may still work): self-service. */}
+              {!incomplete && <NewLinkForm c={c} rid={rid} />}
+            </>
           ) : loadFailed ? (
             <div className="mt-6 rounded-md bg-white p-5 text-base text-ink shadow-card" role="alert">
               <p className="font-semibold">{c('loadError')}</p>
@@ -261,6 +266,76 @@ function DocumentsView(p: Props) {
         </div>
       </Section>
     </div>
+  );
+}
+
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * «Pedir un enlace nuevo» (used or expired link). The answer is always the
+ * same, whether or not the address matches: the school emails a fresh link
+ * only to the address on file, only when the documents step is open
+ * (POST /admissions/documents/new-link/). One request at a time.
+ */
+function NewLinkForm({ c, rid }: { c: Copy; rid: number | null }) {
+  const [value, setValue] = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+  const once = useSingleFlight();
+  const doneRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { if (done) doneRef.current?.focus(); }, [done]);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const address = value.trim();
+    if (!EMAIL_SHAPE.test(address)) { setError(c('newLinkBadEmail')); return; }
+    once(async () => {
+      setError('');
+      setSending(true);
+      try {
+        await requiredDocsApi.requestNewLink(address, rid);
+        setDone(true);
+      } catch (err) {
+        const status = apiErrorStatus(err);
+        setError(status === 429 ? c('newLinkTooMany') : status === 400 ? c('newLinkBadEmail') : c('newLinkError'));
+      } finally {
+        setSending(false);
+      }
+    });
+  };
+
+  if (done) {
+    return (
+      <div ref={doneRef} tabIndex={-1} className="mt-4 flex items-start gap-3 rounded-md bg-success-bg p-5 text-base text-ink focus:outline-none">
+        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
+        <p aria-live="polite">{c('newLinkDone')}</p>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={submit} noValidate aria-labelledby="docs-new-link-title" className="mt-4 rounded-md bg-white p-5 shadow-card">
+      <h2 id="docs-new-link-title" className="font-head text-lg font-bold text-ink">{c('newLinkTitle')}</h2>
+      <p className="mt-1 text-base text-muted">{c('newLinkText')}</p>
+      <label className="label mt-4" htmlFor="docs-new-link-email">{c('newLinkEmailLabel')}</label>
+      <input
+        id="docs-new-link-email"
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        className="input-field text-base"
+        value={value}
+        onChange={(e) => { setValue(e.target.value); if (error) setError(''); }}
+        aria-required="true"
+        aria-invalid={!!error || undefined}
+        aria-describedby={error ? 'docs-new-link-error' : undefined}
+      />
+      <p id="docs-new-link-error" aria-live="polite" className={clsx('text-sm font-medium text-danger', error && 'mt-1.5')}>{error}</p>
+      <button type="submit" disabled={sending} className="btn-primary mt-4 min-h-[44px] w-full justify-center disabled:opacity-60 sm:w-auto">
+        {sending ? c('newLinkSending') : c('newLinkButton')}
+      </button>
+    </form>
   );
 }
 
@@ -446,6 +521,15 @@ export const sections = [
         f.textarea('invalidText', 'Enlace usado o caducado'),
         f.text('invalidEmail', 'Correo para escribir'),
       ]),
+      ...grouped('Pedir un enlace nuevo', [
+        f.text('newLinkTitle', 'Enlace nuevo: título'), f.textarea('newLinkText', 'Enlace nuevo: explicación'),
+        f.text('newLinkEmailLabel', 'Enlace nuevo: campo de correo'), f.text('newLinkButton', 'Enlace nuevo: botón'),
+        f.text('newLinkSending', 'Enlace nuevo: botón mientras se envía'),
+        f.textarea('newLinkDone', 'Enlace nuevo: confirmación'),
+        f.text('newLinkBadEmail', 'Enlace nuevo: correo no válido'),
+        f.text('newLinkTooMany', 'Enlace nuevo: demasiadas solicitudes'),
+        f.text('newLinkError', 'Enlace nuevo: no se pudo enviar'),
+      ]),
     ],
     defaults: {
       label: 'Admisiones', title: 'Documentos de inscripción',
@@ -469,6 +553,15 @@ export const sections = [
       loadError: 'No se pudo cargar la lista de documentos. Revise su conexión e intente de nuevo.', retryLabel: 'Reintentar',
       invalidText: 'Este enlace ya se usó o caducó. Pida a admisiones un nuevo enlace de documentos, o escriba a',
       invalidEmail: '{{correo}}',
+      newLinkTitle: 'Pedir un enlace nuevo',
+      newLinkText: 'Escriba el correo con el que hizo la solicitud de inscripción. Si coincide, le enviaremos a ese correo un enlace nuevo para subir los documentos.',
+      newLinkEmailLabel: 'Correo electrónico',
+      newLinkButton: 'Pedir un enlace nuevo',
+      newLinkSending: 'Enviando…',
+      newLinkDone: 'Si el correo coincide con una solicitud en curso, le enviaremos un enlace nuevo en unos minutos. Revise también su carpeta de spam.',
+      newLinkBadEmail: 'Escriba un correo electrónico válido.',
+      newLinkTooMany: 'Ya pidió varios enlaces. Espere una hora e intente de nuevo, o escriba a admisiones.',
+      newLinkError: 'No se pudo enviar la solicitud. Revise su conexión e intente de nuevo.',
     },
   }),
 ];

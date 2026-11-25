@@ -49,3 +49,17 @@ def test_preview_and_run(admin_client, parent_user):
     assert AuditLog.objects.filter(context='school-year.rollover').exists()
     # cannot apply the same cycle twice
     assert admin_client.post(reverse('school-year-run'), {'confirm': 'AVANZAR', 'new_cycle': '2027-2028'}, format='json').status_code == 400
+
+
+@pytest.mark.django_db
+def test_reset_threshold_has_the_family_alert_cap(admin_client):
+    # Was up to $5,000; now the same ceiling as each family's alert (the
+    # largest single top-up, $1,000). Nothing is applied when it is refused.
+    resp = admin_client.post(reverse('school-year-run'), {
+        'confirm': 'AVANZAR', 'new_cycle': '2027-2028', 'reset_threshold': 1500}, format='json')
+    assert resp.status_code == 400
+    assert resp.data['reset_threshold'] == ['El monto máximo de la alerta es $1,000.']
+    assert SiteSettings.load().school_year != '2027-2028'
+    resp = admin_client.post(reverse('school-year-run'), {
+        'confirm': 'AVANZAR', 'new_cycle': '2027-2028', 'reset_threshold': 'abc'}, format='json')
+    assert resp.status_code == 400 and resp.data['reset_threshold'] == ['Monto no válido.']

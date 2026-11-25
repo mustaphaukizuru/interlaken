@@ -257,3 +257,56 @@ class TestGuardianInputHardening:
         assert resp.status_code == 400 and 'relationship' in resp.data
         parent.refresh_from_db()
         assert parent.whatsapp != '1' * 21
+
+
+@pytest.mark.django_db
+class TestGuardianPhoneRule:
+    """QA 2026-11-24: WhatsApp and phone accepted letters. Digits, +, spaces,
+    dashes and parentheses with 10 to 15 digits (core.phones); a number saved
+    before the rule never blocks saving another field."""
+
+    def _detail(self, api_client, parent, student):
+        api_client.force_authenticate(AdminFactory())
+        return reverse('student-guardian-detail', args=[student.pk, parent.pk])
+
+    def test_link_refuses_letters_and_short_numbers(self, api_client):
+        student = StudentProfileFactory()
+        api_client.force_authenticate(AdminFactory())
+        url = reverse('student-guardians', kwargs={'pk': student.pk})
+        resp = api_client.post(url, {'email': 'letras@test.mx', 'phone': '55 1234 abcd'}, format='json')
+        assert resp.status_code == 400 and resp.data['phone'] == [
+            'Escriba solo números; puede usar espacios, guiones, paréntesis y el signo +.']
+        resp = api_client.post(url, {'email': 'corto@test.mx', 'phone': '55 1234'}, format='json')
+        assert resp.status_code == 400 and resp.data['phone'] == ['El número debe tener de 10 a 15 dígitos.']
+        assert not User.objects.filter(email__in=['letras@test.mx', 'corto@test.mx']).exists()
+        resp = api_client.post(url, {'email': 'bien@test.mx', 'phone': '+52 (55) 1234-5678'}, format='json')
+        assert resp.status_code == 201, resp.data
+        assert User.objects.get(email='bien@test.mx').whatsapp == '+52 (55) 1234-5678'
+
+    def test_edit_refuses_a_new_number_with_letters(self, api_client):
+        parent = ParentFactory(email='wa@test.mx', whatsapp='5215512345678')
+        student = StudentProfileFactory(parents=[parent])
+        url = self._detail(api_client, parent, student)
+        resp = api_client.patch(url, {'whatsapp': '521551234567x'}, format='json')
+        assert resp.status_code == 400 and 'whatsapp' in resp.data
+        resp = api_client.patch(url, {'phone': 'casa'}, format='json')
+        assert resp.status_code == 400 and 'phone' in resp.data
+        parent.refresh_from_db()
+        assert parent.whatsapp == '5215512345678'
+
+    def test_a_stored_legacy_number_does_not_block_other_fields(self, api_client):
+        # The edit dialog sends every field, the old numbers included.
+        parent = ParentFactory(email='viejo@test.mx', first_name='Ana', whatsapp='55-12 ext 3')
+        ParentProfile.objects.create(user=parent, phone='555', relationship='Madre')
+        student = StudentProfileFactory(parents=[parent])
+        url = self._detail(api_client, parent, student)
+        resp = api_client.patch(url, {
+            'first_name': 'Ana María', 'last_name': '', 'email': 'viejo@test.mx',
+            'whatsapp': '55-12 ext 3', 'phone': '555', 'relationship': 'Madre',
+        }, format='json')
+        assert resp.status_code == 200, resp.data
+        parent.refresh_from_db()
+        assert parent.first_name == 'Ana María' and parent.whatsapp == '55-12 ext 3'
+        # Changing it, though, follows the rule.
+        resp = api_client.patch(url, {'whatsapp': '55-12 ext 4'}, format='json')
+        assert resp.status_code == 400 and 'whatsapp' in resp.data

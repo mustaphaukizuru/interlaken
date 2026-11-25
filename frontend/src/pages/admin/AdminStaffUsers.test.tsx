@@ -159,6 +159,41 @@ describe('AdminStaffUsers: puesto y áreas de la consola', () => {
     })));
   });
 
+  // 2026-11-24: the invitation emails where to sign in (never the password).
+  it.each([
+    [true, 'Le enviamos un correo con el enlace para entrar. El correo no incluye la contraseña.'],
+    [false, 'No se pudo enviar el correo de bienvenida.'],
+  ])('says next to the one-time password whether the invitation email left (%s)', async (sent, message) => {
+    vi.mocked(portalApi.inviteStaff).mockResolvedValue({ data: {
+      ...berta, id: 9, email: 'caja@x.mx', temporary_password: 'Tmp-123456', invite_email_sent: sent,
+    } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Berta Zea');
+    await userEvent.click(screen.getAllByRole('button', { name: /Invitar/ })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Invitar al personal' });
+    expect(within(dialog).getByText(/Le enviaremos un correo con el enlace para entrar, sin la contraseña/)).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Correo'), 'caja@x.mx');
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Caja');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Crear cuenta/ }));
+    const reveal = await screen.findByRole('dialog', { name: 'Contraseña temporal' });
+    expect(within(reveal).getByText('Tmp-123456')).toBeInTheDocument();
+    expect(within(reveal).getByText(/la primera vez que entre se le pedirá crear su propia contraseña/)).toBeInTheDocument();
+    expect(within(reveal).getByRole('status')).toHaveTextContent(message);
+  });
+
+  it('a password reset (no email involved) says nothing about an email', async () => {
+    vi.mocked(portalApi.resetStaffPassword).mockResolvedValue({ data: { temporary_password: 'Tmp-999999', sessions_revoked: 0 } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Berta Zea');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para berta@x.mx' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /Generar contraseña/ }));
+    const confirm = await screen.findByRole('dialog', { name: 'Generar nueva contraseña' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Generar' }));
+    const reveal = await screen.findByRole('dialog', { name: 'Contraseña temporal' });
+    expect(within(reveal).getByText('Tmp-999999')).toBeInTheDocument();
+    expect(within(reveal).queryByRole('status')).toBeNull();
+  });
+
   it('edits the areas of a staff account from «⋯» → «Puesto y áreas»', async () => {
     vi.mocked(portalApi.updateStaff).mockResolvedValue({ data: berta } as never);
     vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [

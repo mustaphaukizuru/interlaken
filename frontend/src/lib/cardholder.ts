@@ -3,6 +3,8 @@
  * screening, manual v1.8). Mirrors backend/apps/payments/billing.py; the server
  * re-validates everything.
  */
+import { emailProblem, phoneProblem, PHONE_MESSAGES } from './validators';
+
 export interface Cardholder {
   first_name: string;
   last_name: string;
@@ -44,8 +46,11 @@ export function cardholderErrors(c: Cardholder): Partial<Record<keyof Cardholder
   for (const k of required) if (!hasText(c[k])) e[k] = 'Requerido.';
   if (!MX_STATES.some((s) => s.code === c.state)) e.state = 'Elija el estado.';
   if (digits(c.postal_code).length !== 5) e.postal_code = 'Código postal de 5 dígitos.';
-  const phone = digits(c.phone).length;
-  if (phone < 10 || phone > 15) e.phone = 'Teléfono de 10 dígitos.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email.trim())) e.email = 'Correo no válido.';
+  // Empty asks for it; letters (not only a wrong length) are refused, as the server does.
+  if (!c.phone.trim()) e.phone = 'Escriba su teléfono.';
+  else if (phoneProblem(c.phone) === PHONE_MESSAGES.chars) e.phone = PHONE_MESSAGES.chars;
+  else if (digits(c.phone).length < 10 || digits(c.phone).length > 15) e.phone = 'Teléfono de 10 dígitos.';
+  const email = emailProblem(c.email);
+  if (email) e.email = email;
   return e;
 }

@@ -21,8 +21,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'email', 'first_name', 'last_name', 'full_name', 'role',
             'avatar', 'whatsapp', 'has_usable_password', 'notif_prefs', 'last_login',
+            # A temporary password is still in use: the SPA asks for a new one
+            # before any portal page (apps/accounts/authentication.py).
+            'password_change_required',
         ]
-        read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs', 'last_login']
+        read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs', 'last_login',
+                            'password_change_required']
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -42,6 +46,13 @@ class UserSerializer(serializers.ModelSerializer):
             from .people import cafeteria_account_payload
             data['cafeteria_account'] = cafeteria_account_payload(instance)
         return data
+
+    def validate_whatsapp(self, value):
+        # Digits, +, spaces, dashes and parentheses, 10 to 15 digits; the number
+        # already saved is accepted as it is (core.phones).
+        from apps.core.phones import check_phone
+
+        return check_phone(value, current=getattr(self.instance, 'whatsapp', None))
 
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
