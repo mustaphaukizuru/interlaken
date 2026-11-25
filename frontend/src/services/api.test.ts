@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { api } from './api';
+import { api, isPasswordChangeRequired } from './api';
 import { useAuthStore } from '@/store/authStore';
 
 // Two mock layers: one on the shared `api` instance (business requests) and one
@@ -79,5 +79,38 @@ describe('api 401 → cookie refresh interceptor', () => {
 
     await expect(api.get('/accounts/me/')).rejects.toBeTruthy();
     expect(refreshCalled).toBe(false);
+  });
+});
+
+describe('api 403 password_change_required → «Cree su contraseña»', () => {
+  const user = { id: 3, email: 'a@x.mx', first_name: 'A', last_name: 'B', full_name: 'A B', role: 'parent' as const, avatar: '', whatsapp: '' };
+
+  beforeEach(() => {
+    useAuthStore.setState({ user, accessToken: 't', isAuthenticated: true });
+    apiMock = new MockAdapter(api);
+  });
+
+  afterEach(() => apiMock.restore());
+
+  it('flags the account and leaves the request pending (no error toast on the way out)', async () => {
+    apiMock.onGet('/cafeteria/balance/').reply(403, { detail: 'Antes de continuar, cree su propia contraseña.', code: 'password_change_required' });
+    let settled = false;
+    api.get('/cafeteria/balance/').then(() => { settled = true; }, () => { settled = true; });
+    await vi.waitFor(() => expect(useAuthStore.getState().user?.password_change_required).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(settled).toBe(false);
+  });
+
+  it('any other 403 still fails normally', async () => {
+    apiMock.onGet('/accounts/admin/staff/').reply(403, { detail: 'No tiene permiso.' });
+    await expect(api.get('/accounts/admin/staff/')).rejects.toBeTruthy();
+    expect(useAuthStore.getState().user?.password_change_required).toBeUndefined();
+  });
+
+  it('isPasswordChangeRequired reads the status and the code', () => {
+    expect(isPasswordChangeRequired({ response: { status: 403, data: { code: 'password_change_required' } } })).toBe(true);
+    expect(isPasswordChangeRequired({ response: { status: 403, data: { code: 'other' } } })).toBe(false);
+    expect(isPasswordChangeRequired({ response: { status: 401, data: { code: 'password_change_required' } } })).toBe(false);
+    expect(isPasswordChangeRequired(undefined)).toBe(false);
   });
 });

@@ -21,6 +21,12 @@ export interface User {
   has_custom_avatar?: boolean;
   whatsapp: string;
   has_usable_password?: boolean;
+  /**
+   * Still on a temporary password an administrator handed out: «Cree su
+   * contraseña» comes before any portal or console page (ProtectedRoute), and
+   * the API refuses everything else with 403 `password_change_required`.
+   */
+  password_change_required?: boolean;
   last_login?: string | null;
   notif_prefs?: {
     email_enabled: boolean;

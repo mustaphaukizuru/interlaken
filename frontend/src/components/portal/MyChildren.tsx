@@ -180,7 +180,8 @@ function AddChild({ onCancel, onDone }: { onCancel: () => void; onDone: (name: s
       <h3 id={`${codeId}-title`} className="font-semibold text-ink">Escriba el código</h3>
       {/* Neutral on purpose: any matrícula can be typed here, so the other
           child's name, grade and the guardians' addresses stay hidden until
-          the code proves the family (QA 2026-11-24). */}
+          the code proves the family; the server no longer even sends them
+          (QA 2026-11-24). The name arrives with the confirmation. */}
       <div className="flex gap-3 rounded-md bg-brand-50 px-3 py-3 text-sm text-brand-700" role="status">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
         <p>

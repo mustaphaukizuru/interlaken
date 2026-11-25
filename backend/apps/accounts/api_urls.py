@@ -22,6 +22,7 @@ from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
 from .merge import GuardianMergePreviewView, GuardianMergeView
 from .notify_email import NotifyEmailConfirmView, NotifyEmailVerifyView, NotifyEmailView
+from .own_password import MyPasswordView
 from .password_requests import (
     PasswordRequestBulkView,
     PasswordRequestDetailView,
@@ -115,6 +116,8 @@ urlpatterns = [
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),
     path('me/',              views.CurrentUserView.as_view(),     name='current-user'),
+    # Replace one's own password with the current one (a temporary one first), 2026-11-24.
+    path('me/password/',     MyPasswordView.as_view(),            name='my-password'),
     path('me/sessions/',     MySessionsView.as_view(),            name='my-sessions'),
     path('me/sessions/close-others/', CloseOtherSessionsView.as_view(), name='close-other-sessions'),
     path('me/totp/setup/',   TotpSetupView.as_view(),             name='totp-setup'),
@@ -131,7 +134,7 @@ urlpatterns = [
     path('me/notify-email/verify/', NotifyEmailVerifyView.as_view(), name='my-notify-email-verify'),
     path('notify-email/confirm/', NotifyEmailConfirmView.as_view(), name='notify-email-confirm'),
     path('avatar/<int:user_id>/<str:token>/', AvatarServeView.as_view(), name='avatar-serve'),
-    # No self-service password reset/change (school policy): see admin-set-password.
+    # No self-service password reset (school policy): see admin-set-password.
     path('notification-preferences/', password_views.NotificationPreferenceView.as_view(), name='notification-preferences'),
     path('students/',        views.StudentListView.as_view(),     name='students'),
     path('students/<int:pk>/', views.StudentDetailView.as_view(), name='student-detail'),

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ConsoleAreaGuard } from './ConsoleAreaGuard';
 import { useAuthStore, type User } from '@/store/authStore';
@@ -111,6 +112,25 @@ describe('ProtectedRoute', () => {
     renderAt('/staff');
     expect(screen.getByText('LOGIN PAGE')).toBeInTheDocument();
     expect(screen.queryByText('STAFF DASHBOARD')).not.toBeInTheDocument();
+  });
+
+  // A temporary password from the school (2026-11-24): «Cree su contraseña» first.
+  it('shows «Cree su contraseña» instead of the page while a temporary password is in use', () => {
+    useAuthStore.setState({ user: { ...adminUser, password_change_required: true }, isAuthenticated: true });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/admin']}>
+          <Routes>
+            <Route path="/admin" element={<ProtectedRoute roles={['admin']}><div>ADMIN CONTENT</div></ProtectedRoute>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole('heading', { name: 'Cree su contraseña' })).toBeInTheDocument();
+    expect(screen.queryByText('ADMIN CONTENT')).not.toBeInTheDocument();
+    // Once saved (the flag clears), the same route shows the page it was going to.
+    act(() => useAuthStore.setState({ user: { ...adminUser, password_change_required: false } }));
+    expect(screen.getByText('ADMIN CONTENT')).toBeInTheDocument();
   });
 });
 

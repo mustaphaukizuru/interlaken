@@ -83,6 +83,7 @@ def convert_registration(
     Raises ``ConvertError`` (400 bad matrícula / not convertible, 409 race).
     Runs in its own transaction (a savepoint inside the caller's).
     """
+    from apps.accounts.admin_password import set_temporary_password
     from apps.accounts.import_students import STUDENT_EMAIL_DOMAIN
     from apps.accounts.models import ParentProfile, StudentProfile, User
     from apps.core.matricula import normalize_matricula
@@ -164,8 +165,9 @@ def convert_registration(
                         role=User.Role.PARENT,
                     )
                     pwd = password()
-                    parent.set_password(pwd)
-                    parent.save(update_fields=["password"])
+                    # Handed over by the school: the family creates its own
+                    # password at the first sign-in (password_change_required).
+                    set_temporary_password(parent, pwd)
                     ParentProfile.objects.get_or_create(
                         user=parent, defaults={"phone": phone or ""}
                     )

@@ -9,6 +9,8 @@ export interface User {
   avatar: string;
   whatsapp: string;
   has_usable_password?: boolean;
+  /** Still on a temporary password: «Cree su contraseña» first (ProtectedRoute). */
+  password_change_required?: boolean;
   notif_prefs?: {
     email_enabled: boolean;
     in_app_enabled: boolean;

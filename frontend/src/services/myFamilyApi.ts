@@ -23,12 +23,17 @@ export interface MyFamily {
   can_add: boolean;
 }
 
+/**
+ * The code left. Nothing about the other child comes back before the code
+ * proves the family (anyone signed in can type a matrícula): no name, grade
+ * or mailbox, only how many mailboxes got it (QA 2026-11-24).
+ */
 export interface CodeSent {
-  sent_to: string[];
-  student: { name: string; first_name: string; grade: string; group: string };
+  sent_count: number;
   expires_in_minutes: number;
 }
 
+/** The code was right: now the child is named. */
 export interface Linked {
   linked: string;
   children: MyChild[];

@@ -74,6 +74,11 @@ def test_convert_creates_student_and_family(admin_client, reg, parent_user):
     cred = {c['email']: c for c in r.data['credentials']}
     assert cred['maria@test.mx']['password'] and maria.check_password(cred['maria@test.mx']['password'])
     assert cred['juan@test.mx']['password'] is None
+    # The generated password is temporary: María creates her own at the first
+    # sign-in; Juan kept the account (and password) he already had.
+    assert maria.password_change_required is True
+    parent_user.refresh_from_db()
+    assert parent_user.password_change_required is False
     reg.refresh_from_db()
     assert reg.status == 'complete'
     again = admin_client.post(url, {}, format='json')
