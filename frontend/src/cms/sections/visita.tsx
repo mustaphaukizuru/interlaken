@@ -30,6 +30,8 @@ import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import { Illustration, wash } from '@/components/ui/Illustration';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { isIllustration, type IllustrationName } from '@/lib/illustrations';
+import { phoneProblem } from '@/lib/validators';
+import { apiFieldErrors } from '@/lib/apiErrors';
 import type { AvailabilitySlot } from '@/types';
 import { imageSrc, imageSrcSet, useCmsImage, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
@@ -109,10 +111,13 @@ const VISIT_PHOTOS: VisitPhoto[] = [
 ];
 
 // Rules stay in code; each message is the prop that words it (errName...).
+// An empty e-mail or phone asks for it (errEmailEmpty, errPhoneEmpty); only a
+// typed one can be wrong. Phones follow the site's rule (lib/validators): digits
+// plus +, spaces, dashes and parentheses, 10 to 15 digits; the server checks it too.
 const schema = z.object({
   parent_name:  z.string().min(3, 'errName'),
-  parent_email: z.string().email('errEmail'),
-  parent_phone: z.string().min(10, 'errPhone'),
+  parent_email: z.string().trim().min(1, 'errEmailEmpty').pipe(z.email('errEmail')),
+  parent_phone: z.string().trim().min(1, 'errPhoneEmpty').refine((v) => !phoneProblem(v), 'errPhone'),
   child_name:   z.string().optional(),
   child_grade:  z.string().optional(),
 });
@@ -221,9 +226,11 @@ function VisitBookingView(p: BookingProps) {
       // The slot just booked may be full now: «Agendar otra visita» must not
       // offer it again from the old list (QA 2026-11-24).
       void queryClient.invalidateQueries({ queryKey: ['availability'] });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // The server's reason (a full slot, or a field it refused) before the generic message.
+      const fields = apiFieldErrors(err);
       setBookingError(
-        err?.response?.data?.detail ??
+        fields.detail ?? fields.parent_phone ?? fields.parent_email ?? fields.parent_name ??
           (c('bookingError') || 'No fue posible completar la reserva. Intente de nuevo.'),
       );
     }
@@ -500,7 +507,8 @@ export const sections = [
         f.text('submitLabel', 'Texto del botón de envío'),
       ]),
       ...grouped('Mensajes', [
-        f.text('errName', 'Falta el nombre'), f.text('errEmail', 'Correo no válido'), f.text('errPhone', 'Teléfono no válido'),
+        f.text('errName', 'Falta el nombre'), f.text('errEmailEmpty', 'Falta el correo'), f.text('errEmail', 'Correo no válido'),
+        f.text('errPhoneEmpty', 'Falta el teléfono'), f.text('errPhone', 'Teléfono no válido'),
         f.text('bookingError', 'Si la reserva no se pudo completar'),
       ]),
       ...grouped('Confirmación', [
@@ -533,7 +541,8 @@ export const sections = [
       weekdays: 'Lun, Mar, Mié, Jue, Vie, Sáb, Dom',
       nameLabel: 'Nombre completo', emailLabel: 'Correo electrónico', phoneLabel: 'Teléfono / WhatsApp',
       childLabel: 'Nombre del alumno (opcional)', gradeLabel: 'Grado de interés (opcional)',
-      errName: 'Nombre requerido', errEmail: 'Correo inválido', errPhone: 'Teléfono inválido',
+      errName: 'Nombre requerido', errEmailEmpty: 'Escriba su correo.', errEmail: 'Revise el correo: debe ser como nombre@ejemplo.com.',
+      errPhoneEmpty: 'Escriba su teléfono.', errPhone: 'Revise el teléfono: solo números, de 10 a 15 dígitos (puede usar espacios, guiones, paréntesis y +).',
       bookingError: 'No fue posible completar la reserva. Intente de nuevo.',
       hintIllustration: 'visita', whatsappIllustration: 'informes',
       photosTitle: '',

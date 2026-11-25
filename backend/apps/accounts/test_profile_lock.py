@@ -49,3 +49,22 @@ def test_there_is_no_self_service_password_change(api_client):
     api_client.force_authenticate(ParentFactory())
     r = api_client.patch(reverse('current-user'), {'password': 'nueva-clave-123'}, format='json')
     assert r.status_code == 403
+
+
+def test_own_whatsapp_follows_the_phone_rule(api_client):
+    # QA 2026-11-24: the WhatsApp field accepted letters; a number saved before
+    # the rule is sent back unchanged with the name and still saves.
+    admin = AdminFactory(first_name='Lupe', whatsapp='55 ext 1')
+    api_client.force_authenticate(admin)
+    url = reverse('current-user')
+    r = api_client.patch(url, {'first_name': 'Guadalupe', 'whatsapp': '55 ext 1'}, format='json')
+    assert r.status_code == 200, r.data
+    r = api_client.patch(url, {'whatsapp': '55 1234 abcd'}, format='json')
+    assert r.status_code == 400 and r.data['whatsapp'] == [
+        'Escriba solo números; puede usar espacios, guiones, paréntesis y el signo +.']
+    r = api_client.patch(url, {'whatsapp': '5512'}, format='json')
+    assert r.status_code == 400 and r.data['whatsapp'] == ['El número debe tener de 10 a 15 dígitos.']
+    r = api_client.patch(url, {'whatsapp': ' +52 1 55 1234 5678 '}, format='json')
+    assert r.status_code == 200, r.data
+    admin.refresh_from_db()
+    assert admin.whatsapp == '+52 1 55 1234 5678'

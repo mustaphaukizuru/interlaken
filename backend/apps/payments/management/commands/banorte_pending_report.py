@@ -31,6 +31,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.core.models import OpsStatus
+from apps.core.plurals import count
 from apps.payments import ops_alerts
 from apps.payments.models import BanorteCheckout
 from apps.payments.multicobros import review_reason
@@ -110,7 +111,8 @@ class Command(BaseCommand):
             "después llega la respuesta del banco, el saldo se acreditaría dos veces."
         )
         sent = ops_alerts.email_admins(
-            f"Interlaken: {len(rows)} pago(s) Banorte por revisar en MultiCobros", body
+            f"Interlaken: {count(len(rows), 'pago Banorte', 'pagos Banorte')} por revisar en MultiCobros",
+            body,
         )
         if sent:
             OpsStatus.set(STATE_KEY, {"reported": ids, "alerted_at": now.isoformat()})

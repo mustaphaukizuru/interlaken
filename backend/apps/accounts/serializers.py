@@ -47,6 +47,13 @@ class UserSerializer(serializers.ModelSerializer):
             data['cafeteria_account'] = cafeteria_account_payload(instance)
         return data
 
+    def validate_whatsapp(self, value):
+        # Digits, +, spaces, dashes and parentheses, 10 to 15 digits; the number
+        # already saved is accepted as it is (core.phones).
+        from apps.core.phones import check_phone
+
+        return check_phone(value, current=getattr(self.instance, 'whatsapp', None))
+
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
 

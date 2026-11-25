@@ -56,10 +56,12 @@ import { useStudentsBulk } from '@/hooks/queries/students';
 import { useAuthStore } from '@/store/authStore';
 import { LIVE } from '@/lib/live';
 import { GRADES } from '@/lib/grades';
+import { LOW_BALANCE_THRESHOLD_MAX, thresholdProblem } from '@/lib/validators';
 import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, isCardTopUp, movementSign, options } from '@/lib/status/cafeteria';
 import { MovementAmount } from '@/components/admin/MovementAmount';
 import { PAYMENT_FAILURE, gatewayLabel } from '@/lib/status/payment';
 import type { CafeteriaBalance, TopUpLogEntry } from '@/types';
+import { plural } from '@/lib/plural';
 
 type Tab = 'roster' | 'movements' | 'deposits' | 'pos' | 'reconcile' | 'low' | 'customers';
 
@@ -337,12 +339,12 @@ function RosterTab() {
       const posTopups = d?.pos_topups_credited ?? 0;
       const deferred = d?.pos_topups_deferred ?? 0;
       toast.success(
-        `Sincronización: ${receipts} recibo(s), ${created} compra(s) nueva(s)`
-        + (posTopups ? `, ${posTopups} recarga(s) en caja por ${mxn(d?.pos_topups_total ?? '0')}` : '')
-        + (deferred ? `, ${deferred} recarga(s) en espera (monedero con movimientos recientes)` : '')
+        `Sincronización: ${plural(receipts, 'recibo', 'recibos')}, ${plural(created, 'compra nueva', 'compras nuevas')}`
+        + (posTopups ? `, ${plural(posTopups, 'recarga', 'recargas')} en caja por ${mxn(d?.pos_topups_total ?? '0')}` : '')
+        + (deferred ? `, ${plural(deferred, 'recarga', 'recargas')} en espera (monedero con movimientos recientes)` : '')
         + (skipped ? `, ${skipped} sin movimiento de monedero` : '')
         + (unmatched ? `, ${unmatched} sin alumno vinculado` : '')
-        + (failed ? `, ${failed} saldo(s) fallido(s)` : '')
+        + (failed ? `, ${plural(failed, 'saldo fallido', 'saldos fallidos')}` : '')
         + '.',
       );
       void refreshBalances();
@@ -376,7 +378,9 @@ function RosterTab() {
       pending?.name === 'set_threshold' ? { ...body, payload: { ...body.payload, threshold } } : body,
     );
   const fetchExport = exporter((p) => exportBalances.mutateAsync(p), filters, selection);
-  const validThreshold = threshold !== '' && Number(threshold) >= 0;
+  // Same ceiling as each family's own alert (the largest single top-up); the server checks it too.
+  const thresholdIssue = threshold === '' ? null : thresholdProblem(threshold);
+  const validThreshold = threshold !== '' && !thresholdIssue;
 
   // A9: the Alumnos «Archivar» / «Eliminar» (same endpoint, rules and
   // confirmations: erase only what has nothing to keep, archive the rest).
@@ -408,8 +412,8 @@ function RosterTab() {
           </p>
           {(lastSync.skipped > 0 || lastSync.unmatched > 0) && (
             <p className="mt-0.5 text-muted">
-              {lastSync.skipped > 0 && <>{lastSync.skipped} recibo(s) sin movimiento de monedero (venta en efectivo o tarjeta: el saldo no cambia). </>}
-              {lastSync.unmatched > 0 && <>{lastSync.unmatched} recibo(s) de un cliente que no es un alumno vinculado: revise “Vincular Loyverse” en Alumnos.</>}
+              {lastSync.skipped > 0 && <>{plural(lastSync.skipped, 'recibo', 'recibos')} sin movimiento de monedero (venta en efectivo o tarjeta: el saldo no cambia). </>}
+              {lastSync.unmatched > 0 && <>{plural(lastSync.unmatched, 'recibo', 'recibos')} de un cliente que no es un alumno vinculado: revise “Vincular Loyverse” en Alumnos.</>}
             </p>
           )}
         </div>
@@ -500,8 +504,8 @@ function RosterTab() {
             setPending(BALANCE_ACTIONS[1]);
           }}
         >
-          <Input label="Nuevo umbral (MXN)" type="number" inputMode="decimal" min="0" step="1" required value={threshold} onChange={(e) => setThreshold(e.target.value)} />
-          <p className="text-xs text-muted">Se avisa a la familia cuando el saldo queda en este monto o menos.</p>
+          <Input label="Nuevo umbral (MXN)" type="number" inputMode="decimal" min="0" max={LOW_BALANCE_THRESHOLD_MAX} step="1" required value={threshold} onChange={(e) => setThreshold(e.target.value)} error={thresholdIssue ?? undefined} />
+          <p className="text-xs text-muted">Se avisa a la familia cuando el saldo queda en este monto o menos. Máximo {mxn(LOW_BALANCE_THRESHOLD_MAX)}.</p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={() => setAskThreshold(false)}>Cancelar</Button>
             <Button type="submit" size="sm" disabled={!validThreshold}>Continuar</Button>
@@ -1116,7 +1120,7 @@ function ReconcileTab() {
             <p className="mb-3 text-sm text-muted" role="status">
               {data.drift_count > 0 ? (
                 <span className="inline-flex items-center gap-1.5 text-amber">
-                  <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {data.drift_count} diferencia(s) en esta página ({data.checked} revisadas de {data.total}).
+                  <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {plural(data.drift_count, 'diferencia', 'diferencias')} en esta página ({data.checked} {data.checked === 1 ? 'revisada' : 'revisadas'} de {data.total}).
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 text-green-700">
@@ -1318,9 +1322,9 @@ function CustomersTab() {
     <Card>
       {summary && (
         <p className="mb-3 text-sm text-muted">
-          {totalCards} tarjeta(s) en Loyverse: {summary.student} alumno(s), {summary.staff} de personal,
-          {' '}{summary.test} de prueba, {summary.other} otra(s)
-          {summary.missing > 0 ? `; ${summary.missing} ya no existe(n) en Loyverse.` : '.'}
+          {plural(totalCards, 'tarjeta', 'tarjetas')} en Loyverse: {plural(summary.student, 'alumno', 'alumnos')}, {summary.staff} de personal,
+          {' '}{summary.test} de prueba, {plural(summary.other, 'otra', 'otras')}
+          {summary.missing > 0 ? `; ${summary.missing} ya no ${summary.missing === 1 ? 'existe' : 'existen'} en Loyverse.` : '.'}
         </p>
       )}
       <DataTable<LoyverseCustomer>

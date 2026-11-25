@@ -121,6 +121,13 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Debe haber al menos un asistente.')
         return value
 
+    def validate_parent_phone(self, value):
+        # Required by the model; digits, +, spaces, dashes and parentheses,
+        # 10 to 15 digits (core.phones). A new booking has no stored value.
+        from apps.core.phones import check_phone
+
+        return check_phone(value)
+
 
 class SlotGeneratorSerializer(serializers.Serializer):
     """Admin bulk/recurring slot generator input.

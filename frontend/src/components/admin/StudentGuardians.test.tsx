@@ -8,6 +8,7 @@ vi.mock('@/services/api', () => ({
     linkGuardian: vi.fn(),
     unlinkGuardian: vi.fn(),
     setUserPassword: vi.fn(),
+    updateGuardian: vi.fn(),
   },
 }));
 
@@ -136,6 +137,50 @@ describe('StudentGuardians', () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('Ese correo ya pertenece a un alumno.');
     });
+  });
+
+  it('refuses letters in the tutor phone before linking (QA 2026-11-24)', async () => {
+    renderWithProviders(<StudentGuardians studentId={7} />);
+    await screen.findByText('Sin tutores vinculados');
+    await userEvent.click(screen.getByRole('button', { name: /^Vincular$/i }));
+    fireEvent.change(screen.getByLabelText(/Correo del tutor/i), { target: { value: 'ana@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono \/ WhatsApp/i), { target: { value: '55 1234 abcd' } });
+    await userEvent.click(screen.getByRole('button', { name: /Vincular tutor/i }));
+    expect(await screen.findByText('Escriba solo números; puede usar espacios, guiones, paréntesis y el signo +.')).toBeInTheDocument();
+    expect(linkGuardian).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/Teléfono \/ WhatsApp/i), { target: { value: '(55) 1234-5678' } });
+    await userEvent.click(screen.getByRole('button', { name: /Vincular tutor/i }));
+    await waitFor(() => expect(linkGuardian).toHaveBeenCalledWith(7, expect.objectContaining({ phone: '(55) 1234-5678' })));
+  });
+
+  it('the edit dialog asks for an emptied e-mail, refuses a new number with letters and keeps a saved one', async () => {
+    const updateGuardian = vi.mocked(portalApi.updateGuardian);
+    updateGuardian.mockResolvedValue({ data: GUARDIAN } as never);
+    // Saved before the phone rule: sent back as it is, it never blocks the save.
+    const legacy = { ...GUARDIAN, first_name: 'Ana', last_name: 'López', whatsapp: '55 ext 12' };
+    listGuardians.mockResolvedValue({ data: { student: STUDENT, guardians: [legacy] } } as never);
+    renderWithProviders(<StudentGuardians studentId={7} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar a Ana López' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar tutor' });
+
+    const email = within(dialog).getByLabelText(/Correo de acceso/);
+    fireEvent.change(email, { target: { value: '' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+    expect(within(dialog).getByText('Escriba el correo.')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/inválido/)).toBeNull();
+    fireEvent.change(email, { target: { value: 'ana@' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+    expect(within(dialog).getByText('Revise el correo: debe ser como nombre@ejemplo.com.')).toBeInTheDocument();
+    fireEvent.change(email, { target: { value: 'ana@example.com' } });
+
+    fireEvent.change(within(dialog).getByLabelText('Teléfono'), { target: { value: 'casa' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+    expect(within(dialog).getByText('Escriba solo números; puede usar espacios, guiones, paréntesis y el signo +.')).toBeInTheDocument();
+    expect(updateGuardian).not.toHaveBeenCalled();
+
+    fireEvent.change(within(dialog).getByLabelText('Teléfono'), { target: { value: '5511111111' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(updateGuardian).toHaveBeenCalledWith(7, 31, expect.objectContaining({ whatsapp: '55 ext 12', phone: '5511111111' })));
   });
 
   it('lists guardians and unlinks after confirmation', async () => {

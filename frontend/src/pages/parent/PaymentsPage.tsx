@@ -25,6 +25,7 @@ import type { Payment } from '@/types';
 import { PAYMENT_FAILURE, PAYMENT_STATUS_META } from '@/lib/status/payment';
 import { TOPUP_STATUS } from '@/lib/status/cafeteria';
 import { applyPhrase } from '@/lib/topupApply';
+import { plural } from '@/lib/plural';
 
 // Label + variant come from the shared map (`lib/status/payment`); the portal
 // adds an icon and a help line per status.
@@ -255,7 +256,7 @@ function SummaryTiles({ summary, loading }: { summary?: PaymentSummary; loading:
   // Words, never a bare «—» placeholder (QA 2026-11-24: «Última recarga —»).
   const none = 'Sin datos';
   const tiles = [
-    { icon: Wallet, label: 'Recargado este mes', value: summary ? formatMXN(summary.month_total) : none, sub: summary ? `${summary.month_count} pago(s)` : '' },
+    { icon: Wallet, label: 'Recargado este mes', value: summary ? formatMXN(summary.month_total) : none, sub: summary ? plural(summary.month_count, 'pago', 'pagos') : '' },
     { icon: CalendarDays, label: 'Última recarga', value: summary?.last_success ? formatMXN(summary.last_success.amount) : summary ? 'Sin recargas' : none,
       sub: summary?.last_success ? format(new Date(summary.last_success.created_at), 'd MMM yyyy', { locale: es }) : '' },
     { icon: Clock, label: 'Pendientes', value: summary ? String(summary.pending_count) : none, sub: 'por confirmar' },

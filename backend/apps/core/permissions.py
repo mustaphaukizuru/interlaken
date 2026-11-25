@@ -7,14 +7,17 @@ definition now. Data Ops Phase 10 moved the last local duplicates here too,
 each with its exact original rule (no behaviour change):
 
 * ``IsParentOrAdmin`` (was in ``apps/cafeteria/views.py``): family portal actors.
-* ``IsStaffOrAdmin`` (was in ``apps/portal/analytics.py``): role staff/admin, or
-  the Django ``is_staff`` flag.
 * ``is_admin_or_django_staff`` (was ``_is_staff`` in ``apps/admissions/views.py``):
   role admin, or the Django ``is_staff`` flag (a ``staff`` role without the flag
   does not count); it lets school users past the applicant token gate.
 
 Staff-role granularity (BACKLOG P1-H1): ``IsAdmin`` also admits a staff account
 for the endpoints of the console areas it holds (``apps/core/areas.py``).
+
+``IsAdminOrStaff`` and ``IsStaffOrAdmin`` (any staff account, whatever its
+areas) were removed on 2026-11-24: no endpoint used them any more («Panel de
+Dirección» moved to ``IsAdmin``), and a class that lets every staff role in
+is easy to reach for by mistake.
 """
 
 from rest_framework import permissions
@@ -36,24 +39,6 @@ def _role(user):
 def is_admin_or_django_staff(user) -> bool:
     """Authenticated with role ``admin`` or the Django ``is_staff`` flag."""
     return _authenticated(user) and bool(getattr(user, "is_staff", False) or _role(user) == ADMIN)
-
-
-class IsAdminOrStaff(permissions.BasePermission):
-    """Authenticated ``admin`` or ``staff`` (content editors, BACKLOG P3-10)."""
-
-    def has_permission(self, request, view):
-        user = request.user
-        return _authenticated(user) and _role(user) in (ADMIN, STAFF)
-
-
-class IsStaffOrAdmin(permissions.BasePermission):
-    """School personnel: role staff/admin (the Django ``is_staff`` flag also counts)."""
-
-    def has_permission(self, request, view):
-        user = request.user
-        return _authenticated(user) and bool(
-            _role(user) in (ADMIN, STAFF) or getattr(user, "is_staff", False)
-        )
 
 
 class IsAdmin(permissions.BasePermission):

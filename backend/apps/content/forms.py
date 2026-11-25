@@ -32,6 +32,7 @@ from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 from apps.core.listing import AdminListMixin, apply_date_range
 from apps.core.permissions import IsAdmin
+from apps.core.phones import phone_problem
 from apps.core.plurals import count as plural
 from apps.core.ratelimit import ratelimit
 
@@ -39,7 +40,6 @@ from .ops import AuditedCrudMixin, bool_filter, delete_action
 
 FIELD_TYPES = ('text', 'email', 'phone', 'textarea', 'select', 'radio', 'checkbox', 'date', 'number')
 KEY_RE = re.compile(r'^[a-z][a-z0-9_]{0,39}$')
-PHONE_RE = re.compile(r'^\+?[0-9 ()-]{8,20}$')
 MAX_FIELDS = 40
 MAX_VALUE_LEN = 4000
 
@@ -119,8 +119,9 @@ def validate_submission(form: FormDefinition, payload: dict) -> dict:
                 serializers.EmailField().run_validation(val)
             except serializers.ValidationError:
                 errors[key] = 'Correo no válido.'
-        elif ftype == 'phone' and not PHONE_RE.match(val):
-            errors[key] = 'Teléfono no válido.'
+        elif ftype == 'phone' and phone_problem(val):
+            # Same rule as every phone of the site (core.phones).
+            errors[key] = phone_problem(val)
         elif ftype in ('select', 'radio') and val not in f.get('options', []):
             errors[key] = 'Elija una opción válida.'
         elif ftype == 'number':

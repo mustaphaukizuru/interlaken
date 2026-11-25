@@ -71,6 +71,12 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
                 'El nombre y los apellidos admiten como máximo 100 caracteres cada uno.')
         return value
 
+    def validate_phone(self, value):
+        # Digits, +, spaces, dashes and parentheses, 10 to 15 digits (core.phones).
+        from apps.core.phones import check_phone
+
+        return check_phone(value)
+
     def validate(self, attrs):
         # Age rule (BACKLOG P1-G1): strict on the public form.
         from .eligibility import eligibility_error

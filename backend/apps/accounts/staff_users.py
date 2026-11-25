@@ -202,8 +202,10 @@ class StaffListCreateView(AdminListMixin, generics.ListAPIView):
         last = (request.data.get('last_name') or '').strip()
         role = request.data.get('role') or User.Role.STAFF
         title, areas, errors = parse_staff_access(request.data, role=role)
-        if not email or '@' not in email:
-            errors['email'] = ['Correo inválido.']
+        if not email:
+            errors['email'] = ['Escriba el correo.']
+        elif '@' not in email:
+            errors['email'] = ['Revise el correo.']
         elif User.objects.filter(email__iexact=email).exists():
             errors['email'] = ['Ese correo ya está registrado.']
         if not first:
@@ -293,7 +295,8 @@ class StaffDetailView(APIView):
             try:
                 validate_email(email)
             except DjangoValidationError:
-                return Response({'email': ['Correo inválido.']}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'email': ['Revise el correo.' if email else 'Escriba el correo.']},
+                                status=status.HTTP_400_BAD_REQUEST)
             if email != target.email.lower():
                 if User.objects.filter(email__iexact=email).exclude(pk=target.pk).exists():
                     return Response({'email': ['Ese correo ya está registrado.']},

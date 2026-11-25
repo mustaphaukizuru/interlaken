@@ -83,8 +83,8 @@ describe('ImportLoyverseModal — the preview lists every change per student', (
 
     // Summary counts and the skip reasons are still there.
     expect(screen.getByText('28')).toBeInTheDocument();
-    expect(screen.getByText(/42 cliente\(s\) de Loyverse omitidos/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Importar 30 cambio\(s\)/ })).toBeInTheDocument();
+    expect(screen.getByText(/42 clientes de Loyverse omitidos/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Importar 30 cambios/ })).toBeInTheDocument();
   });
 
   it('filters by field chip and by the search box', async () => {
@@ -94,7 +94,7 @@ describe('ImportLoyverseModal — the preview lists every change per student', (
 
     await user.click(screen.getByRole('button', { name: 'Grupo (10)' }));
     expect(dataRows()).toHaveLength(10);
-    expect(screen.getByText('10 de 30 cambio(s).')).toBeInTheDocument();
+    expect(screen.getByText('10 de 30 cambios.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Todos (30)' }));
     await user.type(screen.getByRole('textbox', { name: /Buscar en los cambios/ }), 'ci09941');
@@ -114,11 +114,11 @@ describe('ImportLoyverseModal — the preview lists every change per student', (
       .mockResolvedValueOnce({ data: { ...report, import: { ...report.import, commit: true } } } as never);
     const onImported = vi.fn();
     render(<ImportLoyverseModal open onClose={() => {}} onImported={onImported} />);
-    await user.click(await screen.findByRole('button', { name: /Importar 30 cambio\(s\)/ }));
+    await user.click(await screen.findByRole('button', { name: /Importar 30 cambios/ }));
 
     await waitFor(() => expect(importLoyverse).toHaveBeenLastCalledWith(true));
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
-      'Importación: 2 creado(s), 28 actualizado(s), 5 nombre(s); 0 vinculado(s).');
+      'Importación: 2 creados, 28 actualizados, 5 nombres; 0 vinculados.');
     expect(onImported).toHaveBeenCalled();
   });
 });

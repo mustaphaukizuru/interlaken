@@ -97,10 +97,21 @@ GUARDIAN_LABELS = {
 }
 
 
-def clean_guardian_fields(data, keys) -> tuple[dict, dict]:
+PHONE_KEYS = ('phone', 'whatsapp')
+
+
+def clean_guardian_fields(data, keys, current=None) -> tuple[dict, dict]:
     """``({key: stripped text}, {key: [error]})`` for the ``keys`` present in
     ``data``. A number is read as text (a phone typed as digits); anything else
-    that is not text, or is longer than its column, is an error."""
+    that is not text, or is longer than its column, is an error.
+
+    ``phone`` and ``whatsapp`` follow ``core.phones`` (digits, +, spaces,
+    dashes and parentheses, 10 to 15 digits); ``current`` ({key: stored
+    value}) lets a form that sends every field keep a number saved before
+    that rule."""
+    from apps.core.phones import phone_problem
+
+    current = current or {}
     values, errors = {}, {}
     if not hasattr(data, 'get'):     # a JSON list or string body
         data = {}
@@ -120,6 +131,11 @@ def clean_guardian_fields(data, keys) -> tuple[dict, dict]:
         if len(value) > limit:
             errors[key] = [f'{GUARDIAN_LABELS[key]} admite como máximo {limit} caracteres.']
             continue
+        if key in PHONE_KEYS and value != (current.get(key) or '').strip():
+            problem = phone_problem(value)
+            if problem:
+                errors[key] = [problem]
+                continue
         values[key] = value
     return values, errors
 
@@ -284,7 +300,12 @@ class StudentGuardianDetailView(APIView):
             return Response(error_body('Solo se editan cuentas de padres/tutores.'),
                             status=status.HTTP_403_FORBIDDEN)
 
-        data, errors = clean_guardian_fields(request.data, self.EDITABLE)
+        # The edit dialog sends every field: the numbers already saved stay valid.
+        stored_profile = ParentProfile.objects.filter(user=parent).first()
+        data, errors = clean_guardian_fields(request.data, self.EDITABLE, current={
+            'whatsapp': parent.whatsapp,
+            'phone': stored_profile.phone if stored_profile else '',
+        })
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
         if not data:

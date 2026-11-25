@@ -45,7 +45,7 @@ describe('ImportStaffModal', () => {
     expect(post).toHaveBeenCalledWith('/accounts/admin/import-staff-loyverse/', { commit: '0' });
     expect(screen.getByText('Código distinto al correo')).toBeInTheDocument();
     expect(screen.getAllByText('Sin actividad').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('2 compra(s) por recuperar').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('2 compras por recuperar').length).toBeGreaterThan(0);
 
     // Without ticking: only the new one would be written.
     expect(screen.getByRole('button', { name: /Importar 1/ })).toBeInTheDocument();
@@ -54,8 +54,8 @@ describe('ImportStaffModal', () => {
 
     await waitFor(() => expect(post).toHaveBeenLastCalledWith('/accounts/admin/import-staff-loyverse/', { commit: '1', convert: [41] }));
     const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent('1 creado(s), 1 convertido(s) a Personal');
-    expect(within(status).getByText(/2 compra\(s\) anteriores ahora aparecen en su historial/)).toBeInTheDocument();
+    expect(status).toHaveTextContent('1 creado, 1 convertido a Personal');
+    expect(within(status).getByText(/2 compras anteriores ahora aparecen en su historial/)).toBeInTheDocument();
     expect(onImported).toHaveBeenCalled();
   });
 
@@ -113,8 +113,8 @@ describe('ImportStaffModal', () => {
       await waitFor(() => expect(post).toHaveBeenLastCalledWith('/accounts/admin/import-staff-loyverse/',
         { commit: '1', convert: [41], skip: ['u-caja'] }));
       const status = await screen.findByRole('status');
-      expect(status).toHaveTextContent('1 creado(s), 1 agregado(s) a una cuenta existente, 1 convertido(s) a Personal, 1 omitido(s).');
-      expect(status).toHaveTextContent('3 compra(s) anteriores ahora aparecen en su historial');
+      expect(status).toHaveTextContent('1 creado, 1 agregado a una cuenta existente, 1 convertido a Personal, 1 omitido.');
+      expect(status).toHaveTextContent('3 compras anteriores ahora aparecen en su historial');
       const outcome = screen.getByRole('group', { name: 'Resultado por fila' });
       expect(outcome).toHaveTextContent('1Omitidos (sin marcar)');
       expect(outcome).toHaveTextContent('1Con error');

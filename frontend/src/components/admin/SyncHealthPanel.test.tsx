@@ -151,7 +151,7 @@ describe('buildChecks — convergence lights (2026-09-23 drift audit)', () => {
   it('drift: green when the last full pass found nobody above Loyverse', () => {
     const c = check({}, 'drift');
     expect(c.tone).toBe('ok');
-    expect(c.detail).toMatch(/10 alumno\(s\) comparados/);
+    expect(c.detail).toMatch(/10 alumnos comparados/);
   });
 
   it('drift: amber with the peso total when wallets sit above Loyverse', () => {
@@ -170,8 +170,8 @@ describe('buildChecks — convergence lights (2026-09-23 drift audit)', () => {
     const c = check({ stale_links: 36, unmatched_receipts: 4,
                       wallet_audit: { ...base.wallet_audit!, unlinked_students: 2 } }, 'roster');
     expect(c.tone).toBe('warn');
-    expect(c.label).toMatch(/36 alumno\(s\) sin cliente en Loyverse/);
-    expect(c.label).toMatch(/2 alumno\(s\) nuevo/);
+    expect(c.label).toMatch(/36 alumnos sin cliente en Loyverse/);
+    expect(c.label).toMatch(/2 alumnos nuevos/);
     expect(c.label).toMatch(/4 recibo/);
     expect(c.detail).toMatch(/darlos de baja/);
   });
@@ -229,12 +229,12 @@ describe('SyncHealthPanel — Sincronizar roster ahora', () => {
     await waitFor(() => expect(syncRoster).toHaveBeenCalledWith(true));
     expect(syncRoster).not.toHaveBeenCalledWith(false);
     const dialog = await screen.findByRole('dialog', { name: 'Sincronizar roster con Loyverse' });
-    expect(within(dialog).getByRole('list', { name: 'Resumen de la vista previa' })).toHaveTextContent('1alta(s)');
+    expect(within(dialog).getByRole('list', { name: 'Resumen de la vista previa' })).toHaveTextContent('1alta5actualizados3nombres2vínculos');
     await user.click(within(dialog).getByRole('button', { name: 'Aplicar sincronización' }));
 
     await waitFor(() => expect(syncRoster).toHaveBeenCalledWith(false));
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
-      expect.stringMatching(/1 alta\(s\), 5 actualizado\(s\), 3 nombre\(s\), 2 vinculado\(s\), 4 sin grado en Loyverse/),
+      expect.stringMatching(/1 alta, 5 actualizados, 3 nombres, 2 vinculados, 4 sin grado en Loyverse/),
       expect.anything(),
     );
     // The panel re-reads the health payload so the light can turn green.

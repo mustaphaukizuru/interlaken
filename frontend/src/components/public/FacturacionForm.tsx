@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { contactApi } from '@/services/api';
+import { PHONE_MESSAGES, phoneProblem } from '@/lib/validators';
 
 /**
  * Solicitud de facturación: los mismos 7 campos, todos obligatorios, que el
@@ -113,7 +114,8 @@ export function FacturacionForm({ billingEmail, copy }: { billingEmail: string; 
     const rfc = form.rfc.trim();
     if (rfc && (rfc.length < 12 || rfc.length > 13)) next.rfc = c.errRfc;
     if (form.cp && !/^\d{5}$/.test(form.cp.trim())) next.cp = c.errCp;
-    if (form.phone && digits(form.phone).length !== 10) next.phone = c.errPhone;
+    // Letters are refused like a wrong length (the site's phone rule; the server checks it too).
+    if (form.phone && (digits(form.phone).length !== 10 || phoneProblem(form.phone) === PHONE_MESSAGES.chars)) next.phone = c.errPhone;
     if (Object.keys(next).length) { setErrors(next); setFocusTick((n) => n + 1); return; }
     send.mutate();
   };

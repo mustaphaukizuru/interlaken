@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { portalApi } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { plural } from '@/lib/plural';
 
 /** An active student the office may need to withdraw: no Loyverse customer
  *  (a leaver, in practice) or a customer without a grade code (posible baja). */
@@ -111,8 +112,8 @@ function LinkLoyverseBody({ onClose, onLinked }: {
     try {
       const { data } = await portalApi.bulkStudents({ ids: [...selected], action: 'status', value: 'withdrawn' });
       const notDone = (data.failed?.length ?? 0) + (data.skipped?.length ?? 0);
-      if (notDone > 0) toast.error(`${data.updated} dado(s) de baja; ${notDone} sin aplicar.`);
-      else toast.success(`${data.updated} alumno(s) dados de baja.`);
+      if (notDone > 0) toast.error(`${plural(data.updated, 'dado de baja', 'dados de baja')}; ${notDone} sin aplicar.`);
+      else toast.success(`${plural(data.updated, 'alumno dado de baja', 'alumnos dados de baja')}.`);
       setConfirmBaja(false);
       setSelected(new Set());
       onLinked?.();
@@ -128,7 +129,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
     setPhase('committing');
     try {
       const { data } = await portalApi.linkLoyverse(true);
-      toast.success(`${data.linked} alumno(s) vinculado(s) con Loyverse.`);
+      toast.success(`${plural(data.linked, 'alumno vinculado', 'alumnos vinculados')} con Loyverse.`);
       onLinked?.();
       onClose();
     } catch (e: any) {
@@ -221,8 +222,11 @@ function LinkLoyverseBody({ onClose, onLinked }: {
             title="Dar de baja definitiva"
             confirmLabel={`Dar de baja a ${selected.size}`}
             message={
-              `Se marcarán ${selected.size} alumno(s) como baja definitiva: dejan de contar como activos, `
-              + 'su cuenta de alumno ya no puede iniciar sesión y quedan en Auditoría. '
+              (selected.size === 1
+                ? 'Se marcará 1 alumno como baja definitiva: deja de contar como activo, '
+                  + 'su cuenta de alumno ya no puede iniciar sesión y queda en Auditoría. '
+                : `Se marcarán ${plural(selected.size, 'alumno', 'alumnos')} como baja definitiva: dejan de contar como activos, `
+                  + 'su cuenta de alumno ya no puede iniciar sesión y quedan en Auditoría. ')
               + (selectedBalance > 0
                 ? `Entre ellos queda un saldo de ${formatMXN(selectedBalance)} en cafetería; la baja no lo toca: decida su devolución por separado.`
                 : 'Ninguno de los seleccionados tiene saldo pendiente en cafetería.')
@@ -246,7 +250,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
               <Button variant="secondary" onClick={onClose}>Cerrar</Button>
               {report.linked > 0 && (
                 <Button onClick={commit}>
-                  <Link2 className="h-4 w-4" /> Vincular {report.linked} alumno(s)
+                  <Link2 className="h-4 w-4" /> Vincular {plural(report.linked, 'alumno', 'alumnos')}
                 </Button>
               )}
             </div>

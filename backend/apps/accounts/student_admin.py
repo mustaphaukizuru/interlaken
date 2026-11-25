@@ -87,7 +87,14 @@ class StudentWriteSerializer(serializers.Serializer):
 
     def validate_curp(self, value):
         return (value or '').strip().upper()
-    loyverse_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def validate_emergency_phone(self, value):
+        # core.phones; the number already on the file is accepted as it is.
+        from apps.core.phones import check_phone
+
+        current = self.context.get('profile')
+        return check_phone(value, current=current.emergency_phone if current is not None else None)
+    loyverse_id =serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     def validate_loyverse_id(self, value):
         # The column is unique when not blank (accounts_student_loyverse_id_uniq):

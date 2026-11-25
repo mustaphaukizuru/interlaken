@@ -38,11 +38,13 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
 import { useSingleFlight } from '@/hooks/useSingleFlight';
-import { fieldErrorsOrNull } from '@/lib/apiErrors';
+import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
+import { budgetProblem, thresholdProblem } from '@/lib/validators';
 import {
   applyNotice, applyPhrase, canTopUp, DEFAULT_WHATSAPP, formatCents, isScheduled, loadsInstantly, pendingCoversLowBalance, projectBalance, sentence,
 } from '@/lib/topupApply';
 import { formatMXN } from '@/lib/format';
+import { plural } from '@/lib/plural';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TX_TYPES = ['purchase', 'topup', 'refund'] as const;
@@ -409,8 +411,11 @@ export default function CafeteriaPage() {
       setThresholdStudent(null);
       queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
     },
-    onError: () => toast.error('No se pudo actualizar la alerta. Intente nuevamente.'),
+    // The server's reason (e.g. above the maximum) before the generic message.
+    onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo actualizar la alerta. Intente nuevamente.')),
   });
+  // Up to the largest single top-up (QA 2026-11-24: $99,999 was accepted); the server checks it too.
+  const thresholdIssue = thresholdValue === '' ? null : thresholdProblem(thresholdValue, topupMax);
 
   // Family-set daily/weekly spending budget (#13). Empty field → 0 (disabled).
   const budgetMutation = useMutation({
@@ -424,8 +429,10 @@ export default function CafeteriaPage() {
       setBudgetStudent(null);
       queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
     },
-    onError: () => toast.error('No se pudo actualizar el presupuesto. Intente nuevamente.'),
+    onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo actualizar el presupuesto. Intente nuevamente.')),
   });
+  // A daily cap above the weekly one could never be reached (QA 2026-11-24); the server checks it too.
+  const budgetIssue = budgetProblem(budgetDaily, budgetWeekly);
 
   const openBudget = (b: CafeteriaBalance) => {
     setBudgetStudent(b);
@@ -450,7 +457,7 @@ export default function CafeteriaPage() {
       const created = data?.created ?? 0;
       toast.success(
         created > 0
-          ? `Actualizado: ${created} compra(s) nueva(s) desde Loyverse.`
+          ? `Actualizado: ${plural(created, 'compra nueva', 'compras nuevas')} desde Loyverse.`
           : 'Saldos y movimientos actualizados desde Loyverse.',
       );
     } catch {
@@ -972,11 +979,15 @@ export default function CafeteriaPage() {
                 min="0"
                 step="10"
                 className="input-field min-h-[44px] text-base"
+                max={topupMax}
                 placeholder="Ej. 20"
                 value={thresholdValue}
                 onChange={(e) => setThresholdValue(e.target.value)}
+                aria-invalid={thresholdIssue ? true : undefined}
+                aria-describedby={thresholdIssue ? 'threshold-amount-error' : undefined}
               />
-              <p className="mt-1 text-xs text-subtle">Predeterminado: $20</p>
+              {thresholdIssue && <p id="threshold-amount-error" className="mt-1 text-xs text-coral">{thresholdIssue}</p>}
+              <p className="mt-1 text-xs text-subtle">Predeterminado: $20 · Máximo ${topupMax.toLocaleString('es-MX')}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="secondary" onClick={() => setThresholdStudent(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
@@ -984,7 +995,7 @@ export default function CafeteriaPage() {
                 variant="primary"
                 loading={thresholdMutation.isPending}
                 onClick={() => thresholdMutation.mutate()}
-                disabled={thresholdValue === '' || parseFloat(thresholdValue) < 0}
+                disabled={thresholdValue === '' || !!thresholdIssue}
                 className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 Guardar
@@ -1030,7 +1041,10 @@ export default function CafeteriaPage() {
                 placeholder="Sin límite"
                 value={budgetWeekly}
                 onChange={(e) => setBudgetWeekly(e.target.value)}
+                aria-invalid={budgetIssue ? true : undefined}
+                aria-describedby={budgetIssue ? 'budget-error' : undefined}
               />
+              {budgetIssue && <p id="budget-error" className="mt-1 text-xs text-coral">{budgetIssue}</p>}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="secondary" onClick={() => setBudgetStudent(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
@@ -1041,6 +1055,7 @@ export default function CafeteriaPage() {
                 disabled={
                   (budgetDaily !== '' && parseFloat(budgetDaily) < 0)
                   || (budgetWeekly !== '' && parseFloat(budgetWeekly) < 0)
+                  || !!budgetIssue
                 }
                 className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
               >

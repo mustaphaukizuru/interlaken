@@ -22,6 +22,8 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count
 from django.db.models.functions import Lower
 
+from apps.core.plurals import count
+
 
 def duplicate_loyverse_ids():
     from apps.accounts.models import StudentProfile
@@ -146,6 +148,6 @@ class Command(BaseCommand):
             if total == 0:
                 self.stdout.write(self.style.SUCCESS("OK: sin hallazgos."))
             else:
-                self.stdout.write(self.style.WARNING(f"{total} hallazgo(s)."))
+                self.stdout.write(self.style.WARNING(f"{count(total, 'hallazgo', 'hallazgos')}."))
         if total:
             raise SystemExit(1)

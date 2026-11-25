@@ -19,6 +19,7 @@ import { portalApi, type PasswordRequest, type PasswordRequestResolved } from '@
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
 import { mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { emailProblem } from '@/lib/validators';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { useDirtyCloseGuard, useReportDirty } from '@/hooks/useDirtyCloseGuard';
@@ -278,7 +279,8 @@ function LogRequestForm({ onClose, onCancel, onDirty, onSaved }: {
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!email.includes('@')) { setError('Correo inválido.'); return; }
+    const problem = emailProblem(email, { messages: { empty: 'Escriba el correo de la cuenta.', invalid: 'Revise el correo: debe ser como nombre@ejemplo.com.' } });
+    if (problem) { setError(problem); return; }
     create.mutate();
   };
   return (

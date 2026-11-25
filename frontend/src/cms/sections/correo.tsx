@@ -94,11 +94,18 @@ function Badge({ tone, children }: { tone: 'brand' | 'success' | 'warning' | 'da
   return <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-md ${tones[tone]}`} aria-hidden="true">{children}</span>;
 }
 
+/**
+ * A pupil's avisos read «Alumno» / «de Carla R.»; a staff member's cafetería
+ * account and any other login read «Cuenta» / «de su cuenta» (QA 2026-11-24:
+ * a staff wallet said «Alumno»). `kind` decides when the server sends it.
+ */
+const isPupil = (account: NotifyEmailLink['account']) => (account?.kind ? account.kind === 'alumno' : !!account?.is_student);
+
 /** The facts the link confirms, as label/value rows. */
 function Facts({ link, c }: { link: NotifyEmailLink; c: Copy }) {
   const rows: [string, string][] = [];
   if (link.account) {
-    rows.push([link.account.is_student ? c('factStudent') : c('factAccount'),
+    rows.push([isPupil(link.account) ? c('factStudent') : c('factAccount'),
       [link.account.name, link.account.detail].filter(Boolean).join(' · ')]);
   }
   if (link.email) rows.push([c('factEmail'), link.email]);
@@ -126,7 +133,7 @@ function Outcome({ link, c, portal }: { link: NotifyEmailLink; c: Copy; portal: 
   const heading = useRef<HTMLHeadingElement>(null);
   // Move focus to the outcome so screen readers announce it after the click.
   useEffect(() => { heading.current?.focus(); }, []);
-  const whose = link.account?.is_student ? fill(c('whoseStudent'), { nombre: link.account.name }) : c('whoseAccount');
+  const whose = isPupil(link.account) ? fill(c('whoseStudent'), { nombre: link.account?.name ?? '' }) : c('whoseAccount');
 
   if (link.state === 'confirmed') {
     return (
@@ -159,7 +166,7 @@ function Outcome({ link, c, portal }: { link: NotifyEmailLink; c: Copy; portal: 
 }
 
 function Ready({ link, c, art, pending, failed, onConfirm }: { link: NotifyEmailLink; c: Copy; art: unknown; pending: boolean; failed: boolean; onConfirm: () => void }) {
-  const whose = link.account?.is_student ? fill(c('whoseStudent'), { nombre: link.account.name }) : c('whoseAccount');
+  const whose = isPupil(link.account) ? fill(c('whoseStudent'), { nombre: link.account?.name ?? '' }) : c('whoseAccount');
   // «none» shows the old badge; content saved before the field existed shows the envelope.
   const illustration = art === 'none' ? undefined : isIllustration(art) ? art : 'mensaje';
   return (
@@ -203,7 +210,7 @@ function Ready({ link, c, art, pending, failed, onConfirm }: { link: NotifyEmail
 const SAMPLE: NotifyEmailLink = {
   state: 'ready', email: 'familia@ejemplo.com', separate_account: false,
   expires_at: '2026-12-01T18:00:00Z',
-  account: { name: 'Nombre del alumno', detail: 'Primaria · Grupo A', is_student: true },
+  account: { name: 'Nombre del alumno', detail: 'Primaria · Grupo A', is_student: true, kind: 'alumno' },
 } as NotifyEmailLink;
 
 interface Props { portalLink?: CmsLink; [copy: string]: unknown }

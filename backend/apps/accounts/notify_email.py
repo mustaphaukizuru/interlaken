@@ -75,19 +75,24 @@ def mask_email(email: str) -> str:
 def account_label(user) -> dict:
     """Who the avisos are about, as a parent recognizes it and with little exposed.
 
-    A student account reads «Carla R.» with grade and group; any other
-    account reads by the holder's first name.
+    ``kind`` says which: ``alumno`` (a pupil, «Carla R.» with grade and
+    group), ``personal`` (a staff member's cafetería account, «Personal del
+    colegio»: QA 2026-11-24 found /confirmar-correo calling it «Alumno») or
+    ``cuenta`` (any other login, by the holder's first name). ``is_student``
+    stays for links opened by an older page.
     """
     from apps.portal.emailing import first_name_initial
 
     profile = getattr(user, 'student_profile', None)
     name = first_name_initial(user.full_name) or 'su cuenta'
+    if profile is not None and profile.is_personal:
+        return {'name': name, 'detail': 'Personal del colegio', 'is_student': False, 'kind': 'personal'}
     if profile is not None:
         grade = (profile.grade or '').strip()
         group = (profile.group or '').strip()
         detail = ' · '.join(x for x in (grade, f'Grupo {group}' if group else '') if x)
-        return {'name': name, 'detail': detail, 'is_student': True}
-    return {'name': name, 'detail': '', 'is_student': False}
+        return {'name': name, 'detail': detail, 'is_student': True, 'kind': 'alumno'}
+    return {'name': name, 'detail': '', 'is_student': False, 'kind': 'cuenta'}
 
 
 def _issued_at(token: str) -> datetime | None:

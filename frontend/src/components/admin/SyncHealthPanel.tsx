@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { cafeteriaApi, type RosterSyncReport, type SyncHealth } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { plural, pluralWord } from '@/lib/plural';
 
 type Tone = 'ok' | 'warn' | 'bad';
 
@@ -104,10 +105,10 @@ export function buildChecks(h: SyncHealth): Check[] {
   // Stale links and unlinked pupils need a person; parked receipts on their
   // own are usually staff or test cards and only get mentioned.
   const rosterIssues: string[] = [];
-  if (stale > 0) rosterIssues.push(`${stale} alumno(s) sin cliente en Loyverse`);
-  if (newKids > 0) rosterIssues.push(`${newKids} alumno(s) nuevo(s) en Loyverse sin vincular`);
+  if (stale > 0) rosterIssues.push(`${plural(stale, 'alumno', 'alumnos')} sin cliente en Loyverse`);
+  if (newKids > 0) rosterIssues.push(`${plural(newKids, 'alumno nuevo', 'alumnos nuevos')} en Loyverse sin vincular`);
   const rosterLabel = rosterIssues.length > 0 && parked > 0
-    ? [...rosterIssues, `${parked} recibo(s) sin alumno`] : rosterIssues;
+    ? [...rosterIssues, `${plural(parked, 'recibo', 'recibos')} sin alumno`] : rosterIssues;
 
   return [
     {
@@ -167,7 +168,7 @@ export function buildChecks(h: SyncHealth): Check[] {
       tone: unlinked === 0 ? 'ok' : unlinked > h.active_students / 2 ? 'bad' : 'warn',
       label: unlinked === 0
         ? 'Todos los alumnos vinculados'
-        : `${unlinked} alumno(s) sin vincular a Loyverse`,
+        : `${plural(unlinked, 'alumno', 'alumnos')} sin vincular a Loyverse`,
       detail: unlinked === 0
         ? `${h.linked_students} de ${h.active_students} alumnos activos.`
         : 'Sus compras llegan como “sin alumno vinculado”. Use Vincular Loyverse en Alumnos.',
@@ -177,7 +178,7 @@ export function buildChecks(h: SyncHealth): Check[] {
       icon: AlertTriangle,
       tone: h.purchases_last_7d > 0 ? 'ok' : pollStale ? 'warn' : 'bad',
       label: h.purchases_last_7d > 0
-        ? `${h.purchases_last_7d} compra(s) registradas en 7 días`
+        ? `${plural(h.purchases_last_7d, 'compra registrada', 'compras registradas')} en 7 días`
         : 'Sin compras registradas en 7 días',
       detail: h.purchases_last_7d > 0
         ? `Último movimiento ${ago(h.last_transaction_at)}.`
@@ -197,11 +198,11 @@ export function buildChecks(h: SyncHealth): Check[] {
         ? 'Sin conciliación reciente'
         : drifting === 0
           ? 'Saldos conciliados con Loyverse'
-          : `${drifting} alumno(s) con saldo por encima de Loyverse`,
+          : `${plural(drifting, 'alumno', 'alumnos')} con saldo por encima de Loyverse`,
       detail: !audit
         ? 'El sondeo aún no ha comparado el plantel completo con Loyverse.'
         : drifting === 0
-          ? `${audit.compared} alumno(s) comparados ${ago(audit.at)}`
+          ? `${plural(audit.compared, 'alumno comparado', 'alumnos comparados')} ${ago(audit.at)}`
             + (audit.deferred > 0 ? `; ${audit.deferred} en espera por movimientos recientes.` : '.')
           : `Diferencia total ${formatMXN(driftTotal)} (${ago(audit.at)}). Si persiste después del `
             + 'repaso nocturno, revise la pestaña Reconciliación.',
@@ -214,9 +215,9 @@ export function buildChecks(h: SyncHealth): Check[] {
       detail: rosterIssues.length === 0
         ? 'Ningún alumno sin cliente en Loyverse ni cliente de alumno sin vincular.'
           + (audit?.profiles_total
-            ? ` ${audit.profiles_total} tarjeta(s) sincronizadas, ${audit.profiles_staff ?? 0} de personal.`
+            ? ` ${plural(audit.profiles_total, 'tarjeta sincronizada', 'tarjetas sincronizadas')}, ${audit.profiles_staff ?? 0} de personal.`
             : '')
-          + (parked > 0 ? ` ${parked} recibo(s) de tarjetas sin alumno.` : '')
+          + (parked > 0 ? ` ${plural(parked, 'recibo', 'recibos')} de tarjetas sin alumno.` : '')
         : 'Un alumno sin cliente en Loyverse ya no puede comprar en cafetería: en Alumnos, el aviso '
           + '«Revisarlos» los lista para eliminarlos o darlos de baja. Los alumnos nuevos se vinculan '
           + 'solos cada madrugada y sus recibos pendientes se aplican en ese momento.',
@@ -313,8 +314,8 @@ export function SyncHealthPanel() {
       setPreview(null);
       const s = r.summary;
       toast.success(
-        `Roster sincronizado: ${s.created} alta(s), ${s.updated} actualizado(s), ${s.renamed} nombre(s), `
-        + `${s.linked} vinculado(s)`
+        `Roster sincronizado: ${plural(s.created, 'alta', 'altas')}, ${plural(s.updated, 'actualizado', 'actualizados')}, ${plural(s.renamed, 'nombre', 'nombres')}, `
+        + `${plural(s.linked, 'vinculado', 'vinculados')}`
         + (s.possible_leavers ? `, ${s.possible_leavers} sin grado en Loyverse (posible baja)` : '')
         + '.',
         { duration: 8000 },
@@ -412,12 +413,12 @@ function RosterPreview({ report }: { report: RosterSyncReport }) {
     <div className="space-y-3 text-sm">
       <p className="text-muted">Vista previa: todavía no se ha escrito nada. Esto es lo que cambiaría al aplicar.</p>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Resumen de la vista previa">
-        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.created}</span><span className="text-xs text-subtle">alta(s)</span></li>
-        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.updated}</span><span className="text-xs text-subtle">actualizado(s)</span></li>
-        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.renamed}</span><span className="text-xs text-subtle">nombre(s)</span></li>
-        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.linked}</span><span className="text-xs text-subtle">vínculo(s)</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.created}</span><span className="text-xs text-subtle">{pluralWord(s.created, 'alta', 'altas')}</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.updated}</span><span className="text-xs text-subtle">{pluralWord(s.updated, 'actualizado', 'actualizados')}</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.renamed}</span><span className="text-xs text-subtle">{pluralWord(s.renamed, 'nombre', 'nombres')}</span></li>
+        <li className="rounded-sm bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.linked}</span><span className="text-xs text-subtle">{pluralWord(s.linked, 'vínculo', 'vínculos')}</span></li>
       </ul>
-      {s.possible_leavers > 0 && <p className="text-xs text-amber">{s.possible_leavers} alumno(s) sin grado en Loyverse (posible baja): no se dan de baja automáticamente.</p>}
+      {s.possible_leavers > 0 && <p className="text-xs text-amber">{plural(s.possible_leavers, 'alumno', 'alumnos')} sin grado en Loyverse (posible baja): no se {s.possible_leavers === 1 ? 'da' : 'dan'} de baja automáticamente.</p>}
       {nothing && <p className="text-xs text-subtle">No hay cambios pendientes: el roster ya coincide con Loyverse.</p>}
       {changes.length > 0 && (
         <ul className="max-h-48 divide-y divide-line/60 overflow-y-auto rounded-sm border border-line text-xs" aria-label="Cambios">

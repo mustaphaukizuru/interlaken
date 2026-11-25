@@ -40,6 +40,32 @@ class TestLowBalanceThreshold:
             {'threshold': '-5'}, format='json').status_code == 400
 
 
+    def test_threshold_is_capped_at_the_top_up_maximum(self, api_client, settings):
+        # QA 2026-11-24: $99,999 was accepted. The cap is the largest single
+        # top-up (CAFETERIA_TOPUP_MAX, $1,000).
+        settings.CAFETERIA_TOPUP_MAX = '1000'
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        api_client.force_authenticate(parent)
+        url = reverse('cafeteria-threshold', args=[student.id])
+        resp = api_client.patch(url, {'threshold': '99999'}, format='json')
+        assert resp.status_code == 400
+        assert resp.data['threshold'] == ['El monto máximo de la alerta es $1,000.']
+        assert api_client.patch(url, {'threshold': '1000.00'}, format='json').status_code == 200
+        assert CafeteriaBalance.objects.get(student=student).low_balance_threshold == Decimal('1000.00')
+
+    def test_a_stored_higher_threshold_survives_a_budget_edit(self, api_client):
+        # The cap only applies when the alert itself is changed.
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        CafeteriaBalance.objects.create(student=student, low_balance_threshold=Decimal('5000'))
+        api_client.force_authenticate(parent)
+        resp = api_client.patch(reverse('cafeteria-budget', args=[student.id]),
+                                {'daily_spend_limit': '50', 'weekly_spend_limit': '200'}, format='json')
+        assert resp.status_code == 200, resp.data
+        assert CafeteriaBalance.objects.get(student=student).low_balance_threshold == Decimal('5000.00')
+
+
 class TestPerChildTrend:
     def test_trend_scopes_to_one_child(self, api_client):
         parent = ParentFactory()
