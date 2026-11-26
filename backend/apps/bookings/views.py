@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 from apps.content.ops import AuditedCrudMixin
+from apps.core.areas import has_area
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView
 from apps.core.exporting import AdminExportMixin
@@ -41,6 +42,7 @@ from .services import (
     create_booking,
     occupied_seats,
 )
+from .services.staff_alerts import CANCELLED_BY_FAMILY, alert_staff
 
 
 def _can_access_booking(user, booking):
@@ -51,8 +53,6 @@ def _can_access_booking(user, booking):
     to the booking's contact email. Admins, and staff holding the «visitas» area,
     may access any booking (a cafetería cashier may not).
     """
-    from apps.core.areas import has_area
-
     if not (user and user.is_authenticated):
         return False
     if user.role == User.Role.ADMIN:
@@ -266,6 +266,11 @@ class BookingCancelView(APIView):
                actor=request.user, context='bookings: cancelación')
         # Remove the parent's calendar event (fail-soft; clears the stored id).
         calendar.sync_booking_cancelled(booking)
+        # The family cancelled it themselves: the school hears about it. Staff
+        # who may cancel any visit (admins, «visitas» area) made the change and
+        # need no alert.
+        if not has_area(request.user, 'visitas'):
+            alert_staff(booking, CANCELLED_BY_FAMILY)
         return Response(BookingSerializer(booking).data)
 
 

@@ -89,6 +89,20 @@ describe('AdminBookings: reservas', () => {
     expect(api.getAdminBookings).toHaveBeenCalledWith({ page: 1 });
   });
 
+  it('maps «Seguimiento» onto the server follow-up filter (the menu counts)', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas?seguimiento=por_cerrar' });
+    await screen.findByText('Ana');
+    expect(api.getAdminBookings).toHaveBeenCalledWith({ page: 1, followup: 'to_close' });
+    await userEvent.selectOptions(screen.getByLabelText('Seguimiento'), 'proximas');
+    await waitFor(() => expect(api.getAdminBookings).toHaveBeenCalledWith({ page: 1, followup: 'upcoming' }));
+  });
+
+  it('ignores an unknown «Seguimiento» value in the address', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas?seguimiento=algun-dia' });
+    await screen.findByText('Ana');
+    expect(api.getAdminBookings).toHaveBeenCalledWith({ page: 1 });
+  });
+
   it('writes the type filter to the URL and refetches', async () => {
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
     await screen.findByText('Ana');

@@ -218,6 +218,7 @@ updating. Skipping any one of these breaks that feature silently.
 | **Google sign-in** | Add `https://interlaken.edu.mx/auth/google/callback/` as an authorised redirect URI | Google Cloud console → Credentials |
 | **Loyverse** | Point the receipts webhook at `https://interlaken.edu.mx/api/v1/cafeteria/loyverse/webhook/<SECRET>/` | Loyverse → Integrations → Webhooks |
 | **Banorte** | Nothing to point: the lightbox needs no webhook or return URL. Put the merchant credentials and the current certificate in `.env` and run `check_banorte` (see `docs/BANORTE-INTEGRATION.md`) | VPS `deploy/.env` |
+| **Google Calendar (visits)** | A service-account key in `deploy/secrets/google-calendar.json`, the calendar shared with that account, and `GOOGLE_CALENDAR_ID` / `GOOGLE_CALENDAR_SA_KEY` in `.env` (NOT the sign-in client's id and secret). Check with `sync_calendar --check` (see `docs/GOOGLE_CALENDAR.md`) | Google Cloud + Google Calendar + VPS `deploy/.env` |
 
 Test the Loyverse webhook with a real purchase at the till. The parent's balance
 should move within seconds.

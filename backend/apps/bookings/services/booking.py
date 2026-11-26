@@ -15,6 +15,7 @@ from django.utils import timezone
 from ..models import AvailabilitySlot, Booking
 from . import calendar
 from .notifications import send_booking_confirmation
+from .staff_alerts import alert_staff
 
 
 class SlotUnavailable(Exception):
@@ -30,6 +31,8 @@ def create_booking(*, slot_id, parent_name, parent_email='', parent_phone='',
     Email + calendar side effects run outside the lock and are fail-soft, so a
     broken SMTP/Google never turns a saved booking into a 500. The email is only
     sent when a ``parent_email`` is present (WhatsApp bookings confirm in-channel).
+    The school hears about every booking, whatever its source (``staff_alerts``:
+    admissions inbox, Visitas staff and administrators), after the commit.
     """
     with transaction.atomic():
         try:
@@ -63,4 +66,5 @@ def create_booking(*, slot_id, parent_name, parent_email='', parent_phone='',
     if notify_email and parent_email:
         send_booking_confirmation(booking)
     calendar.sync_booking_created(booking)
+    alert_staff(booking)
     return booking
