@@ -38,14 +38,15 @@ def _visit_details(booking):
     ]
 
 
-def _visit_email(booking, subject, body, content):
-    """The branded email plus the .ics invite (never blocks the send if the .ics fails)."""
+def _visit_email(booking, subject, body, content, *, restore: bool = False):
+    """The branded email plus the .ics invite (never blocks the send if the .ics fails).
+    ``restore=True`` attaches the event republished after a cancellation."""
     from apps.portal.services import build_email
 
     email = build_email(subject, body, [booking.parent_email], reply_to=settings.ADMISSIONS_EMAIL,
                         content=content)
     try:
-        email.attach('visita-interlaken.ics', build_ics(booking),
+        email.attach('visita-interlaken.ics', build_ics(booking, restore=restore),
                      'text/calendar; charset=utf-8; method=PUBLISH')
     except Exception as exc:  # pragma: no cover - defensive; never block on ics
         logger.warning('No se pudo generar el .ics para la reserva %s: %s', booking.pk, exc)
@@ -127,6 +128,43 @@ def send_booking_cancellation(booking):
     delivered = bool(email.send(fail_silently=True))
     if not delivered:
         logger.warning('No se pudo enviar la cancelación de la reserva %s a %s',
+                       booking.pk, booking.parent_email)
+    return delivered
+
+
+def restored_content(booking):
+    """``(subject, EmailContent)`` sent when the school undoes a cancellation
+    (owner 2026-11-26, «Deshacer cancelación»; pure, render_emails previews it)."""
+    from apps.portal.emailing import EmailContent, long_date
+
+    slot = booking.slot
+    content = EmailContent(
+        category='Visitas', tone='success',
+        title='Su visita sigue en pie',
+        intro=(f'Estimado/a {booking.parent_name}: le escribimos por la cancelación que recibió de '
+               f'su visita del {long_date(slot.date)} a las {slot.start_time:%H:%M}. Fue un error '
+               f'nuestro y su visita sigue en pie, con los mismos datos. Le pedimos una disculpa.'),
+        details=_visit_details(booking),
+        note=('Le adjuntamos de nuevo la invitación de calendario para que la visita vuelva a su '
+              'agenda. Si ya no puede asistir, responda a este correo o escríbanos por WhatsApp.'),
+        signoff='¡Le esperamos!\nEquipo de Admisiones',
+        reason=VISIT_REASON,
+    )
+    return f'Su visita sigue en pie: {_visit_type_label(booking)}', content
+
+
+def send_booking_restored(booking):
+    """Tell the family a cancelled visit is back, with the .ics of the SAME
+    event restored (``build_ics(restore=True)``: same UID, a SEQUENCE above
+    the cancellation's) so a calendar that dropped it adds it again.
+
+    Best-effort like the confirmation: never raises, returns True when sent.
+    """
+    subject, content = restored_content(booking)
+    email = _visit_email(booking, subject, '', content, restore=True)
+    delivered = bool(email.send(fail_silently=True))
+    if not delivered:
+        logger.warning('No se pudo enviar el aviso de visita restablecida de la reserva %s a %s',
                        booking.pk, booking.parent_email)
     return delivered
 

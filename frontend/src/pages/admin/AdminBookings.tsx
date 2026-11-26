@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Ban, CalendarClock, CalendarPlus, Check, Eye, EyeOff, Loader2, RotateCcw, Trash2, Upload, UserCheck, UserX, X,
+  Ban, CalendarClock, CalendarPlus, Check, Eye, EyeOff, FolderInput, FolderOpen, Loader2, RotateCcw, Trash2, Upload, UserCheck, UserX, X,
   type LucideIcon,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -42,6 +43,9 @@ import {
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
 import { bookingsApi, type AdminBookingsParams, type AdminSlot, type AdminSlotsParams, type BookingAction } from '@/services/api';
 import type { Booking } from '@/types';
+import { canOpen } from '@/lib/areas';
+import { useAuthStore } from '@/store/authStore';
+import { PassToAdmissionsDialog } from '@/components/admin/admissions/PassToAdmissionsDialog';
 
 const WEEKDAYS = [
   { value: 1, label: 'Lun' },
@@ -298,6 +302,56 @@ function NoteDialog({
   );
 }
 
+/**
+ * «Deshacer cancelación» (owner 2026-11-26): the visit goes back to
+ * «Confirmada» and retakes its seat (the server re-checks the slot). The family
+ * was told it was cancelled, so by default it gets «Su visita sigue en pie»
+ * with the calendar invite again; the note is optional (it goes to the log).
+ */
+function UndoCancelDialog({ booking, loading, onConfirm, onClose }: {
+  booking: Booking | null;
+  loading: boolean;
+  onConfirm: (note: string, notify: boolean) => void;
+  onClose: () => void;
+}) {
+  const [notify, setNotify] = useState(true);
+  const [note, setNote] = useState('');
+  return (
+    <Modal open={!!booking} onClose={onClose} title="Deshacer cancelación" maxWidth={480}>
+      {booking && (
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onConfirm(note.trim(), notify); }}>
+          <p className="text-sm text-muted">
+            La visita de <span className="font-semibold text-ink">{booking.parent_name}</span> del{' '}
+            <span className="font-semibold text-ink">{format(parseISO(booking.slot_date), "d 'de' MMM yyyy", { locale: es })}</span>{' '}
+            a las {hhmm(booking.slot_start_time)} vuelve a «Confirmada» y recupera su lugar, si el horario aún tiene cupo.
+          </p>
+          <label className="flex min-h-[44px] items-start gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-line text-purple focus:ring-purple/40"
+              checked={notify}
+              onChange={(e) => setNotify(e.target.checked)}
+            />
+            <span>
+              Avisar a la familia por correo
+              <span className="block text-xs text-muted">Recibe «Su visita sigue en pie» con la invitación de calendario otra vez.</span>
+            </span>
+          </label>
+          <div>
+            <label className="label" htmlFor="undo-note">Nota (opcional, queda en la bitácora)</label>
+            <textarea id="undo-note" className="input-field min-h-[72px] text-base" value={note} maxLength={500}
+              onChange={(e) => setNote(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>Volver</Button>
+            <Button type="submit" loading={loading}>Deshacer cancelación</Button>
+          </div>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
 // ── Reservas ──────────────────────────────────────────────
 /**
  * Text that takes the room the table can give it, up to `max` px, and ends in
@@ -326,7 +380,16 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
   { id: 'parent', header: 'Tutor', sortKey: 'parent', hideable: false, minWidth: 140, className: 'font-medium text-ink', cell: (b) => b.parent_name },
   {
     id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
-    cell: (b) => { const m = bookingStatusMeta(b.status); return <Badge variant={m.variant}>{m.label}</Badge>; },
+    cell: (b) => {
+      const m = bookingStatusMeta(b.status);
+      return (
+        <span className="flex flex-col items-start gap-1">
+          <Badge variant={m.variant}>{m.label}</Badge>
+          {/* Already in Admisiones (owner 2026-11-26): the stage of its case. */}
+          {b.admissions_case && <span className="text-[11px] leading-tight text-muted">Admisiones: {b.admissions_case.stage_label}</span>}
+        </span>
+      );
+    },
   },
   { id: 'type', header: 'Tipo', minWidth: 110, cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
   {
@@ -408,15 +471,19 @@ interface NoteAsk { booking: Booking; act: BookingAction; title: string; message
  *  already folds the cell into a menu, where each move is a labelled button.
  *  Accessible names are the same in both. */
 function BookingRowActions({
-  booking, busyAct, onAct, onCancel, onNote,
+  booking, busyAct, onAct, onCancel, onNote, onUndo, onPass,
 }: {
   booking: Booking;
   busyAct?: BookingAction;
   onAct: (b: Booking, act: BookingAction) => void;
   onCancel: (b: Booking) => void;
   onNote: (ask: NoteAsk) => void;
+  onUndo: (b: Booking) => void;
+  onPass: (b: Booking) => void;
 }) {
   const isLg = useMediaQuery('(min-width: 1024px)');
+  const navigate = useNavigate();
+  const user = useAuthStore((st) => st.user);
   const s = booking.status as BookingStatus;
   const who = booking.parent_name;
   const busy = busyAct !== undefined;
@@ -425,7 +492,8 @@ function BookingRowActions({
   const started = visitStarted(booking.slot_date, booking.slot_start_time);
   const moves: RowMove[] = [];
   const isMarked = s === 'attended' || s === 'no_show';
-  if (canMove(s, 'confirmed') && !isMarked) {
+  // A cancelled visit comes back only through «Deshacer cancelación» below.
+  if (canMove(s, 'confirmed') && !isMarked && s !== 'cancelled') {
     moves.push({ act: 'confirm', label: 'Confirmar', ariaLabel: `Confirmar la reserva de ${who}`, Icon: Check,
       tone: 'hover:bg-green-50 hover:text-green-600', run: () => onAct(booking, 'confirm') });
   }
@@ -455,10 +523,24 @@ function BookingRowActions({
       run: () => onNote({ booking, act: 'confirm', notify: false, title: 'Deshacer asistencia', confirmLabel: 'Volver a «Confirmada»',
         message: `La visita de ${who} volverá a «Confirmada». Indique por qué se corrige. La familia no recibe ningún correo.` }) });
   }
-  if (canMove(s, 'pending')) {
-    moves.push({ act: 'reopen', label: 'Reabrir', ariaLabel: `Reabrir la reserva de ${who}`, Icon: RotateCcw,
-      tone: 'hover:bg-brand-50 hover:text-brand-600',
-      run: () => onNote({ booking, act: 'reopen', title: 'Reabrir reserva', confirmLabel: 'Reabrir', message: `La reserva de ${who} volverá a «Pendiente» si el horario aún tiene cupo para ${booking.num_attendees} ${booking.num_attendees === 1 ? 'persona' : 'personas'}.` }) });
+  // «Deshacer cancelación» (owner 2026-11-26) replaces «Reabrir» (to «Pendiente»,
+  // silent): straight back to «Confirmada», and the family hears it is back.
+  // Only while the visit is still to come; the server refuses it after.
+  if (s === 'cancelled' && !started && canMove(s, 'confirmed')) {
+    moves.push({ act: 'uncancel', label: 'Deshacer cancelación', ariaLabel: `Deshacer la cancelación de ${who}`, Icon: RotateCcw,
+      tone: 'hover:bg-brand-50 hover:text-brand-600', run: () => onUndo(booking) });
+  }
+  // Admisiones (owner 2026-11-26): a visit booked on the website had no case.
+  // Last in the list: it is a follow-up, never the row's next step.
+  const kase = booking.admissions_case;
+  if (kase) {
+    if (canOpen(user, '/admin/admisiones')) {
+      moves.push({ act: 'case', label: 'Ver expediente', ariaLabel: `Ver el expediente de admisión de ${who}`, Icon: FolderOpen,
+        tone: 'hover:bg-brand-50 hover:text-brand-600', run: () => navigate(`/admin/admisiones/${kase.id}`) });
+    }
+  } else {
+    moves.push({ act: 'admissions', label: 'Pasar a Admisiones', ariaLabel: `Pasar a Admisiones la visita de ${who}`, Icon: FolderInput,
+      tone: 'hover:bg-brand-50 hover:text-brand-600', run: () => onPass(booking) });
   }
   return (
     <RowMoves
@@ -581,6 +663,12 @@ function BookingsView() {
     setBulkAction(a);
   };
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
+  // Ticked by default; unticked cancels a repeated booking without an email
+  // (2026-11-26: one family got three cancellation emails for duplicates).
+  const [cancelNotify, setCancelNotify] = useState(true);
+  const openCancel = (b: Booking) => { setCancelNotify(true); setCancelFor(b); };
+  const [undoFor, setUndoFor] = useState<Booking | null>(null);
+  const [passFor, setPassFor] = useState<Booking | null>(null);
   const [noteAsk, setNoteAsk] = useState<NoteAsk | null>(null);
   // 768 to 1439 px: contact folded under the tutor (BOOKING_COLUMNS_FOLDED).
   const isTable = useMediaQuery('(min-width: 768px)');
@@ -600,7 +688,10 @@ function BookingsView() {
     rowsInFlight.current.add(b.id);
     setBusyRows((m) => ({ ...m, [b.id]: a }));
     action.mutateAsync({ id: b.id, act: a, note, notify })
-      .then(() => { toast.success('Reserva actualizada.'); setCancelFor(null); setNoteAsk(null); })
+      .then(() => {
+        toast.success(a === 'uncancel' ? 'La visita volvió a «Confirmada».' : 'Reserva actualizada.');
+        setCancelFor(null); setNoteAsk(null); setUndoFor(null);
+      })
       .catch((e: unknown) => toast.error(apiErrorMessage(e, 'No fue posible actualizar la reserva.')))
       .finally(() => {
         rowsInFlight.current.delete(b.id);
@@ -637,8 +728,10 @@ function BookingsView() {
             booking={b}
             busyAct={busyRows[b.id]}
             onAct={act}
-            onCancel={setCancelFor}
+            onCancel={openCancel}
             onNote={setNoteAsk}
+            onUndo={setUndoFor}
+            onPass={setPassFor}
           />
         )}
         toolbar={(
@@ -693,15 +786,44 @@ function BookingsView() {
         cancelLabel="Volver"
         loading={action.isPending}
         onClose={() => setCancelFor(null)}
-        onConfirm={() => cancelFor && act(cancelFor, 'cancel')}
+        onConfirm={() => cancelFor && act(cancelFor, 'cancel', undefined, cancelNotify)}
         message={cancelFor && (
           <>
-            Esto cancelará la visita de <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
-            <span className="font-semibold text-ink">{format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}</span>{' '}
-            a las {hhmm(cancelFor.slot_start_time)} y liberará el cupo. La familia recibirá un correo con la cancelación.
+            <p>
+              Esto cancelará la visita de <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
+              <span className="font-semibold text-ink">{format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}</span>{' '}
+              a las {hhmm(cancelFor.slot_start_time)} y liberará el cupo.{' '}
+              {visitStarted(cancelFor.slot_date, cancelFor.slot_start_time)
+                ? 'La visita ya pasó: la familia no recibe ningún correo.'
+                : cancelNotify ? 'La familia recibirá un correo con la cancelación.' : 'La familia no recibirá ningún correo.'}
+            </p>
+            {!visitStarted(cancelFor.slot_date, cancelFor.slot_start_time) && (
+              <label className="mt-3 flex min-h-[44px] items-start gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-line text-purple focus:ring-purple/40"
+                  checked={cancelNotify}
+                  onChange={(e) => setCancelNotify(e.target.checked)}
+                />
+                <span>
+                  Enviar a la familia el correo de cancelación
+                  <span className="block text-xs text-muted">Quítelo para cancelar una reserva repetida sin avisar.</span>
+                </span>
+              </label>
+            )}
           </>
         )}
       />
+
+      <UndoCancelDialog
+        key={undoFor ? `undo-${undoFor.id}` : 'undo-closed'}
+        booking={undoFor}
+        loading={action.isPending}
+        onClose={() => setUndoFor(null)}
+        onConfirm={(note, notify) => undoFor && act(undoFor, 'uncancel', note || undefined, notify)}
+      />
+
+      <PassToAdmissionsDialog bookingId={passFor?.id ?? null} parentName={passFor?.parent_name} bookingStatus={passFor?.status} onClose={() => setPassFor(null)} />
 
       <NoteDialog
         // A fresh note per booking and move: never carry the last motive over.

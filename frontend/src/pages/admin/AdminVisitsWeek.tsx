@@ -18,6 +18,7 @@ import { apiFieldErrors } from '@/lib/apiErrors';
 import { BOOKING_STATUS_META, visitStarted, type BookingStatus } from '@/lib/status/booking';
 import { canOpen } from '@/lib/areas';
 import { useAuthStore } from '@/store/authStore';
+import { PassToAdmissionsDialog } from '@/components/admin/admissions/PassToAdmissionsDialog';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const OUTCOMES: [string, string][] = [['interested', 'Interesada, dar seguimiento'], ['enrolling', 'Se inscribirá'], ['not_now', 'No por ahora'], ['declined', 'No le interesó']];
@@ -78,6 +79,8 @@ export default function AdminVisitsWeek() {
   const [note, setNote] = useState('');
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
   const [noShowFor, setNoShowFor] = useState<WeekBooking | null>(null);
+  // An interested family with no case yet goes straight to «Pasar a Admisiones».
+  const [passFor, setPassFor] = useState<WeekBooking | null>(null);
   // The bookings/slots lists live under ['admin', 'bookings' | 'slots', ...].
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['visits-week'] });
@@ -94,7 +97,12 @@ export default function AdminVisitsWeek() {
     onSuccess: ({ data: r }) => {
       const pr = r.pre_registration;
       const label = pr ? STAGE_LABEL[pr.stage ?? ''] ?? pr.stage ?? '' : '';
-      toast.success(!pr ? 'Resultado guardado.' : pr.changed ? `Resultado guardado; expediente en «${label}».` : pr.skipped ? `Resultado guardado. ${pr.skipped}` : `Resultado guardado; el expediente sigue en «${label}».`);
+      // Owner 2026-11-26: a family that booked on the website has no case;
+      // when it is interested, offer to start its admissions process now.
+      const offerCase = !pr && (outcome === 'interested' || outcome === 'enrolling');
+      toast.success(!pr ? (offerCase ? 'Resultado guardado. Esta familia aún no tiene expediente de admisión.' : 'Resultado guardado.')
+        : pr.changed ? `Resultado guardado; expediente en «${label}».` : pr.skipped ? `Resultado guardado. ${pr.skipped}` : `Resultado guardado; el expediente sigue en «${label}».`);
+      if (offerCase) setPassFor(outcomeFor);
       setOutcomeFor(null); setNote(''); invalidate();
     },
     onError: (e) => toast.error(apiFieldErrors(e).detail || 'No se pudo guardar.'),
@@ -227,6 +235,8 @@ export default function AdminVisitsWeek() {
           <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setOutcomeFor(null)}>Cancelar</Button><Button onClick={() => setOutcomeM.mutate()} loading={setOutcomeM.isPending}>Guardar resultado</Button></div>
         </div>
       </Modal>
+
+      <PassToAdmissionsDialog bookingId={passFor?.id ?? null} parentName={passFor?.parent_name} bookingStatus={passFor?.status} onClose={() => setPassFor(null)} />
     </>
   );
 }

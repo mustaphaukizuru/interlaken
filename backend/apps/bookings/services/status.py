@@ -33,7 +33,11 @@ from apps.core.transitions import assert_transition
 
 from ..models import AvailabilitySlot, Booking
 from . import calendar
-from .notifications import send_booking_cancellation, send_booking_confirmation
+from .notifications import (
+    send_booking_cancellation,
+    send_booking_confirmation,
+    send_booking_restored,
+)
 
 ENTITY = "bookings.booking"
 
@@ -64,6 +68,13 @@ def assert_visit_started(booking, target: str) -> None:
     (QA 2026-11-24: a visit could be marked «Asistió» days before)."""
     if target in ATTENDANCE_TARGETS and not visit_started(booking):
         raise ValidationError('La visita aún no ocurre.', code='not_started')
+    # «Deshacer cancelación» puts a visit back on the family's agenda: only
+    # while it is still to come (owner 2026-11-26).
+    if (target == Booking.Status.CONFIRMED and booking.status == Booking.Status.CANCELLED
+            and visit_started(booking)):
+        raise ValidationError('La visita ya pasó: ya no se puede deshacer la cancelación. '
+                              'Si la familia quiere venir, agende una visita nueva.',
+                              code='already_past')
     # Undoing an attendance (→ «Confirmada») is for a mark made by mistake; a
     # visit with a recorded result already moved its admissions case.
     if (target == Booking.Status.CONFIRMED and booking.status in ATTENDANCE_TARGETS
@@ -126,7 +137,15 @@ def change_booking_status(booking, target: str, *, note: str | None = None, noti
         booking.save(update_fields=["status", "updated_at"])
 
     def side_effects():
-        if target == Booking.Status.CONFIRMED:
+        if target == Booking.Status.CONFIRMED and previous == Booking.Status.CANCELLED:
+            # «Deshacer cancelación»: the family was told it was cancelled
+            # (the .ics took it off their calendar), so they hear it is back,
+            # with the same event restored. ``confirmation_sent`` is already
+            # True, so the plain confirmation would never go out here.
+            if notify and booking.parent_email:
+                send_booking_restored(booking)
+            calendar.sync_booking_created(booking)
+        elif target == Booking.Status.CONFIRMED:
             if notify and booking.parent_email and not booking.confirmation_sent:
                 send_booking_confirmation(booking)
             calendar.sync_booking_created(booking)

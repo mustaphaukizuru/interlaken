@@ -11,6 +11,8 @@ vi.mock('@/services/api', async () => ({
     exportBookings: vi.fn(),
     bookingAction: vi.fn(),
     bulkBookings: vi.fn(),
+    getBookingAdmissions: vi.fn(),
+    passToAdmissions: vi.fn(),
     getAdminSlots: vi.fn(),
     exportSlots: vi.fn(),
     bulkSlots: vi.fn(),
@@ -31,6 +33,7 @@ import AdminBookings from './AdminBookings';
 import { bookingsApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
+import { useAuthStore } from '@/store/authStore';
 
 const api = vi.mocked(bookingsApi);
 
@@ -57,6 +60,7 @@ const page = <T,>(results: T[]) => ({ data: { count: results.length, next: null,
 beforeEach(() => {
   vi.clearAllMocks();
   stubViewport(1280);
+  useAuthStore.setState({ user: null });
   api.getAdminBookings.mockResolvedValue(page(BOOKINGS) as never);
   api.getAdminSlots.mockResolvedValue(page(SLOTS) as never);
   api.bookingAction.mockResolvedValue({ data: {} } as never);
@@ -118,7 +122,7 @@ describe('AdminBookings: reservas', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Ana' }));
     const anaMenu = screen.getByRole('menu', { name: 'Más acciones para la reserva de Ana' });
     expect(within(anaMenu).getAllByRole('menuitem').map((m) => m.getAttribute('aria-label'))).toEqual([
-      'Marcar que Ana asistió', 'Marcar que Ana no asistió', 'Cancelar la reserva de Ana',
+      'Marcar que Ana asistió', 'Marcar que Ana no asistió', 'Cancelar la reserva de Ana', 'Pasar a Admisiones la visita de Ana',
     ]);
     expect(screen.queryByRole('menuitem', { name: 'Reabrir la reserva de Ana' })).not.toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
@@ -128,9 +132,12 @@ describe('AdminBookings: reservas', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Beto' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Marcar que Beto no asistió' }));
     await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(2, 'no_show', {}));
-    // cancelled: only reopen, visible, and no «⋯» with nothing in it.
+    // cancelled and already past: no «Confirmar», no «Reabrir» (replaced) and no
+    // «Deshacer cancelación» (only before the visit); only «Pasar a Admisiones».
     expect(screen.queryByRole('button', { name: 'Confirmar la reserva de Carla' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reabrir la reserva de Carla' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reabrir la reserva de Carla' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deshacer la cancelación de Carla' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pasar a Admisiones la visita de Carla' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Más acciones para la reserva de Carla' })).not.toBeInTheDocument();
   });
 
@@ -144,7 +151,7 @@ describe('AdminBookings: reservas', () => {
     expect(screen.getByRole('button', { name: 'Confirmar la reserva de Eva' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Eva' }));
     expect(within(screen.getByRole('menu', { name: 'Más acciones para la reserva de Eva' })).getAllByRole('menuitem')
-      .map((m) => m.getAttribute('aria-label'))).toEqual(['Cancelar la reserva de Eva']);
+      .map((m) => m.getAttribute('aria-label'))).toEqual(['Cancelar la reserva de Eva', 'Pasar a Admisiones la visita de Eva']);
     await userEvent.keyboard('{Escape}');
     // Confirmed and not started: cancelling is the only move.
     expect(screen.queryByRole('button', { name: 'Marcar que Fer asistió' })).toBeNull();
@@ -153,6 +160,7 @@ describe('AdminBookings: reservas', () => {
   });
 
   it('the cancel dialog reads «Volver» / «Cancelar la visita» and says the family gets an email (QA 2026-11-24)', async () => {
+    api.getAdminBookings.mockResolvedValue(page([booking(1, 'Ana', 'pending', { slot_date: '2099-06-15' })]) as never);
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
     await screen.findByText('Ana');
     await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Ana' }));
@@ -200,17 +208,9 @@ describe('AdminBookings: reservas', () => {
     await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(1, 'attended', {}));
   });
 
-  it('reopen and the no-show correction ask for a note and send it', async () => {
+  it('the no-show correction asks for a note and sends it', async () => {
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
-    await screen.findByText('Carla');
-    await userEvent.click(screen.getByRole('button', { name: 'Reabrir la reserva de Carla' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Reabrir reserva' });
-    const submit = within(dialog).getByRole('button', { name: 'Reabrir' });
-    expect(submit).toBeDisabled();
-    await userEvent.type(within(dialog).getByLabelText(/Motivo/), 'La familia llamó');
-    await userEvent.click(submit);
-    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(3, 'reopen', { note: 'La familia llamó' }));
-
+    await screen.findByText('Dani');
     await userEvent.click(screen.getByRole('button', { name: 'Marcar que Dani asistió' }));
     const fix = await screen.findByRole('dialog', { name: 'Corregir: sí asistió' });
     await userEvent.type(within(fix).getByLabelText(/Motivo/), 'Llegó tarde');
@@ -227,6 +227,121 @@ describe('AdminBookings: reservas', () => {
     await userEvent.type(within(dialog).getByLabelText(/Motivo/), 'Marcado por error');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Volver a «Confirmada»' }));
     await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(4, 'confirm', { note: 'Marcado por error', notify: false }));
+  });
+
+  it('«Deshacer cancelación» returns a cancelled visit to come to «Confirmada» and tells the family by default (owner 2026-11-26)', async () => {
+    api.getAdminBookings.mockResolvedValue(page([booking(7, 'Gina', 'cancelled', { slot_date: '2099-06-15' })]) as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Gina');
+    expect(screen.queryByRole('button', { name: 'Confirmar la reserva de Gina' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Deshacer la cancelación de Gina' }));
+    let dialog = await screen.findByRole('dialog', { name: 'Deshacer cancelación' });
+    expect(within(dialog).getByRole('checkbox', { name: /Avisar a la familia por correo/ })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Deshacer cancelación' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(7, 'uncancel', {}));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('La visita volvió a «Confirmada».'));
+
+    // Quietly, with a note: notify=false and the note go to the server.
+    await userEvent.click(screen.getByRole('button', { name: 'Deshacer la cancelación de Gina' }));
+    dialog = await screen.findByRole('dialog', { name: 'Deshacer cancelación' });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Avisar a la familia por correo/ }));
+    await userEvent.type(within(dialog).getByLabelText(/Nota/), 'Se canceló por error');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Deshacer cancelación' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(7, 'uncancel', { note: 'Se canceló por error', notify: false }));
+  });
+
+  it('a repeated booking can be cancelled without emailing the family (owner 2026-11-26)', async () => {
+    api.getAdminBookings.mockResolvedValue(page([booking(1, 'Ana', 'confirmed', { slot_date: '2099-06-15' })]) as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar la reserva de Ana' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancelar la visita' });
+    const box = within(dialog).getByRole('checkbox', { name: /Enviar a la familia el correo de cancelación/ });
+    expect(box).toBeChecked();
+    await userEvent.click(box);
+    expect(dialog).toHaveTextContent('La familia no recibirá ningún correo.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar la visita' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(1, 'cancel', { notify: false }));
+  });
+
+  it('a past visit cancels without a checkbox: no email goes out', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Ana' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Cancelar la reserva de Ana' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancelar la visita' });
+    expect(dialog).toHaveTextContent('La visita ya pasó: la familia no recibe ningún correo.');
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+  });
+
+  it('«Pasar a Admisiones» offers the family case to link the visit to (owner 2026-11-26)', async () => {
+    useAuthStore.setState({ user: { id: 1, role: 'admin' } as never });
+    api.getBookingAdmissions.mockResolvedValue({ data: {
+      case: null,
+      duplicates: [{ id: 9, child_name: 'Lucía López', parent_name: 'Beto', parent_phone: '5512345678', parent_email: 'beto@test.mx',
+        level: 'primaria', level_label: 'Primaria', grade_applying: '1° Primaria', cycle: '2027-2028', stage: 'informes', stage_label: 'Informes',
+        closed_outcome: '', closed_outcome_label: '', status: 'pending', next_action: '', days_waiting: 0, stage_changed_at: null, exam_at: null,
+        created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z' }],
+      prefill: { child_name: 'Lucía', grade_applying: '1° Primaria', child_grade_text: '1° primaria', parent_name: 'Beto',
+        parent_email: 'beto@test.mx', parent_phone: '5512345678' },
+    } } as never);
+    api.passToAdmissions.mockResolvedValue({ data: { created: false, case: { id: 9, child_name: 'Lucía López', stage: 'visita' } } } as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Beto');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Beto' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Pasar a Admisiones la visita de Beto' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pasar a Admisiones' });
+    expect(await within(dialog).findByLabelText('Nombre del alumno')).toHaveValue('Lucía');
+    expect(within(dialog).getByLabelText('Grado al que ingresa')).toHaveValue('1° Primaria');
+    expect(dialog).toHaveTextContent('Ya hay un expediente con este celular o correo.');
+    expect(within(dialog).getByRole('button', { name: 'Crear un expediente nuevo' })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Agregar la visita al expediente de Lucía López' }));
+    await waitFor(() => expect(api.passToAdmissions).toHaveBeenCalledWith(2, { link_to: 9 }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Visita agregada al expediente de Lucía López.'));
+  });
+
+  it('creating the case sends the «Nuevo prospecto» fields; a missing grade is caught first', async () => {
+    useAuthStore.setState({ user: { id: 1, role: 'admin' } as never });
+    api.getBookingAdmissions.mockResolvedValue({ data: {
+      case: null, duplicates: [],
+      prefill: { child_name: 'Lucía', grade_applying: '', child_grade_text: 'kinder', parent_name: 'Beto',
+        parent_email: 'beto@test.mx', parent_phone: '5512345678' },
+    } } as never);
+    api.passToAdmissions.mockResolvedValue({ data: { created: true, case: { id: 55, child_name: 'Lucía', stage: 'visita' } } } as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Beto');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Beto' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Pasar a Admisiones la visita de Beto' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pasar a Admisiones' });
+    expect(await within(dialog).findByText('Al agendar escribió «kinder».')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear expediente' }));
+    expect(api.passToAdmissions).not.toHaveBeenCalled();
+    expect(dialog).toHaveTextContent('Elija el grado.');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Grado al que ingresa'), '3° Preescolar');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear expediente' }));
+    await waitFor(() => expect(api.passToAdmissions).toHaveBeenCalledWith(2, {
+      child_name: 'Lucía', parent_name: 'Beto', parent_phone: '5512345678', parent_email: 'beto@test.mx',
+      grade_applying: '3° Preescolar', cycle: 'proximo',
+    }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Expediente creado: Lucía.'));
+  });
+
+  it('a visit already in Admisiones shows its stage and «Ver expediente» (only to who may open Admisiones)', async () => {
+    api.getAdminBookings.mockResolvedValue(page([
+      booking(2, 'Beto', 'confirmed', { admissions_case: { id: 55, stage: 'visita', stage_label: 'Visita guiada' } }),
+    ]) as never);
+    const { unmount } = renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Beto');
+    expect(screen.getByText('Admisiones: Visita guiada')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Beto' }));
+    expect(screen.queryByRole('menuitem', { name: /Pasar a Admisiones/ })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Ver el expediente/ })).toBeNull();
+    unmount();
+    useAuthStore.setState({ user: { id: 1, role: 'admin' } as never });
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Beto');
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Beto' }));
+    expect(screen.getByRole('menuitem', { name: 'Ver el expediente de admisión de Beto' })).toBeInTheDocument();
   });
 
   it('shows the server reason when a move is refused (capacity)', async () => {

@@ -27,6 +27,8 @@ is marked WA).
 | Admisión aceptada (cuentas creadas) | admin converts | G | no | yes | no | WA (credentials via template) | soporte@ |
 | Visita confirmada | booking | visitor | no | yes (+ .ics) | no | WA | admisiones@ |
 | Recordatorio de visita (24h) | `send_visit_reminders` | visitor | no | yes | no | WA | admisiones@ |
+| Visita cancelada por el colegio | Visitas «Cancelar» (a visit still to come) | visitor | no | yes (+ .ics CANCEL), unless the staff member unticks «Enviar a la familia el correo de cancelación» | no | no | admisiones@ |
+| Su visita sigue en pie | Visitas «Deshacer cancelación» (`uncancel`, 2026-11-26) | visitor | no | yes (+ the same .ics, SEQUENCE 2), unless «Avisar a la familia por correo» is unticked | no | no | admisiones@ |
 | Nueva visita agendada (aviso al colegio) | any booking: web, Puertas Abiertas, WhatsApp (`bookings.services.staff_alerts`) | email: `ADMISSIONS_EMAIL` + staff with the «visitas» area; bell: every admin + those staff | yes (admins and Visitas staff) | yes (inbox + Visitas staff, one message) | per user's preferences | no | the family's email |
 | Visita cancelada por la familia (aviso al colegio) | family cancels (`BookingCancelView`, not staff) | same as above | yes | yes | per user's preferences | no | the family's email |
 | Contraseña asignada por admin | inbox resolve / reset dialog | F | no | manual (admin sends template by WA or email) | no | manual | soporte@ |

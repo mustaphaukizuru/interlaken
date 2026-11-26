@@ -17,6 +17,7 @@ vi.mock('@/services/api', () => ({
       ...[25, 26, 27, 28, 29, 30].map((d) => ({ date: `2026-08-${d}`, slots: [] })),
     ] } }),
     adminReschedule: vi.fn(), adminOutcome: vi.fn(), bookingAction: vi.fn(),
+    getBookingAdmissions: vi.fn(), passToAdmissions: vi.fn(),
   },
 }));
 
@@ -82,6 +83,19 @@ describe('AdminVisitsWeek', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar «No asistió»' }));
     await waitFor(() => expect(bookingsApi.bookingAction).toHaveBeenCalledWith(5, 'no_show'));
     expect(toast.success).toHaveBeenCalledWith('Visita marcada como «No asistió».');
+  });
+  it('an interested family with no case is offered «Pasar a Admisiones» right after the result (owner 2026-11-26)', async () => {
+    vi.mocked(bookingsApi.adminOutcome).mockResolvedValue({ data: { pre_registration: null } } as never);
+    vi.mocked(bookingsApi.getBookingAdmissions).mockResolvedValue({ data: { case: null, duplicates: [], prefill: {
+      child_name: 'Ana', grade_applying: '', child_grade_text: '', parent_name: 'María', parent_email: '', parent_phone: '5512345678',
+    } } } as never);
+    renderWithProviders(<AdminVisitsWeek />, { route: '/admin/visitas/semana' });
+    await userEvent.click(await screen.findByRole('button', { name: /Resultado/ }));
+    const outcome = await screen.findByRole('dialog', { name: /Resultado de la visita/ });
+    await userEvent.click(within(outcome).getByRole('button', { name: 'Guardar resultado' }));
+    const pass = await screen.findByRole('dialog', { name: 'Pasar a Admisiones' });
+    expect(await within(pass).findByLabelText('Nombre del alumno')).toHaveValue('Ana');
+    expect(bookingsApi.getBookingAdmissions).toHaveBeenCalledWith(5);
   });
   it('a visit still to come offers no «No asistió» and no «Resultado», only «Reprogramar» (QA 2026-11-24)', async () => {
     vi.mocked(bookingsApi.adminWeek).mockResolvedValueOnce({ data: { start: '2099-06-15', end: '2099-06-21', days: [

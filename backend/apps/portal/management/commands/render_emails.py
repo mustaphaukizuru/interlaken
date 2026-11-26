@@ -232,7 +232,12 @@ def _admissions_samples(capture) -> list[Sample]:
 
 
 def _visit_samples() -> list[Sample]:
-    from apps.bookings.services.notifications import confirmation_content, reminder_content
+    from apps.bookings.services.notifications import (
+        cancellation_content,
+        confirmation_content,
+        reminder_content,
+        restored_content,
+    )
     from apps.bookings.services.staff_alerts import cancelled_booking_content, new_booking_content
 
     reply = getattr(settings, 'ADMISSIONS_EMAIL', '') or getattr(settings, 'CONTACT_EMAIL', '')
@@ -240,6 +245,9 @@ def _visit_samples() -> list[Sample]:
     # The school's own alerts (2026-11-26) reply to the family.
     return [Sample('visita-confirmada', 'Visitas', *confirmation_content(booking), reply),
             Sample('visita-recordatorio', 'Visitas', *reminder_content(booking), reply),
+            Sample('visita-cancelada', 'Visitas', *cancellation_content(booking), reply),
+            # «Deshacer cancelación» (owner 2026-11-26): the visit is back on.
+            Sample('visita-sigue-en-pie', 'Visitas', *restored_content(booking), reply),
             Sample('visita-nueva-escuela', 'Visitas', *new_booking_content(booking), booking.parent_email),
             Sample('visita-cancelada-escuela', 'Visitas', *cancelled_booking_content(booking),
                    booking.parent_email)]

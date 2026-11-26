@@ -10,6 +10,7 @@
 import axios from 'axios';
 import type { BulkRequest, BulkResult, ExportParams, ImportFormat, ListParams } from './dataOps';
 import type { AuditLogEntry, CheckoutStart } from '@/types';
+import type { CaseRow } from '@/hooks/queries/cases';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -1011,6 +1012,13 @@ export const bookingsApi = {
   bookingAction: (id: number, action: BookingAction, body?: { note?: string; notify?: boolean }) =>
     api.post(`/bookings/admin/bookings/${id}/${action}/`, body ?? {}),
 
+  /** «Pasar a Admisiones»: the visit's case (or null), duplicates and the prefill. */
+  getBookingAdmissions: (id: number) =>
+    api.get<BookingAdmissions>(`/bookings/admin/bookings/${id}/admissions/`),
+  /** Create the case from the visit, or `{ link_to }` an existing one (409 if it has one). */
+  passToAdmissions: (id: number, body: PassToAdmissionsBody) =>
+    api.post<{ case: CaseRow; created: boolean }>(`/bookings/admin/bookings/${id}/admissions/`, body),
+
   /** Bulk confirm / cancel / attended / no_show (Data Ops C5). */
   bulkBookings: (body: BulkRequest) =>
     api.post<BulkResult>('/bookings/admin/bookings/bulk/', body),
@@ -1034,7 +1042,34 @@ export const bookingsApi = {
     api.post('/bookings/admin/slots/import/', body, { responseType }),
 };
 
-export type BookingAction = 'confirm' | 'cancel' | 'attended' | 'no_show' | 'reopen';
+/** `uncancel`: «Deshacer cancelación», a cancelled visit back to «Confirmada»
+ *  (the family hears it is back unless `notify: false`). */
+export type BookingAction = 'confirm' | 'cancel' | 'attended' | 'no_show' | 'reopen' | 'uncancel';
+
+/** The admissions case a visit belongs to («Ver expediente»). */
+export interface BookingCaseBrief { id: number; stage: string; stage_label: string; child_name?: string }
+
+/** «Pasar a Admisiones» (owner 2026-11-26): what the dialog starts from. */
+export interface BookingAdmissions {
+  case: BookingCaseBrief | null;
+  /** Cases with the family's phone or email: link one instead of a twin. */
+  duplicates: CaseRow[];
+  prefill: {
+    child_name: string;
+    /** '' when what the family wrote is not one of the admission grades. */
+    grade_applying: string;
+    /** What the family wrote when booking («1 de primaria»). */
+    child_grade_text: string;
+    parent_name: string;
+    parent_email: string;
+    parent_phone: string;
+  };
+}
+
+export type PassToAdmissionsBody =
+  | { link_to: number }
+  | { child_name: string; parent_name: string; parent_phone: string; parent_email: string;
+      grade_applying: string; cycle: string; notes?: string };
 
 export interface AdminBookingsParams {
   q?: string;

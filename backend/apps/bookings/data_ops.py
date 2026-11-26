@@ -182,13 +182,22 @@ def _booking_action(name: str, label_es: str, target: str, *, requires_note=Fals
     enforces the note row by row, so a correction sent without one fails.
     """
 
+    def keep_cancelled(instance):
+        # «Confirmar» over a selection never revives a cancelled visit: that is
+        # «Deshacer cancelación», one row at a time (the family gets an email
+        # saying it is back), so a broad selection cannot undo cancellations.
+        if target == Booking.Status.CONFIRMED and instance.status == Booking.Status.CANCELLED:
+            raise BulkSkip("Está cancelada: use «Deshacer cancelación» en su fila.")
+
     def plan(instance, payload):
+        keep_cancelled(instance)
         plan_booking_status(instance, target, note=None)
         if is_reverse(STATUS_ENTITY, instance.status, target):
             return CORRECTION
         return None
 
     def handler(instance, payload, actor):
+        keep_cancelled(instance)
         notify = payload.get("notify", True) not in (False, "false", "0", 0)
         previous = change_booking_status(
             instance, target, note=str(payload.get("note") or ""), notify=notify

@@ -461,6 +461,10 @@ export interface Booking {
   source: 'web' | 'whatsapp' | 'admin';
   confirmation_sent: boolean;
   created_at: string;
+  /** Post-visit result («Resultado de la visita»), '' when not recorded. */
+  outcome?: string;
+  /** Console only: the admissions case the visit belongs to (owner 2026-11-26). */
+  admissions_case?: { id: number; stage: string; stage_label: string } | null;
 }
 
 export interface DashboardData {
