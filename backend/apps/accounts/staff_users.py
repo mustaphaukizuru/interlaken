@@ -8,7 +8,14 @@ POST  /accounts/admin/staff/            invite: create with a generated password
 PATCH /accounts/admin/staff/<pk>/       role / active / name / email
 POST  /accounts/admin/staff/<pk>/reset-password/   new generated password (returned once)
 GET   /accounts/admin/staff/<pk>/activity/         the account and its last actions in Auditoría
+POST  /accounts/admin/staff/<pk>/console-access/   give a staff cafetería login the console
+DELETE /accounts/admin/staff/<pk>/console-access/  back to a cafetería-only login
 POST  /accounts/admin/staff/bulk/       deactivate / reactivate / archive / restore / delete
+
+An address that already belongs to a staff cafetería login (role student with a
+«Personal del colegio» profile) is not invited again: POST answers 409
+``staff_cafeteria_login`` with the person, and the console offers
+``console-access`` on that same login (2026-11-25).
 
 Guards: only admins; an admin cannot deactivate or demote themselves; the last
 active admin cannot be demoted/deactivated; superusers are untouchable here
@@ -60,15 +67,41 @@ logger = logging.getLogger(__name__)
 STAFF_ROLES = (User.Role.ADMIN, User.Role.STAFF)
 
 
-def invite_email(user: User):
+def invite_email(user: User, *, granted: bool = False):
     """``(subject, EmailContent)`` telling a new staff member where to sign in.
 
     It never carries the password: the school hands the temporary one over in
     person, and the console asks to replace it at the first sign-in.
+
+    ``granted``: the person already had a login (their «Personal del colegio»
+    cafetería account) and was just given console access (2026-11-25). No
+    password was generated for them, so the email speaks of Google only and
+    says their cafetería account stays as it was.
     """
     from apps.portal.emailing import EmailContent
 
     login_url = f"{(settings.FRONTEND_URL or '').rstrip('/')}/login"
+    if granted:
+        areas = ', '.join(AREAS[a][0] for a in AREAS if a in (user.staff_areas or []))
+        hello = f'Hola {user.first_name}: el colegio' if user.first_name else 'El colegio'
+        content = EmailContent(
+            category='Consola del colegio',
+            title='Ya puede entrar a la consola del Colegio Interlaken',
+            intro=f'{hello} le dio acceso a la consola del personal con la misma cuenta que ya tenía.',
+            preheader='Entre con «Continuar con Google» usando su correo del colegio.',
+            details=[('Su correo de acceso', user.email), ('Dónde entrar', login_url),
+                     *([('Puede usar', areas)] if areas else [])],
+            paragraphs=[
+                'Entre con «Continuar con Google» usando este mismo correo.',
+                'Su cuenta de cafetería no cambia: su saldo, sus recargas y su historial siguen en «Mi cafetería».',
+            ],
+            cta_label='Entrar a la consola',
+            cta_url=login_url,
+            note='Si no esperaba este acceso, avise al colegio.',
+            reason=('Recibe este correo porque un administrador del Colegio Interlaken le dio acceso '
+                    'a la consola del personal.'),
+        )
+        return 'Ya puede entrar a la consola del Colegio Interlaken', content
     created = 'creó una cuenta para usted en la consola del personal.'
     content = EmailContent(
         category='Consola del colegio',
@@ -91,12 +124,12 @@ def invite_email(user: User):
     return 'Su cuenta en la consola del Colegio Interlaken', content
 
 
-def send_invite_email(user: User) -> bool:
+def send_invite_email(user: User, *, granted: bool = False) -> bool:
     """Best effort: a mail problem never undoes the invitation."""
     from apps.portal.services import send_email
 
     try:
-        subject, content = invite_email(user)
+        subject, content = invite_email(user, granted=granted)
         return bool(send_email(subject=subject, message='', recipients=[user.email], content=content))
     except Exception:  # noqa: BLE001 - the account exists either way
         logger.warning('Staff invite email failed for user #%s', user.pk, exc_info=True)
@@ -106,16 +139,29 @@ def send_invite_email(user: User) -> bool:
 class StaffUserSerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField()
     has_password = serializers.SerializerMethodField()
+    # The login also holds a «Personal del colegio» cafetería account (wallet,
+    # «Mi cafetería»): deactivating it would take the cafetería away too, so
+    # Usuarios offers «Quitar acceso a la consola» instead (2026-11-25).
+    has_cafeteria = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'is_active',
                   'is_superuser', 'last_login', 'date_joined', 'has_password',
-                  'staff_title', 'staff_areas', 'archived_at']
+                  'staff_title', 'staff_areas', 'archived_at', 'has_cafeteria']
         read_only_fields = fields
 
     def get_has_password(self, u):
         return u.has_usable_password()
+
+    def get_has_cafeteria(self, u):
+        # The list annotates it (no query per row); one account asks once.
+        annotated = getattr(u, 'has_cafeteria_account', None)
+        if annotated is not None:
+            return bool(annotated)
+        from .people import own_cafeteria_account
+
+        return own_cafeteria_account(u) is not None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -183,6 +229,53 @@ def last_active_admin(target) -> bool:
     return not User.objects.filter(role=User.Role.ADMIN, is_active=True).exclude(pk=target.pk).exists()
 
 
+# ── console access on a staff cafetería login (owner, 2026-11-25) ─────────────
+# The office could not invite the person in charge of admissions: her address
+# already belonged to her «Personal del colegio» cafetería login (role student,
+# apps/accounts/people.py), so «Nuevo usuario» answered «ya está registrado».
+# That same login now gets the console: one account, one wallet, one history.
+STAFF_CAFETERIA_LOGIN = 'staff_cafeteria_login'
+FAMILY_LOGIN_REFUSED = (
+    'Ese correo es de una familia o de un alumno: no puede ser usuario de la consola. '
+    'Invite a la persona con otro correo, por ejemplo el del colegio.'
+)
+SUPERUSER_REFUSED = 'Las cuentas superusuario se administran desde el panel técnico.'
+
+
+def console_grant_refusal(user) -> tuple[str | None, str | None]:
+    """``(message, code)`` saying why ``user``'s own login cannot get the
+    console, or ``(None, None)`` when it can: an active, not archived staff
+    cafetería login. A parent who also works here keeps their family login
+    for their children, so it is refused like any family account."""
+    from .people import is_staff_only_login
+
+    if user.is_superuser:
+        return SUPERUSER_REFUSED, 'superuser'
+    if user.role in STAFF_ROLES:
+        return 'Esa persona ya es usuario de la consola.', 'already_console'
+    if not is_staff_only_login(user):
+        return FAMILY_LOGIN_REFUSED, 'family_login'
+    if user.archived_at is not None:
+        return ('Esa persona está archivada: restáurela en Personal antes de darle acceso '
+                'a la consola.'), 'archived'
+    if not user.is_active:
+        return 'La cuenta está desactivada: actívela antes de darle acceso a la consola.', 'inactive'
+    return None, None
+
+
+def staff_person(user) -> dict:
+    """Who the «Nuevo usuario» dialog offers console access to."""
+    from .people import own_cafeteria_account
+
+    profile = own_cafeteria_account(user)
+    return {
+        'id': user.pk,
+        'full_name': user.full_name,
+        'email': user.email,
+        'puesto_label': (profile.get_puesto_display() if profile else '') or 'Sin asignar',
+    }
+
+
 class StaffListCreateView(AdminListMixin, generics.ListAPIView):
     """GET (list contract: ``q``, ``ordering``, ``role``/``rol``, ``active``/``activo``,
     ``page_size``) and POST (invite) on /accounts/admin/staff/."""
@@ -194,7 +287,13 @@ class StaffListCreateView(AdminListMixin, generics.ListAPIView):
     filterset_class = StaffFilterSet
 
     def get_queryset(self):
-        return User.objects.filter(role__in=STAFF_ROLES)
+        from django.db.models import Exists, OuterRef
+
+        from .models import StudentProfile
+
+        # «También cafetería» per row without a query per row (has_cafeteria).
+        wallet = StudentProfile.objects.filter(user_id=OuterRef('pk'), tipo=StudentProfile.Tipo.PERSONAL)
+        return User.objects.filter(role__in=STAFF_ROLES).annotate(has_cafeteria_account=Exists(wallet))
 
     def post(self, request):
         email = (request.data.get('email') or '').strip().lower()
@@ -202,12 +301,28 @@ class StaffListCreateView(AdminListMixin, generics.ListAPIView):
         last = (request.data.get('last_name') or '').strip()
         role = request.data.get('role') or User.Role.STAFF
         title, areas, errors = parse_staff_access(request.data, role=role)
+        existing = User.objects.filter(email__iexact=email).first() if '@' in email else None
         if not email:
             errors['email'] = ['Escriba el correo.']
         elif '@' not in email:
             errors['email'] = ['Revise el correo.']
-        elif User.objects.filter(email__iexact=email).exists():
-            errors['email'] = ['Ese correo ya está registrado.']
+        elif existing is not None:
+            refusal, code = console_grant_refusal(existing)
+            if code is None:
+                # Their staff cafetería login IS the account: the dialog offers
+                # console access on it (StaffConsoleAccessView), never a second one.
+                return Response({
+                    'code': STAFF_CAFETERIA_LOGIN,
+                    'detail': ('Esa persona ya tiene cuenta de cafetería como personal del colegio. '
+                               'Puede darle acceso a la consola con esa misma cuenta.'),
+                    'person': staff_person(existing),
+                }, status=status.HTTP_409_CONFLICT)
+            if code not in ('already_console', 'superuser'):
+                errors['email'] = [refusal]
+            elif existing.archived_at is not None:
+                errors['email'] = ['Ese correo es de una cuenta archivada: restáurela en Usuarios › Archivadas.']
+            else:
+                errors['email'] = ['Ese correo ya es usuario de la consola.']
         if not first:
             errors['first_name'] = ['Requerido.']
         if role not in STAFF_ROLES:
@@ -390,6 +505,101 @@ class StaffResetPasswordView(APIView):
             record('permission', target, {'password': ['[redacted]', '[redacted]'], 'sessions_revoked': revoked},
                    actor=request.user, context='accounts.staff_set_password')
         return Response({'temporary_password': password, 'sessions_revoked': revoked})
+
+
+class StaffConsoleAccessView(APIView):
+    """POST / DELETE /accounts/admin/staff/<pk>/console-access/ (owner, 2026-11-25).
+
+    POST gives a staff cafetería login (``role='student'`` holding a
+    ``tipo='personal'`` profile) the console: ``role='staff'`` with a puesto
+    preset or explicit ``staff_areas`` (+ ``staff_title``), at least one area.
+    The login, wallet, Loyverse link and history stay as they are and no
+    password is generated: the person signs in with Google (an admin can still
+    generate a temporary one in Usuarios); the invitation email tells them.
+    Families, pupils, console users, superusers, archived and inactive
+    accounts are refused (``console_grant_refusal``).
+
+    DELETE is the inverse for a ``role='staff'`` account that holds a staff
+    wallet: back to a cafetería-only login (areas and title cleared, console
+    sessions closed), wallet untouched. Never an admin (change the role to
+    Personal in Usuarios first), a superuser or oneself.
+
+    Admin only: who may use the console is a Usuarios decision (ADMIN_ONLY in
+    core/test_areas.py). Both write an audit row.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        target = User.objects.filter(pk=pk).first()
+        if target is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        title, areas, errors = parse_staff_access(request.data, role=User.Role.STAFF)
+        if not errors and not areas:
+            errors['staff_areas'] = ['Elija al menos un área de la consola.']
+        with transaction.atomic():
+            # Locked and judged inside the transaction: a double click must not
+            # write (or email) twice.
+            target = User.objects.select_for_update().get(pk=target.pk)
+            refusal, code = console_grant_refusal(target)
+            if refusal:
+                conflict = code in ('already_console', 'superuser')
+                return Response({'detail': refusal, 'code': code},
+                                status=status.HTTP_409_CONFLICT if conflict else status.HTTP_400_BAD_REQUEST)
+            if errors:
+                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+            changes = {
+                'role': [target.role, User.Role.STAFF],
+                'staff_title': [target.staff_title, title],
+                'staff_areas': [list(target.staff_areas or []), areas],
+            }
+            target.role = User.Role.STAFF
+            target.is_staff = False
+            target.staff_title = title
+            target.staff_areas = areas
+            target.save(update_fields=['role', 'is_staff', 'staff_title', 'staff_areas'])
+            record('permission', target, {'via': 'portal', **changes}, actor=request.user,
+                   context='portal: acceso a la consola')
+        data = StaffUserSerializer(target).data
+        data['invite_email_sent'] = send_invite_email(target, granted=True)
+        return Response(data)
+
+    def delete(self, request, pk):
+        from .people import own_cafeteria_account
+
+        target = User.objects.filter(pk=pk).first()
+        if target is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if target.is_superuser:
+            return Response({'detail': SUPERUSER_REFUSED}, status=status.HTTP_403_FORBIDDEN)
+        if target.pk == request.user.pk:
+            return Response({'detail': 'No puede quitarse su propio acceso a la consola.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if target.role == User.Role.ADMIN:
+            return Response({'detail': 'Es administrador: primero cámbiele el rol a Personal en Usuarios.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if target.role != User.Role.STAFF:
+            return Response({'detail': 'Esa cuenta no tiene acceso a la consola.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if own_cafeteria_account(target) is None:
+            return Response({'detail': ('No tiene cuenta de cafetería: para quitarle la consola, '
+                                        'desactívela en Usuarios.')},
+                            status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            changes = {
+                'role': [target.role, User.Role.STUDENT],
+                'staff_title': [target.staff_title, ''],
+                'staff_areas': [list(target.staff_areas or []), []],
+            }
+            target.role = User.Role.STUDENT
+            target.is_staff = False
+            target.staff_title = ''
+            target.staff_areas = []
+            target.save(update_fields=['role', 'is_staff', 'staff_title', 'staff_areas'])
+            # Console sessions end now; the next sign-in lands in «Mi cafetería».
+            revoked = revoke_refresh_tokens(target)
+            record('permission', target, {'via': 'portal', 'sessions_revoked': revoked, **changes},
+                   actor=request.user, context='portal: quitar acceso a la consola')
+        return Response({'id': target.pk, 'role': target.role, 'sessions_revoked': revoked})
 
 
 # ── bulk: deactivate / reactivate (Data Ops C5) ────────────

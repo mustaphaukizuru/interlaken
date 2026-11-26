@@ -1,7 +1,7 @@
 import { Fragment, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserCog, Plus, KeyRound, Copy, Check, FileUp, UserX, UserCheck, ShieldCheck, Pencil, History, MailCheck, MailWarning } from 'lucide-react';
+import { UserCog, Plus, KeyRound, Copy, Check, FileUp, UserX, UserCheck, ShieldCheck, ShieldOff, Pencil, History, MailCheck, MailWarning, Coffee } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -28,11 +28,13 @@ import { useRowSelection } from '@/hooks/useRowSelection';
 import { useDirtyCloseGuard, useReportDirty, valuesDiffer } from '@/hooks/useDirtyCloseGuard';
 import { adminKeys } from '@/hooks/queries/keys';
 import { STAFF_ENTITY, staffImportApi, useStaffBulk, useStaffExport, useStaffList, type StaffListParams } from '@/hooks/queries/staff';
+import { invalidateStudents } from '@/hooks/queries/studentKeys';
 import { useAuthStore } from '@/store/authStore';
-import { portalApi, type StaffUser } from '@/services/api';
+import { portalApi, type StaffCafeteriaPerson, type StaffUser } from '@/services/api';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
-import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
+import { apiErrorCode, apiErrorMessage, apiErrorStatus, fieldErrorsOrNull } from '@/lib/apiErrors';
 import { StaffAccessFields, StaffAccessModal, StaffAccessSummary, type StaffAccess } from '@/components/admin/StaffAccessFields';
+import { RemoveConsoleAccessDialog } from '@/components/admin/ConsoleAccess';
 import { PUESTOS } from '@/lib/areaCatalog';
 import { shortDate } from '@/lib/tableFormat';
 
@@ -72,6 +74,8 @@ export default function AdminStaffUsers() {
   const [toView, setToView] = useState<StaffUser | null>(null);
   // «Administrador» is never one click away: the select asks first (QA 2026-11-24).
   const [toPromote, setToPromote] = useState<StaffUser | null>(null);
+  // Back to a cafetería-only login (Personal, 2026-11-25).
+  const [toRemove, setToRemove] = useState<StaffUser | null>(null);
   const isLg = useMediaQuery('(min-width: 1024px)');
 
   const [page, setPage] = useUrlPage();
@@ -148,6 +152,12 @@ export default function AdminStaffUsers() {
           {u.is_superuser && <Badge variant="warning">Superusuario</Badge>}
           {/* The address under the name: the account's identity, without a column of its own. */}
           {u.full_name && <span className="block w-full truncate text-xs text-subtle" title={u.email}>{u.email}</span>}
+          {/* Their staff wallet lives on this same login (Personal, 2026-11-25). */}
+          {u.has_cafeteria && (
+            <span className="inline-flex w-full items-center gap-1 text-xs text-subtle">
+              <Coffee className="h-3.5 w-3.5" aria-hidden="true" /> También compra en cafetería
+            </span>
+          )}
         </span>
       ),
     },
@@ -211,6 +221,11 @@ export default function AdminStaffUsers() {
       if (u.role !== 'admin') {
         items.push({ key: 'password', label: 'Generar contraseña', icon: KeyRound, onSelect: () => setToReset(u) });
       }
+      // A staff member who also buys at the cafetería keeps that login: «Desactivar»
+      // would take «Mi cafetería» away too, so the console alone goes here.
+      if (u.role === 'staff' && u.has_cafeteria) {
+        items.push({ key: 'console', label: 'Quitar acceso a la consola', ariaLabel: `Quitar acceso a la consola a ${u.email}`, icon: ShieldOff, onSelect: () => setToRemove(u) });
+      }
       items.push(
         { key: 'toggle', label: u.is_active ? 'Desactivar' : 'Reactivar', icon: u.is_active ? UserX : UserCheck, onSelect: () => setToToggle(u) },
         { key: 'archive', label: 'Archivar', icon: ARCHIVE_ACTION.icon, onSelect: () => setConfirming({ action: ARCHIVE_ACTION, one: u }) },
@@ -224,7 +239,7 @@ export default function AdminStaffUsers() {
     <>
       <PageHeader
         title="Usuarios del personal"
-        subtitle="Administradores (todo el portal) y personal con su puesto: Secretaría, Recepción, Cafetería o áreas a la medida. Las cuentas superusuario se gestionan en el panel técnico."
+        subtitle="Administradores (todo el portal) y personal con su puesto: Secretaría, Recepción, Cafetería, Admisiones o áreas a la medida. Las cuentas superusuario se gestionan en el panel técnico."
         actions={(
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => setInviteOpen(true)}><Plus size={16} aria-hidden="true" /> Invitar</Button>
@@ -322,7 +337,7 @@ export default function AdminStaffUsers() {
         api={staffImportApi}
         headers={IMPORT_HEADERS}
         templatePrefix="personal"
-        description={<>Una fila por persona. <code>rol</code>: <em>staff</em> (Personal) o <em>admin</em>. <code>puesto</code> (opcional, solo Personal): <em>secretaria</em>, <em>recepcion</em> o <em>cafeteria</em> da las áreas de ese puesto. Las cuentas se crean sin contraseña: la persona entra con Google o, si es Personal, usted genera una con «Contraseña» (las cuentas de administrador usan su propio flujo de recuperación).</>}
+        description={<>Una fila por persona. <code>rol</code>: <em>staff</em> (Personal) o <em>admin</em>. <code>puesto</code> (opcional, solo Personal): <em>secretaria</em>, <em>recepcion</em>, <em>cafeteria</em> o <em>admisiones</em> da las áreas de ese puesto. Las cuentas se crean sin contraseña: la persona entra con Google o, si es Personal, usted genera una con «Contraseña» (las cuentas de administrador usan su propio flujo de recuperación).</>}
       />
       <BulkConfirmDialog
         open={!!confirming}
@@ -346,7 +361,11 @@ export default function AdminStaffUsers() {
         onClose={() => setToToggle(null)}
         onConfirm={() => toToggle && patch.mutate({ id: toToggle.id, data: { is_active: !toToggle.is_active } })}
         title={toToggle?.is_active ? 'Desactivar cuenta' : 'Reactivar cuenta'}
-        message={toToggle?.is_active ? `${toToggle.email} no podrá iniciar sesión y sus sesiones abiertas se cerrarán.` : `${toToggle?.email} podrá volver a iniciar sesión.`}
+        message={toToggle?.is_active
+          ? `${toToggle.email} no podrá iniciar sesión y sus sesiones abiertas se cerrarán.${toToggle.has_cafeteria && toToggle.role === 'staff'
+            ? ' También perderá «Mi cafetería». Para quitarle solo la consola use «Quitar acceso a la consola».'
+            : ''}`
+          : `${toToggle?.email} podrá volver a iniciar sesión.`}
         confirmLabel={toToggle?.is_active ? 'Desactivar' : 'Reactivar'}
         loading={patch.isPending}
       />
@@ -370,6 +389,10 @@ export default function AdminStaffUsers() {
       />
       <RevealModal data={revealed} onClose={() => setRevealed(null)} />
       <StaffAccessModal user={toAccess} onClose={() => setToAccess(null)} onSaved={invalidate} />
+      <RemoveConsoleAccessDialog
+        person={toRemove ? { userId: toRemove.id, name: toRemove.full_name, email: toRemove.email } : null}
+        onClose={() => setToRemove(null)}
+      />
     </>
   );
 }
@@ -378,12 +401,19 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
   const guard = useDirtyCloseGuard(onClose);
   return (
     <>
-      <Modal open={open} onClose={guard.requestClose} title="Invitar al personal" maxWidth={480}>
+      <Modal open={open} onClose={guard.requestClose} title="Invitar al personal" maxWidth={520}>
         <InviteForm key={String(open)} onClose={onClose} onCancel={guard.requestClose} onDirty={guard.reportDirty} onInvited={onInvited} />
       </Modal>
       {guard.dialog}
     </>
   );
+}
+
+/** The person a 409 `staff_cafeteria_login` names (their address is a staff cafetería login). */
+function staffCafeteriaPerson(err: unknown): StaffCafeteriaPerson | null {
+  if (apiErrorStatus(err) !== 409 || apiErrorCode(err) !== 'staff_cafeteria_login') return null;
+  const person = (err as { response?: { data?: { person?: StaffCafeteriaPerson } } }).response?.data?.person;
+  return person && typeof person.id === 'number' ? person : null;
 }
 
 const INVITE_START = { email: '', first_name: '', last_name: '', role: 'staff' as StaffUser['role'] };
@@ -394,38 +424,87 @@ function InviteForm({ onClose, onCancel, onDirty, onInvited }: {
   onClose: () => void; onCancel: () => void; onDirty: (dirty: boolean) => void;
   onInvited: (r: Revealed) => void;
 }) {
+  const qc = useQueryClient();
   const [form, setForm] = useState(INVITE_START);
   const [access, setAccess] = useState<StaffAccess>(ACCESS_START);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  // The address is a staff cafetería login (2026-11-25): offer the console on it.
+  const [offer, setOffer] = useState<StaffCafeteriaPerson | null>(null);
   // Areas in any order are the same access.
   const sorted = (a: StaffAccess) => ({ ...a, staff_areas: [...a.staff_areas].sort() });
   useReportDirty(valuesDiffer(form, INVITE_START) || valuesDiffer(sorted(access), sorted(ACCESS_START)), onDirty);
   const invite = useMutation({
     mutationFn: () => portalApi.inviteStaff(form.role === 'staff' ? { ...form, ...access } : form),
     onSuccess: ({ data }) => { onInvited({ user: data, password: data.temporary_password, emailSent: data.invite_email_sent }); onClose(); },
-    onError: (e: unknown) => { const f = fieldErrorsOrNull(e); if (f && Object.keys(f).length) setErrors(f); else toast.error('No se pudo crear la cuenta.'); },
+    onError: (e: unknown) => {
+      const person = staffCafeteriaPerson(e);
+      if (person) { setErrors({}); setOffer(person); return; }
+      const f = fieldErrorsOrNull(e);
+      if (f && Object.keys(f).length) setErrors(f); else toast.error('No se pudo crear la cuenta.');
+    },
   });
-  const submit = (e: FormEvent) => { e.preventDefault(); invite.mutate(); };
+  const grant = useMutation({
+    mutationFn: (person: StaffCafeteriaPerson) => portalApi.grantConsoleAccess(person.id, access),
+    onSuccess: ({ data }, person) => {
+      void qc.invalidateQueries({ queryKey: adminKeys.entity(STAFF_ENTITY) });
+      void invalidateStudents(qc);
+      toast.success(`${person.full_name || person.email} ya puede entrar a la consola.`);
+      if (!data.invite_email_sent) {
+        toast(`No se pudo enviar el correo de aviso: dígale que entre con «Continuar con Google» usando ${person.email}.`, { duration: 8000 });
+      }
+      onClose();
+    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo dar el acceso.')),
+  });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (offer) { if (access.staff_areas.length) grant.mutate(offer); return; }
+    invite.mutate();
+  };
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <Input label="Correo" type="email" inputMode="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={errors.email} required />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Nombre" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} error={errors.first_name} required />
-        <Input label="Apellidos" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      </div>
-      <div>
-        <label className="label" htmlFor="st-role">Rol</label>
-        <select id="st-role" className="input-field min-h-[44px]" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as StaffUser['role'] })}>
-          <option value="staff">Personal (solo las áreas de su puesto)</option>
-          <option value="admin">Administrador (todo el portal)</option>
-        </select>
-      </div>
-      {form.role === 'staff' && <StaffAccessFields value={access} onChange={setAccess} idPrefix="invite" />}
-      {errors.staff_areas && <p className="text-xs text-coral">{errors.staff_areas}</p>}
-      <p className="text-sm text-muted">Le enviaremos un correo con el enlace para entrar, sin la contraseña. La contraseña temporal aparece al crear la cuenta: entréguela en persona.</p>
+      <Input label="Correo" type="email" inputMode="email" value={form.email} onChange={(e) => { setOffer(null); setForm({ ...form, email: e.target.value }); }} error={errors.email} required />
+      {offer && (
+        <div role="status" className="space-y-3 rounded-md border border-purple/20 bg-purple-light px-4 py-3 text-sm text-ink">
+          <p>
+            <strong>{offer.full_name || offer.email}</strong> ya tiene cuenta de cafetería como personal del colegio
+            ({offer.puesto_label}). Puede darle acceso a la consola con esa misma cuenta: conserva su saldo y su
+            historial, y entra con «Continuar con Google».
+          </p>
+          {form.role === 'admin' && (
+            <p className="text-xs text-muted">Entrará como Personal con las áreas que elija aquí; después puede hacerla administradora desde esta lista.</p>
+          )}
+          <StaffAccessFields value={access} onChange={setAccess} idPrefix="offer" />
+          {!access.staff_areas.length && <p className="text-xs text-warning">Elija un puesto o al menos un área.</p>}
+        </div>
+      )}
+      {!offer && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="Nombre" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} error={errors.first_name} required />
+            <Input label="Apellidos" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+          </div>
+          <div>
+            <label className="label" htmlFor="st-role">Rol</label>
+            <select id="st-role" className="input-field min-h-[44px]" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as StaffUser['role'] })}>
+              <option value="staff">Personal (solo las áreas de su puesto)</option>
+              <option value="admin">Administrador (todo el portal)</option>
+            </select>
+          </div>
+          {form.role === 'staff' && <StaffAccessFields value={access} onChange={setAccess} idPrefix="invite" />}
+          {errors.staff_areas && <p className="text-xs text-coral">{errors.staff_areas}</p>}
+          <p className="text-sm text-muted">Le enviaremos un correo con el enlace para entrar, sin la contraseña. La contraseña temporal aparece al crear la cuenta: entréguela en persona.</p>
+        </>
+      )}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" onClick={onCancel} className="min-h-[44px]">Cancelar</Button>
-        <Button type="submit" loading={invite.isPending} className="min-h-[44px]"><UserCog className="h-4 w-4" aria-hidden="true" /> Crear cuenta</Button>
+        {offer ? (
+          <Button type="submit" loading={grant.isPending} disabled={!access.staff_areas.length} className="min-h-[44px]">
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Dar acceso a la consola
+          </Button>
+        ) : (
+          <Button type="submit" loading={invite.isPending} className="min-h-[44px]"><UserCog className="h-4 w-4" aria-hidden="true" /> Crear cuenta</Button>
+        )}
       </div>
     </form>
   );

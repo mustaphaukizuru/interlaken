@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type MouseEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, House, Briefcase, type LucideIcon } from 'lucide-react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, House, Briefcase, ShieldCheck, ShieldOff, type LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { ImportStaffModal } from '@/components/admin/ImportStaffModal';
@@ -34,8 +34,12 @@ import { GRADES, NIVELES } from '@/lib/grades';
 import { formatMXN } from '@/lib/format';
 import { shortDate } from '@/lib/tableFormat';
 import { canOpen, isAdmin } from '@/lib/areas';
+import { PUESTO_LABEL, PUESTO_OPTIONS, consoleAction } from '@/lib/people';
+import { plural } from '@/lib/plural';
 import { useAuthStore } from '@/store/authStore';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
+import { ConsoleAccessCell, GrantConsoleAccessModal, RemoveConsoleAccessDialog, type ConsolePerson } from '@/components/admin/ConsoleAccess';
+import type { StaffPuesto } from '@/types';
 import AdminStudentDetail from './AdminStudentDetail';
 
 type StatusKey = keyof typeof STUDENT_STATUS;
@@ -72,6 +76,8 @@ const BULK_ACTIONS: BulkActionDef[] = [
 ];
 /** First in the bar: select the siblings, then the family preview (who joins, who gains access). */
 const FAMILY_ACTION: BulkActionDef = { name: 'family', label: 'Vincular como hermanos', icon: House };
+/** «Personal» (2026-11-25): every staff member starts «Sin asignar»; this is the office's first job. */
+const PUESTO_ACTION: BulkActionDef = { name: 'puesto', label: 'Cambiar puesto', icon: Briefcase };
 
 // A column of icons wide enough to stay pinned beside the data; below lg the
 // table moves them into its overflow menu, where the words show too.
@@ -96,17 +102,38 @@ function initial(s: RosterStudent) {
   return (s.user.first_name || s.user.full_name || '?').charAt(0).toUpperCase();
 }
 
+type RosterMode = 'alumno' | 'personal';
+
 /**
- * /admin/alumnos — the roster on the Data Ops UI foundation: FilterBar (search,
- * estado tabs, nivel/grado/acceso/vínculo, grupo), DataTable v2 (server sort on
- * every mapped column, column controls persisted as `students`, pinned name),
- * selection with bulk status/grade/group/sync, export CSV/Excel/PDF of the view
- * or the selection, and the generic ImportDialog. Opens on the active students.
- * Archivar takes a student off every list (Archivados tab, Restaurar); an admin's
- * Eliminar erases a record with nothing to keep and archives the rest (server
- * rules: student_delete.py). On 2xl screens a row opens the detail pane.
+ * /admin/alumnos and /admin/personal — the roster on the Data Ops UI
+ * foundation: FilterBar (search, estado tabs, nivel/grado/acceso/vínculo,
+ * grupo), DataTable v2 (server sort on every mapped column, column controls
+ * persisted per list, pinned name), selection with bulk status/grade/group/sync,
+ * export CSV/Excel/PDF of the view or the selection, and the generic
+ * ImportDialog. Opens on the active people. Archivar takes someone off every
+ * list (Archivados tab, Restaurar); an admin's Eliminar erases a record with
+ * nothing to keep and archives the rest (server rules: student_delete.py). On
+ * 2xl screens a row opens the detail pane.
+ *
+ * «Personal» (owner, 2026-11-25: its own menu entry, it used to be a tab of
+ * Alumnos) lists the staff cafetería accounts with their puesto (filter and
+ * bulk «Cambiar puesto») and who of them uses the console: an admin gives or
+ * takes away console access on the person's own login (ConsoleAccess.tsx).
  */
-export default function AdminStudents() {
+export default function AdminStudents({ mode = 'alumno' }: { mode?: RosterMode } = {}) {
+  const location = useLocation();
+  // Bookmarks of the old «Personal» tab (/admin/alumnos?tipo=personal) keep working.
+  const params = new URLSearchParams(location.search);
+  if (mode === 'alumno' && params.get('tipo') === 'personal') {
+    params.delete('tipo');
+    const rest = params.toString();
+    return <Navigate to={`/admin/personal${rest ? `?${rest}` : ''}`} replace />;
+  }
+  // Two routes, one component: the key gives each list its own state.
+  return <Roster key={mode} personal={mode === 'personal'} />;
+}
+
+function Roster({ personal }: { personal: boolean }) {
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
   const sort = parseSort(get('orden'));
@@ -117,19 +144,19 @@ export default function AdminStudents() {
   // Secretaría without the cafetería area was bounced from that link silently.
   const canCafeteria = canOpen(me, '/admin/cafeteria');
   const navigate = useNavigate();
-  // «Alumnos» / «Personal» (2026-11-18): staff cafetería accounts are never
-  // in the pupils' list; their own tab lists them with their puesto.
-  const personal = get('tipo') === 'personal';
+  // Staff cafetería accounts are never in the pupils' list (2026-11-18).
   const tipoParam = personal ? 'personal' : undefined;
+  const base = personal ? '/admin/personal' : '/admin/alumnos';
   const filters: Omit<StudentsListParams, 'page'> = {
     tipo: tipoParam,
     q: get('q') || undefined,
     status: estado === ALL_STATUSES || estado === ARCHIVED ? undefined : estado || 'active',
     archived: estado === ARCHIVED ? '1' : undefined,
     access: get('acceso') || undefined,
-    level: get('nivel') || undefined,
-    grade: get('grado') || undefined,
-    group: get('grupo') || undefined,
+    level: personal ? undefined : get('nivel') || undefined,
+    grade: personal ? undefined : get('grado') || undefined,
+    group: personal ? undefined : get('grupo') || undefined,
+    puesto: personal ? get('puesto') || undefined : undefined,
     linked: vinculado || undefined,
     ordering: serializeSort(sort) || undefined,
   };
@@ -141,13 +168,13 @@ export default function AdminStudents() {
   const missingCount = missing?.count ?? 0;
   const { data: archivedList } = useStudentsList({ page: 1, page_size: 1, archived: '1', tipo: tipoParam });
   const archivedCount = archivedList?.count ?? 0;
-  // The other tab's size, for its label (one tiny page-size-1 query).
-  const { data: otherTab } = useStudentsList({ page: 1, page_size: 1, status: 'active', tipo: personal ? undefined : 'personal' });
-  const otherCount = otherTab?.count;
-  const switchTipo = (next: 'alumno' | 'personal') => set({
-    tipo: next === 'personal' ? 'personal' : null,
-    estado: null, nivel: null, grado: null, grupo: null, acceso: null, vinculado: null, q: null, page: null, orden: null,
-  });
+  const [granting, setGranting] = useState<ConsolePerson | null>(null);
+  const [removing, setRemoving] = useState<ConsolePerson | null>(null);
+  const personOf = (s: RosterStudent): ConsolePerson => ({ userId: s.user.id, name: s.user.full_name, email: s.user.email });
+  // What the people in this list are called, in the counts, toasts and dialogs.
+  const noun = personal
+    ? { one: 'persona', many: 'personas', gender: 'f' as const }
+    : { one: 'alumno', many: 'alumnos', gender: 'm' as const };
   const viewingArchived = estado === ARCHIVED;
   const isLg = useMediaQuery('(min-width: 1024px)');
   const exportStudents = useStudentsExport();
@@ -192,7 +219,7 @@ export default function AdminStudents() {
     ? [RESTORE_ACTION, ...(canDelete ? [DELETE_ACTION] : [])]
     : personal
       // Staff: no families, grades or groups (a puesto instead).
-      ? [ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS.filter((a) => ['status', 'sync_loyverse'].includes(a.name))]
+      ? [PUESTO_ACTION, ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS.filter((a) => ['status', 'sync_loyverse'].includes(a.name))]
       : [FAMILY_ACTION, ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS];
 
   const columns = useMemo<Column<RosterStudent>[]>(() => [
@@ -204,7 +231,7 @@ export default function AdminStudents() {
             {initial(s)}
           </span>
           <Link
-            to={`/admin/alumnos/${s.id}`}
+            to={`${base}/${s.id}`}
             onClick={(e) => openStudent(e, s.id)}
             className="font-medium text-ink hover:text-purple hover:underline"
             aria-current={selectedId === s.id ? 'true' : undefined}
@@ -227,7 +254,11 @@ export default function AdminStudents() {
     },
     { id: 'loyverse_code', header: 'Código Loyverse', defaultHidden: true, minWidth: 120, className: 'font-mono text-xs text-muted', cell: (s) => s.loyverse_code || s.student_id },
     ...(personal
-      ? [{ id: 'puesto', header: 'Puesto', minWidth: 140, className: 'text-muted', cell: (s: RosterStudent) => s.puesto_label || 'Sin asignar' }]
+      ? [
+        { id: 'puesto', header: 'Puesto', sortKey: 'puesto', minWidth: 140, className: 'text-muted', cell: (s: RosterStudent) => s.puesto_label || 'Sin asignar' },
+        // Who of the staff also uses the console, and for what (2026-11-25).
+        { id: 'console', header: 'Consola', minWidth: 170, cell: (s: RosterStudent) => <ConsoleAccessCell user={s.user} /> },
+      ]
       : [
         { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s: RosterStudent) => s.grade },
         { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s: RosterStudent) => s.group || '—' },
@@ -284,7 +315,7 @@ export default function AdminStudents() {
       cell: (s) => (s.user.last_login ? shortDate(s.user.last_login) : <span className="text-coral-600">Nunca</span>),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [twoPane, selectedId, personal]);
+  ], [twoPane, selectedId, personal, base]);
 
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
     exportStudents.mutateAsync({
@@ -311,7 +342,9 @@ export default function AdminStudents() {
   };
   const pickedValue = (value: string) => {
     if (!picking) return;
-    const labelFor = picking.name === 'status' ? STUDENT_STATUS[value as StatusKey]?.label ?? value : value;
+    const labelFor = picking.name === 'status' ? STUDENT_STATUS[value as StatusKey]?.label ?? value
+      : picking.name === 'puesto' ? PUESTO_LABEL[value as StaffPuesto] ?? value
+      : value;
     const withdraw = picking.name === 'status' && value === 'withdrawn';
     setConfirming({
       action: {
@@ -326,19 +359,32 @@ export default function AdminStudents() {
   };
 
   const pickerProps = (() => {
-    if (picking?.name === 'status') return { label: 'Nuevo estado', options: STATUS_OPTIONS, hint: '«Baja definitiva» deja al alumno en la pestaña de bajas y su saldo se muestra antes de confirmar. Para quitarlo de las listas use Archivar.' };
+    if (picking?.name === 'status') {
+      return {
+        label: 'Nuevo estado', options: STATUS_OPTIONS,
+        hint: personal
+          ? '«Baja definitiva» deja a la persona en la pestaña de bajas y su saldo se muestra antes de confirmar. Para quitarla de las listas use Archivar.'
+          : '«Baja definitiva» deja al alumno en la pestaña de bajas y su saldo se muestra antes de confirmar. Para quitarlo de las listas use Archivar.',
+      };
+    }
+    if (picking?.name === 'puesto') return { label: 'Nuevo puesto', options: PUESTO_OPTIONS, hint: 'Solo cambia el puesto que se ve en la lista y en la credencial; no da acceso a la consola.' };
     if (picking?.name === 'grade') return { label: 'Nuevo grado', options: GRADES.map((g) => ({ value: g, label: g })), freeText: true, maxLength: 20 };
     return { label: 'Nuevo grupo', options: groupOptions, freeText: true, maxLength: 5, uppercase: true, hint: 'Elija un grupo existente o escriba uno nuevo.' };
   })();
 
-  const SECONDARY = [
-    { key: 'import', label: 'Importar archivo', icon: FileUp, run: () => setImportOpen(true) },
-    { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download, run: () => setImportLoyverseOpen(true) },
-    // A3: admins only (the endpoint refuses everyone else).
-    ...(canDelete ? [{ key: 'staff', label: 'Importar personal desde Loyverse', icon: Briefcase, run: () => setImportStaffOpen(true) }] : []),
-    { key: 'link', label: 'Vincular Loyverse', icon: Link2, run: () => setLinkOpen(true) },
-  ];
-  const anyFilter = !!estado || Object.entries(filters).some(([k, v]) => k !== 'ordering' && k !== 'status' && v);
+  // «Personal» brings its people from Loyverse; Alumnos imports files and pupils.
+  const SECONDARY = personal
+    ? [
+      // A3: admins only (the endpoint refuses everyone else).
+      ...(canDelete ? [{ key: 'staff', label: 'Importar personal desde Loyverse', icon: Briefcase, run: () => setImportStaffOpen(true) }] : []),
+      { key: 'link', label: 'Vincular Loyverse', icon: Link2, run: () => setLinkOpen(true) },
+    ]
+    : [
+      { key: 'import', label: 'Importar archivo', icon: FileUp, run: () => setImportOpen(true) },
+      { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download, run: () => setImportLoyverseOpen(true) },
+      { key: 'link', label: 'Vincular Loyverse', icon: Link2, run: () => setLinkOpen(true) },
+    ];
+  const anyFilter = !!estado || Object.entries(filters).some(([k, v]) => k !== 'ordering' && k !== 'status' && k !== 'tipo' && v);
   const startOne = (action: BulkActionDef, one: RosterStudent) => setConfirming({ action, payload: action.payload, one });
   const lifecycleItems = (s: RosterStudent): RowMenuItem[] => [
     s.archived_at
@@ -346,6 +392,18 @@ export default function AdminStudents() {
       : { key: 'archive', label: 'Archivar', icon: ARCHIVE_ACTION.icon, onSelect: () => startOne(ARCHIVE_ACTION, s) },
     ...(canDelete ? [{ key: 'delete', label: 'Eliminar', icon: DELETE_ACTION.icon, danger: true, onSelect: () => startOne(DELETE_ACTION, s) }] : []),
   ];
+  // Who uses the console is a Usuarios decision: admins only, like the API.
+  const consoleItems = (s: RosterStudent): RowMenuItem[] => {
+    if (!personal || !canDelete || s.archived_at) return [];
+    const kind = consoleAction(s.user);
+    if (kind === 'grant') {
+      return [{ key: 'console', label: 'Dar acceso a la consola', icon: ShieldCheck, ariaLabel: `Dar acceso a la consola a ${s.user.full_name}`, onSelect: () => setGranting(personOf(s)) }];
+    }
+    if (kind === 'remove') {
+      return [{ key: 'console', label: 'Quitar acceso a la consola', icon: ShieldOff, ariaLabel: `Quitar acceso a la consola a ${s.user.full_name}`, onSelect: () => setRemoving(personOf(s)) }];
+    }
+    return [];
+  };
 
   // Archiving a few named rows can be undone from the toast; a whole filtered
   // view is restored from the Archivados tab instead.
@@ -353,7 +411,9 @@ export default function AdminStudents() {
     if (action.name !== 'archive' || result.ok === 0) return;
     toast((t) => (
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        <span>{result.ok === 1 ? 'Alumno archivado.' : `${result.ok.toLocaleString('es-MX')} alumnos archivados.`}</span>
+        <span>{personal
+          ? (result.ok === 1 ? 'Persona archivada.' : `${plural(result.ok, 'persona archivada', 'personas archivadas')}.`)
+          : (result.ok === 1 ? 'Alumno archivado.' : `${plural(result.ok, 'alumno archivado', 'alumnos archivados')}.`)}</span>
         {ids.length > 0 && (
           <button
             type="button"
@@ -369,7 +429,7 @@ export default function AdminStudents() {
             Deshacer
           </button>
         )}
-        <Link to={`/admin/alumnos?estado=${ARCHIVED}`} onClick={() => toast.dismiss(t.id)} className="font-semibold text-purple underline-offset-2 hover:underline">
+        <Link to={`${base}?estado=${ARCHIVED}`} onClick={() => toast.dismiss(t.id)} className="font-semibold text-purple underline-offset-2 hover:underline">
           Ver archivados
         </Link>
       </span>
@@ -380,14 +440,16 @@ export default function AdminStudents() {
     <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
       <div className="min-w-0 space-y-6">
         <PageHeader
-          title="Alumnos"
-          subtitle="Directorio de alumnos: búsqueda, filtros, acciones en lote, importación y exportación."
+          title={personal ? 'Personal' : 'Alumnos'}
+          subtitle={personal
+            ? 'Personal del colegio que compra en cafetería: mismo saldo, recargas, estado de cuenta y credencial que los alumnos. Aquí también decide quién entra a la consola.'
+            : 'Directorio de alumnos: búsqueda, filtros, acciones en lote, importación y exportación.'}
           actions={(
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
                 <Plus size={16} aria-hidden="true" /> {personal ? 'Nuevo personal' : 'Nuevo alumno'}
               </button>
-              <ExportMenu filenamePrefix="alumnos" selectedCount={selection.count} fetch={fetchExport} />
+              <ExportMenu filenamePrefix={personal ? 'personal' : 'alumnos'} selectedCount={selection.count} fetch={fetchExport} />
               <Dropdown
                 width={260}
                 trigger={({ open, toggle }) => (
@@ -437,34 +499,13 @@ export default function AdminStudents() {
           onDone={() => selection.onClear()}
         />
         <ImportLoyverseModal open={importLoyverseOpen} onClose={() => setImportLoyverseOpen(false)} onImported={() => refetch()} />
-        {importStaffOpen && <ImportStaffModal open onClose={() => setImportStaffOpen(false)} onImported={() => { void refetch(); switchTipo('personal'); }} />}
+        {importStaffOpen && <ImportStaffModal open onClose={() => setImportStaffOpen(false)} onImported={() => { void refetch(); if (!personal) navigate('/admin/personal'); }} />}
         <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
+        <GrantConsoleAccessModal person={granting} onClose={() => setGranting(null)} />
+        <RemoveConsoleAccessDialog person={removing} onClose={() => setRemoving(null)} />
 
-        {/* Pupils and staff cafetería accounts live in two lists (A4). */}
-        <div role="tablist" aria-label="Tipo de registro" className="inline-flex gap-1 rounded-md bg-cream-2 p-1">
-          {([['alumno', 'Alumnos', Users], ['personal', 'Personal', Briefcase]] as const).map(([value, label, Icon]) => {
-            const on = (value === 'personal') === personal;
-            const n = on ? undefined : otherCount;
-            return (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                onClick={() => !on && switchTipo(value)}
-                className={`inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[38px] ${
-                  on ? 'bg-white text-purple shadow-sm ring-1 ring-purple/15' : 'text-muted hover:text-ink'
-                }`}
-              >
-                <Icon size={16} aria-hidden="true" /> {label}
-                {n !== undefined && <span className="rounded-full bg-white/70 px-1.5 text-xs font-medium text-subtle">{n.toLocaleString('es-MX')}</span>}
-              </button>
-            );
-          })}
-        </div>
         {personal && (
           <p className="-mt-3 text-sm text-muted">
-            Personal del colegio que compra en cafetería: mismo saldo, recargas, estado de cuenta y credencial que los alumnos.
             No cuentan como alumnos ni reciben comunicados de familias.
             {canDelete && <> Para traer al personal de Loyverse use <button type="button" className="font-semibold text-purple underline-offset-2 hover:underline" onClick={() => setImportStaffOpen(true)}>Importar personal desde Loyverse</button>.</>}
           </p>
@@ -474,25 +515,28 @@ export default function AdminStudents() {
         {vinculado === MISSING ? (isLoading || count > 0) && (
           <div role="note" className="flex flex-col gap-3 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
             <p>
-              <strong>Estos alumnos ya no existen en Loyverse</strong>, así que no pueden comprar en cafetería.{' '}
+              <strong>{personal ? 'Estas personas ya no existen en Loyverse' : 'Estos alumnos ya no existen en Loyverse'}</strong>, así que no pueden comprar en cafetería.{' '}
               {canDelete
                 ? <>Selecciónelos y use <strong>Eliminar</strong>: se borran por completo quienes no tienen nada que conservar, y se archivan los demás (salen de la lista y su historial se conserva).</>
                 : <>Selecciónelos y use <strong>Archivar</strong>: salen de la lista y su historial se conserva.</>}
             </p>
             {count > 0 && (
               <button type="button" className="btn-outline min-h-[44px] shrink-0 sm:min-h-[40px]" onClick={selection.onSelectAllMatching}>
-                Seleccionar {count === 1 ? 'al alumno' : `los ${count.toLocaleString('es-MX')}`}
+                Seleccionar {count === 1 ? (personal ? 'a la persona' : 'al alumno') : `${personal ? 'las' : 'los'} ${count.toLocaleString('es-MX')}`}
               </button>
             )}
           </div>
         ) : missingCount > 0 && (
           <Link
-            to={`/admin/alumnos?vinculado=${MISSING}`}
+            to={`${base}?vinculado=${MISSING}`}
             className="flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
           >
             <span className="flex items-center gap-2.5">
               <AlertTriangle className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
-              <span><strong>{missingCount.toLocaleString('es-MX')} alumno{missingCount === 1 ? '' : 's'}</strong> ya no {missingCount === 1 ? 'tiene' : 'tienen'} cliente en Loyverse: probablemente ya no estudian aquí.</span>
+              <span>
+                <strong>{plural(missingCount, noun.one, noun.many)}</strong> ya no {missingCount === 1 ? 'tiene' : 'tienen'} cliente en Loyverse:{' '}
+                {personal ? 'probablemente ya no trabajan aquí.' : 'probablemente ya no estudian aquí.'}
+              </span>
             </span>
             <span className="flex items-center gap-1 font-semibold text-purple">Revisarlos <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>
           </Link>
@@ -508,18 +552,19 @@ export default function AdminStudents() {
               : `${count} ${personal ? 'personas del personal encontradas' : 'alumnos encontrados'}`}
           </p>
           <DataTable<RosterStudent>
-            tableId="students"
+            // Each list keeps its own column choices (their columns differ).
+            tableId={personal ? 'staff-roster' : 'students'}
             columns={columns}
             rows={students}
             rowKey={(s) => s.id}
             rowLabel={(s) => s.user.full_name}
-            caption="Directorio de alumnos"
+            caption={personal ? 'Directorio del personal' : 'Directorio de alumnos'}
             sort={sort}
             onSort={onSort}
             page={page}
             count={count}
             onPage={setPage}
-            itemLabel="alumnos"
+            itemLabel={noun.many}
             isLoading={isLoading}
             isError={isError}
             onRetry={() => refetch()}
@@ -533,7 +578,7 @@ export default function AdminStudents() {
             rowActions={(s) => (
               <>
                 {/* From lg the name is this link, and the pinned column has no room to spare. */}
-                <Link to={`/admin/alumnos/${s.id}`} className={`${ROW_ACTION} lg:hidden`} title="Ver ficha" aria-label={`Ver ficha de ${s.user.full_name}`}>
+                <Link to={`${base}/${s.id}`} className={`${ROW_ACTION} lg:hidden`} title="Ver ficha" aria-label={`Ver ficha de ${s.user.full_name}`}>
                   <RowActionLabel icon={Eye} label="Ficha" />
                 </Link>
                 <button type="button" onClick={() => setEditing(s)} className={ROW_ACTION} title="Editar" aria-label={`Editar a ${s.user.full_name}`}>
@@ -554,15 +599,16 @@ export default function AdminStudents() {
                         key: 'cafeteria', label: 'Cafetería', icon: Wallet, ariaLabel: `Cafetería de ${s.user.full_name}`,
                         onSelect: () => navigate(`/admin/cafeteria/${s.id}`),
                       }] : []),
+                      ...consoleItems(s),
                       ...lifecycleItems(s),
                     ]}
                   />
-                ) : lifecycleItems(s).map((it) => {
+                ) : [...consoleItems(s), ...lifecycleItems(s)].map((it) => {
                   const Icon = it.icon!;
                   return (
                     <Fragment key={it.key}>
                       {it.danger && <div role="separator" className="my-0.5 h-px bg-line" />}
-                      <button type="button" onClick={it.onSelect} className={it.danger ? MENU_BUTTON_DANGER : MENU_BUTTON} aria-label={`${it.label} a ${s.user.full_name}`}>
+                      <button type="button" onClick={it.onSelect} className={it.danger ? MENU_BUTTON_DANGER : MENU_BUTTON} aria-label={it.ariaLabel ?? `${it.label} a ${s.user.full_name}`}>
                         <Icon size={16} aria-hidden="true" /> {it.label}
                       </button>
                     </Fragment>
@@ -577,7 +623,9 @@ export default function AdminStudents() {
                   : { placeholder: 'Buscar por nombre, matrícula, correo o grado…', label: 'Buscar alumnos' }}
                 tabs={{ paramKey: 'estado', options: statusTabs, allLabel: null, defaultValue: 'active', label: 'Filtrar por estado' }}
                 selects={[
-                  ...(personal ? [] : [
+                  ...(personal ? [
+                    { key: 'puesto', label: 'Puesto', options: PUESTO_OPTIONS, allLabel: 'Todos los puestos' },
+                  ] : [
                     { key: 'nivel', label: 'Nivel', options: NIVELES.map(([value, label]) => ({ value, label })), allLabel: 'Todos los niveles' },
                     {
                       key: 'grado', label: 'Grado', allLabel: 'Todos los grados',
@@ -609,13 +657,13 @@ export default function AdminStudents() {
                 allMatchingCount={count}
                 onSelectAllMatching={selection.onSelectAllMatching}
                 onClear={selection.onClear}
-                itemLabel="alumnos"
-                gender="m"
+                itemLabel={noun.many}
+                gender={noun.gender}
                 actions={bulkActions}
                 inline={6}
                 onAction={startBulk}
                 busy={bulk.isPending}
-                exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="alumnos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+                exportMenu={<ExportMenu label={personal ? 'Exportar seleccionadas' : 'Exportar seleccionados'} filenamePrefix={personal ? 'personal' : 'alumnos'} selectedCount={selection.count} forceSelected fetch={fetchExport} />}
               />
             )}
             empty={personal ? {
@@ -647,7 +695,7 @@ export default function AdminStudents() {
         <BulkValueDialog
           open={!!picking}
           onClose={() => setPicking(null)}
-          title={picking ? `${picking.label}: ${selection.count.toLocaleString('es-MX')} alumnos` : ''}
+          title={picking ? `${picking.label}: ${plural(selection.count, noun.one, noun.many)}` : ''}
           onSubmit={pickedValue}
           {...pickerProps}
         />
@@ -656,8 +704,8 @@ export default function AdminStudents() {
           onClose={() => setConfirming(null)}
           action={confirming?.action ?? null}
           payload={confirming?.payload}
-          entityLabel="alumnos"
-          gender="m"
+          entityLabel={noun.many}
+          gender={noun.gender}
           ids={confirming?.one ? [confirming.one.id] : selection.ids}
           allMatching={confirming?.one ? false : selection.allMatching}
           subject={confirming?.one?.user.full_name}
@@ -674,7 +722,7 @@ export default function AdminStudents() {
         />
       </div>
       {twoPane && selectedId && (
-        <aside className="min-w-0 rounded-md bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto shadow-card" aria-label="Detalle del alumno">
+        <aside className="min-w-0 rounded-md bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto shadow-card" aria-label={personal ? 'Detalle de la persona' : 'Detalle del alumno'}>
           <div className="mb-2 flex justify-end"><button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelectedId(null)}>Cerrar panel</button></div>
           <AdminStudentDetail id={selectedId} embedded onDeleted={() => setSelectedId(null)} />
         </aside>

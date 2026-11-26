@@ -558,6 +558,8 @@ STUDENT_ORDERING = {
     'last_login': 'user__last_login',
     'enrollment_date': 'enrollment_date',
     'balance': 'balance',
+    # «Personal» (staff): the stored keys sort in the labels' alphabetical order.
+    'puesto': ('puesto', 'user__last_name', 'user__first_name'),
 }
 STUDENT_SEARCH_FIELDS = ('user__first_name', 'user__last_name', 'user__email', 'student_id', 'grade')
 
