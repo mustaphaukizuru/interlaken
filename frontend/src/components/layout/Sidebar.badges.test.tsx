@@ -56,3 +56,26 @@ describe('Sidebar «Por verificar» next to Cafetería', () => {
     expect(screen.getByRole('link', { name: 'Cafetería, 2 pendientes' })).not.toHaveTextContent('Por verificar');
   });
 });
+
+describe('Sidebar Visitas (owner 2026-11-25: the dot counts the people coming)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    stubViewport(1280);
+    useAuthStore.setState({ user: admin, accessToken: 't', isAuthenticated: true });
+  });
+
+  it('shows the upcoming visits as the red dot and «Por cerrar: N» under the label', () => {
+    badges.current = { visitas: 3, visitas_cerrar: 1 };
+    renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
+    const link = screen.getByRole('link', { name: 'Visitas, 3 pendientes, por cerrar: 1' });
+    expect(link).toHaveAttribute('href', '/admin/visitas');
+    expect(link).toHaveTextContent('Por cerrar: 1');
+    expect(link).toHaveTextContent('3');
+  });
+
+  it('hides «Por cerrar» when every past visit is closed', () => {
+    badges.current = { visitas: 2, visitas_cerrar: 0 };
+    renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
+    expect(screen.getByRole('link', { name: 'Visitas, 2 pendientes' })).not.toHaveTextContent('Por cerrar');
+  });
+});

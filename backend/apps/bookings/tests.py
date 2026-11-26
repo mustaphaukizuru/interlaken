@@ -177,7 +177,7 @@ class CalendarFailSoftTests(TestCase):
     def test_sync_calendar_command_is_clean_noop(self):
         out = StringIO()
         call_command('sync_calendar', stdout=out)
-        self.assertIn('not configured', out.getvalue())
+        self.assertIn('no está configurado', out.getvalue())
 
 
 class BookingTimeGuardTests(TestCase):

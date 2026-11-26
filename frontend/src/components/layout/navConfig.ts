@@ -5,7 +5,7 @@ import {
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 /** Keys returned by GET /core/badges/ (BACKLOG P1-E3). */
-export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'cafeteria_verificar' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
+export type BadgeKey = 'admisiones' | 'visitas' | 'visitas_cerrar' | 'cafeteria' | 'cafeteria_verificar' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
 
 export interface NavEntry {
   icon: LucideIcon;
@@ -68,7 +68,11 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         { icon: ClipboardList, label: 'Admisiones', to: '/admin/admisiones', end: true, badgeKey: 'admisiones' },
         { icon: KanbanSquare, label: 'Pipeline', to: '/admin/admisiones/pipeline' },
         { icon: FolderCheck, label: 'Documentos requeridos', to: '/admin/admisiones/documentos' },
-        { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas' },
+        // The red dot counts the people coming (every standing visit from today
+        // on); «Por cerrar», past visits nobody marked «Asistió» / «No asistió»
+        // (owner 2026-11-25: three web bookings, a dot that stayed at 0).
+        { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas',
+          subBadge: { key: 'visitas_cerrar', label: 'Por cerrar' } },
         { icon: CalendarDays, label: 'Agenda semanal', to: '/admin/visitas/semana' },
       ],
     },

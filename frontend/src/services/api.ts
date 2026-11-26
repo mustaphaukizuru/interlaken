@@ -1044,6 +1044,9 @@ export interface AdminBookingsParams {
   date?: string;
   from?: string;
   to?: string;
+  /** `upcoming` (standing visits from today on: Visitas' red dot) or `to_close`
+   *  (past visits nobody marked attended or no-show: «Por cerrar»). */
+  followup?: 'upcoming' | 'to_close';
   ordering?: string;
   page?: number;
   page_size?: number;

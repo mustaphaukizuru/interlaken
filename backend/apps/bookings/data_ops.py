@@ -36,14 +36,33 @@ VISIT_TYPE_LABEL = {"individual": "Individual", "open_class": "Puertas Abiertas"
 
 
 # ── bookings: list ────────────────────────────────────────
+FOLLOWUP_CHOICES = (("upcoming", "Próximas"), ("to_close", "Por cerrar"))
+
+
 class BookingFilterSet(django_filters.FilterSet):
-    """``?type=&status=&source=&date=&from=&to=`` (dates are the slot's DateField)."""
+    """``?type=&status=&source=&date=&from=&to=&followup=`` (dates are the slot's DateField).
+
+    ``followup``: ``upcoming`` (visits from today on that still stand) or
+    ``to_close`` (past visits nobody marked attended or no-show): the same
+    querysets as the «Visitas» red dot and its «Por cerrar» line
+    (``services.followup``), so the list matches the number.
+    """
 
     type = django_filters.ChoiceFilter(field_name="slot__visit_type", choices=VisitType.choices)
     status = django_filters.ChoiceFilter(field_name="status", choices=Booking.Status.choices)
     source = django_filters.ChoiceFilter(field_name="source", choices=Booking.Source.choices)
     date = django_filters.DateFilter(field_name="slot__date")
     slot = django_filters.NumberFilter(field_name="slot_id")
+    followup = django_filters.ChoiceFilter(choices=FOLLOWUP_CHOICES, method="filter_followup")
+
+    def filter_followup(self, qs, name, value):
+        from .services.followup import to_close_q, upcoming_q
+
+        if value == "upcoming":
+            return qs.filter(upcoming_q())
+        if value == "to_close":
+            return qs.filter(to_close_q())
+        return qs
 
 
 # ``from`` is a Python keyword: declare the range bounds on base_filters.

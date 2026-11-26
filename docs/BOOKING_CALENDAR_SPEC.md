@@ -74,6 +74,12 @@ class Booking:
 > (create/confirm → event, cancel → delete) and the `sync_calendar` retry command.
 > **Fail-soft:** a booking never fails on a calendar error. **Manual GCP + env setup
 > is required** for events to actually appear — set `GOOGLE_CALENDAR_ID` and `GOOGLE_CALENDAR_SA_KEY` in `deploy/.env`.
+>
+> **2026-11-26:** setup steps in `docs/GOOGLE_CALENDAR.md`. Production had never synced (the two
+> variables held the sign-in client's id and secret); `sync_calendar` now says which variable is
+> wrong, `--check` verifies the share, the key is mounted from `deploy/secrets/`, and the family
+> is no longer added as an attendee unless `GOOGLE_CALENDAR_INVITE_FAMILY=true` (our own email
+> with the .ics covers them). Every booking also alerts the school (`staff_alerts.py`).
 
 **Recommended: a service account writing to a shared school calendar** (server-side, no per-parent OAuth, cron-friendly).
 

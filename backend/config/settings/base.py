@@ -491,10 +491,17 @@ PAYMENTS_OPEN_TO_ALL = env.bool('PAYMENTS_OPEN_TO_ALL', default=False)
 # Server-side calendar writes for confirmed bookings use a *service account*
 # (NOT the OAuth login client). Both empty → calendar integration is a no-op and
 # bookings still succeed (fail-soft, picked up later by `manage.py sync_calendar`).
-# See BOOKING_CALENDAR_SPEC.md §3 for the GCP setup. Never
-# commit the key file — GOOGLE_CALENDAR_SA_KEY is a path read from the env.
+# Setup: docs/GOOGLE_CALENDAR.md. Never commit the key file: GOOGLE_CALENDAR_SA_KEY
+# is the PATH of the JSON key (in production /run/secrets/interlaken/google-calendar.json,
+# mounted from deploy/secrets/), and GOOGLE_CALENDAR_ID the calendar's id
+# (…@group.calendar.google.com), not the sign-in client's id or secret.
 GOOGLE_CALENDAR_ID = env('GOOGLE_CALENDAR_ID', default='')
 GOOGLE_CALENDAR_SA_KEY = env('GOOGLE_CALENDAR_SA_KEY', default='')
+# Add the family as an attendee, so Google emails them its own invite. Off by
+# default: families already get the school's confirmation email with an .ics,
+# and a service account without domain-wide delegation may not invite anyone
+# (the call fails first and is retried without the family).
+GOOGLE_CALENDAR_INVITE_FAMILY = env.bool('GOOGLE_CALENDAR_INVITE_FAMILY', default=False)
 
 # ── WHATSAPP ──────────────────────────────────────────────
 # Tier 1 (deep link): WHATSAPP_NUMBER powers the wa.me "Reservar por WhatsApp"

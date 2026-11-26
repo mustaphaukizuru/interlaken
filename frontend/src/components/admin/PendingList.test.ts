@@ -20,6 +20,19 @@ describe('pendingRows', () => {
     expect(keys).toContain('loyverse_alertas');
     expect(keys).not.toContain('saldo_bajo');
   });
+
+  it('says what the Visitas counts mean and opens the matching list (owner 2026-11-25)', () => {
+    const rows = pendingRows({ visitas: 2, visitas_cerrar: 1 });
+    // Past visits to close come first: they need an action today.
+    expect(rows.map((r) => r.key)).toEqual(['visitas_cerrar', 'visitas']);
+    const [toClose, upcoming] = rows;
+    expect([toClose.one, toClose.many, toClose.to]).toEqual(
+      ['visita por cerrar', 'visitas por cerrar', '/admin/visitas?seguimiento=por_cerrar']);
+    expect([upcoming.one, upcoming.many, upcoming.to]).toEqual(
+      ['visita próxima', 'visitas próximas', '/admin/visitas?seguimiento=proximas']);
+    // Not «por confirmar» any more: web bookings are confirmed on the spot.
+    expect(rows.some((r) => r.many.includes('por confirmar'))).toBe(false);
+  });
 });
 
 describe('verifyHint (school, 2026-11-22: say whether the money is already in the balance)', () => {

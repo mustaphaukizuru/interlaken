@@ -140,6 +140,7 @@ def _compute_badges(user) -> dict:
         return out
     from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
     from apps.bookings.models import Booking
+    from apps.bookings.services.followup import upcoming_visits, visits_to_close
     from apps.cafeteria.models import TopUpRequest
     from apps.cafeteria.services import low_balance_queryset
     from apps.content.forms import FormSubmission
@@ -159,7 +160,10 @@ def _compute_badges(user) -> dict:
         'admisiones': ('admisiones', lambda: (
             PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
             + Registration.objects.filter(status=Registration.Status.SUBMITTED).count())),
-        'visitas': ('visitas', lambda: Booking.objects.filter(status=Booking.Status.PENDING).count()),
+        # People coming: visits from today on that still stand. Web bookings
+        # are confirmed on the spot, so counting «Pendiente» ones (as until
+        # 2026-11-26) kept this at 0 while families booked.
+        'visitas': ('visitas', lambda: upcoming_visits().count()),
         # Cash requests to apply, plus real card top-ups still to load into
         # the POS and apply, or to verify in MultiCobros.
         'cafeteria': ('cafeteria', lambda: office_cash.count() + online_topups_awaiting_staff().count()),
@@ -194,6 +198,8 @@ def _compute_badges(user) -> dict:
     if 'visitas' in areas:
         out['visitas_hoy'] = (Booking.objects.filter(slot__date=timezone.localdate())
                               .exclude(status=Booking.Status.CANCELLED).count())
+        # «Por cerrar»: past visits nobody marked «Asistió» / «No asistió».
+        out['visitas_cerrar'] = visits_to_close().count()
     if 'cafeteria' in areas:
         # «Por verificar»: the part of «cafeteria» only a MultiCobros check can
         # move (paid by card, approval not verified), shown apart next to Cafetería.
