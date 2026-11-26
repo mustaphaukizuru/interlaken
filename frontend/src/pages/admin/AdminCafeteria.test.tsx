@@ -260,7 +260,10 @@ describe('AdminCafeteria Depósitos: Banorte operations', () => {
     vi.mocked(paymentsApi.reconcileBanorte).mockResolvedValue(ok({ detail: 'settled', payment: {} }));
     const u = await openTab(/Depósitos/, '/admin/cafeteria?revisar=multicobros');
     expect(await screen.findByText('Expirado')).toBeInTheDocument();
-    expect(screen.getByText('Por revisar en MultiCobros', { selector: 'span' })).toBeInTheDocument();
+    // An attempt the bank never answered, with the reason (owner, 2026-11-25:
+    // «Por revisar» read like the approved ones still to verify).
+    expect(screen.getByText('Sin respuesta del banco', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByText('expiró sin respuesta de Banorte')).toBeInTheDocument();
     await u.click(screen.getByRole('button', { name: /Conciliar con MultiCobros el pago de Mía Soto/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('PAGO94')).toBeInTheDocument();
@@ -295,6 +298,44 @@ describe('AdminCafeteria Depósitos: Banorte operations', () => {
     expect(await screen.findByText('Simulación (no cargar)')).toBeInTheDocument();
     expect(screen.getByText('Banorte')).toBeInTheDocument();
     expect(screen.queryByText('banorte')).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminCafeteria Depósitos «Por verificar en MultiCobros» (owner, 2026-11-25)', () => {
+  // Loaded into the balance and Loyverse by the app (instant), approval not
+  // confirmed in MultiCobros yet: «Completado», and nothing else set it apart.
+  const toVerifyRow = {
+    ...loadRow, id: 48, student_name: 'Iker Ruiz', needs_pos_load: false, pos_loaded_at: '2026-11-25T13:47:00Z',
+    banorte: { ...loadRow.banorte, verified_at: null, verified_by_name: '', needs_verification: true },
+  };
+
+  it('lists exactly the top-ups to verify, explains them and offers «Verificar» on each row', async () => {
+    api.topups.mockResolvedValue(page([toVerifyRow]));
+    const u = userEvent.setup();
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?tab=deposits&revisar=verificar' });
+    expect(await screen.findByText('Iker Ruiz')).toBeInTheDocument();
+    expect(api.topups).toHaveBeenCalledWith(expect.objectContaining({ to_verify: 1 }));
+    expect(api.topups).not.toHaveBeenCalledWith(expect.objectContaining({ needs_review: 1 }));
+    expect(screen.getByRole('note')).toHaveTextContent('ya están en el saldo y en Loyverse: no las cargue en el POS');
+    expect(screen.getByText('Sin verificar')).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Verificar en MultiCobros la recarga de Iker Ruiz' }));
+    expect(within(await screen.findByRole('dialog')).getByText('Verificar operación en MultiCobros')).toBeInTheDocument();
+  });
+
+  it('keeps the old link for the attempts the bank never answered, under their own name', async () => {
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?tab=deposits&revisar=multicobros' });
+    await waitFor(() => expect(api.topups).toHaveBeenCalledWith(expect.objectContaining({ needs_review: 1 })));
+    expect(api.topups).not.toHaveBeenCalledWith(expect.objectContaining({ to_verify: 1 }));
+    expect(await screen.findByRole('note')).toHaveTextContent('sin respuesta clara del banco');
+    expect(screen.getByRole('option', { name: 'Por verificar en MultiCobros' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Intentos sin respuesta del banco' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Por revisar en MultiCobros' })).toBeNull();
+  });
+
+  it('choosing the filter asks the API for the top-ups to verify', async () => {
+    const u = await openTab(/Depósitos/);
+    await u.selectOptions(screen.getByRole('combobox', { name: 'Revisión' }), 'verificar');
+    await waitFor(() => expect(api.topups).toHaveBeenLastCalledWith(expect.objectContaining({ to_verify: 1, page: 1 })));
   });
 });
 
@@ -489,5 +530,44 @@ describe('AdminCafeteria Reconciliación', () => {
     await u.click(screen.getByRole('checkbox', { name: 'Seleccionar Iván Soto' }));
     await u.click(within(screen.getByRole('region', { name: 'Acciones en lote' })).getByRole('button', { name: 'Corregir' }));
     await waitFor(() => expect(api.bulkReconcile).toHaveBeenCalledWith(expect.objectContaining({ action: 'fix', ids: [5], dry_run: true })));
+  });
+
+  // Owner, 2026-11-25: «Solo diferencias» + «Reconciliar» said everything was
+  // fine while a student on another page had a difference. The totals are now
+  // those of everyone compared.
+  const driftRow = { student_id: 5, student_name: 'Iván Soto', student_code: '05', loyverse_id: 'l5', local_balance: '80.00', loyverse_balance: '65.00', drift: '15.00', in_sync: false, error: null };
+
+  it('counts the differences of everyone compared, not of the page', async () => {
+    api.reconcile.mockResolvedValue(ok({
+      error: null, count: 1, total: 1, checked: 391, drift_count: 1, has_more: false, offset: 0, limit: 20, results: [driftRow],
+    }));
+    const u = await openTab(/Reconciliación/);
+    await u.click(screen.getByRole('button', { name: /Reconciliar/ }));
+    expect(await screen.findByText(/1 diferencia en total \(391 revisados\)\./)).toBeInTheDocument();
+    expect(screen.queryByText(/en esta página/)).toBeNull();
+  });
+
+  it('says «Todo en orden» only when everyone matches', async () => {
+    api.reconcile.mockResolvedValue(ok({
+      error: null, count: 0, total: 0, checked: 391, drift_count: 0, has_more: false, offset: 0, limit: 20, results: [],
+    }));
+    const u = await openTab(/Reconciliación/);
+    await u.click(screen.getByRole('button', { name: /Reconciliar/ }));
+    expect(await screen.findByText(/Todo en orden: 391 revisados, sin diferencias\./)).toBeInTheDocument();
+    expect(screen.getByText('Ningún alumno tiene diferencias.')).toBeInTheDocument();
+  });
+
+  it('never says «Todo en orden» when Loyverse could not be read', async () => {
+    api.reconcile.mockResolvedValue(ok({
+      error: 'La conexión con Loyverse no está configurada.', count: 0, total: 0, checked: 391, drift_count: 0,
+      has_more: false, offset: 0, limit: 20, results: [],
+    }));
+    const u = await openTab(/Reconciliación/);
+    await u.click(screen.getByRole('button', { name: /Reconciliar/ }));
+    expect(await screen.findByText(/No se pudo consultar Loyverse: no se comparó ningún saldo\./)).toBeInTheDocument();
+    expect(screen.getByText(/La conexión con Loyverse no está configurada\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Todo en orden/)).toBeNull();
+    expect(screen.queryByText('Ningún alumno tiene diferencias.')).toBeNull();
+    expect(screen.getByText('No se comparó ningún saldo')).toBeInTheDocument();
   });
 });

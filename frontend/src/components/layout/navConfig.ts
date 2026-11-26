@@ -15,14 +15,20 @@ export interface NavEntry {
   /** Live counter from /core/badges/ to show next to the label. */
   badgeKey?: BadgeKey;
   /** A second counter that needs its own words, shown under the label as
-   *  «label: N» while it is above zero (e.g. «Por verificar: 2»). */
-  subBadge?: { key: BadgeKey; label: string };
+   *  «label: N» while it is above zero (e.g. «Por verificar: 2»). With `to`
+   *  it is its own link to the list of exactly those items (rendered next to
+   *  the entry, never inside its link). */
+  subBadge?: { key: BadgeKey; label: string; to?: string };
 }
 
 export interface NavGroup {
   heading: string;
   items: NavEntry[];
 }
+
+/** Depósitos filtered to the card top-ups still to verify in MultiCobros
+ *  (loaded or not): what «Por verificar: N» counts. */
+export const TO_VERIFY_PATH = '/admin/cafeteria?tab=deposits&revisar=verificar';
 
 const FAMILY_GROUPS: NavGroup[] = [
   {
@@ -69,8 +75,9 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       items: [
         // «Por verificar»: card top-ups nothing applies until someone checks
         // them in MultiCobros (2026-11-18: two sat in Loyverse all morning).
+        // It opens exactly those in Depósitos (owner, 2026-11-25).
         { icon: Coffee,     label: 'Cafetería', to: '/admin/cafeteria', badgeKey: 'cafeteria',
-          subBadge: { key: 'cafeteria_verificar', label: 'Por verificar' } },
+          subBadge: { key: 'cafeteria_verificar', label: 'Por verificar', to: TO_VERIFY_PATH } },
         { icon: CreditCard, label: 'Pagos',     to: '/admin/pagos' },
       ],
     },

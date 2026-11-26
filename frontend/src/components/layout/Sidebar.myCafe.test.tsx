@@ -22,17 +22,31 @@ describe('Sidebar «Mi cafetería»', () => {
     stubViewport(1280);
   });
 
-  it('adds the entry for an admin who holds a cafetería account, console untouched', () => {
+  it('adds the entry for an admin who holds a cafetería account, inside the console (owner, 2026-11-25)', () => {
     useAuthStore.setState({ user: { ...base, cafeteria_account: account }, accessToken: 't', isAuthenticated: true });
     renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
-    expect(screen.getByRole('link', { name: /Mi cafetería/ })).toHaveAttribute('href', '/portal/mi-cafeteria');
+    expect(screen.getByRole('link', { name: /Mi cafetería/ })).toHaveAttribute('href', '/admin/mi-cafeteria');
     expect(screen.getByRole('link', { name: /^Usuarios/ })).toBeInTheDocument();
   });
 
-  it('adds it for staff with console areas too', () => {
+  it('keeps the whole admin menu while «Mi cafetería» is open, with the entry highlighted', () => {
+    useAuthStore.setState({ user: { ...base, cafeteria_account: account }, accessToken: 't', isAuthenticated: true });
+    renderWithProviders(<Sidebar role="admin" />, { route: '/admin/mi-cafeteria' });
+    expect(screen.getByRole('link', { name: /Mi cafetería/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /^Alumnos/ })).toBeInTheDocument();
+    expect(screen.getAllByText('Administración').length).toBeGreaterThan(0);
+  });
+
+  it('adds it for staff with console areas too, inside the console', () => {
     useAuthStore.setState({ user: { ...base, role: 'staff', staff_areas: ['visitas'], cafeteria_account: account }, accessToken: 't', isAuthenticated: true });
     renderWithProviders(<Sidebar role="admin" />, { route: '/admin/visitas' });
-    expect(screen.getByRole('link', { name: /Mi cafetería/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Mi cafetería/ })).toHaveAttribute('href', '/admin/mi-cafeteria');
+  });
+
+  it('a staff login without console areas keeps the portal address', () => {
+    useAuthStore.setState({ user: { ...base, role: 'staff', staff_areas: [], cafeteria_account: account }, accessToken: 't', isAuthenticated: true });
+    renderWithProviders(<Sidebar role="staff" />, { route: '/staff' });
+    expect(screen.getByRole('link', { name: /Mi cafetería/ })).toHaveAttribute('href', '/portal/mi-cafeteria');
   });
 
   it('never for an account without one', () => {

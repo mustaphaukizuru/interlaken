@@ -726,8 +726,12 @@ describe('CafeteriaPage launch fixes (2026-11-09)', () => {
     // The page is about him (his card says why), and the one-shot params are gone.
     expect(await screen.findByText(/aún no está vinculado a cafetería\/Loyverse/)).toBeInTheDocument();
     await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(11));
-    expect(urlParams().get('recarga')).toBeNull();
-    expect(urlParams().get('hijo')).toBeNull();
+    // The params are removed by a separate URL update: wait for it too (under a
+    // busy machine the store could settle a render before the URL did).
+    await waitFor(() => {
+      expect(urlParams().get('recarga')).toBeNull();
+      expect(urlParams().get('hijo')).toBeNull();
+    });
   });
 
   it('a ?recarga link without ?hijo never falls back to a sibling either', async () => {

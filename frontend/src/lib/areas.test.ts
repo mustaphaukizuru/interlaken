@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { areasFor, areasOf, canOpen, consoleHome, hasConsole, homePath } from './areas';
+import { areasFor, areasOf, canOpen, consoleHome, hasConsole, homePath, MY_CAFETERIA_PATH, myCafeteriaPath } from './areas';
 import { PUESTOS } from './areaCatalog';
 
 const admin = { role: 'admin' as const };
@@ -58,5 +58,31 @@ describe('console areas', () => {
     expect(areasFor('/admin/pagos?estado=failed')).toEqual(['cafeteria']);
     expect(areasFor('/admin/calendario')).toEqual(['comunicados']);
     expect(areasFor('/admin/usuarios')).toEqual([]);
+  });
+});
+
+describe('«Mi cafetería» inside the console (owner, 2026-11-25)', () => {
+  const wallet = { id: 9, tipo: 'personal' as const, puesto: '' as const, puesto_label: 'Sin asignar', is_active: true, linked: true };
+
+  it('is the console address for a console user with a staff wallet', () => {
+    expect(myCafeteriaPath({ ...admin, cafeteria_account: wallet })).toBe(MY_CAFETERIA_PATH);
+    expect(myCafeteriaPath({ ...cafeteria, cafeteria_account: wallet })).toBe('/admin/mi-cafeteria');
+  });
+
+  it('keeps the portal address for staff without console areas, and none for families or pupils', () => {
+    expect(myCafeteriaPath({ ...teacher, cafeteria_account: wallet })).toBe('/portal/mi-cafeteria');
+    expect(myCafeteriaPath({ role: 'student' as const, cafeteria_account: wallet })).toBeNull();
+    expect(myCafeteriaPath({ role: 'parent' as const, cafeteria_account: null })).toBeNull();
+    expect(myCafeteriaPath(admin)).toBeNull();
+  });
+
+  it('any console area opens it (it is the person\'s own wallet, not a section), only with a wallet', () => {
+    const visitas = { role: 'staff' as const, staff_areas: ['visitas'] };
+    expect(canOpen({ ...visitas, cafeteria_account: wallet }, '/admin/mi-cafeteria')).toBe(true);
+    expect(canOpen({ ...visitas, cafeteria_account: wallet }, '/admin/mi-cafeteria/credencial')).toBe(true);
+    expect(canOpen(visitas, '/admin/mi-cafeteria')).toBe(false);
+    expect(canOpen({ ...teacher, cafeteria_account: wallet }, '/admin/mi-cafeteria')).toBe(false);
+    // Not a prefix trick: a lookalike path is still judged as a section.
+    expect(canOpen({ ...visitas, cafeteria_account: wallet }, '/admin/mi-cafeteriaX')).toBe(false);
   });
 });

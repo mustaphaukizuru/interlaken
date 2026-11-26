@@ -12,7 +12,7 @@ import StudentCard from '@/components/portal/StudentCard';
 import { InstallPrompt, LowBalancePrompt, useLowBalancePrompt } from '@/components/portal/CardPrompts';
 import { useFamilyChildren } from '@/components/portal/familyChildren';
 import { cafeteriaApi } from '@/services/api';
-import { useMineScope } from '@/lib/cafeteriaScope';
+import { useMineScope, useMyCafeteriaPath } from '@/lib/cafeteriaScope';
 import { useOnline } from '@/hooks/useOnline';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import type { CafeteriaCard, LoyverseHistoryReceipt } from '@/types';
@@ -52,6 +52,7 @@ function Stat({ icon: Icon, label, value, hint }: { icon: typeof Store; label: s
 export default function CredencialPage() {
   // «Mi cafetería»: the caller's own staff card only.
   const mine = useMineScope();
+  const myCafeteria = useMyCafeteriaPath();
   // The service worker answers from its 7-day cache when offline, and React
   // Query then stamps that old answer as new: the server's Date header says
   // when the balance really left the school.
@@ -124,7 +125,7 @@ export default function CredencialPage() {
     <div className="space-y-6">
       <div>
         {mine && (
-          <Link to="/portal/mi-cafeteria" className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm text-sm font-semibold text-purple hover:underline print:hidden">
+          <Link to={myCafeteria} className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-sm text-sm font-semibold text-purple hover:underline print:hidden">
             <ArrowLeft size={16} aria-hidden="true" /> Volver a Mi cafetería
           </Link>
         )}

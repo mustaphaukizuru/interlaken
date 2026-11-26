@@ -22,13 +22,24 @@ describe('Sidebar «Por verificar» next to Cafetería', () => {
     useAuthStore.setState({ user: admin, accessToken: 't', isAuthenticated: true });
   });
 
-  it('shows «Por verificar: N» under Cafetería, beside the usual count', () => {
+  it('shows «Por verificar: N» under Cafetería as its own link to exactly those top-ups (owner, 2026-11-25)', () => {
     badges.current = { cafeteria: 3, cafeteria_verificar: 2 };
     renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
-    const link = screen.getByRole('link', { name: 'Cafetería, 3 pendientes, por verificar: 2' });
-    expect(link).toHaveAttribute('href', '/admin/cafeteria');
-    expect(link).toHaveTextContent('Por verificar: 2');
-    expect(link).toHaveTextContent('3');
+    const entry = screen.getByRole('link', { name: 'Cafetería, 3 pendientes' });
+    expect(entry).toHaveAttribute('href', '/admin/cafeteria');
+    expect(entry).toHaveTextContent('3');
+    // A sibling link, never an anchor nested inside the entry's anchor.
+    const verify = screen.getByRole('link', { name: 'Por verificar: 2. Ver la lista' });
+    expect(verify).toHaveAttribute('href', '/admin/cafeteria?tab=deposits&revisar=verificar');
+    expect(verify).toHaveTextContent('Por verificar: 2');
+    expect(entry.contains(verify)).toBe(false);
+    expect(verify.parentElement?.closest('a')).toBeNull();
+  });
+
+  it('marks the «Por verificar» link as the current page on that list', () => {
+    badges.current = { cafeteria: 3, cafeteria_verificar: 2 };
+    renderWithProviders(<Sidebar role="admin" />, { route: '/admin/cafeteria?tab=deposits&revisar=verificar' });
+    expect(screen.getByRole('link', { name: 'Por verificar: 2. Ver la lista' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('stays out of the way when nothing waits for MultiCobros', () => {
@@ -36,6 +47,7 @@ describe('Sidebar «Por verificar» next to Cafetería', () => {
     renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
     const link = screen.getByRole('link', { name: 'Cafetería, 1 pendientes' });
     expect(link).not.toHaveTextContent('Por verificar');
+    expect(screen.queryByRole('link', { name: /Por verificar/ })).toBeNull();
   });
 
   it('an older server without the key changes nothing', () => {

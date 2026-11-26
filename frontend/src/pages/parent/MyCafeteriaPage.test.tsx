@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 
 /**
@@ -26,8 +26,10 @@ vi.mock('@/services/api', () => ({
 }));
 vi.mock('@/lib/banorteCheckout', () => ({ openBanorteLightbox: vi.fn(), closeBanorteLightbox: vi.fn() }));
 
+import { Route, Routes, useLocation } from 'react-router-dom';
 import MyCafeteriaPage from './MyCafeteriaPage';
 import { cafeteriaApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const ownWallet = {
@@ -76,5 +78,53 @@ describe('MyCafeteriaPage', () => {
     renderWithProviders(<MyCafeteriaPage view="credencial" />, { route: '/portal/mi-cafeteria/credencial' });
     expect(await screen.findByRole('heading', { name: 'Mi credencial de cafetería' })).toBeInTheDocument();
     expect(cafeteriaApi.getCards).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('MyCafeteriaPage inside the console (owner, 2026-11-25)', () => {
+  const account = { id: 77, tipo: 'personal' as const, puesto: 'direccion' as const, puesto_label: 'Dirección', is_active: true, linked: true };
+  const admin = {
+    id: 3, email: 'caja@x.mx', first_name: 'Caja', last_name: 'Central', full_name: 'Caja Central',
+    role: 'admin' as const, avatar: '', whatsapp: '', cafeteria_account: account,
+  };
+
+  function Where() {
+    const { pathname, search } = useLocation();
+    return <output data-testid="where">{`${pathname}${search}`}</output>;
+  }
+
+  function renderRoutes(path: string) {
+    return renderWithProviders(
+      <Routes>
+        <Route path="/portal/mi-cafeteria" element={<MyCafeteriaPage />} />
+        <Route path="/portal/mi-cafeteria/credencial" element={<MyCafeteriaPage view="credencial" />} />
+        <Route path="/admin/mi-cafeteria" element={<><Where /><MyCafeteriaPage /></>} />
+        <Route path="/admin/mi-cafeteria/credencial" element={<><Where /><MyCafeteriaPage view="credencial" /></>} />
+      </Routes>,
+      { route: path },
+    );
+  }
+
+  beforeEach(() => {
+    vi.mocked(cafeteriaApi.getMyBalance).mockReset().mockResolvedValue({ data: [ownWallet] } as never);
+    useAuthStore.setState({ user: admin, accessToken: 't', isAuthenticated: true });
+  });
+  afterEach(() => useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false }));
+
+  it('sends a console user from the old portal address to the console one, keeping the query', async () => {
+    renderRoutes('/portal/mi-cafeteria?recarga=200');
+    expect(await screen.findByTestId('where')).toHaveTextContent('/admin/mi-cafeteria?recarga=200');
+    expect(await screen.findByRole('heading', { name: 'Mi cafetería' })).toBeInTheDocument();
+  });
+
+  it('links the credential inside the console', async () => {
+    renderRoutes('/admin/mi-cafeteria');
+    expect(await screen.findByRole('link', { name: 'Ver mi credencial' })).toHaveAttribute('href', '/admin/mi-cafeteria/credencial');
+  });
+
+  it('the credential goes back to the console wallet', async () => {
+    renderRoutes('/portal/mi-cafeteria/credencial');
+    expect(await screen.findByTestId('where')).toHaveTextContent('/admin/mi-cafeteria/credencial');
+    expect(await screen.findByRole('link', { name: /Volver a Mi cafetería/ })).toHaveAttribute('href', '/admin/mi-cafeteria');
   });
 });

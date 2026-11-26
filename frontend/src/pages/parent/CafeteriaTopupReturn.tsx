@@ -9,6 +9,7 @@ import Logo from '@/components/ui/Logo';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { downloadBlob, paymentsApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { useMyCafeteriaPath } from '@/lib/cafeteriaScope';
 import { PAYMENT_FAILURE } from '@/lib/status/payment';
 import { apiErrorStatus } from '@/lib/apiErrors';
 import { applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatWhatsapp, whatsappHref } from '@/lib/topupApply';
@@ -39,8 +40,10 @@ export default function CafeteriaTopupReturn() {
 
   // The school's WhatsApp and load time for the "por aplicar" message.
   const userId = useAuthStore((s) => s.user?.id ?? null);
-  // A console user who topped up their own staff wallet goes back to «Mi cafetería».
+  // A console user who topped up their own staff wallet goes back to «Mi
+  // cafetería», inside the console when they have one (owner, 2026-11-25).
   const ownWallet = useAuthStore((s) => !!s.user?.cafeteria_account && (s.user.role === 'admin' || s.user.role === 'staff'));
+  const myCafeteria = useMyCafeteriaPath();
   const { data: availability } = useQuery({
     queryKey: ['payments-availability', userId],
     queryFn: () => paymentsApi.getAvailability().then((r) => r.data),
@@ -243,7 +246,7 @@ export default function CafeteriaTopupReturn() {
               </a>
             )}
             <Link
-              to={ownWallet ? '/portal/mi-cafeteria' : '/portal/cafeteria'}
+              to={ownWallet ? myCafeteria : '/portal/cafeteria'}
               className={`${outcome === 'success' ? 'btn-primary' : 'btn-secondary'} min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40`}
             >
               <Coffee className="h-4 w-4" /> {outcome === 'failed' ? 'Intentar de nuevo' : 'Ver saldo de cafetería'}

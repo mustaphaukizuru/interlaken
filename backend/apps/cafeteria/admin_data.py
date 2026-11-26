@@ -281,6 +281,7 @@ class TopUpFilter(PersonFilterSet):
     needs_review = django_filters.BooleanFilter(method="filter_needs_review", widget=BooleanWidget)
     needs_apply = django_filters.BooleanFilter(method="filter_needs_apply", widget=BooleanWidget)
     needs_verify = django_filters.BooleanFilter(method="filter_needs_verify", widget=BooleanWidget)
+    to_verify = django_filters.BooleanFilter(method="filter_to_verify", widget=BooleanWidget)
     applied_on = django_filters.DateFilter(method="filter_applied_on")
 
     class Meta:
@@ -322,6 +323,18 @@ class TopUpFilter(PersonFilterSet):
             .values("pk")
         )
 
+    def filter_to_verify(self, qs, name, value):
+        """Every card top-up whose approval staff still have to match in
+        MultiCobros, whether or not it already reached the balance: exactly
+        the sidebar's «Por verificar» count (``core.badges``). With the
+        instant auto-load they are «Completado», and nothing else in Depósitos
+        set them apart from the verified ones (owner, 2026-11-25)."""
+        if not value:
+            return qs
+        from apps.payments.multicobros import paid_topups_awaiting_verification
+
+        return qs.filter(pk__in=paid_topups_awaiting_verification().values("pk"))
+
     def filter_needs_pos(self, qs, name, value):
         """Paid online, credited locally, not yet loaded into the POS (refunds and
         Payworks simulations excluded: a simulated approval moved no money)."""
@@ -342,7 +355,8 @@ class TopUpFilter(PersonFilterSet):
         )
 
     def filter_needs_review(self, qs, name, value):
-        """Card attempts staff must look up in MultiCobros ("Conciliar con MultiCobros")."""
+        """Card attempts the bank never answered, to look up in MultiCobros
+        ("Conciliar con MultiCobros"; «Intentos sin respuesta del banco»)."""
         if not value:
             return qs
         from apps.payments.models import Payment
@@ -1059,12 +1073,14 @@ class AdminAdjustmentListView(DateRangeMixin, AdminListMixin, generics.ListAPIVi
 # ── top-ups log ───────────────────────────────────────────
 class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     """GET .../admin/topups/?q=&status=&method=&student=&from=&to=&ordering=
-    &needs_pos=&needs_unload=&needs_review=&needs_verify=
+    &needs_pos=&needs_unload=&needs_review=&needs_verify=&to_verify=
 
     Every ``TopUpRequest`` (office + online) with its linked gateway payment.
     ``needs_pos=1`` is the POS load queue, ``needs_unload=1`` the post-refund
-    unload queue, ``needs_review=1`` the card attempts to check in MultiCobros,
-    ``needs_verify=1`` the top-ups the app already loaded, still to verify.
+    unload queue, ``needs_review=1`` the card attempts the bank never answered
+    (look them up in MultiCobros), ``needs_verify=1`` the top-ups the app
+    already loaded, still to verify, and ``to_verify=1`` every approval still
+    to verify, loaded or not (the sidebar's «Por verificar»).
     """
     admin_area = 'cafeteria'
 
@@ -1435,8 +1451,12 @@ def reconcile_row(student, remote=None, error=None, pos_queue=None) -> dict:
 
 def reconcile_rows(students, points, *, error=None) -> list[dict]:
     """Rows for ``students`` against ``points`` (customer id → points, from ONE
-    store-wide fetch). ``error`` marks every row when that fetch failed."""
-    queue = services.pos_queue_reasons([s.id for s in students])
+    store-wide fetch). ``error`` marks every row when that fetch failed.
+
+    The POS-queue reasons are read for the whole school (three small queries)
+    rather than for an ``IN`` list of every id: the list now compares the
+    entire roster, a few hundred ids that would only grow the query."""
+    queue = services.pos_queue_reasons()
     rows = []
     for student in students:
         remote = points.get(student.loyverse_id)
@@ -1473,16 +1493,49 @@ def serialize_reconcile_row(row: dict) -> dict:
     }
 
 
+def _list_page(request, rows: list, page_size: int):
+    """``(page, next_url, previous_url)`` of an in-memory list, DRF-style links.
+
+    ``Paginator.get_page`` clamps: a page past the end (a «Corregir» that
+    removed the last difference of the last page) answers the last page
+    instead of a 404 the console would show as an error."""
+    from django.core.paginator import Paginator
+    from rest_framework.utils.urls import remove_query_param, replace_query_param
+
+    page = Paginator(rows, page_size).get_page(request.query_params.get("page"))
+    url = request.build_absolute_uri()
+    next_url = (
+        replace_query_param(url, "page", page.next_page_number()) if page.has_next() else None
+    )
+    previous_url = None
+    if page.has_previous():
+        number = page.previous_page_number()
+        previous_url = (
+            remove_query_param(url, "page")
+            if number == 1
+            else replace_query_param(url, "page", number)
+        )
+    return page, next_url, previous_url
+
+
 class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     """GET .../admin/reconcile/?q=&grade=&group=&ordering=&page=&page_size=&only=drift
 
     Linked, active students: local ledger vs live Loyverse points. One
     store-wide customer fetch per request (2 pages of 250), never one Loyverse
-    read per row: a 100-row page of serial reads blew the 60 s worker budget. ``total`` is the matching roster (drives the
-    pager); ``count`` stays the rows returned after ``only=drift`` (which
-    filters within the page, as before). ``offset``/``limit``/``has_more``
-    describe the page; the legacy ``limit``/``offset`` query params were
-    removed in Data Ops Phase 10 (``page``/``page_size`` only).
+    read per row: a 100-row page of serial reads blew the 60 s worker budget.
+
+    Every matching student is compared on each request, not only the visible
+    page: ``only=drift`` used to filter inside the 20-row page, so with a
+    difference on page 7 page 1 said «Todo en orden» (owner, 2026-11-25).
+    The page is cut AFTER comparing, from the drifting rows when
+    ``only=drift`` or from all of them otherwise.
+
+    ``total`` is the length of that list (drives the pager), ``count`` the
+    rows on this page, ``drift_count`` the differences across everyone
+    compared and ``checked`` how many were compared. ``offset``/``limit``/
+    ``has_more`` describe the page; the legacy ``limit``/``offset`` query
+    params were removed in Data Ops Phase 10 (``page``/``page_size`` only).
     """
     admin_area = 'cafeteria'
 
@@ -1500,35 +1553,30 @@ class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
         )
 
     def list(self, request, *args, **kwargs):
-        qs = self.filter_queryset(self.get_queryset())
-        params = request.query_params
-        students = list(self.paginate_queryset(qs) or [])
-        paginator = self.paginator
-        total = paginator.page.paginator.count
-        limit = paginator.get_page_size(request) or paginator.page_size
-        offset = (paginator.page.number - 1) * limit
-        next_url, previous_url = paginator.get_next_link(), paginator.get_previous_link()
+        # One query for the whole filtered, ordered roster (a few hundred rows).
+        students = list(self.filter_queryset(self.get_queryset()))
         points, error = store_points()
         rows = [serialize_reconcile_row(r) for r in reconcile_rows(students, points, error=error)]
         # Loyverse unreachable: nothing was compared, so no row is a drift
         # (QA 2026-11-24: every row counted as one); ``error`` says why.
         drifting = [] if error else [r for r in rows if not r["in_sync"]]
-        if params.get("only") == "drift":
-            rows = drifting
-        checked = len(students)
+        listed = drifting if params_only_drift(request) else rows
+        limit = self.paginator.get_page_size(request) or self.paginator.page_size
+        page, next_url, previous_url = _list_page(request, listed, limit)
+        results = list(page.object_list)
         return Response(
             {
                 "error": error,
-                "count": len(rows),
+                "count": len(results),
                 "next": next_url,
                 "previous": previous_url,
                 "drift_count": len(drifting),
-                "checked": checked,
-                "total": total,
-                "offset": offset,
+                "checked": len(students),
+                "total": len(listed),
+                "offset": (page.number - 1) * limit,
                 "limit": limit,
-                "has_more": offset + checked < total,
-                "results": rows,
+                "has_more": page.has_next(),
+                "results": results,
             }
         )
 

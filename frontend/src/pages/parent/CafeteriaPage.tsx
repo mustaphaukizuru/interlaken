@@ -27,7 +27,7 @@ import { EMPTY_CARDHOLDER, cardholderErrors, type Cardholder } from '@/lib/cardh
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { useAuthStore } from '@/store/authStore';
 import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
-import { useMineScope } from '@/lib/cafeteriaScope';
+import { useMineScope, useMyCafeteriaPath } from '@/lib/cafeteriaScope';
 import type { CafeteriaBalance, CafeteriaTransaction, CheckoutStart } from '@/types';
 import { closeBanorteLightbox, openBanorteLightbox, type BanorteEvent } from '@/lib/banorteCheckout';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
@@ -100,6 +100,7 @@ export default function CafeteriaPage() {
   const queryClient = useQueryClient();
   // «Mi cafetería»: the caller's own staff wallet only (?mine=1 on every call).
   const mine = useMineScope();
+  const myCafeteria = useMyCafeteriaPath();
   const storedChildId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
@@ -544,7 +545,7 @@ export default function CafeteriaPage() {
             </Button>
           )}
           {mine && (
-            <Link to="/portal/mi-cafeteria/credencial" className="btn-outline min-h-[44px] text-sm">
+            <Link to={`${myCafeteria}/credencial`} className="btn-outline min-h-[44px] text-sm">
               Ver mi credencial
             </Link>
           )}

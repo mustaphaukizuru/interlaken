@@ -44,7 +44,8 @@ export function useCustomersList(params: ListParams, options: Omit<UseQueryOptio
   });
 }
 
-/** Reconciliation reads Loyverse live per row: only when the person asks (`enabled`). */
+/** Reconciliation reads Loyverse live (the whole store, every student
+ *  compared): only when the person asks (`enabled`). */
 export function useReconcileList(params: ListParams, enabled: boolean) {
   return useQuery<ReconcilePage, unknown, ReconcilePage, readonly unknown[]>({
     queryKey: adminKeys.list(CAF_RECONCILE, params),

@@ -1,4 +1,6 @@
 import { createContext, useContext } from 'react';
+import { myCafeteriaPath } from '@/lib/areas';
+import { useAuthStore } from '@/store/authStore';
 
 /**
  * «Mi cafetería» (2026-11-18). True while the family cafetería pages
@@ -11,3 +13,11 @@ import { createContext, useContext } from 'react';
 export const MineScope = createContext(false);
 
 export const useMineScope = () => useContext(MineScope);
+
+/**
+ * The address of the caller's own wallet, for links back to it: inside the
+ * console for a console user (/admin/mi-cafeteria, owner 2026-11-25), the
+ * portal one otherwise.
+ */
+export const useMyCafeteriaPath = () =>
+  myCafeteriaPath(useAuthStore((s) => s.user)) ?? '/portal/mi-cafeteria';
