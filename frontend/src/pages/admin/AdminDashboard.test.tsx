@@ -100,7 +100,8 @@ describe('AdminDashboard', () => {
       expect.stringMatching(/^4 pre-registros nuevos/),
       expect.stringMatching(/^1 mensaje sin atender/),
     ]);
-    expect(links[0]).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
+    // Exactly those top-ups in Depósitos, like the sidebar's «Por verificar» (2026-11-25).
+    expect(links[0]).toHaveAttribute('href', '/admin/cafeteria?tab=deposits&revisar=verificar');
     expect(links[0]).toHaveTextContent('$444.00');
     expect(links[0]).toHaveTextContent('Desde hace 1 día');
     expect(links[1].getAttribute('href')).toMatch(/^\/admin\/pagos\?estado=failed&desde=/);

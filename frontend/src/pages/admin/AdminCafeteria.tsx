@@ -727,7 +727,15 @@ const banorteCell = (d: TopUpLogEntry) => {
       )}
       {b.last_error && <span className="block font-sans text-amber" title={b.last_error}>{b.last_error}</span>}
       {b.simulation && <span className="block font-sans text-subtle">Simulación ({b.mode}), sin cargo real</span>}
-      {b.review_reason && <Badge variant="warning">Por revisar en MultiCobros</Badge>}
+      {/* An attempt the bank never answered (expired, replaced, timed out):
+          look it up with «Conciliar con MultiCobros». Not the same as «Sin
+          verificar», an APPROVED one still to confirm (owner, 2026-11-25). */}
+      {b.review_reason && (
+        <span className="block font-sans">
+          <Badge variant="warning">Sin respuesta del banco</Badge>
+          <span className="block text-muted">{b.review_reason}</span>
+        </span>
+      )}
       {b.needs_verification
         ? <Badge variant="warning">Sin verificar</Badge>
         : b.verified_at && <span className="block font-sans text-green-700">Verificada · {b.verified_by_name}</span>}
@@ -752,14 +760,36 @@ const applyTotal = (plan: BulkResult) => {
   return total ? <p className="text-xs">Total a acreditar: <strong className="text-ink">{mxn(total)}</strong>.</p> : null;
 };
 
+/**
+ * Depósitos «Revisión» filter (owner, 2026-11-25). Two different MultiCobros
+ * jobs that used to share one name:
+ * - `verificar`: APPROVED card top-ups still to confirm in MultiCobros. With
+ *   the instant auto-load they are «Completado» (already in the balance and in
+ *   Loyverse), so nothing else in this list set them apart. Same set as the
+ *   sidebar's «Por verificar: N».
+ * - `multicobros` (kept for old links): attempts the bank never answered, to
+ *   look up with «Conciliar con MultiCobros».
+ */
+const REVIEW_OPTIONS = [
+  { value: 'verificar', label: 'Por verificar en MultiCobros' },
+  { value: 'multicobros', label: 'Intentos sin respuesta del banco' },
+];
+
+const REVIEW_NOTES: Record<string, string> = {
+  verificar: 'Recargas con tarjeta aprobadas que falta confirmar en MultiCobros. Las que dicen «Completado» ya están en el saldo y en Loyverse: no las cargue en el POS. Confírmelas una por una con «Verificar en MultiCobros» o todas a la vez con «Subir reporte de MultiCobros».',
+  multicobros: 'Intentos de pago con tarjeta sin respuesta clara del banco (expirados, reemplazados o sin respuesta). Búsquelos en MultiCobros con «Conciliar con MultiCobros» para saber si hubo cargo.',
+};
+
 function DepositsTab() {
   const { get } = useUrlFilters();
   const filtered = useActiveFilters(['q', 'estado', 'metodo', 'desde', 'hasta', 'revisar']);
   const [page, setPage] = useUrlPage();
   const [sort, onSort] = useUrlSort();
+  const review = get('revisar');
   const filters = clean({
     q: get('q'), status: get('estado'), method: get('metodo'), from: get('desde'), to: get('hasta'), ordering: serializeSort(sort),
-    needs_review: get('revisar') === 'multicobros' ? 1 : undefined,
+    needs_review: review === 'multicobros' ? 1 : undefined,
+    to_verify: review === 'verificar' ? 1 : undefined,
   });
   const { data, isLoading, isError, refetch } = useTopUpsList({ page, ...filters });
   const count = data?.count ?? 0;
@@ -769,10 +799,13 @@ function DepositsTab() {
   const [pending, setPending] = useState<{ action: BulkActionDef; ids: RowKey[] | null } | null>(null);
   const [reconciling, setReconciling] = useState<TopUpLogEntry | null>(null);
   const [applyingPaid, setApplyingPaid] = useState<TopUpLogEntry | null>(null);
+  const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
   const fetchExport = exporter((p) => exportTopups.mutateAsync(p), filters, selection);
+  const reviewNote = review ? REVIEW_NOTES[review] : undefined;
 
   return (
     <Card>
+      {reviewNote && <p className="mb-4 max-w-3xl text-sm text-muted" role="note">{reviewNote}</p>}
       <DataTable<TopUpLogEntry>
         tableId="cafeteria-topups"
         columns={TOPUP_COLUMNS}
@@ -799,7 +832,7 @@ function DepositsTab() {
             tabs={{ paramKey: 'estado', options: options(TOPUP_STATUS), allLabel: 'Todos', label: 'Filtrar por estado' }}
             selects={[
               { key: 'metodo', label: 'Método', options: options(TOPUP_METHOD), allLabel: 'Todos los métodos' },
-              { key: 'revisar', label: 'Revisión', options: [{ value: 'multicobros', label: 'Por revisar en MultiCobros' }], allLabel: 'Sin filtro de revisión' },
+              { key: 'revisar', label: 'Revisión', options: REVIEW_OPTIONS, allLabel: 'Sin filtro de revisión' },
             ]}
             dateRange={{ idPrefix: 'caf-dep' }}
           >
@@ -829,6 +862,10 @@ function DepositsTab() {
           <Button size="sm" onClick={() => setApplyingPaid(d)} aria-label={`Aplicar la recarga pagada de ${d.student_name}`}>
             <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Aplicar
           </Button>
+        ) : d.banorte?.needs_verification ? (
+          <Button size="sm" variant="secondary" onClick={() => setVerifying(d)} aria-label={`Verificar en MultiCobros la recarga de ${d.student_name}`}>
+            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" /> Verificar en MultiCobros
+          </Button>
         ) : (d.banorte?.can_reconcile && d.payment_id) ? (
           <Button size="sm" variant="secondary" onClick={() => setReconciling(d)} aria-label={`Conciliar con MultiCobros el pago de ${d.student_name}`}>
             <FileSearch className="w-3.5 h-3.5" aria-hidden="true" /> Conciliar con MultiCobros
@@ -851,6 +888,7 @@ function DepositsTab() {
         renderPlan={pending?.action.name === 'apply' || pending?.action.name === 'apply_paid' ? applyTotal : undefined}
       />
       <ReconcileBanorteDialog row={reconciling} onClose={() => setReconciling(null)} />
+      <VerifyBanorteDialog row={verifying} onClose={() => setVerifying(null)} />
       <ApplyPaidDialog row={applyingPaid} onClose={() => setApplyingPaid(null)} />
     </Card>
   );
@@ -1094,7 +1132,7 @@ function ReconcileTab() {
     <Card>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          Compara el saldo local contra los puntos de Loyverse, página por página (una consulta a Loyverse por alumno).
+          Compara el saldo local de todos contra los puntos de Loyverse (una sola consulta a Loyverse).
         </p>
         <div className="flex items-center gap-3">
           <label className="inline-flex min-h-[44px] items-center gap-2 text-sm text-muted">
@@ -1113,18 +1151,25 @@ function ReconcileTab() {
       </div>
 
       {!started ? (
-        <EmptyState icon={Scale} title="Ejecuta la reconciliación" description="Presiona «Reconciliar» para comparar con Loyverse." />
+        <EmptyState icon={Scale} title="Ejecute la reconciliación" description="Presione «Reconciliar» para comparar con Loyverse." />
       ) : (
         <>
+          {/* Totals of EVERYONE compared, not of this page (owner, 2026-11-25:
+              «Solo diferencias» used to say «Todo en orden» on page 1 with a
+              difference on another page). */}
           {data && (
             <p className="mb-3 text-sm text-muted" role="status">
-              {data.drift_count > 0 ? (
+              {data.error ? (
+                <span className="inline-flex items-center gap-1.5 text-danger">
+                  <AlertTriangle className="w-4 h-4" aria-hidden="true" /> No se pudo consultar Loyverse: no se comparó ningún saldo. {data.error}
+                </span>
+              ) : data.drift_count > 0 ? (
                 <span className="inline-flex items-center gap-1.5 text-amber">
-                  <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {plural(data.drift_count, 'diferencia', 'diferencias')} en esta página ({data.checked} {data.checked === 1 ? 'revisada' : 'revisadas'} de {data.total}).
+                  <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {plural(data.drift_count, 'diferencia', 'diferencias')} en total ({plural(data.checked, 'revisado', 'revisados')}).
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 text-green-700">
-                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Todo en orden en esta página ({data.checked} revisadas de {data.total}).
+                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Todo en orden: {plural(data.checked, 'revisado', 'revisados')}, sin diferencias.
                 </span>
               )}
             </p>
@@ -1170,7 +1215,10 @@ function ReconcileTab() {
                 <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Corregir
               </Button>
             ) : null)}
-            empty={{ icon: CheckCircle2, title: 'Sin diferencias', description: 'Ningún alumno de esta página tiene diferencias.' }}
+            empty={data?.error
+              // Nothing was compared: an empty list must not read as «no differences».
+              ? { icon: AlertTriangle, title: 'No se comparó ningún saldo', description: 'Loyverse no respondió. Intente de nuevo con «Reconciliar».' }
+              : { icon: CheckCircle2, title: 'Sin diferencias', description: 'Ningún alumno tiene diferencias.' }}
           />
         </>
       )}

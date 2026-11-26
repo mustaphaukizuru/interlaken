@@ -527,7 +527,9 @@ class TestReconcile:
         _balance(a, 50)
         _balance(b, 70)
         data = api_client.get(reverse("admin-reconcile"), {"page_size": 1}).json()
-        assert data["total"] == 2 and data["checked"] == 1 and data["has_more"] is True
+        # Both compared (the drift of Rivera counts from page 1), one shown.
+        assert data["total"] == 2 and data["checked"] == 2 and data["count"] == 1
+        assert data["drift_count"] == 1 and data["has_more"] is True
         assert data["results"][0]["student_id"] == a.id
         found = api_client.get(reverse("admin-reconcile"), {"q": "rivera"}).json()
         assert found["results"][0]["drift"] == "20.00"

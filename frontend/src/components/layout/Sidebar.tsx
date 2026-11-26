@@ -3,9 +3,9 @@ import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, BarChart3, LayoutDashboard, Coffee } from 'lucide-react';
+import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, ChevronRight, BarChart3, LayoutDashboard, Coffee } from 'lucide-react';
 import { accountEntries, navGroupsByRole, type NavGroup, type Role } from './navConfig';
-import { canOpen, consoleHome, homePath } from '@/lib/areas';
+import { canOpen, consoleHome, homePath, myCafeteriaPath } from '@/lib/areas';
 import { useBadges } from '@/hooks/useBadges';
 import { Avatar } from '@/components/ui/Avatar';
 
@@ -45,9 +45,11 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
     : role === 'staff'
       ? [{ heading: 'Consola', items: [{ icon: LayoutDashboard, label: user.staff_title || 'Mi consola', to: home }] }]
       : [];
-  // A console user who also eats at the cafetería (their own staff wallet).
-  const myCafe: NavGroup[] = user?.cafeteria_account && (user.role === 'admin' || user.role === 'staff')
-    ? [{ heading: 'Mi cuenta', items: [{ icon: Coffee, label: 'Mi cafetería', to: '/portal/mi-cafeteria' }] }]
+  // A console user who also eats at the cafetería (their own staff wallet),
+  // opened inside the console so the admin menu stays (owner, 2026-11-25).
+  const myCafePath = myCafeteriaPath(user);
+  const myCafe: NavGroup[] = myCafePath
+    ? [{ heading: 'Mi cuenta', items: [{ icon: Coffee, label: 'Mi cafetería', to: myCafePath }] }]
     : [];
   // A staff member whose only login is the portal one (a «Personal del
   // colegio» cafetería account): the portal reads «Personal», not «Familia».
@@ -73,7 +75,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   const touchX = useRef<number | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   // Folded group headings, persisted per browser. The admin menu is 23 entries
   // in five groups; an office that lives in Cafetería should not scroll past
   // Contenido del sitio every time.
@@ -219,9 +221,14 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
               {group.items.map(({ icon: Icon, label, to, end, badgeKey, subBadge }) => {
                 const count = badgeKey ? badges[badgeKey] ?? 0 : 0;
                 const sub = subBadge ? badges[subBadge.key] ?? 0 : 0;
-                const name = [label, count ? `${count} pendientes` : '', sub && subBadge ? `${subBadge.label.toLowerCase()}: ${sub}` : '']
+                // A sub-badge with its own address (owner, 2026-11-25: «Por
+                // verificar» opens exactly those top-ups) is a separate link
+                // under the entry: an anchor inside the entry's anchor is
+                // invalid HTML and unreachable by keyboard.
+                const subLink = sub > 0 && subBadge?.to ? { ...subBadge, to: subBadge.to } : null;
+                const name = [label, count ? `${count} pendientes` : '', sub && subBadge && !subLink ? `${subBadge.label.toLowerCase()}: ${sub}` : '']
                   .filter(Boolean).join(', ');
-                return (
+                const entry = (
                   <NavLink
                     key={to}
                     to={to}
@@ -244,7 +251,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                         <Icon size={20} className="flex-shrink-0" aria-hidden="true" />
                         <span className={`flex-1 ${rail ? 'lg:hidden' : ''}`}>
                           {label}
-                          {sub > 0 && subBadge && (
+                          {sub > 0 && subBadge && !subLink && (
                             <span aria-hidden="true" className={`block text-[11px] font-semibold leading-tight ${isActive ? 'text-white/85' : 'text-amber'}`}>
                               {subBadge.label}: {sub > 99 ? '99+' : sub}
                             </span>
@@ -258,6 +265,23 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                       </>
                     )}
                   </NavLink>
+                );
+                if (!subLink) return entry;
+                return (
+                  <div key={to} className="flex flex-col">
+                    {entry}
+                    {/* Lined up with the entry's label (14px padding + 20px icon + 12px gap). */}
+                    <Link
+                      to={subLink.to}
+                      onClick={onNavigate}
+                      aria-current={`${pathname}${search}` === subLink.to ? 'page' : undefined}
+                      aria-label={`${subLink.label}: ${sub}. Ver la lista`}
+                      className={`ml-10 inline-flex min-h-[32px] items-center gap-1 self-start rounded-sm px-1.5 text-[12px] font-semibold leading-tight text-amber no-underline hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${rail ? 'lg:hidden' : ''}`}
+                    >
+                      {subLink.label}: {sub > 99 ? '99+' : sub}
+                      <ChevronRight size={14} aria-hidden="true" />
+                    </Link>
+                  </div>
                 );
               })}
             </div>

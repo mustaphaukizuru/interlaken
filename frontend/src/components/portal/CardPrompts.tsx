@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { formatMXN } from '@/lib/format';
 import { forgetInstallEvent, installEvent, isIosSafari, runningInstalled } from '@/lib/installPrompt';
 import type { CafeteriaCard } from '@/types';
+import { useMyCafeteriaPath } from '@/lib/cafeteriaScope';
 
 /*
  * The credential page's two pop-ups (owner, 2026-11-22). Never both at once:
@@ -30,7 +31,8 @@ export function useLowBalancePrompt(card: CafeteriaCard | undefined) {
 export function LowBalancePrompt({ card, mine, onClose }: { card: CafeteriaCard; mine: boolean; onClose: () => void }) {
   const first = card.student.name.split(' ')[0];
   const own = mine || card.student.tipo === 'personal';
-  const to = own ? '/portal/mi-cafeteria' : `/portal/cafeteria?hijo=${card.student.id}&recarga=200`;
+  const myCafeteria = useMyCafeteriaPath();
+  const to = own ? myCafeteria : `/portal/cafeteria?hijo=${card.student.id}&recarga=200`;
   return (
     <Modal open onClose={onClose} title={own ? 'Su saldo está bajo' : `Saldo bajo de ${first}`} maxWidth={420}>
       <div className="space-y-4 text-sm text-ink">

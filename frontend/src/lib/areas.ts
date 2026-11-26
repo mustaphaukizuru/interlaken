@@ -33,7 +33,7 @@ const SECTIONS: [prefix: string, areas: AreaKey[]][] = [
   ['/admin/contrasenas', ['accesos']],
 ];
 
-type Who = Pick<User, 'role'> & { staff_areas?: string[] } | null | undefined;
+type Who = Pick<User, 'role'> & { staff_areas?: string[]; cafeteria_account?: User['cafeteria_account'] } | null | undefined;
 
 export const isAdmin = (user: Who) => user?.role === 'admin';
 
@@ -57,6 +57,30 @@ function sectionOf(path: string): [string, AreaKey[]] | undefined {
 const isStaffPanel = (path: string) => /^\/staff(?:[/?#]|$)/.test(path);
 
 /**
+ * «Mi cafetería» inside the console (owner, 2026-11-25): it used to open the
+ * family portal frame, so the admin menu vanished and the way back hid in the
+ * account menu. Not a section of any area: it is the person's own wallet, so
+ * any console user holding a staff cafetería account may open it.
+ */
+export const MY_CAFETERIA_PATH = '/admin/mi-cafeteria';
+
+const isMyCafeteria = (path: string) => {
+  const clean = path.split(/[?#]/)[0].replace(/\/+$/, '');
+  return clean === MY_CAFETERIA_PATH || clean.startsWith(`${MY_CAFETERIA_PATH}/`);
+};
+
+/**
+ * Where `user` sees their own staff wallet: inside the console for a console
+ * user, the portal address for a staff login without console areas, and
+ * null for everyone else (a portal-only staff login already has it as its
+ * «Cafetería»; families have no own wallet).
+ */
+export function myCafeteriaPath(user: Who): string | null {
+  if (!user?.cafeteria_account || (user.role !== 'admin' && user.role !== 'staff')) return null;
+  return hasConsole(user) ? MY_CAFETERIA_PATH : '/portal/mi-cafeteria';
+}
+
+/**
  * May `user` open this console path? /staff (the «Panel de Dirección» with
  * admissions, ARCO and money, and the site content) is for administrators
  * only, like the API (QA 2026-11-24). Other paths outside /admin are not
@@ -66,6 +90,7 @@ export function canOpen(user: Who, path: string): boolean {
   if (isStaffPanel(path)) return isAdmin(user);
   if (!path.startsWith('/admin')) return true;
   if (isAdmin(user)) return true;
+  if (isMyCafeteria(path)) return hasConsole(user) && !!user?.cafeteria_account;
   const section = sectionOf(path);
   if (!section) return false;
   const held = areasOf(user);
