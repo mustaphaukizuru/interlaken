@@ -1,11 +1,11 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, CircleDollarSign, FileLock2, FolderCheck, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, CircleDollarSign, FileLock2, FolderCheck, Briefcase, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 /** Keys returned by GET /core/badges/ (BACKLOG P1-E3). */
-export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'cafeteria_verificar' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
+export type BadgeKey = 'admisiones' | 'visitas' | 'visitas_cerrar' | 'cafeteria' | 'cafeteria_verificar' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
 
 export interface NavEntry {
   icon: LucideIcon;
@@ -15,14 +15,20 @@ export interface NavEntry {
   /** Live counter from /core/badges/ to show next to the label. */
   badgeKey?: BadgeKey;
   /** A second counter that needs its own words, shown under the label as
-   *  «label: N» while it is above zero (e.g. «Por verificar: 2»). */
-  subBadge?: { key: BadgeKey; label: string };
+   *  «label: N» while it is above zero (e.g. «Por verificar: 2»). With `to`
+   *  it is its own link to the list of exactly those items (rendered next to
+   *  the entry, never inside its link). */
+  subBadge?: { key: BadgeKey; label: string; to?: string };
 }
 
 export interface NavGroup {
   heading: string;
   items: NavEntry[];
 }
+
+/** Depósitos filtered to the card top-ups still to verify in MultiCobros
+ *  (loaded or not): what «Por verificar: N» counts. */
+export const TO_VERIFY_PATH = '/admin/cafeteria?tab=deposits&revisar=verificar';
 
 const FAMILY_GROUPS: NavGroup[] = [
   {
@@ -56,11 +62,17 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       items: [
         { icon: BarChart3,     label: 'Inicio',     to: '/admin', end: true },
         { icon: Users,         label: 'Alumnos',    to: '/admin/alumnos' },
+        // Staff who buy at the cafetería, and who of them uses the console (2026-11-25).
+        { icon: Briefcase,     label: 'Personal',   to: '/admin/personal' },
         { icon: House,         label: 'Familias',   to: '/admin/familias' },
         { icon: ClipboardList, label: 'Admisiones', to: '/admin/admisiones', end: true, badgeKey: 'admisiones' },
         { icon: KanbanSquare, label: 'Pipeline', to: '/admin/admisiones/pipeline' },
         { icon: FolderCheck, label: 'Documentos requeridos', to: '/admin/admisiones/documentos' },
-        { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas' },
+        // The red dot counts the people coming (every standing visit from today
+        // on); «Por cerrar», past visits nobody marked «Asistió» / «No asistió»
+        // (owner 2026-11-25: three web bookings, a dot that stayed at 0).
+        { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas',
+          subBadge: { key: 'visitas_cerrar', label: 'Por cerrar', to: '/admin/visitas?seguimiento=por_cerrar' } },
         { icon: CalendarDays, label: 'Agenda semanal', to: '/admin/visitas/semana' },
       ],
     },
@@ -69,8 +81,9 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       items: [
         // «Por verificar»: card top-ups nothing applies until someone checks
         // them in MultiCobros (2026-11-18: two sat in Loyverse all morning).
+        // It opens exactly those in Depósitos (owner, 2026-11-25).
         { icon: Coffee,     label: 'Cafetería', to: '/admin/cafeteria', badgeKey: 'cafeteria',
-          subBadge: { key: 'cafeteria_verificar', label: 'Por verificar' } },
+          subBadge: { key: 'cafeteria_verificar', label: 'Por verificar', to: TO_VERIFY_PATH } },
         { icon: CreditCard, label: 'Pagos',     to: '/admin/pagos' },
       ],
     },

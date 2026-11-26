@@ -64,17 +64,31 @@ handles passwords) and every **admin** see everything. A **staff** account
 
 | Area (`key`) | Console sections | Puestos that include it |
 |---|---|---|
-| Alumnos y familias (`alumnos`) | `/admin/alumnos` (roster, file, tutores, imports, Loyverse link) | Secretaría |
+| Alumnos y familias (`alumnos`) | `/admin/alumnos` (roster, file, tutores, imports, Loyverse link), `/admin/personal` (staff cafetería accounts) | Secretaría |
 | Accesos de familias (`accesos`) | `/admin/contrasenas`, family temporary passwords | Secretaría |
-| Admisiones (`admisiones`) | `/admin/admisiones`, pipeline | Secretaría |
-| Visitas y agenda (`visitas`) | `/admin/visitas`, agenda semanal, slot generation | Secretaría, Recepción |
-| Mensajes y formularios (`mensajes`) | `/admin/mensajes`, form submissions (forms are read-only) | Secretaría, Recepción |
+| Admisiones (`admisiones`) | `/admin/admisiones`, pipeline | Secretaría, Admisiones |
+| Visitas y agenda (`visitas`) | `/admin/visitas`, agenda semanal, slot generation | Secretaría, Recepción, Admisiones |
+| Mensajes y formularios (`mensajes`) | `/admin/mensajes`, form submissions (forms are read-only) | Secretaría, Recepción, Admisiones |
 | Comunicados y calendario (`comunicados`) | `/admin/comunicados` (no emergency broadcast), `/admin/calendario` | Secretaría |
 | Cafetería y pagos (`cafeteria`) | `/admin/cafeteria`, `/admin/pagos` | Cafetería |
 
 Always admin-only: Dashboard, Usuarios, Ajustes, site content (páginas,
 navegación, medios, testimonios, form builder), Auditoría, ARCO, Nuevo ciclo,
 Fusionar cuentas, emergency broadcast. Medical data stays masked for staff.
+
+**Staff who buy at the cafetería (2026-11-25).** A staff member's wallet is a
+`StudentProfile` with `tipo = personal`, listed in **Personal**
+(`/admin/personal`, its own menu entry; it used to be a tab of Alumnos). Most
+of those people sign in with a cafetería-only login (`role = student`). An
+admin gives that same login the console from Personal, from the person's file,
+or from Usuarios → Invitar (an address that is already a staff cafetería login
+answers 409 `staff_cafeteria_login` and the dialog offers it):
+`POST /accounts/admin/staff/<id>/console-access/` makes it `role = staff` with
+the chosen puesto or areas, keeps the wallet and history, generates no
+password (the person signs in with Google) and emails them.
+`DELETE` on the same address turns it back into a cafetería-only login and
+closes its console sessions. Both are admin-only and audited. Family and
+pupil logins never get the console this way.
 
 Enforcement is server side: each console endpoint declares `admin_area` (or
 `admin_area_read` for read-only access) and `core.permissions.IsAdmin` admits a

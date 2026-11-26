@@ -40,6 +40,8 @@ const EXPLICIT_TITLES: Record<string, string> = {
   '/admin/admisiones': 'Admisiones',
   '/admin/visitas': 'Visitas',
   '/admin/cafeteria': 'Cafetería',
+  '/admin/mi-cafeteria': 'Mi cafetería',
+  '/admin/mi-cafeteria/credencial': 'Credencial',
   '/admin/comunicados': 'Comunicados',
   '/admin/ajustes': 'Ajustes',
   '/staff': 'Analítica',

@@ -57,6 +57,20 @@ export interface StaffUser {
   staff_areas?: string[];
   /** Set when the account was archived: off the list, cannot sign in (Restaurar). */
   archived_at?: string | null;
+  /** The login also holds a «Personal del colegio» cafetería account («Mi cafetería»). */
+  has_cafeteria?: boolean;
+}
+
+/**
+ * «Nuevo usuario» with an address that already belongs to a staff cafetería
+ * login (409 `staff_cafeteria_login`, 2026-11-25): that same login can get the
+ * console (`grantConsoleAccess`) instead of a second account.
+ */
+export interface StaffCafeteriaPerson {
+  id: number;
+  full_name: string;
+  email: string;
+  puesto_label: string;
 }
 
 export interface PasswordRequest {
@@ -1030,6 +1044,9 @@ export interface AdminBookingsParams {
   date?: string;
   from?: string;
   to?: string;
+  /** `upcoming` (standing visits from today on: Visitas' red dot) or `to_close`
+   *  (past visits nobody marked attended or no-show: «Por cerrar»). */
+  followup?: 'upcoming' | 'to_close';
   ordering?: string;
   page?: number;
   page_size?: number;
@@ -1226,6 +1243,16 @@ export const portalApi = {
     api.get<{ user: StaffUser; total_actions: number; recent: AuditLogEntry[] }>(`/accounts/admin/staff/${id}/activity/`),
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
+  /**
+   * A staff cafetería login (role student, «Personal del colegio») gets the
+   * console on that same login: wallet and history kept, no password (Google),
+   * an email tells them. `userId` is the login's id (`student.user.id`).
+   */
+  grantConsoleAccess: (userId: number, data: { staff_title: string; staff_areas: string[] }) =>
+    api.post<StaffUser & { invite_email_sent: boolean }>(`/accounts/admin/staff/${userId}/console-access/`, data),
+  /** Back to a cafetería-only login (console sessions closed, wallet untouched). */
+  removeConsoleAccess: (userId: number) =>
+    api.delete<{ id: number; role: string; sessions_revoked: number }>(`/accounts/admin/staff/${userId}/console-access/`),
   /** Password request inbox (admin). */
   getPasswordRequests: (params?: ListParams) =>
     api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params }),

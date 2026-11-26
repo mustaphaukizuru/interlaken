@@ -82,6 +82,31 @@ describe('CommandPalette', () => {
     expect(screen.getByText(/INT-007/)).toBeInTheDocument();
   });
 
+  it('lists staff cafetería accounts under «Personal» with their puesto, after the pupils', async () => {
+    students.mockResolvedValue({
+      data: {
+        results: [
+          { id: 9, tipo: 'personal', puesto: 'docente', puesto_label: 'Docente',
+            user: { first_name: 'Rosa', last_name: 'Pérez' }, student_id: 'rperez', grade: '', group: '' },
+          { id: 7, tipo: 'alumno', user: { first_name: 'Ana', last_name: 'García' },
+            student_id: 'INT-007', grade: '3', group: 'B' },
+        ],
+      },
+    } as never);
+    renderPalette();
+    await userEvent.keyboard('{Control>}k{/Control}');
+    await userEvent.type(screen.getByRole('combobox'), 'ra');
+
+    expect(await screen.findByText('Rosa Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Personal')).toBeInTheDocument();
+    expect(screen.getByText('rperez · Docente')).toBeInTheDocument();
+    // Never read as a pupil with an empty grade.
+    expect(screen.queryByText(/rperez · $/)).not.toBeInTheDocument();
+    // Pupils first, so each heading shows once.
+    const text = document.body.textContent ?? '';
+    expect(text.indexOf('Ana García')).toBeLessThan(text.indexOf('Rosa Pérez'));
+  });
+
   it('closes on Escape', async () => {
     renderPalette();
     await userEvent.keyboard('{Control>}k{/Control}');

@@ -27,13 +27,15 @@ export interface StudentsListParams {
   archived?: string;
   /** Pupils by default; `personal` = staff cafetería accounts, `todos` = both. */
   tipo?: string;
+  /** Staff only: one puesto (`docente`, `direccion`...). */
+  puesto?: string;
   enrolled_from?: string;
   enrolled_to?: string;
   [key: string]: string | number | undefined;
 }
 
 /** Ordering keys `/accounts/students/` whitelists (docs/API-LISTING.md). */
-export const STUDENTS_ORDERING_KEYS = ['name', 'student_id', 'grade', 'group', 'status', 'last_login', 'enrollment_date', 'balance'] as const;
+export const STUDENTS_ORDERING_KEYS = ['name', 'student_id', 'grade', 'group', 'status', 'last_login', 'enrollment_date', 'balance', 'puesto'] as const;
 
 export const useStudentsList = createListHook<RosterStudent, StudentsListParams>(STUDENTS_ENTITY, portalApi.getStudents);
 

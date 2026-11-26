@@ -33,6 +33,7 @@ import {
 } from '@/hooks/queries/bookings';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { plural } from '@/lib/plural';
 import { shortDateTime } from '@/lib/tableFormat';
 import {
   BOOKING_SOURCE_OPTIONS, BOOKING_STATUS_OPTIONS, VISIT_TYPE_LABEL, VISIT_TYPE_OPTIONS, bookingStatusMeta, canMove, visitStarted,
@@ -532,10 +533,25 @@ function RowMoves({ moves, isLg, busy, busyAct, menuLabel }: {
   );
 }
 
+/**
+ * «Seguimiento» (owner 2026-11-25): the visits the menu counts. «Próximas» is
+ * the red dot on Visitas (standing visits from today on), «Por cerrar» the line
+ * under it (past visits nobody marked «Asistió» or «No asistió»). Same server
+ * filter as those counts (`followup`), so the list matches the number.
+ */
+const FOLLOWUP_OPTIONS = [
+  { value: 'proximas', label: 'Próximas' },
+  { value: 'por_cerrar', label: 'Por cerrar (ya pasaron)' },
+];
+const FOLLOWUP_PARAM = new Map<string, NonNullable<AdminBookingsParams['followup']>>([
+  ['proximas', 'upcoming'],
+  ['por_cerrar', 'to_close'],
+]);
+
 function BookingsView() {
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
-  const filtered = useActiveFilters(['q', 'estado', 'tipo', 'origen', 'desde', 'hasta']);
+  const filtered = useActiveFilters(['q', 'estado', 'tipo', 'origen', 'desde', 'hasta', 'seguimiento']);
   const sort = parseSort(get('orden'));
   const filters: Omit<AdminBookingsParams, 'page'> = {
     q: get('q') || undefined,
@@ -544,6 +560,7 @@ function BookingsView() {
     source: get('origen') || undefined,
     from: get('desde') || undefined,
     to: get('hasta') || undefined,
+    followup: FOLLOWUP_PARAM.get(get('seguimiento') ?? ''),
     ordering: serializeSort(sort) || undefined,
   };
   const filterKey = JSON.stringify(filters);
@@ -592,7 +609,7 @@ function BookingsView() {
   };
 
   return (
-    <Card title={`${count.toLocaleString('es-MX')} reservas`}
+    <Card title={plural(count, 'reserva', 'reservas')}
       action={<ExportMenu filenamePrefix="visitas" selectedCount={selection.count} fetch={fetchExport} />}>
       <DataTable<Booking>
         tableId="bookings"
@@ -629,6 +646,7 @@ function BookingsView() {
             search={{ placeholder: 'Tutor, correo, teléfono o alumno…', label: 'Buscar reservas' }}
             tabs={{ paramKey: 'estado', options: BOOKING_STATUS_OPTIONS, allLabel: 'Todas', label: 'Filtrar por estado' }}
             selects={[
+              { key: 'seguimiento', label: 'Seguimiento', options: FOLLOWUP_OPTIONS, allLabel: 'Todas las visitas' },
               { key: 'tipo', label: 'Tipo de visita', options: VISIT_TYPE_OPTIONS, allLabel: 'Todos los tipos' },
               { key: 'origen', label: 'Origen', options: BOOKING_SOURCE_OPTIONS, allLabel: 'Todos los orígenes' },
             ]}

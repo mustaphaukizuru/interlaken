@@ -49,6 +49,9 @@ PUESTOS: dict[str, tuple[str, tuple[str, ...]]] = {
                                   'mensajes', 'comunicados')),
     'recepcion': ('Recepción', ('visitas', 'mensajes')),
     'cafeteria': ('Cafetería', ('cafeteria',)),
+    # Owner, 2026-11-25: the person in charge of admissions also runs the visit
+    # agenda and reads the contact inbox (where the site's enquiries arrive).
+    'admisiones': ('Admisiones', ('admisiones', 'visitas', 'mensajes')),
 }
 
 ALL_AREAS = frozenset(AREAS)

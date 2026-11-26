@@ -14,6 +14,8 @@ vi.mock('@/services/api', () => ({
     studentsBulk: vi.fn(),
     importLoyverse: vi.fn(),
     linkLoyverse: vi.fn(),
+    grantConsoleAccess: vi.fn(),
+    removeConsoleAccess: vi.fn(),
   },
   downloadBlob: vi.fn(),
 }));
@@ -428,42 +430,120 @@ describe('AdminStudents · Vincular como hermanos (bulk)', () => {
   });
 });
 
-describe('AdminStudents · Personal tab (staff cafetería accounts, 2026-11-18)', () => {
+// Staff cafetería accounts (2026-11-18); their own menu entry «Personal» and
+// console access on the same login (owner, 2026-11-25).
+describe('AdminStudents · Personal', () => {
   const staffRow = {
     id: 51, student_id: 'rlince', loyverse_code: 'rlince', grade: '', group: '', tipo: 'personal',
     puesto: 'docente', puesto_label: 'Docente', status: 'active', is_active: true, balance: '35.00',
-    user: { id: 61, first_name: 'Rosa', last_name: 'Lince', full_name: 'Rosa Lince', email: 'rlince@interlaken.com.mx' },
+    user: { id: 61, first_name: 'Rosa', last_name: 'Lince', full_name: 'Rosa Lince', email: 'rlince@interlaken.com.mx', role: 'student', staff_areas: [] },
   };
+  const consoleRow = {
+    ...staffRow, id: 52, student_id: 'mvega', loyverse_code: 'mvega', puesto: 'administracion', puesto_label: 'Administración',
+    user: { id: 62, first_name: 'Marta', last_name: 'Vega', full_name: 'Marta Vega', email: 'mvega@interlaken.com.mx', role: 'staff', staff_title: 'Admisiones', staff_areas: ['admisiones', 'visitas', 'mensajes'] },
+  };
+  const asAdmin = () => useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', first_name: 'A', last_name: 'B', full_name: 'A B', role: 'admin', avatar: '', whatsapp: '' }, accessToken: 't', isAuthenticated: true });
+  const staffList = () => mockedStudents.mockImplementation(async (params) => (params?.tipo === 'personal' && !params?.page_size
+    ? { data: { results: [staffRow, consoleRow], count: 2 } }
+    : { data: { results: [], count: 0 } }) as never);
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     stubViewport(1280);
-    useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', first_name: 'A', last_name: 'B', full_name: 'A B', role: 'admin', avatar: '', whatsapp: '' }, accessToken: 't', isAuthenticated: true });
+    asAdmin();
   });
 
-  it('the pupils list never asks for staff; the Personal tab lists them with their puesto', async () => {
-    mockedStudents.mockImplementation(async (params) => (params?.tipo === 'personal'
-      ? { data: { results: [staffRow], count: 1 } }
-      : { data: { results: [], count: 0 } }) as never);
-    renderWithProviders(<><AdminStudents /><LocationProbe /></>, { route: '/admin/alumnos' });
+  it('the pupils list never asks for staff and has no «Personal» tab any more', async () => {
+    staffList();
+    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
     await waitFor(() => expect(mockedStudents).toHaveBeenCalled());
-    const roster = mockedStudents.mock.calls.find(([p]) => p?.page_size === undefined)![0];
-    expect(roster?.tipo).toBeUndefined();                       // server default: pupils only
-    expect(await screen.findByRole('tab', { name: /Personal\s*1/ })).toBeInTheDocument();
+    expect(mockedStudents.mock.calls.every(([p]) => p?.tipo === undefined)).toBe(true);   // pupils only
+    expect(await screen.findByRole('heading', { name: 'Alumnos' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Personal/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Más acciones/ }));
+    expect(screen.queryByRole('menuitem', { name: 'Importar personal desde Loyverse' })).toBeNull();
+  });
 
-    await userEvent.click(screen.getByRole('tab', { name: /Personal/ }));
+  it('old links to the «Personal» tab land on the new section, filters kept', async () => {
+    staffList();
+    renderWithProviders(<><AdminStudents /><LocationProbe /></>, { route: '/admin/alumnos?tipo=personal&q=rosa' });
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/admin/personal?q=rosa'));
+  });
+
+  it('lists the staff with their puesto and who uses the console, filtered by puesto', async () => {
+    staffList();
+    renderWithProviders(<AdminStudents mode="personal" />, { route: '/admin/personal?puesto=docente&orden=puesto' });
     expect(await screen.findByText('Rosa Lince')).toBeInTheDocument();
-    expect(screen.getByTestId('location').textContent).toContain('tipo=personal');
-    expect(screen.getByRole('columnheader', { name: /Puesto/ })).toBeInTheDocument();
+    expect(mockedStudents).toHaveBeenCalledWith({ page: 1, tipo: 'personal', status: 'active', puesto: 'docente', ordering: 'puesto' });
+    expect(screen.getByRole('heading', { name: 'Personal' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Puesto' })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: 'Consola' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /^Código/ })).toBeInTheDocument();
-    expect(screen.getByText('Docente')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Familia/ })).toBeNull();
+    expect(screen.getByText('Solo cafetería')).toBeInTheDocument();
+    expect(screen.getByText('Admisiones, Visitas y agenda, Mensajes y formularios')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Rosa Lince' })).toHaveAttribute('href', '/admin/personal/51');
     expect(screen.getByRole('button', { name: /Nuevo personal/ })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Puesto' })).toHaveValue('docente');
+  });
+
+  it('«Cambiar puesto» changes the selected staff in one go', async () => {
+    staffList();
+    const bulk = vi.mocked(portalApi.studentsBulk);
+    bulk.mockImplementation(async (body) => ({ data: { action: 'puesto', requested: 2, ok: 2, failed: [], skipped: [], dry_run: !!body.dry_run } }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStudents mode="personal" />, { route: '/admin/personal' });
+    await screen.findByText('Rosa Lince');
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las filas de esta página' }));
+    const bar = await screen.findByRole('region', { name: 'Acciones en lote' });
+    expect(bar).toHaveTextContent('2 personas seleccionadas');
+    await user.click(within(bar).getByRole('button', { name: 'Cambiar puesto' }));
+    const picker = await screen.findByRole('dialog', { name: /Cambiar puesto: 2 personas/ });
+    await user.selectOptions(within(picker).getByLabelText('Nuevo puesto'), 'docente');
+    await user.click(within(picker).getByRole('button', { name: 'Continuar' }));
+    await waitFor(() => expect(bulk).toHaveBeenCalledWith({ action: 'puesto', ids: [51, 52], all_matching: false, filters: undefined, payload: { value: 'docente' }, dry_run: true }));
+    await user.click(await screen.findByRole('button', { name: /Cambiar puesto a «Docente».*\(2\)/ }));
+    await waitFor(() => expect(bulk).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'puesto', payload: { value: 'docente' }, dry_run: false })));
+  });
+
+  it('an admin gives a cafetería-only login the console from its row', async () => {
+    staffList();
+    vi.mocked(portalApi.grantConsoleAccess).mockResolvedValue({ data: { id: 61, role: 'staff', invite_email_sent: true } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStudents mode="personal" />, { route: '/admin/personal' });
+    await screen.findByText('Rosa Lince');
+    await user.click(screen.getByRole('button', { name: 'Más acciones para Marta Vega' }));
+    expect(screen.getByRole('menuitem', { name: 'Quitar acceso a la consola a Marta Vega' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Más acciones para Rosa Lince' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Dar acceso a la consola a Rosa Lince' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Dar acceso a la consola' });
+    expect(dialog).toHaveTextContent('Conserva su cuenta de cafetería, su saldo y su historial.');
+    // Nothing is preselected: «Dar acceso» waits for a puesto or an area.
+    expect(within(dialog).getByRole('button', { name: 'Dar acceso' })).toBeDisabled();
+    await user.selectOptions(within(dialog).getByLabelText('Puesto'), 'admisiones');
+    await user.click(within(dialog).getByRole('button', { name: 'Dar acceso' }));
+    await waitFor(() => expect(portalApi.grantConsoleAccess).toHaveBeenCalledWith(61, {
+      staff_title: 'Admisiones', staff_areas: ['admisiones', 'visitas', 'mensajes'],
+    }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rosa Lince ya puede entrar a la consola.'));
+  });
+
+  it('a staff account with the roster area sees the access but cannot change it', async () => {
+    useAuthStore.setState({ user: { id: 9, email: 's@x.mx', first_name: 'S', last_name: 'C', full_name: 'S C', role: 'staff', staff_areas: ['alumnos'], avatar: '', whatsapp: '' }, accessToken: 't', isAuthenticated: true });
+    staffList();
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStudents mode="personal" />, { route: '/admin/personal' });
+    expect(await screen.findByText('Solo cafetería')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Más acciones para Rosa Lince' }));
+    expect(screen.queryByRole('menuitem', { name: /acceso a la consola/ })).toBeNull();
   });
 
   it('an admin finds «Importar personal desde Loyverse» in Más acciones', async () => {
     mockedStudents.mockResolvedValue({ data: { results: [], count: 0 } } as never);
-    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos?tipo=personal' });
+    renderWithProviders(<AdminStudents mode="personal" />, { route: '/admin/personal' });
     await userEvent.click(await screen.findByRole('button', { name: /Más acciones/ }));
     expect(screen.getByRole('menuitem', { name: 'Importar personal desde Loyverse' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Importar archivo' })).toBeNull();
   });
 });

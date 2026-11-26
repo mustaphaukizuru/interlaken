@@ -15,6 +15,7 @@ vi.mock('@/services/api', () => ({
 import toast from 'react-hot-toast';
 import CafeteriaTopupReturn from './CafeteriaTopupReturn';
 import { paymentsApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 
 const getStatus = vi.mocked(paymentsApi.getPaymentStatus);
 const getAvailability = vi.mocked(paymentsApi.getAvailability);
@@ -179,5 +180,27 @@ describe('CafeteriaTopupReturn polling', () => {
     });
 
     expect(getStatus.mock.calls.length).toBe(callsBefore);
+  });
+});
+
+describe('CafeteriaTopupReturn for a console user\'s own wallet (owner, 2026-11-25)', () => {
+  const account = { id: 7, tipo: 'personal' as const, puesto: 'direccion' as const, puesto_label: 'Dirección', is_active: true, linked: true };
+  const admin = {
+    id: 3, email: 'caja@x.mx', first_name: 'Caja', last_name: 'Central', full_name: 'Caja Central',
+    role: 'admin' as const, avatar: '', whatsapp: '', cafeteria_account: account,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getAvailability.mockResolvedValue({ data: { online: true, test_mode: false, topup_policy: POLICY } } as never);
+    useAuthStore.setState({ user: admin, accessToken: 't', isAuthenticated: true });
+  });
+  afterEach(() => useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false }));
+
+  it('goes back to «Mi cafetería» inside the console, not to the family page', async () => {
+    getStatus.mockResolvedValue({ data: { status: 'success' } } as never);
+    renderAt('?payment_id=9');
+    expect(await screen.findByText('Pago confirmado')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver saldo de cafetería/ })).toHaveAttribute('href', '/admin/mi-cafeteria');
   });
 });

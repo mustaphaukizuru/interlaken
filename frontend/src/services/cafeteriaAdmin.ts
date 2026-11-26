@@ -27,8 +27,15 @@ export interface ReconcileRowV2 extends ReconcileRow {
   loyverse_code?: string;
 }
 
-/** `/admin/reconcile/`: `total` drives the pager; `count` is the rows returned after `only=drift`. */
+/**
+ * `/admin/reconcile/`: everyone matching the filters is compared on every
+ * request (2026-11-25), then the page is cut. `total` = rows of the list being
+ * paged (only the differences with `only=drift`; drives the pager), `count` =
+ * rows on this page, `checked` = everyone compared, `drift_count` = their
+ * differences. `error`: Loyverse could not be read (nothing compared).
+ */
 export interface ReconcilePage {
+  error?: string | null;
   count: number;
   total: number;
   checked: number;

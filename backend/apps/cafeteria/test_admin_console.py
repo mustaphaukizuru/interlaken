@@ -510,14 +510,54 @@ class TestReconcile:
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(reverse("admin-reconcile"), {"page_size": 2})
         assert resp.status_code == 200
-        assert resp.data["checked"] == 2
+        # Everyone is compared on every page (2026-11-25); the page is cut after.
+        assert resp.data["checked"] == 3
+        assert resp.data["count"] == 2
         assert resp.data["total"] == 3
         assert resp.data["has_more"] is True
         assert len(resp.data["results"]) == 2
 
         page2 = api_client.get(reverse("admin-reconcile"), {"page_size": 2, "page": 2})
-        assert page2.data["checked"] == 1
+        assert page2.data["checked"] == 3 and page2.data["count"] == 1
+        assert page2.data["offset"] == 2
         assert page2.data["has_more"] is False
+
+    @patch("apps.cafeteria.services.get_all_customers")
+    def test_only_drift_finds_a_difference_on_any_page(self, mock_all, api_client):
+        """Owner, 2026-11-25: «Solo diferencias» filtered inside the 20-row
+        page, so a student with a difference on page 2 read as «Todo en
+        orden» on page 1. Now everyone is compared and the page is cut from
+        the differences."""
+        students = [StudentProfileFactory(loyverse_id=f"loy-{i:02d}") for i in range(25)]
+        for s in students:
+            _balance(s, 50)
+        mock_all.return_value = [{"id": s.loyverse_id, "total_points": 50} for s in students]
+        api_client.force_authenticate(user=AdminFactory())
+
+        page2 = api_client.get(reverse("admin-reconcile"), {"page": 2}).data
+        assert page2["total"] == 25 and page2["count"] == 5 and page2["drift_count"] == 0
+        target = page2["results"][0]["loyverse_id"]
+        mock_all.return_value = [
+            {"id": s.loyverse_id, "total_points": 45 if s.loyverse_id == target else 50}
+            for s in students
+        ]
+
+        page1 = api_client.get(reverse("admin-reconcile")).data
+        assert page1["count"] == 20 and page1["checked"] == 25
+        assert all(r["in_sync"] for r in page1["results"])
+        assert page1["drift_count"] == 1  # counted although it is on page 2
+
+        only = api_client.get(reverse("admin-reconcile"), {"only": "drift"}).data
+        assert only["total"] == 1 and only["count"] == 1 and only["checked"] == 25
+        assert only["results"][0]["loyverse_id"] == target
+        assert only["results"][0]["drift"] == "5.00"
+        assert only["has_more"] is False and only["next"] is None
+
+        # A page past the end (the last difference was just corrected while
+        # the console sat on page 2) answers the last page, not a 404.
+        past = api_client.get(reverse("admin-reconcile"), {"only": "drift", "page": 2})
+        assert past.status_code == 200
+        assert past.data["offset"] == 0 and past.data["results"][0]["loyverse_id"] == target
 
     @patch("apps.cafeteria.services.get_customer_by_id")
     def test_legacy_limit_offset_is_ignored(self, mock_get, api_client):

@@ -45,7 +45,7 @@ def test_badges_admin_and_family(api_client):
 # ── the dashboard's «Pendientes» counters (UX Phase 7) ───────────────────────
 
 PENDIENTES_KEYS = {
-    'preregistros', 'inscripciones', 'documentos', 'visitas_hoy', 'cafeteria_verificar',
+    'preregistros', 'inscripciones', 'documentos', 'visitas_hoy', 'visitas_cerrar', 'cafeteria_verificar',
     'cafeteria_caja', 'cafeteria_aplicar', 'pagos_fallidos', 'saldo_bajo', 'loyverse_alertas',
     'sin_loyverse', 'contrasenas', 'mensajes', 'arco', 'arco_vencidas',
 }
@@ -66,7 +66,7 @@ def test_admin_gets_every_pendientes_counter_and_keeps_the_sidebar_keys():
     (('cafeteria',), {'cafeteria', 'cafeteria_verificar', 'cafeteria_caja', 'cafeteria_aplicar',
                       'pagos_fallidos', 'saldo_bajo', 'loyverse_alertas'}),
     (('admisiones',), {'admisiones', 'preregistros', 'inscripciones', 'documentos'}),
-    (('visitas', 'mensajes'), {'visitas', 'visitas_hoy', 'mensajes', 'formularios'}),
+    (('visitas', 'mensajes'), {'visitas', 'visitas_hoy', 'visitas_cerrar', 'mensajes', 'formularios'}),
     (('alumnos',), {'sin_loyverse'}),
     (('accesos',), {'contrasenas'}),
     (('comunicados',), set()),
@@ -125,7 +125,41 @@ def test_visits_today_skip_cancelled_and_other_days():
     book(today + timedelta(days=1), Booking.Status.CONFIRMED)
     data = _compute_badges(staff('visitas'))
     assert data['visitas_hoy'] == 2
-    assert data['visitas'] == 1  # the sidebar keeps counting bookings to confirm
+    # The red dot counts the people coming (owner 2026-11-25): every standing
+    # visit from today on, confirmed or pending, not only «Pendiente» ones.
+    assert data['visitas'] == 3
+    assert data['visitas_cerrar'] == 0
+
+
+def test_visitas_red_dot_counts_upcoming_and_por_cerrar_counts_unclosed_past_visits():
+    from apps.bookings.models import AvailabilitySlot, Booking
+
+    today = timezone.localdate()
+    hours = iter(range(8, 18))
+
+    def book(day, status):
+        h = next(hours)
+        slot = AvailabilitySlot.objects.create(date=day, start_time=time(h), end_time=time(h, 30), capacity=5)
+        Booking.objects.create(slot=slot, parent_name='Tutora Prueba', parent_email='t@ejemplo.test',
+                               parent_phone='5511112222', status=status)
+
+    # A web booking is confirmed on the spot: before 2026-11-26 none of these lit the dot.
+    book(today + timedelta(days=1), Booking.Status.CONFIRMED)
+    book(today + timedelta(days=2), Booking.Status.CONFIRMED)
+    book(today + timedelta(days=3), Booking.Status.CANCELLED)
+    # Past: still open (to close), and already closed one way or another.
+    book(today - timedelta(days=2), Booking.Status.CONFIRMED)
+    book(today - timedelta(days=1), Booking.Status.PENDING)
+    book(today - timedelta(days=1), Booking.Status.ATTENDED)
+    book(today - timedelta(days=1), Booking.Status.NO_SHOW)
+    book(today - timedelta(days=1), Booking.Status.CANCELLED)
+
+    data = _compute_badges(staff('visitas'))
+    assert data['visitas'] == 2
+    assert data['visitas_cerrar'] == 2
+    # Only for accounts that may open Visitas.
+    assert 'visitas_cerrar' not in _compute_badges(staff('cafeteria'))
+    assert _compute_badges(AdminFactory())['visitas_cerrar'] == 2
 
 
 def test_failed_payments_skip_family_cancellations_and_old_ones():

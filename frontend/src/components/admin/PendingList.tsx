@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AlertOctagon, CalendarCheck, CalendarClock, CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, Coffee, CreditCard,
+  AlertOctagon, CalendarCheck, CalendarClock, CalendarX2, CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, Coffee, CreditCard,
   FileCheck2, FormInput, Inbox, KeyRound, RefreshCw, Scale, ShieldAlert, UserPlus, UserX, Wallet, type LucideIcon,
 } from 'lucide-react';
 import { coreApi } from '@/services/api';
 import { formatMXN } from '@/lib/format';
 import { ErrorState } from '@/components/ui/ErrorState';
 import type { AreaKey } from '@/lib/areas';
+import { TO_VERIFY_PATH } from '@/components/layout/navConfig';
 
 /** GET /core/badges/: counts per queue plus `<key>_edad` (minutes the oldest has waited). */
 export type Counters = Record<string, number>;
@@ -86,8 +87,10 @@ export function verifyHint(count: number, loaded: number | undefined, total?: st
  * filtered list. Keys are those of GET /core/badges/ (backend core/badges.py).
  */
 const ITEMS: Item[] = [
+  // Exactly those top-ups in Depósitos, with «Verificar en MultiCobros» on each
+  // row: the same list as the sidebar's «Por verificar» (owner, 2026-11-25).
   { key: 'cafeteria_verificar', area: 'cafeteria', icon: ShieldAlert, tone: 'warning',
-    one: 'recarga por verificar', many: 'recargas por verificar', to: '/admin/cafeteria?tab=pos',
+    one: 'recarga por verificar', many: 'recargas por verificar', to: TO_VERIFY_PATH,
     hint: (c, t) => verifyHint(c.cafeteria_verificar ?? 0, t.verificarCargadas, t.verificar) },
   { key: 'cafeteria_aplicar', area: 'cafeteria', icon: Coffee, tone: 'warning',
     one: 'recarga con tarjeta por aplicar', many: 'recargas con tarjeta por aplicar', to: '/admin/cafeteria?tab=pos',
@@ -117,8 +120,13 @@ const ITEMS: Item[] = [
     to: '/admin/admisiones?vista=inscripciones&estado=submitted' },
   { key: 'preregistros', area: 'admisiones', icon: UserPlus, tone: 'info',
     one: 'pre-registro nuevo', many: 'pre-registros nuevos', to: '/admin/admisiones?etapa=informes' },
+  // Past visits nobody closed, then the people coming (Visitas' red dot).
+  { key: 'visitas_cerrar', area: 'visitas', icon: CalendarX2, tone: 'warning',
+    one: 'visita por cerrar', many: 'visitas por cerrar', to: '/admin/visitas?seguimiento=por_cerrar',
+    hint: () => 'Ya pasaron: márquelas «Asistió» o «No asistió».' },
   { key: 'visitas', area: 'visitas', icon: CalendarClock, tone: 'info',
-    one: 'visita por confirmar', many: 'visitas por confirmar', to: '/admin/visitas?estado=pending' },
+    one: 'visita próxima', many: 'visitas próximas', to: '/admin/visitas?seguimiento=proximas',
+    hint: () => 'Agendadas desde hoy en adelante.' },
   { key: 'visitas_hoy', area: 'visitas', icon: CalendarCheck, tone: 'info',
     one: 'visita hoy', many: 'visitas hoy', to: () => `/admin/visitas?desde=${daysAgo(0)}&hasta=${daysAgo(0)}` },
   { key: 'mensajes', area: 'mensajes', icon: Inbox, tone: 'info',

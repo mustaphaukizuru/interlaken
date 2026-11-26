@@ -115,6 +115,12 @@ services:
       MEDIA_ROOT: /data/media
     volumes:
       - media:/data/media
+      # Key files the app reads by PATH (docs/GOOGLE_CALENDAR.md): the Google
+      # Calendar service-account JSON goes in deploy/secrets/ on the VPS and is
+      # read here as /run/secrets/interlaken/google-calendar.json. Read-only;
+      # deploy.sh creates the folder (owner 10001, the container's user, mode
+      # 700) and the folder is git-ignored, so a key is never committed.
+      - ./secrets:/run/secrets/interlaken:ro
     healthcheck:
       # SECURE_SSL_REDIRECT is on, so a plain HTTP probe would be answered with
       # a 301 to https and never reach the view. Send the same X-Forwarded-Proto

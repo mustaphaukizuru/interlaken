@@ -86,6 +86,21 @@ if [[ ! -d /var/log/journal ]]; then
   echo "           Fix once: sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald"
 fi
 
+# Key files mounted read-only into the app at /run/secrets/interlaken (the
+# Google Calendar service-account key: docs/GOOGLE_CALENDAR.md). The app runs
+# as uid 10001, so the folder and its files must belong to it; nobody else may
+# read them. Created empty when missing, so compose never makes it root-owned.
+if [[ ! -d secrets ]]; then
+  echo "  creating deploy/secrets/ (key files for the app; see docs/GOOGLE_CALENDAR.md)"
+  mkdir -m 700 secrets
+fi
+if ! chown -R 10001:10001 secrets 2>/dev/null; then
+  echo "  WARNING: could not give deploy/secrets/ to the app user (uid 10001)."
+  echo "           Fix once: sudo chown -R 10001:10001 $(pwd)/secrets"
+fi
+chmod 700 secrets
+find secrets -type f -exec chmod 600 {} +
+
 # ── Rollback point ──────────────────────────────────────────────────────────
 # Tag the currently-running image before rebuilding, so a bad deploy has
 # somewhere to go back to. Without this the rebuild plus `image prune` destroys

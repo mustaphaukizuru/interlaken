@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  CalendarCheck, Download, GraduationCap, Megaphone, Search, Settings, X,
+  Briefcase, CalendarCheck, Download, GraduationCap, Megaphone, Search, Settings, X,
 } from 'lucide-react';
 import { bookingsApi, portalApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -11,7 +11,7 @@ import type { Booking, StudentProfile } from '@/types';
 
 interface Item {
   key: string;
-  group: 'Acciones' | 'Alumnos' | 'Reservas' | 'Ir a';
+  group: 'Acciones' | 'Alumnos' | 'Personal' | 'Reservas' | 'Ir a';
   icon: typeof Search;
   title: string;
   detail: string;
@@ -206,16 +206,24 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
       ? roleActions.filter((a) => normalize(`${a.title} ${a.detail}`).includes(nq))
       : roleActions;
     if (!enabled) return actions;
+    // Staff cafetería accounts come back with the pupils (tipo=todos): they get
+    // their own «Personal» heading and read as their puesto, never as a pupil
+    // with an empty grade. Pupils first, so each heading shows once.
+    const people = (students.data ?? []).slice(0, 5);
+    const person = (s: StudentProfile, staff: boolean): Item => ({
+      key: `s-${s.id}`,
+      group: staff ? 'Personal' : 'Alumnos',
+      icon: staff ? Briefcase : GraduationCap,
+      title: `${s.user?.first_name ?? ''} ${s.user?.last_name ?? ''}`.trim() || s.student_id,
+      detail: staff
+        ? `${s.student_id} · ${s.puesto_label || 'Sin asignar'}`
+        : `${s.student_id} · ${s.grade}${s.group ? ` ${s.group}` : ''}`,
+      to: `/admin/cafeteria/${s.id}`,
+    });
     return [
       ...actions,
-      ...(students.data ?? []).slice(0, 5).map((s): Item => ({
-        key: `s-${s.id}`,
-        group: 'Alumnos',
-        icon: GraduationCap,
-        title: `${s.user?.first_name ?? ''} ${s.user?.last_name ?? ''}`.trim() || s.student_id,
-        detail: `${s.student_id} · ${s.grade}${s.group ? ` ${s.group}` : ''}`,
-        to: `/admin/cafeteria/${s.id}`,
-      })),
+      ...people.filter((s) => s.tipo !== 'personal').map((s) => person(s, false)),
+      ...people.filter((s) => s.tipo === 'personal').map((s) => person(s, true)),
       ...(bookings.data ?? []).slice(0, 5).map((b): Item => ({
         key: `b-${b.id}`,
         group: 'Reservas',
@@ -282,8 +290,8 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder={isAdmin ? "Buscar alumnos o reservas…" : "¿A dónde quiere ir?"}
-            aria-label="Buscar alumnos o reservas"
+            placeholder={isAdmin ? "Buscar alumnos, personal o reservas…" : "¿A dónde quiere ir?"}
+            aria-label="Buscar alumnos, personal o reservas"
             role="combobox"
             aria-expanded={items.length > 0}
             aria-controls="cmdk-list"

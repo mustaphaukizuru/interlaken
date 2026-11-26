@@ -81,7 +81,8 @@ export function PortalRoutes() {
         <Route path="cafeteria" element={<CafeteriaPage />} />
         <Route path="credencial" element={<CredencialPage />} />
         <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
-        {/* A staff member's own wallet, for logins that have the console. */}
+        {/* A staff member's own wallet. Console users are sent to /admin/mi-cafeteria
+            (MyCafeteriaPage); a staff login without console areas stays here. */}
         <Route path="mi-cafeteria" element={<MyCafeteriaPage />} />
         <Route path="mi-cafeteria/credencial" element={<MyCafeteriaPage view="credencial" />} />
         <Route path="pagos"     element={<PaymentsPage />} />
@@ -141,8 +142,14 @@ export function AdminRoutes() {
         <Route path="visitas/semana" element={<AdminVisitsWeek />} />
         <Route path="cafeteria"   element={<AdminCafeteria />} />
         <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
+        {/* The person's own staff wallet, inside the console (owner, 2026-11-25). */}
+        <Route path="mi-cafeteria" element={<MyCafeteriaPage />} />
+        <Route path="mi-cafeteria/credencial" element={<MyCafeteriaPage view="credencial" />} />
         <Route path="alumnos"     element={<AdminStudents />} />
         <Route path="alumnos/:studentId" element={<AdminStudentDetail />} />
+        {/* Staff cafetería accounts and their console access (2026-11-25). */}
+        <Route path="personal"    element={<AdminStudents mode="personal" />} />
+        <Route path="personal/:studentId" element={<AdminStudentDetail />} />
         <Route path="familias"    element={<AdminFamilies />} />
         <Route path="comunicados" element={<AdminAnnouncements />} />
         <Route path="ajustes"     element={<AdminSettings />} />

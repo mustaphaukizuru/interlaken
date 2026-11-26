@@ -645,6 +645,47 @@ class TestVerifyAfterTheFact:
         paid_topup("200.00", checkout="PRD", balance=100)  # PAID: «Por aplicar», not here
         assert admin_client.get(reverse("admin-topups"), {"needs_verify": 1}).data["results"] == []
 
+    def test_to_verify_lists_what_the_sidebar_counts(
+        self, push, loyverse, admin_client, django_capture_on_commit_callbacks
+    ):
+        """Depósitos «Por verificar en MultiCobros» (owner, 2026-11-25): every
+        approval still to verify, loaded by the app (instant, «Completado»)
+        or not (PAID), exactly what the sidebar's «Por verificar» counts.
+        A verified one and a failed attempt stay out."""
+        from django.urls import reverse
+
+        from apps.accounts.factories import ParentFactory, StudentProfileFactory
+        from apps.core.badges import _compute_badges
+
+        def kid(n):
+            return StudentProfileFactory(parents=[ParentFactory()], loyverse_id=f"lv-v{n}")
+
+        def listed():
+            data = admin_client.get(reverse("admin-topups"), {"to_verify": 1}).data
+            return {row["id"] for row in data["results"]}
+
+        push.CAFETERIA_TOPUP_LOYVERSE_PUSH = "instant"
+        with django_capture_on_commit_callbacks(execute=True):
+            # The default student: the fake Loyverse answers for its customer only.
+            _, loaded, loaded_payment = paid_topup("200.00", checkout="PRD", balance=100)
+        loaded.refresh_from_db()
+        assert loaded.status == TopUpRequest.Status.COMPLETED
+        push.CAFETERIA_TOPUP_LOYVERSE_PUSH = "verified"
+        _, waiting, _ = paid_topup("150.00", student=kid(2), checkout="PRD", balance=50)
+        _, done, done_payment = paid_topup("80.00", student=kid(3), checkout="PRD", balance=20)
+        verified(done_payment)
+        failed = TopUpRequest.objects.create(
+            student=kid(4), amount=Decimal("90"), method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.FAILED,
+        )
+
+        assert listed() == {loaded.pk, waiting.pk}
+        assert done.pk not in listed() and failed.pk not in listed()
+        assert _compute_badges(AdminFactory())["cafeteria_verificar"] == len(listed())
+
+        verified(loaded_payment)
+        assert listed() == {waiting.pk}
+
 
 # ── 2026-11-22: $1,000 per top-up, and every one of them automatic ──────────
 class TestThousandAndAutomatic:

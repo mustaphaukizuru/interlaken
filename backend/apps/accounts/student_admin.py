@@ -481,6 +481,24 @@ def _apply_restore(profile, payload, actor):
 _plan_grade, _apply_grade = _field_action('grade', 'grado')
 _plan_group, _apply_group = _field_action('group', 'grupo')
 
+
+def _plan_puesto(profile, payload):
+    """«Cambiar puesto» (Personal, 2026-11-25): a pupil has a grade, never a
+    puesto, so a mixed selection changes only the staff in it."""
+    if profile.tipo != StudentProfile.Tipo.PERSONAL:
+        raise BulkSkip('No es personal del colegio.')
+    if profile.puesto == _value(payload):
+        raise BulkSkip('Ya tiene ese puesto.')
+
+
+def _apply_puesto(profile, payload, actor):
+    _plan_puesto(profile, payload)
+    before, value = profile.puesto, _value(payload)
+    profile.puesto = value
+    profile.save(update_fields=['puesto'])
+    return {'puesto': [before, value], 'via': 'portal-bulk'}
+
+
 STUDENT_BULK_ACTIONS = {
     a.name: a for a in (
         BulkAction('status', 'Cambiar estado', handler=_apply_status, plan=_plan_status,
@@ -488,6 +506,8 @@ STUDENT_BULK_ACTIONS = {
         BulkAction('grade', 'Cambiar grado', handler=_apply_grade, plan=_plan_grade,
                    side_effects='none'),
         BulkAction('group', 'Cambiar grupo', handler=_apply_group, plan=_plan_group,
+                   side_effects='none'),
+        BulkAction('puesto', 'Cambiar puesto', handler=_apply_puesto, plan=_plan_puesto,
                    side_effects='none'),
         # Seeds the opening wallet balance from Loyverse for linked students
         # that were never seeded (sync_student_balance); a no-op otherwise.
@@ -540,7 +560,8 @@ class AdminStudentBulkView(AdminBulkView):
     Actions: ``status`` (payload ``{"value": "active|on_leave|graduated|withdrawn"}``,
     under the ``accounts.studentprofile`` transition table; the dry run of a
     withdrawal lists the students that still hold a wallet balance under
-    ``warnings``), ``grade`` / ``group`` (``{"value": "..."}``) and
+    ``warnings``), ``grade`` / ``group`` (``{"value": "..."}``), ``puesto``
+    (staff only, ``{"value": "docente|direccion|..."}``; pupils are skipped) and
     ``sync_loyverse`` (seed the opening balance of linked, never-seeded
     students), ``archive`` / ``restore`` (off and back on the lists, history
     kept) and ``delete`` (admins only, ``{"confirm": "ELIMINAR"}`` on the
@@ -568,6 +589,8 @@ class AdminStudentBulkView(AdminBulkView):
             raise ValidationError({'value': ['Indique un grado de hasta 20 caracteres.']})
         if action == 'group' and not 1 <= len(value) <= 5:
             raise ValidationError({'value': ['Indique un grupo de hasta 5 caracteres.']})
+        if action == 'puesto' and value not in StudentProfile.Puesto.values:
+            raise ValidationError({'value': ['Puesto no válido.']})
 
     def post(self, request):
         data = request.data if isinstance(request.data, dict) else {}

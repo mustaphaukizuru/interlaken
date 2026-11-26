@@ -56,7 +56,7 @@ export default function AppHeader() {
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
-            aria-label={user.role === 'admin' ? 'Buscar alumnos o reservas' : 'Ir a una sección'}
+            aria-label={user.role === 'admin' ? 'Buscar alumnos, personal o reservas' : 'Ir a una sección'}
             className="hidden min-h-[44px] w-[230px] items-center gap-2 rounded-sm border border-line bg-white px-3.5 text-left transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
           >
             <Search size={16} className="text-subtle" aria-hidden="true" />
