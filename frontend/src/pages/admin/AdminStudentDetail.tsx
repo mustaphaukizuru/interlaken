@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import StudentCard from '@/components/portal/StudentCard';
@@ -55,6 +55,14 @@ export default function AdminStudentDetail({ id, embedded = false, onDeleted }: 
   // Back to the list the person belongs to (the route says it until the file loads).
   const staff = data ? data.tipo === 'personal' : pathname.startsWith('/admin/personal');
   const list = staff ? { to: '/admin/personal', label: 'Personal' } : { to: '/admin/alumnos', label: 'Alumnos' };
+  // Older links (audit, families, admissions) open everyone at /admin/alumnos/:id.
+  // Once the file says who it is, move to its own list's address, so the
+  // breadcrumb and the highlighted menu entry match («Personal» or «Alumnos»).
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (embedded || !data || !params.studentId) return;
+    if (!pathname.startsWith(`${list.to}/`)) navigate(`${list.to}/${data.id}`, { replace: true });
+  }, [embedded, data, params.studentId, pathname, list.to, navigate]);
 
   return (
     <>

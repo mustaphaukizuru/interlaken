@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('@/services/api', () => ({
   portalApi: {
@@ -221,6 +221,35 @@ describe('AdminStudentDetail: a staff member', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', role: 'admin' } as never });
+  });
+
+  // Older links (audit, families, admissions) open everyone at /admin/alumnos/:id.
+  function PathProbe() {
+    return <div data-testid="path">{useLocation().pathname}</div>;
+  }
+  const openAt = (route: string, record: unknown) => {
+    getStudent.mockResolvedValue({ data: record } as never);
+    return renderWithProviders(
+      <>
+        <Routes>
+          <Route path="/admin/alumnos/:studentId" element={<AdminStudentDetail />} />
+          <Route path="/admin/personal/:studentId" element={<AdminStudentDetail />} />
+        </Routes>
+        <PathProbe />
+      </>,
+      { route },
+    );
+  };
+
+  it('an old /admin/alumnos/:id link to a staff file moves to /admin/personal/:id', async () => {
+    openAt('/admin/alumnos/51', STAFF);
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/personal/51'));
+    expect(await screen.findByText('Datos del personal')).toBeInTheDocument();
+  });
+
+  it('a pupil opened under /admin/personal/:id moves to /admin/alumnos/:id', async () => {
+    openAt('/admin/personal/7', STUDENT);
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/alumnos/7'));
   });
 
   it('reads as Personal: code and puesto, no guardians or family, back to Personal', async () => {

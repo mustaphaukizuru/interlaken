@@ -72,7 +72,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         // on); «Por cerrar», past visits nobody marked «Asistió» / «No asistió»
         // (owner 2026-11-25: three web bookings, a dot that stayed at 0).
         { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas',
-          subBadge: { key: 'visitas_cerrar', label: 'Por cerrar' } },
+          subBadge: { key: 'visitas_cerrar', label: 'Por cerrar', to: '/admin/visitas?seguimiento=por_cerrar' } },
         { icon: CalendarDays, label: 'Agenda semanal', to: '/admin/visitas/semana' },
       ],
     },

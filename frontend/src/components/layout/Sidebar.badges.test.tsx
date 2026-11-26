@@ -64,13 +64,16 @@ describe('Sidebar Visitas (owner 2026-11-25: the dot counts the people coming)',
     useAuthStore.setState({ user: admin, accessToken: 't', isAuthenticated: true });
   });
 
-  it('shows the upcoming visits as the red dot and «Por cerrar: N» under the label', () => {
+  it('shows the upcoming visits as the red dot and «Por cerrar: N» as a link to exactly those', () => {
     badges.current = { visitas: 3, visitas_cerrar: 1 };
     renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
-    const link = screen.getByRole('link', { name: 'Visitas, 3 pendientes, por cerrar: 1' });
-    expect(link).toHaveAttribute('href', '/admin/visitas');
-    expect(link).toHaveTextContent('Por cerrar: 1');
-    expect(link).toHaveTextContent('3');
+    const entry = screen.getByRole('link', { name: 'Visitas, 3 pendientes' });
+    expect(entry).toHaveAttribute('href', '/admin/visitas');
+    expect(entry).toHaveTextContent('3');
+    // Its own link (integration of PR 1's sub-badge links), never nested in the entry.
+    const close = screen.getByRole('link', { name: 'Por cerrar: 1. Ver la lista' });
+    expect(close).toHaveAttribute('href', '/admin/visitas?seguimiento=por_cerrar');
+    expect(entry.contains(close)).toBe(false);
   });
 
   it('hides «Por cerrar» when every past visit is closed', () => {
