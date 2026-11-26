@@ -6,14 +6,17 @@ describe('booking status vocabulary', () => {
     expect(BOOKING_TRANSITIONS).toEqual({
       pending: ['confirmed', 'cancelled', 'no_show', 'attended'],
       confirmed: ['attended', 'no_show', 'cancelled'],
-      cancelled: ['pending'],
+      cancelled: ['pending', 'confirmed'],
       attended: ['no_show', 'confirmed'],
       no_show: ['attended', 'confirmed'],
     });
   });
 
-  it('never re-confirms a cancelled booking (an attendance undo goes back to Confirmada with a note)', () => {
-    expect(canMove('cancelled', 'confirmed')).toBe(false);
+  it('a cancelled booking returns to «Confirmada» only as «Deshacer cancelación», no note needed (owner 2026-11-26)', () => {
+    // The table allows it; the row offers it as its own action (never «Confirmar»),
+    // and the server sends it through `uncancel` while the visit is still to come.
+    expect(canMove('cancelled', 'confirmed')).toBe(true);
+    expect(needsNote('cancelled', 'confirmed')).toBe(false);
     expect(canMove('pending', 'confirmed')).toBe(true);
     expect(canMove('unknown', 'confirmed')).toBe(false);
   });

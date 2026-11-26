@@ -29,6 +29,7 @@ from apps.core.ratelimit import ratelimit
 from . import data_ops
 from .models import AvailabilitySlot, Booking
 from .serializers import (
+    AdminBookingSerializer,
     AdminSlotSerializer,
     AvailabilitySlotSerializer,
     BookingCreateSerializer,
@@ -43,6 +44,7 @@ from .services import (
     occupied_seats,
 )
 from .services.staff_alerts import CANCELLED_BY_FAMILY, alert_staff
+from .services.status import visit_started
 
 
 def _can_access_booking(user, booking):
@@ -284,14 +286,15 @@ class AdminBookingsView(AdminListMixin, generics.ListAPIView):
     tiebreak; ``page`` / ``page_size`` (≤ 100). Two queries whatever the page.
     """
     admin_area = 'visitas'
-    serializer_class = BookingSerializer
+    serializer_class = AdminBookingSerializer
     search_fields = data_ops.BOOKING_SEARCH_FIELDS
     ordering = data_ops.BOOKING_ORDERING
     default_ordering = data_ops.BOOKING_DEFAULT_ORDERING
     filterset_class = data_ops.BookingFilterSet
 
     def get_queryset(self):
-        return Booking.objects.select_related('slot')
+        # The case joins in: «Ver expediente» per row without a query each.
+        return Booking.objects.select_related('slot', 'pre_registration')
 
 
 class AdminBookingsExportView(AdminExportMixin, AdminBookingsView):
@@ -334,7 +337,11 @@ class AdminBookingActionView(APIView):
         'attended': Booking.Status.ATTENDED,
         'no_show':  Booking.Status.NO_SHOW,
         'reopen':   Booking.Status.PENDING,
+        # «Deshacer cancelación» (owner 2026-11-26): a cancelled visit straight
+        # back to «Confirmada», with «Su visita sigue en pie» unless notify=false.
+        'uncancel': Booking.Status.CONFIRMED,
     }
+    CONTEXTS = {'uncancel': 'bookings: deshacer cancelación'}
 
     def post(self, request, pk, action):
         new_status = self.ACTIONS.get(action)
@@ -344,6 +351,16 @@ class AdminBookingActionView(APIView):
             booking = Booking.objects.select_related('slot').get(pk=pk)
         except Booking.DoesNotExist:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if action == 'confirm' and booking.status == Booking.Status.CANCELLED:
+            # Undoing a cancellation has its own action: its own email to the
+            # family («Su visita sigue en pie»), date guard and audit context.
+            return Response({'detail': 'No se puede pasar de «Cancelada» a «Confirmada» con «Confirmar»: '
+                                       'use «Deshacer cancelación».'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if action == 'uncancel' and booking.status != Booking.Status.CANCELLED:
+            return Response({'detail': f'La visita está «{booking.get_status_display()}»: solo se '
+                                       'deshace la cancelación de una visita cancelada.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         note = str(request.data.get('note') or '').strip()[:500]
         notify = request.data.get('notify', True) not in (False, 'false', '0', 0)
@@ -351,9 +368,14 @@ class AdminBookingActionView(APIView):
         changes = {'status': [previous, new_status]}
         if note:
             changes['note'] = note
+        if action in ('uncancel', 'cancel'):
+            # Whether the family was emailed: the audit is how the office later
+            # answers «did they hear about it?» (2026-11-26: it could not tell).
+            changes['family_notified'] = bool(notify and booking.parent_email
+                                              and not visit_started(booking))
         record('update', booking, changes, actor=request.user,
-               context=f'bookings: {action}')
-        return Response(BookingSerializer(booking).data)
+               context=self.CONTEXTS.get(action, f'bookings: {action}'))
+        return Response(AdminBookingSerializer(booking).data)
 
 
 class AdminBookingRescheduleView(APIView):
@@ -419,7 +441,7 @@ class AdminBookingRescheduleView(APIView):
         send_email('Su visita al Colegio Interlaken cambió de horario', '', [booking.parent_email],
                    reply_to=settings.ADMISSIONS_EMAIL, content=content)
         record('update', booking, {'slot': {'from': old.pk, 'to': slot.pk}}, actor=request.user, context='bookings: reprogramación')
-        return Response(BookingSerializer(booking).data)
+        return Response(AdminBookingSerializer(booking).data)
 
 
 class AdminBookingOutcomeView(APIView):
@@ -472,9 +494,133 @@ class AdminBookingOutcomeView(APIView):
             if previous != booking.status:
                 changes['status'] = [previous, booking.status]
             record('update', booking, changes, actor=request.user, context='bookings: resultado de visita')
-        data = BookingSerializer(booking).data
+        data = AdminBookingSerializer(booking).data
         data['pre_registration'] = linked
         return Response(data)
+
+
+def _booking_prefill(booking) -> dict:
+    """What «Pasar a Admisiones» starts the form with: the booking's own data.
+    The grade is kept only when it reads as one of the admission grades
+    («1° primaria», «Primaria 1» → «1° Primaria»); the office picks it otherwise."""
+    from apps.admissions.ficha_schema import normalize_grade
+
+    return {
+        'child_name': booking.child_name,
+        'grade_applying': normalize_grade(booking.child_grade) or '',
+        'child_grade_text': booking.child_grade,
+        'parent_name': booking.parent_name,
+        'parent_email': booking.parent_email,
+        'parent_phone': booking.parent_phone,
+    }
+
+
+def _case_brief(lead) -> dict | None:
+    if lead is None:
+        return None
+    from apps.admissions.process import stage_label
+
+    return {
+        'id': lead.pk,
+        'child_name': f'{lead.child_first_name} {lead.child_last_name}'.strip(),
+        'stage': lead.stage,
+        'stage_label': stage_label(lead.stage),
+    }
+
+
+class AdminBookingAdmissionsView(APIView):
+    """GET/POST /bookings/admin/bookings/<pk>/admissions/: «Pasar a Admisiones».
+
+    Owner 2026-11-26: a family that booked on the website by itself had no
+    admissions case, so the office could not start the process from the visit.
+
+    GET: ``{case, duplicates, prefill}``. ``case`` is the Expediente the visit
+    belongs to (or null); ``duplicates`` are cases with the family's phone or
+    email (``process.find_duplicates``), to link instead of creating a twin.
+
+    POST: ``{link_to: <case id>}`` attaches the visit to that case, or the
+    «Nuevo prospecto» fields (``ProspectSerializer``, same rules) create one.
+    Then the case moves forward only: a visit that stands or happened puts it in
+    «Visita guiada», and a result already recorded on the visit is applied like
+    «Resultado de la visita» does (``apply_booking_outcome``); a cancelled or
+    missed visit leaves it in «Informes». 409 when the visit already has a case.
+    Both the case and the booking get an audit row. The booking row is locked so
+    a double click never creates two cases.
+    """
+    admin_area = ('admisiones', 'visitas')
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        from apps.admissions.process import find_duplicates
+        from apps.admissions.process_serializers import case_row
+
+        booking = Booking.objects.select_related('slot', 'pre_registration').filter(pk=pk).first()
+        if booking is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        lead = booking.pre_registration
+        duplicates = [] if lead is not None else [
+            case_row(d) for d in find_duplicates(phone=booking.parent_phone, email=booking.parent_email)
+        ]
+        return Response({'case': _case_brief(lead), 'duplicates': duplicates,
+                         'prefill': _booking_prefill(booking)})
+
+    def post(self, request, pk):
+        from apps.admissions import process
+        from apps.admissions.models import PreRegistration
+        from apps.admissions.process_serializers import ProspectSerializer, case_row
+
+        with transaction.atomic():
+            booking = Booking.objects.select_for_update().filter(pk=pk).first()
+            if booking is None:
+                return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+            if booking.pre_registration_id:
+                return Response({'detail': 'Esta visita ya tiene expediente de admisión.',
+                                 'case': _case_brief(booking.pre_registration)},
+                                status=status.HTTP_409_CONFLICT)
+            link_to = request.data.get('link_to')
+            if link_to not in (None, ''):
+                try:
+                    lead_pk = int(link_to)
+                except (TypeError, ValueError):
+                    return Response({'link_to': ['Expediente no válido.']},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                lead = PreRegistration.objects.select_for_update().filter(pk=lead_pk).first()
+                if lead is None:
+                    return Response({'link_to': ['Expediente no encontrado.']},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                created = False
+            else:
+                ser = ProspectSerializer(data=request.data)
+                ser.is_valid(raise_exception=True)
+                lead = ser.save()
+                created = True
+
+            booking.pre_registration = lead
+            booking.save(update_fields=['pre_registration', 'updated_at'])
+            via = f'visitas: pasar a admisiones (visita #{booking.pk})'
+            if created:
+                record('create', lead, {'via': via, 'booking': booking.pk, 'stage': lead.stage},
+                       actor=request.user, context=f'{process.CASE_CONTEXT}: {via}')
+            else:
+                record('update', lead, {'via': via, 'booking': booking.pk},
+                       actor=request.user, context=f'{process.CASE_CONTEXT}: {via}')
+
+            # Forward only: never pulls a case back, never moves a closed one.
+            standing = (Booking.Status.PENDING, Booking.Status.CONFIRMED, Booking.Status.ATTENDED)
+            if booking.status in standing and booking.outcome:
+                process.apply_booking_outcome(lead, booking, booking.outcome, actor=request.user)
+            elif booking.status in standing:
+                diff = process.advance_to(lead, process.Stage.VISITA)
+                if diff:
+                    diff['booking'] = booking.pk
+                process.save_and_record(lead, diff, request.user,
+                                        context=f'{process.CASE_CONTEXT}: {via}')
+            record('update', booking,
+                   {'pre_registration': [None, lead.pk], 'case_created': created},
+                   actor=request.user, context='bookings: pasar a admisiones')
+        lead.refresh_from_db()
+        return Response({'case': case_row(lead), 'created': created},
+                        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 class AdminWeekView(APIView):

@@ -56,7 +56,10 @@ TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
     "bookings.booking": {
         "pending": frozenset({"confirmed", "cancelled", "no_show", "attended"}),
         "confirmed": frozenset({"attended", "no_show", "cancelled"}),
-        "cancelled": frozenset({"pending"}),
+        # «Deshacer cancelación» (owner 2026-11-26): straight back to «Confirmada»
+        # while the visit is still to come (bookings.services.status guards the
+        # date and the seat); «pending» stays for the API's «reopen».
+        "cancelled": frozenset({"pending", "confirmed"}),
         # Back to «Confirmada» undoes an attendance marked by mistake (a visit
         # marked before it happened stayed stuck: no cancel, no reschedule).
         "attended": frozenset({"no_show", "confirmed"}),

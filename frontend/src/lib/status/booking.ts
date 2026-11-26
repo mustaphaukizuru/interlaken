@@ -41,7 +41,9 @@ export const BOOKING_SOURCE_OPTIONS = [
 export const BOOKING_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   pending: ['confirmed', 'cancelled', 'no_show', 'attended'],
   confirmed: ['attended', 'no_show', 'cancelled'],
-  cancelled: ['pending'],
+  // «Deshacer cancelación» (owner 2026-11-26): straight back to «Confirmada»
+  // while the visit is still to come; «pending» stays for the API's reopen.
+  cancelled: ['pending', 'confirmed'],
   // Back to «Confirmada» undoes an attendance marked by mistake (QA 2026-11-24).
   attended: ['no_show', 'confirmed'],
   no_show: ['attended', 'confirmed'],

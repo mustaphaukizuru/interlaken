@@ -103,6 +103,25 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'status', 'source', 'confirmation_sent', 'created_at', 'outcome', 'outcome_note', 'notes']
 
 
+class AdminBookingSerializer(BookingSerializer):
+    """The console's view of a booking: plus the admissions case it belongs to
+    («Pasar a Admisiones» / «Ver expediente», owner 2026-11-26). Kept out of the
+    public responses: a family's booking answer never names a case. The list
+    selects ``pre_registration`` with the slot, so this adds no query per row."""
+    admissions_case = serializers.SerializerMethodField()
+
+    class Meta(BookingSerializer.Meta):
+        fields = [*BookingSerializer.Meta.fields, 'admissions_case']
+
+    def get_admissions_case(self, obj):
+        lead = obj.pre_registration if obj.pre_registration_id else None
+        if lead is None:
+            return None
+        from apps.admissions.process import stage_label
+
+        return {'id': lead.pk, 'stage': lead.stage, 'stage_label': stage_label(lead.stage)}
+
+
 class BookingCreateSerializer(serializers.ModelSerializer):
     """Public booking payload. Capacity is enforced in the view under a lock."""
     slot = serializers.PrimaryKeyRelatedField(

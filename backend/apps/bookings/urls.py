@@ -15,6 +15,9 @@ urlpatterns = [
     path('admin/bookings/bulk/',               views.AdminBookingBulkView.as_view(),   name='bookings-admin-bulk'),
     path('admin/bookings/<int:pk>/reschedule/', views.AdminBookingRescheduleView.as_view(), name='bookings-admin-reschedule'),
     path('admin/bookings/<int:pk>/outcome/', views.AdminBookingOutcomeView.as_view(), name='bookings-admin-outcome'),
+    # «Pasar a Admisiones» (2026-11-26): before the generic <action> route.
+    path('admin/bookings/<int:pk>/admissions/', views.AdminBookingAdmissionsView.as_view(),
+         name='bookings-admin-admissions'),
     path('admin/week/',                        views.AdminWeekView.as_view(),          name='bookings-admin-week'),
     path('admin/bookings/<int:pk>/<str:action>/', views.AdminBookingActionView.as_view(), name='bookings-admin-action'),
     path('admin/slots/',                       views.AdminSlotListView.as_view(),      name='bookings-admin-slots'),

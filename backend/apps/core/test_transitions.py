@@ -36,7 +36,8 @@ EXPECTED = {
     "bookings.booking": {
         "pending": {"confirmed", "cancelled", "no_show", "attended"},
         "confirmed": {"attended", "no_show", "cancelled"},
-        "cancelled": {"pending"},
+        # «Deshacer cancelación» (owner 2026-11-26), only through `uncancel`.
+        "cancelled": {"pending", "confirmed"},
         "attended": {"no_show", "confirmed"},
         "no_show": {"attended", "confirmed"},
     },

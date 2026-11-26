@@ -54,13 +54,19 @@ def _fold(line: str) -> str:
     return '\r\n'.join([first, *rest])
 
 
-def build_ics(booking, *, cancel: bool = False) -> str:
+def build_ics(booking, *, cancel: bool = False, restore: bool = False) -> str:
     """Return an RFC-5545 VCALENDAR/VEVENT string for ``booking``.
 
     ``cancel=True`` builds the cancellation of the same event (same UID,
     ``METHOD:CANCEL``, ``STATUS:CANCELLED`` and a higher ``SEQUENCE``), which
     removes it from the calendar the confirmation's invite was added to.
+
+    ``restore=True`` (owner 2026-11-26, «Deshacer cancelación») publishes the
+    same event again, confirmed, with a ``SEQUENCE`` above the cancellation's:
+    a calendar that applied the cancellation takes the newer version and puts
+    the visit back instead of ignoring an older copy.
     """
+    sequence = 1 if cancel else (2 if restore else 0)
     slot = booking.slot
     tz = ZoneInfo(getattr(settings, 'TIME_ZONE', 'America/Mexico_City'))
     start = datetime.combine(slot.date, slot.start_time, tzinfo=tz)
@@ -83,7 +89,7 @@ def build_ics(booking, *, cancel: bool = False) -> str:
         'METHOD:CANCEL' if cancel else 'METHOD:PUBLISH',
         'BEGIN:VEVENT',
         f'UID:{uid}',
-        f'SEQUENCE:{1 if cancel else 0}',
+        f'SEQUENCE:{sequence}',
         f'DTSTAMP:{_utc(timezone.now())}',
         f'DTSTART:{_utc(start)}',
         f'DTEND:{_utc(end)}',
