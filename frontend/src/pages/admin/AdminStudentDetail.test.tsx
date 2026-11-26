@@ -8,6 +8,8 @@ vi.mock('@/services/api', () => ({
     getStudent: vi.fn(),
     getStudentHistory: vi.fn(),
     studentsBulk: vi.fn(),
+    grantConsoleAccess: vi.fn(),
+    removeConsoleAccess: vi.fn(),
   },
 }));
 
@@ -198,5 +200,70 @@ describe('AdminStudentDetail: archiving, removing and history', () => {
     await user.click(await screen.findByRole('tab', { name: 'Historial' }));
     expect(await screen.findByText('Grado: 1° Primaria → 2° Primaria')).toBeInTheDocument();
     expect(screen.getByText(/paola@interlaken.com.mx/)).toBeInTheDocument();
+  });
+});
+
+// «Personal» (2026-11-25): a staff wallet's file, from its own section.
+describe('AdminStudentDetail: a staff member', () => {
+  const STAFF = {
+    ...STUDENT, id: 51, student_id: 'rlince', grade: '', group: '', tipo: 'personal', puesto: 'docente', puesto_label: 'Docente',
+    user: { ...STUDENT.user, id: 61, full_name: 'Rosa Lince', email: 'rlince@interlaken.test', role: 'student', staff_areas: [] },
+  };
+  const openStaff = (staff: unknown = STAFF) => {
+    getStudent.mockResolvedValue({ data: staff } as never);
+    return renderWithProviders(
+      <Routes>
+        <Route path="/admin/personal/:studentId" element={<AdminStudentDetail />} />
+      </Routes>,
+      { route: '/admin/personal/51' },
+    );
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', role: 'admin' } as never });
+  });
+
+  it('reads as Personal: code and puesto, no guardians or family, back to Personal', async () => {
+    openStaff();
+    expect(await screen.findByRole('heading', { name: 'Rosa Lince' })).toBeInTheDocument();
+    expect(screen.getByText('Código rlince · Docente')).toBeInTheDocument();
+    expect(screen.getByText('Datos del personal')).toBeInTheDocument();
+    // The back link (and the breadcrumb) lead to Personal, never to Alumnos.
+    const back = screen.getAllByRole('link', { name: 'Personal' });
+    expect(back.length).toBeGreaterThan(0);
+    back.forEach((a) => expect(a).toHaveAttribute('href', '/admin/personal'));
+    expect(screen.queryByRole('link', { name: 'Alumnos' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Tutores' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Familia' })).toBeNull();
+    expect(screen.getByText('Solo cafetería')).toBeInTheDocument();
+  });
+
+  it('an admin gives the console here, and takes it away from a staff login', async () => {
+    vi.mocked(portalApi.grantConsoleAccess).mockResolvedValue({ data: { id: 61, invite_email_sent: true } } as never);
+    const user = userEvent.setup();
+    openStaff();
+    await user.click(await screen.findByRole('button', { name: /Dar acceso a la consola/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Dar acceso a la consola' });
+    await user.selectOptions(within(dialog).getByLabelText('Puesto'), 'recepcion');
+    await user.click(within(dialog).getByRole('button', { name: 'Dar acceso' }));
+    await waitFor(() => expect(portalApi.grantConsoleAccess).toHaveBeenCalledWith(61, { staff_title: 'Recepción', staff_areas: ['visitas', 'mensajes'] }));
+  });
+
+  it('a staff login with the console offers «Quitar acceso a la consola»; a non-admin sees no action', async () => {
+    const withConsole = { ...STAFF, user: { ...STAFF.user, role: 'staff', staff_title: 'Admisiones', staff_areas: ['admisiones', 'visitas', 'mensajes'] } };
+    vi.mocked(portalApi.removeConsoleAccess).mockResolvedValue({ data: { id: 61, role: 'student', sessions_revoked: 1 } } as never);
+    const user = userEvent.setup();
+    const { unmount } = openStaff(withConsole);
+    expect(await screen.findByText('Admisiones, Visitas y agenda, Mensajes y formularios')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Quitar acceso a la consola/ }));
+    const confirm = await screen.findByRole('dialog', { name: 'Quitar acceso a la consola' });
+    await user.click(within(confirm).getByRole('button', { name: 'Quitar acceso' }));
+    await waitFor(() => expect(portalApi.removeConsoleAccess).toHaveBeenCalledWith(61));
+    unmount();
+
+    useAuthStore.setState({ user: { id: 2, email: 's@x.mx', role: 'staff', staff_areas: ['alumnos'] } as never });
+    openStaff();
+    expect(await screen.findByText('Solo cafetería')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /acceso a la consola/ })).toBeNull();
   });
 });

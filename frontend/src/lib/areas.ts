@@ -21,6 +21,8 @@ export const AREA_KEYS: readonly AreaKey[] = ['alumnos', 'accesos', 'admisiones'
  */
 const SECTIONS: [prefix: string, areas: AreaKey[]][] = [
   ['/admin/alumnos', ['alumnos']],
+  // «Personal» (2026-11-25): staff cafetería accounts, same area as the roster.
+  ['/admin/personal', ['alumnos']],
   ['/admin/familias', ['alumnos']],
   ['/admin/admisiones', ['admisiones']],
   ['/admin/visitas', ['visitas']],

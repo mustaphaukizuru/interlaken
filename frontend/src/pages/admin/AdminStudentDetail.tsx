@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import StudentCard from '@/components/portal/StudentCard';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaCard } from '@/types';
 import { Printer } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArrowLeft, Coffee, Pencil } from 'lucide-react';
+import { Archive, ArrowLeft, Coffee, Pencil, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { RecordNotFound } from '@/components/admin/RecordNotFound';
@@ -25,6 +25,8 @@ import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { studentDetailKey } from '@/hooks/queries/studentKeys';
 import { useStudentsBulk } from '@/hooks/queries/students';
 import { areasOf, isAdmin } from '@/lib/areas';
+import { ConsoleAccessCell, GrantConsoleAccessModal, RemoveConsoleAccessDialog, type ConsolePerson } from '@/components/admin/ConsoleAccess';
+import { consoleAction } from '@/lib/people';
 import { StudentFichaDownload } from '@/components/admin/FichaDownloads';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
@@ -35,29 +37,37 @@ import type { StudentProfile } from '@/types';
  * /admin/alumnos/:studentId — student file: identity, guardians, family
  * (hermanos), the cafetería shortcut and the Historial of changes, with Archivar / Restaurar and (admins)
  * Eliminar. (The app does not bill tuition, so there is no ledger.)
+ *
+ * /admin/personal/:studentId — the same file for a staff cafetería account
+ * (2026-11-25): code and puesto instead of matrícula and grade, no guardians
+ * or family, and its console access (admins give or take it away here).
  */
 /** Full page at /admin/alumnos/:id, or embedded as the right pane of the 2xl two-pane roster (BACKLOG P1-B10). */
 export default function AdminStudentDetail({ id, embedded = false, onDeleted }: { id?: number; embedded?: boolean; onDeleted?: () => void } = {}) {
   const params = useParams();
+  const { pathname } = useLocation();
   const studentId = id ?? params.studentId;
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: studentDetailKey(studentId ?? ''),
     queryFn: async () => (await portalApi.getStudent(Number(studentId))).data as StudentProfile,
     enabled: !!studentId,
   });
+  // Back to the list the person belongs to (the route says it until the file loads).
+  const staff = data ? data.tipo === 'personal' : pathname.startsWith('/admin/personal');
+  const list = staff ? { to: '/admin/personal', label: 'Personal' } : { to: '/admin/alumnos', label: 'Alumnos' };
 
   return (
     <>
       {!embedded && (
-        <Link to="/admin/alumnos" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink">
-          <ArrowLeft className="h-4 w-4" /> Alumnos
+        <Link to={list.to} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink">
+          <ArrowLeft className="h-4 w-4" /> {list.label}
         </Link>
       )}
 
       {isLoading ? (
         <LoadingSpinner />
       ) : isError && apiErrorStatus(error) === 404 ? (
-        <RecordNotFound backTo={embedded ? undefined : '/admin/alumnos'} backLabel="Volver a Alumnos" />
+        <RecordNotFound backTo={embedded ? undefined : list.to} backLabel={`Volver a ${list.label}`} />
       ) : isError || !data ? (
         <ErrorState onRetry={() => refetch()} />
       ) : (
@@ -101,6 +111,8 @@ const TABS: { key: Tab; label: string; short?: string }[] = [
   { key: 'cafeteria', label: 'Cafetería y credencial', short: 'Cafetería' },
   { key: 'historial', label: 'Historial' },
 ];
+// A staff member has no guardians and never joins a family (accounts/people.py).
+const STAFF_TABS = TABS.filter((t) => t.key !== 'tutores' && t.key !== 'familia');
 
 const DANGER_OUTLINE =
   'btn-outline border-coral-600 text-coral-700 hover:border-coral-700 hover:bg-coral-50 hover:text-coral-700';
@@ -141,19 +153,29 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
   const qc = useQueryClient();
   const navigate = useNavigate();
   const archived = !!student.archived_at;
+  const staff = student.tipo === 'personal';
+  const tabs = staff ? STAFF_TABS : TABS;
+  const [granting, setGranting] = useState<ConsolePerson | null>(null);
+  const [removing, setRemoving] = useState<ConsolePerson | null>(null);
+  const person: ConsolePerson = { userId: student.user.id, name: student.user.full_name, email: student.user.email };
+  // Admins decide who uses the console (the API refuses everyone else).
+  const consoleKind = staff && canDelete && !archived ? consoleAction(student.user) : null;
+  const refreshFile = () => qc.invalidateQueries({ queryKey: studentDetailKey(student.id) });
   const ArchiveIcon = ARCHIVE_ACTION.icon!;
   const RestoreIcon = RESTORE_ACTION.icon!;
   const DeleteIcon = DELETE_ACTION.icon!;
   return (
     <>
       <StudentFormModal open={editOpen} onClose={() => setEditOpen(false)} student={student} />
+      <GrantConsoleAccessModal person={granting} onClose={() => setGranting(null)} onDone={refreshFile} />
+      <RemoveConsoleAccessDialog person={removing} onClose={() => setRemoving(null)} onDone={refreshFile} />
       <BulkConfirmDialog
         open={!!confirming}
         onClose={() => setConfirming(null)}
         action={confirming}
         payload={confirming?.payload}
-        entityLabel="alumnos"
-        gender="m"
+        entityLabel={staff ? 'personas' : 'alumnos'}
+        gender={staff ? 'f' : 'm'}
         ids={[student.id]}
         subject={student.user.full_name}
         execute={(body) => bulk.mutateAsync(body)}
@@ -161,18 +183,20 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
         onDone={(r) => {
           if (r.outcomes?.erased) {
             // The file is gone: leave the page (or close the two-pane panel).
-            toast.success('Alumno eliminado.');
+            toast.success(staff ? 'Persona eliminada.' : 'Alumno eliminado.');
             setConfirming(null);
             if (onDeleted) onDeleted();
-            else navigate('/admin/alumnos');
+            else navigate(staff ? '/admin/personal' : '/admin/alumnos');
             return;
           }
-          void qc.invalidateQueries({ queryKey: studentDetailKey(student.id) });
+          void refreshFile();
         }}
       />
       <PageHeader
         title={student.user.full_name}
-        subtitle={`Matrícula ${student.student_id} · ${student.grade}${student.group ? ` ${student.group}` : ''}`}
+        subtitle={staff
+          ? `Código ${student.student_id} · ${student.puesto_label || 'Sin asignar'}`
+          : `Matrícula ${student.student_id} · ${student.grade}${student.group ? ` ${student.group}` : ''}`}
         actions={(
           <>
             <button type="button" className="btn-outline" onClick={() => setEditOpen(true)}>
@@ -217,7 +241,7 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
       )}
 
       <div role="tablist" aria-label="Secciones del expediente" className="mb-4 flex gap-1 overflow-x-auto rounded-md bg-cream-2 p-1">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} aria-label={t.label}
             className={`min-h-[44px] whitespace-nowrap rounded-sm px-3 text-sm font-semibold transition-colors sm:min-h-[40px] sm:px-4 ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
             {t.short ? <><span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span></> : t.label}
@@ -226,10 +250,10 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
       </div>
 
       {tab === 'datos' && (<>
-      <Card title="Datos del alumno">
+      <Card title={staff ? 'Datos del personal' : 'Datos del alumno'}>
         <dl className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Matrícula</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">{staff ? 'Código' : 'Matrícula'}</dt>
             <dd className="mt-1 text-sm font-medium text-ink">{student.student_id || '—'}</dd>
           </div>
           <div>
@@ -237,9 +261,9 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
             <dd className="mt-1 font-mono text-sm font-medium text-ink">{student.loyverse_code || student.student_id || '—'}</dd>
           </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Grado y grupo</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">{staff ? 'Puesto' : 'Grado y grupo'}</dt>
             <dd className="mt-1 text-sm font-medium text-ink">
-              {student.grade}{student.group ? ` · ${student.group}` : ''}
+              {staff ? student.puesto_label || 'Sin asignar' : <>{student.grade}{student.group ? ` · ${student.group}` : ''}</>}
             </dd>
           </div>
           <div>
@@ -258,6 +282,30 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
           </div>
         </dl>
       </Card>
+
+      {staff && (
+        // Who of the staff uses the console, on this same login (2026-11-25).
+        <Card title="Acceso a la consola" className="mt-6" action={consoleKind === 'grant' ? (
+          <button type="button" className="btn-outline" onClick={() => setGranting(person)}>
+            <ShieldCheck size={16} aria-hidden="true" /> Dar acceso a la consola
+          </button>
+        ) : consoleKind === 'remove' ? (
+          <button type="button" className="btn-outline" onClick={() => setRemoving(person)}>
+            <ShieldOff size={16} aria-hidden="true" /> Quitar acceso a la consola
+          </button>
+        ) : undefined}>
+          <ConsoleAccessCell user={student.user} />
+          <p className="mt-2 text-xs text-subtle">
+            {student.user.role === 'student'
+              ? 'Entra al portal solo a «Mi cafetería». Con acceso a la consola usa la misma cuenta y conserva su saldo.'
+              : student.user.role === 'staff'
+                ? 'Entra a la consola con su correo y conserva «Mi cafetería». Puesto y áreas se cambian en Usuarios.'
+                : student.user.role === 'admin'
+                  ? 'Administrador: usa toda la consola y conserva «Mi cafetería».'
+                  : 'Su cuenta es de familia (tiene hijos en el colegio): no puede usar la consola con ella.'}
+          </p>
+        </Card>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Datos personales">

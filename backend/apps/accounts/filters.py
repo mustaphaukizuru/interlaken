@@ -43,7 +43,7 @@ TIPO_ALL = ("todos", "all")
 
 class StudentFilterSet(django_filters.FilterSet):
     """``status|estado``, ``access|acceso``, ``level|nivel``, ``grade|grado``,
-    ``group|grupo``, ``linked|vinculado``, ``enrolled_from``/``enrolled_to``,
+    ``group|grupo``, ``linked|vinculado``, ``puesto`` (staff), ``enrolled_from``/``enrolled_to``,
     ``archived|archivados`` (archived students are left out unless it is ``1``,
     which lists only them) and ``tipo`` (``alumno`` by default, ``personal``
     for staff cafetería accounts, ``todos`` for both)."""
@@ -60,6 +60,8 @@ class StudentFilterSet(django_filters.FilterSet):
     grupo = django_filters.CharFilter(method="filter_group")
     linked = django_filters.CharFilter(method="filter_linked")
     vinculado = django_filters.CharFilter(method="filter_linked")
+    # «Personal» list (2026-11-25): staff by puesto (Docente, Dirección...).
+    puesto = django_filters.CharFilter(method="filter_puesto")
     enrolled_from = django_filters.CharFilter(method="filter_enrolled_from")
     enrolled_to = django_filters.CharFilter(method="filter_enrolled_to")
 
@@ -110,6 +112,10 @@ class StudentFilterSet(django_filters.FilterSet):
         if flag is False:
             return qs.filter(loyverse_id="")
         return qs
+
+    def filter_puesto(self, qs, name, value):
+        value = (value or "").strip().lower()
+        return qs.filter(puesto=value) if value in StudentProfile.Puesto.values else qs
 
     def filter_enrolled_from(self, qs, name, value):
         day = _to_date(value)

@@ -32,6 +32,7 @@ ADMIN_ONLY = {
     'apps.accounts.staff_import.ImportStaffLoyverseView',
     'apps.accounts.staff_users.StaffActivityView',
     'apps.accounts.staff_users.StaffBulkView',
+    'apps.accounts.staff_users.StaffConsoleAccessView',
     'apps.accounts.staff_users.StaffDetailView',
     'apps.accounts.staff_users.StaffExportView',
     'apps.accounts.staff_users.StaffImportTemplateView',

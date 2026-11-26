@@ -41,6 +41,7 @@ from .staff_import import ImportStaffLoyverseView
 from .staff_users import (
     StaffActivityView,
     StaffBulkView,
+    StaffConsoleAccessView,
     StaffDetailView,
     StaffExportView,
     StaffImportTemplateView,
@@ -105,6 +106,9 @@ urlpatterns = [
     path('admin/staff/<int:pk>/', StaffDetailView.as_view(), name='admin-staff-detail'),
     path('admin/staff/<int:pk>/reset-password/', StaffResetPasswordView.as_view(), name='admin-staff-reset'),
     path('admin/staff/<int:pk>/activity/', StaffActivityView.as_view(), name='admin-staff-activity'),
+    # A «Personal del colegio» cafetería login gets (or loses) the console, 2026-11-25.
+    path('admin/staff/<int:pk>/console-access/', StaffConsoleAccessView.as_view(),
+         name='admin-staff-console-access'),
     # Password request inbox (families ask by WhatsApp/email; admins resolve here).
     path('admin/password-requests/', PasswordRequestListCreateView.as_view(), name='password-requests'),
     path('admin/password-requests/export/', PasswordRequestExportView.as_view(),

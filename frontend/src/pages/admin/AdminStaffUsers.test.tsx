@@ -13,6 +13,8 @@ vi.mock('@/services/api', () => ({
     getStaffActivity: vi.fn(),
     resetStaffPassword: vi.fn(),
     inviteStaff: vi.fn(),
+    grantConsoleAccess: vi.fn(),
+    removeConsoleAccess: vi.fn(),
   },
   downloadBlob: vi.fn(),
 }));
@@ -272,5 +274,76 @@ describe('AdminStaffUsers: edit, activity, archive and delete', () => {
     await waitFor(() => expect(portalApi.staffBulk).toHaveBeenLastCalledWith(expect.objectContaining({
       action: 'delete', ids: [2], dry_run: false, payload: { confirm: 'ELIMINAR' },
     })));
+  });
+});
+
+// Owner, 2026-11-25: the person in charge of admissions already had a staff
+// cafetería login, so «Invitar» answered «Ese correo ya está registrado».
+describe('AdminStaffUsers: a staff cafetería login gets the console', () => {
+  it('offers console access on the same account instead of a second one', async () => {
+    vi.mocked(portalApi.inviteStaff).mockRejectedValue({ response: { status: 409, data: {
+      code: 'staff_cafeteria_login', detail: 'Esa persona ya tiene cuenta de cafetería.',
+      person: { id: 427, full_name: 'Rosa Lince', email: 'rlince@x.mx', puesto_label: 'Docente' },
+    } } });
+    vi.mocked(portalApi.grantConsoleAccess).mockResolvedValue({ data: { ...berta, id: 427, invite_email_sent: true } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Berta Zea');
+    await user.click(screen.getAllByRole('button', { name: /Invitar/ })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Invitar al personal' });
+    await user.type(within(dialog).getByLabelText('Correo'), 'rlince@x.mx');
+    await user.type(within(dialog).getByLabelText('Nombre'), 'Rosa');
+    await user.click(within(dialog).getByRole('button', { name: /Crear cuenta/ }));
+    const offer = await within(dialog).findByRole('status');
+    expect(offer).toHaveTextContent('Rosa Lince ya tiene cuenta de cafetería como personal del colegio (Docente)');
+    expect(within(dialog).queryByRole('button', { name: /Crear cuenta/ })).not.toBeInTheDocument();
+    await user.selectOptions(within(offer).getByLabelText('Puesto'), 'admisiones');
+    await user.click(within(dialog).getByRole('button', { name: /Dar acceso a la consola/ }));
+    await waitFor(() => expect(portalApi.grantConsoleAccess).toHaveBeenCalledWith(427, {
+      staff_title: 'Admisiones', staff_areas: ['admisiones', 'visitas', 'mensajes'],
+    }));
+    expect(portalApi.inviteStaff).toHaveBeenCalledTimes(1);
+    const toast = (await import('react-hot-toast')).default;
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rosa Lince ya puede entrar a la consola.'));
+  });
+
+  it('a family address keeps the server reason next to the email', async () => {
+    vi.mocked(portalApi.inviteStaff).mockRejectedValue({ response: { status: 400, data: {
+      email: ['Ese correo es de una familia o de un alumno: no puede ser usuario de la consola.'],
+    } } });
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Berta Zea');
+    await user.click(screen.getAllByRole('button', { name: /Invitar/ })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Invitar al personal' });
+    await user.type(within(dialog).getByLabelText('Correo'), 'mama@x.mx');
+    await user.type(within(dialog).getByLabelText('Nombre'), 'Ana');
+    await user.click(within(dialog).getByRole('button', { name: /Crear cuenta/ }));
+    expect(await within(dialog).findByText(/es de una familia o de un alumno/)).toBeInTheDocument();
+    expect(portalApi.grantConsoleAccess).not.toHaveBeenCalled();
+  });
+
+  it('a staff member who also buys at the cafetería loses only the console', async () => {
+    const rosa = { ...berta, id: 7, email: 'rosa@x.mx', full_name: 'Rosa Lince', has_cafeteria: true, staff_title: 'Admisiones', staff_areas: ['admisiones', 'visitas', 'mensajes'] };
+    vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 3, next: null, previous: null, results: [me, berta, rosa] } } as never);
+    vi.mocked(portalApi.removeConsoleAccess).mockResolvedValue({ data: { id: 7, role: 'student', sessions_revoked: 1 } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    expect(await screen.findByText('También compra en cafetería')).toBeInTheDocument();
+    // Berta has no wallet: no such action for her.
+    await user.click(screen.getByRole('button', { name: 'Más acciones para berta@x.mx' }));
+    expect(screen.queryByRole('menuitem', { name: /Quitar acceso a la consola/ })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    // Desactivar warns that it would take «Mi cafetería» too.
+    await user.click(screen.getByRole('button', { name: 'Más acciones para rosa@x.mx' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Desactivar' }));
+    expect(await screen.findByText(/También perderá «Mi cafetería»/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await user.click(screen.getByRole('button', { name: 'Más acciones para rosa@x.mx' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Quitar acceso a la consola a rosa@x.mx' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Quitar acceso a la consola' });
+    expect(confirm).toHaveTextContent('Su cuenta de cafetería, su saldo y su historial no cambian.');
+    await user.click(within(confirm).getByRole('button', { name: 'Quitar acceso' }));
+    await waitFor(() => expect(portalApi.removeConsoleAccess).toHaveBeenCalledWith(7));
   });
 });

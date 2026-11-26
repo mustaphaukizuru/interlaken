@@ -147,6 +147,9 @@ export function AdminRoutes() {
         <Route path="mi-cafeteria/credencial" element={<MyCafeteriaPage view="credencial" />} />
         <Route path="alumnos"     element={<AdminStudents />} />
         <Route path="alumnos/:studentId" element={<AdminStudentDetail />} />
+        {/* Staff cafetería accounts and their console access (2026-11-25). */}
+        <Route path="personal"    element={<AdminStudents mode="personal" />} />
+        <Route path="personal/:studentId" element={<AdminStudentDetail />} />
         <Route path="familias"    element={<AdminFamilies />} />
         <Route path="comunicados" element={<AdminAnnouncements />} />
         <Route path="ajustes"     element={<AdminSettings />} />

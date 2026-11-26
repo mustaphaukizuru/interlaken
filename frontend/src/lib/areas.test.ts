@@ -19,6 +19,21 @@ describe('console areas', () => {
     expect(canOpen(secretaria, '/admin/cafeteria')).toBe(false);
   });
 
+  it('«Personal» belongs to the roster area; the Admisiones puesto lands in Admisiones (2026-11-25)', () => {
+    expect(canOpen(secretaria, '/admin/personal')).toBe(true);
+    expect(canOpen(secretaria, '/admin/personal/51')).toBe(true);
+    expect(canOpen(cafeteria, '/admin/personal')).toBe(false);
+    expect(areasFor('/admin/personal')).toEqual(['alumnos']);
+    const admisiones = PUESTOS.find((p) => p.key === 'admisiones')!;
+    expect(admisiones.areas).toEqual(['admisiones', 'visitas', 'mensajes']);
+    const pm = { role: 'staff' as const, staff_areas: admisiones.areas };
+    expect(homePath(pm)).toBe('/admin/admisiones');
+    expect(canOpen(pm, '/admin/visitas/semana')).toBe(true);
+    expect(canOpen(pm, '/admin/mensajes')).toBe(true);
+    expect(canOpen(pm, '/admin/personal')).toBe(false);
+    expect(canOpen(pm, '/admin/cafeteria')).toBe(false);
+  });
+
   it('keeps the admin-only sections and the dashboard for admins', () => {
     for (const path of ['/admin', '/admin/usuarios', '/admin/ajustes', '/admin/contenido', '/admin/auditoria', '/admin/arco', '/admin/nuevo-ciclo']) {
       expect(canOpen(secretaria, path)).toBe(false);

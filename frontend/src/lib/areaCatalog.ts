@@ -18,8 +18,10 @@ export const AREAS: { key: AreaKey; label: string; description: string }[] = [
 export const AREA_LABEL: Record<AreaKey, string> = Object.fromEntries(AREAS.map((a) => [a.key, a.label])) as Record<AreaKey, string>;
 
 /** Ready-made puestos for the staff form ("Personalizado" = any mix). */
-export const PUESTOS: { key: 'secretaria' | 'recepcion' | 'cafeteria'; label: string; areas: AreaKey[] }[] = [
+export const PUESTOS: { key: 'secretaria' | 'recepcion' | 'cafeteria' | 'admisiones'; label: string; areas: AreaKey[] }[] = [
   { key: 'secretaria', label: 'Secretaría', areas: ['alumnos', 'accesos', 'admisiones', 'visitas', 'mensajes', 'comunicados'] },
   { key: 'recepcion', label: 'Recepción', areas: ['visitas', 'mensajes'] },
   { key: 'cafeteria', label: 'Cafetería', areas: ['cafeteria'] },
+  // Owner, 2026-11-25: admissions also runs the visit agenda and the contact inbox.
+  { key: 'admisiones', label: 'Admisiones', areas: ['admisiones', 'visitas', 'mensajes'] },
 ];

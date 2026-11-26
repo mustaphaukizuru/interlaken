@@ -4,7 +4,7 @@
  * `tipo: 'personal'` (no grade; a puesto). Only admin and portal chunks import
  * this module (never the public home page bundle).
  */
-import type { PersonTipo, StaffPuesto, StudentProfile } from '@/types';
+import type { PersonTipo, StaffPuesto, StudentProfile, User } from '@/types';
 
 export const PUESTO_LABEL: Record<StaffPuesto, string> = {
   sin_asignar: 'Sin asignar',
@@ -29,6 +29,18 @@ export const TIPO_LABEL: Record<PersonTipo, string> = {
 
 /** A staff member's cafetería account (not a pupil). */
 export const isStaffAccount = (p?: Pick<StudentProfile, 'tipo'> | null) => p?.tipo === 'personal';
+
+/**
+ * What an admin may do with the console access of a staff wallet's login
+ * (2026-11-25): give it to a cafetería-only login (role student), take it
+ * away from a staff one. Admins change role in Usuarios; a parent who also
+ * works here keeps the family login, so neither.
+ */
+export function consoleAction(user: Pick<User, 'role'>): 'grant' | 'remove' | null {
+  if (user.role === 'student') return 'grant';
+  if (user.role === 'staff') return 'remove';
+  return null;
+}
 
 /** «3° Primaria A» for a pupil, the puesto for a staff member. */
 export function gradeOrPuesto(p: Pick<StudentProfile, 'tipo' | 'grade' | 'group' | 'puesto_label'>): string {
