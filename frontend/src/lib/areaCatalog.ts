@@ -13,6 +13,7 @@ export const AREAS: { key: AreaKey; label: string; description: string }[] = [
   { key: 'mensajes', label: 'Mensajes y formularios', description: 'Bandeja de contacto y respuestas de formularios del sitio.' },
   { key: 'comunicados', label: 'Comunicados y calendario', description: 'Comunicados a familias y calendario escolar.' },
   { key: 'cafeteria', label: 'Cafetería y pagos', description: 'Saldos, depósitos, carga en POS, reconciliación y pagos con tarjeta.' },
+  { key: 'caja', label: 'Caja', description: 'Registrar recargas en recepción y ver su corte de caja.' },
 ];
 
 export const AREA_LABEL: Record<AreaKey, string> = Object.fromEntries(AREAS.map((a) => [a.key, a.label])) as Record<AreaKey, string>;

@@ -75,6 +75,9 @@ CHECK_WINDOW_SECONDS = 30
 # Where the staff fix things (the console's «Por aplicar»).
 QUEUE_PATH = services.PAID_QUEUE_PATH
 QUEUE_WHERE = services.PAID_QUEUE_WHERE
+# Front-desk top-ups the app could not load (``cafeteria.caja``).
+DESK_QUEUE_PATH = "/admin/cafeteria?tab=deposits&estado=pending&metodo=office"
+DESK_QUEUE_WHERE = "Cafetería → Depósitos (pendientes de «Caja Escolar», «Aplicar»)"
 
 
 def push_mode() -> str:
@@ -268,40 +271,21 @@ def push_topup(payment, *, actor=None, at_payment: bool = False) -> dict:
             outcome = _result("failed", reason="not_linked")
         else:
             cb = CafeteriaBalance.objects.select_for_update().filter(student=student).first()
-            wait = _wait_reason(student, cb)
-            customer = None
-            if not wait:
-                try:
-                    with services._guard_read_budget():
-                        customer = services.get_customer_by_id(student.loyverse_id)
-                except LoyverseError:
-                    wait = "No se pudo leer el saldo en Loyverse."
-            if not wait and customer.get("deleted_at"):
-                _save_push(topup, S.FAILED, "La tarjeta del alumno está borrada en Loyverse.", now)
+            written = write_points_locked(student, cb, _cents(payment.amount), started=started)
+            if written["status"] == "wait":
+                outcome = _record_wait(topup, payment, written["note"], now, after_commit)
+            elif written["status"] == "failed":
+                _save_push(topup, S.FAILED, written["note"], now)
+                if written["reason"] == "not_confirmed":
+                    logger.error(
+                        "Loyverse push of top-up #%s not confirmed: %s", topup.pk, written["note"]
+                    )
                 after_commit.append(("failed", topup, payment))
-                outcome = _result("failed", reason="customer_deleted")
-            elif wait:
-                outcome = _record_wait(topup, payment, wait, now, after_commit)
+                outcome = _result("failed", reason=written["reason"])
             else:
-                before = _cents(services.get_balance_from_customer(customer))
-                local = _cents(cb.balance)
-                if before != local:
-                    outcome = _record_wait(
-                        topup,
-                        payment,
-                        f"Loyverse tiene ${before:,.2f} y la app ${local:,.2f}; se carga "
-                        "cuando coincidan.",
-                        now,
-                        after_commit,
-                    )
-                elif time.monotonic() - started > WRITE_DEADLINE_SECONDS:
-                    outcome = _record_wait(
-                        topup, payment, "Loyverse respondió lento.", now, after_commit
-                    )
-                else:
-                    outcome = _write_and_credit(
-                        topup, payment, cb, customer, before, now, actor, after_commit, record
-                    )
+                outcome = _credit_after_write(
+                    topup, payment, cb, written, now, actor, after_commit, record
+                )
 
     for kind, *args in after_commit:
         if kind == "family":
@@ -326,15 +310,50 @@ def _record_wait(topup, payment, note, now, after_commit) -> dict:
     return _result("waiting", reason=note)
 
 
-def _write_and_credit(topup, payment, cb, customer, before, now, actor, after_commit, record):
-    """Under the locks, with Loyverse == wallet == ``before``: write, re-read,
-    credit only on an exact match."""
-    from apps.cafeteria.models import TopUpRequest
+def write_points_locked(student, cb, delta, *, started) -> dict:
+    """Move ``student``'s Loyverse points by ``delta`` (negative to take money
+    back), under the caller's locks (the top-up row, then the wallet ``cb``).
 
-    S = TopUpRequest.PushState
-    student = topup.student
-    amount = _cents(payment.amount)
-    target = before + amount
+    The one write path for every app-originated change of a card's balance:
+    paid card top-ups (``push_topup``) and front-desk top-ups and their
+    voids (``cafeteria.caja``). Loyverse first: read, require Loyverse ==
+    wallet to the cent (no sale or POS load in flight), write the ABSOLUTE new
+    balance with the full record, re-read. The caller touches the wallet only
+    on ``written``.
+
+    Returns ``{'status', 'reason', 'note', 'before', 'target', 'read_at'}``:
+    ``written`` (the re-read shows exactly ``target``), ``wait`` (nothing was
+    written: try again later; ``note`` says why) or ``failed`` (nothing to
+    retry automatically: ``customer_deleted``, ``below_zero``, or
+    ``not_confirmed`` when a write was sent and the re-read disagrees).
+    """
+    out = {"status": "wait", "reason": "", "note": "", "before": None, "target": None,
+           "read_at": None}
+    wait = _wait_reason(student, cb)
+    customer = None
+    if not wait:
+        try:
+            with services._guard_read_budget():
+                customer = services.get_customer_by_id(student.loyverse_id)
+        except LoyverseError:
+            wait = "No se pudo leer el saldo en Loyverse."
+    if not wait and customer.get("deleted_at"):
+        return {**out, "status": "failed", "reason": "customer_deleted",
+                "note": "La tarjeta del alumno está borrada en Loyverse."}
+    if wait:
+        return {**out, "reason": "busy", "note": wait}
+    before = _cents(services.get_balance_from_customer(customer))
+    local = _cents(cb.balance)
+    if before != local:
+        return {**out, "reason": "mismatch", "before": before,
+                "note": f"Loyverse tiene ${before:,.2f} y la app ${local:,.2f}; se carga "
+                        "cuando coincidan."}
+    if time.monotonic() - started > WRITE_DEADLINE_SECONDS:
+        return {**out, "reason": "slow", "before": before, "note": "Loyverse respondió lento."}
+    target = before + _cents(delta)
+    if target < 0:
+        return {**out, "status": "failed", "reason": "below_zero", "before": before,
+                "note": f"El saldo es ${before:,.2f}: no alcanza para quitar ${-_cents(delta):,.2f}."}
     read_at = timezone.now()
     write_error = ""
     try:
@@ -348,7 +367,6 @@ def _write_and_credit(topup, payment, cb, customer, before, now, actor, after_co
             )
     except LoyverseError:
         after = None
-
     if after != target:
         seen = "no se pudo leer" if after is None else f"${after:,.2f}"
         note = (
@@ -356,10 +374,19 @@ def _write_and_credit(topup, payment, cb, customer, before, now, actor, after_co
             f"${target:,.2f} y ahora muestra {seen}."
             + (f" Error: {write_error}" if write_error else "")
         )
-        _save_push(topup, S.FAILED, note, now)
-        logger.error("Loyverse push of top-up #%s not confirmed: %s", topup.pk, note)
-        after_commit.append(("failed", topup, payment))
-        return _result("failed", reason="not_confirmed")
+        return {**out, "status": "failed", "reason": "not_confirmed", "note": note,
+                "before": before, "target": target, "read_at": read_at}
+    return {**out, "status": "written", "before": before, "target": target, "read_at": read_at}
+
+
+def _credit_after_write(topup, payment, cb, written, now, actor, after_commit, record):
+    """Loyverse confirmed the new balance: credit the wallet (exactly once)."""
+    from apps.cafeteria.models import TopUpRequest
+
+    S = TopUpRequest.PushState
+    student = topup.student
+    amount = _cents(payment.amount)
+    before, target, read_at = written["before"], written["target"], written["read_at"]
 
     tx = services._credit_topup_locked(
         topup,
@@ -614,6 +641,13 @@ def notify_staff(kind, topup, payment) -> int:
     try:
         name = topup.student.user.full_name
         amount = format_amount(payment.amount if payment is not None else topup.amount)
+        # A front-desk top-up («Caja») waits in Depósitos as an office top-up,
+        # not in the card queue «Por aplicar».
+        desk = bool(getattr(topup, "desk_method", ""))
+        where = DESK_QUEUE_WHERE if desk else QUEUE_WHERE
+        queue_path = DESK_QUEUE_PATH if desk else QUEUE_PATH
+        if desk and topup.receipt_folio:
+            amount = f"{amount} (folio {topup.receipt_folio})"
         if kind == "check":
             title = f"Revisar en Loyverse: {name}, {amount}"
             intro = "La app cargó esta recarga en Loyverse, pero una compra coincidió con la carga."
@@ -625,7 +659,7 @@ def notify_staff(kind, topup, payment) -> int:
             title = f"Cargar a mano: {name}, {amount}"
             intro = "La app no pudo cargar esta recarga en Loyverse."
             todo = (
-                f"Cárguela en el POS como siempre y aplíquela en {QUEUE_WHERE}. "
+                f"Cárguela en el POS como siempre y aplíquela en {where}. "
                 "Antes, revise en Loyverse que no esté ya cargada."
             )
         message = "\n\n".join(filter(None, [intro, topup.loyverse_push_note, todo]))
@@ -650,8 +684,8 @@ def notify_staff(kind, topup, payment) -> int:
                     tone="warning",
                     details=details,
                     paragraphs=[p for p in (topup.loyverse_push_note, todo) if p],
-                    cta_label="Abrir «Por aplicar»",
-                    cta_url=portal_url(QUEUE_PATH),
+                    cta_label="Abrir Depósitos" if desk else "Abrir «Por aplicar»",
+                    cta_url=portal_url(queue_path),
                     link_fallback=False,
                     reason="Aviso interno de la consola del Colegio Interlaken.",
                 ),

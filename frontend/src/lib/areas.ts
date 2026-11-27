@@ -9,10 +9,10 @@
  */
 import type { User } from '@/types';
 
-export type AreaKey = 'alumnos' | 'accesos' | 'admisiones' | 'visitas' | 'mensajes' | 'comunicados' | 'cafeteria';
+export type AreaKey = 'alumnos' | 'accesos' | 'admisiones' | 'visitas' | 'mensajes' | 'comunicados' | 'cafeteria' | 'caja';
 
 /** Area keys in console order (labels and puestos: lib/areaCatalog.ts). */
-export const AREA_KEYS: readonly AreaKey[] = ['alumnos', 'accesos', 'admisiones', 'visitas', 'mensajes', 'comunicados', 'cafeteria'];
+export const AREA_KEYS: readonly AreaKey[] = ['alumnos', 'accesos', 'admisiones', 'visitas', 'mensajes', 'comunicados', 'cafeteria', 'caja'];
 
 /**
  * Console sections by path prefix and the areas that open them. A section not
@@ -26,6 +26,8 @@ const SECTIONS: [prefix: string, areas: AreaKey[]][] = [
   ['/admin/familias', ['alumnos']],
   ['/admin/admisiones', ['admisiones']],
   ['/admin/visitas', ['visitas']],
+  // «Caja» (owner 2026-11-27): front-desk top-ups, its own area.
+  ['/admin/caja', ['caja']],
   ['/admin/cafeteria', ['cafeteria']],
   ['/admin/pagos', ['cafeteria']],
   ['/admin/comunicados', ['comunicados']],

@@ -16,6 +16,8 @@ is marked WA).
 | Comunicado publicado / activado | admin publishes | all users in audience (families, staff) | yes | yes (batched cron, 7-day staleness cut-off) | yes if `push_enabled` | no | info@ |
 | Emergencia (broadcast) | admin | all active families + staff | yes | yes (first batch inline) | yes | no | info@ |
 | Recarga aplicada (top-up credited) | webhook / caja | S + G | yes | yes | yes | WA | cafeteria@ |
+| Recibimos su recarga (front-desk top-up, «Caja», folio R-…; 2026-11-27) | `cafeteria.caja` after Loyverse confirms | S + G | yes | yes | yes | — | cafeteria@ |
+| Recarga anulada (front-desk top-up voided with a reason) | `cafeteria.caja.void_desk_topup` | S + G | yes | yes | yes | — | cafeteria@ |
 | Recarga solicitada (pago en caja) | family | S + G (confirmation) and A (to apply) | yes | yes | yes | no | cafeteria@ |
 | Saldo bajo | nightly `low_balance_alerts` | S + G | yes | yes | yes | WA | cafeteria@ |
 | Consumo diario / resumen semanal | `send_spending_digest` | G (and S if real email) | no | yes | no | WA (digest) | cafeteria@ |

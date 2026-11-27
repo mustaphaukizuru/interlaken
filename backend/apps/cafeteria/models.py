@@ -228,11 +228,64 @@ class TopUpRequest(models.Model):
     loyverse_push_attempts = models.PositiveSmallIntegerField(default=0)
     loyverse_push_note = models.CharField(max_length=255, blank=True, default='')
 
+    # ── «Caja»: money taken at the front desk (owner 2026-11-27) ──────────────
+    # A desk top-up is ``method=office`` with ``desk_method`` set: cash, the
+    # card terminal or a payment link. The app writes it into Loyverse first
+    # and credits the wallet only when Loyverse shows the new balance
+    # (``cafeteria.caja``). These rows are what the «corte de caja» and the
+    # «Ingresos de cafetería» report read: who received it (``received_by``),
+    # when (``created_at``), how (``desk_method``), how much (``amount``) and
+    # whether it still counts (``voided_at``).
+    class DeskMethod(models.TextChoices):
+        CASH = 'cash', 'Efectivo'
+        CARD = 'card', 'Tarjeta en recepción'
+        LINK = 'link', 'Liga de pago'
+
+    desk_method = models.CharField('Forma de pago en recepción', max_length=10,
+                                   choices=DeskMethod.choices, blank=True, default='')
+    # Terminal authorisation number or payment-link folio (card and link only).
+    reference = models.CharField('Referencia', max_length=80, blank=True, default='')
+    received_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='desk_topups_received', verbose_name='Recibió',
+    )
+    # «R-000123»: the folio on the family's receipt (set right after insert).
+    receipt_folio = models.CharField('Folio', max_length=20, unique=True, null=True, blank=True)
+    # One per form submission: a double click or a retried request never
+    # creates a second top-up.
+    idempotency_key = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    voided_at = models.DateTimeField('Anulada el', null=True, blank=True)
+    voided_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='desk_topups_voided', verbose_name='Anuló',
+    )
+    void_reason = models.CharField('Motivo de la anulación', max_length=255, blank=True,
+                                   default='')
+    # Card and link payments are matched later in MultiCobros, like the
+    # portal's card payments; cash never is.
+    desk_verified_at = models.DateTimeField('Verificada el', null=True, blank=True)
+    desk_verified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='desk_topups_verified', verbose_name='Verificó',
+    )
+
+    @property
+    def is_desk(self) -> bool:
+        return bool(self.desk_method)
+
+    @property
+    def desk_needs_verification(self) -> bool:
+        return (self.desk_method in (self.DeskMethod.CARD, self.DeskMethod.LINK)
+                and self.voided_at is None and self.desk_verified_at is None
+                and self.status == self.Status.COMPLETED)
+
     class Meta:
         verbose_name = 'Solicitud de Recarga'
         verbose_name_plural = 'Solicitudes de Recarga'
         ordering = ['-created_at']
         indexes = [
+            # «Caja»: the day's desk top-ups by who received them (corte de caja).
+            models.Index(fields=['received_by', '-created_at'], name='caf_topup_desk_received'),
             models.Index(
                 fields=['method', 'status', 'pos_loaded_at'],
                 name='cafeteria_topup_pos_queue',
