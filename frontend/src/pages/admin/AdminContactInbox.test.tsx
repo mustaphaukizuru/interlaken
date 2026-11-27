@@ -121,3 +121,39 @@ describe('AdminContactInbox', () => {
     }));
   });
 });
+
+// Owner 2026-11-26: «Atendido» on a facturación request emails the family its
+// confirmation (once); the inbox says so before and after.
+describe('AdminContactInbox: facturación confirmation', () => {
+  it('warns before marking, then toasts where the confirmation went', async () => {
+    const toast = (await import('react-hot-toast')).default;
+    toggle.mockResolvedValue({ data: { ...messages[1], is_handled: true, ack_sent_at: '2026-09-22T10:00:00Z',
+      confirmation: { sent: true, to: 'beto@x.mx', reason: '' } } } as never);
+    renderWithProviders(<AdminContactInbox />, { route: '/admin/mensajes' });
+    await screen.findByText('Factura de septiembre');
+    const mark = screen.getByRole('button', { name: 'Marcar atendido el mensaje de Beto Gil' });
+    expect(mark).toHaveAttribute('title', expect.stringContaining('la familia recibe por correo la confirmación'));
+    await userEvent.click(mark);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Mensaje atendido. Se envió la confirmación a beto@x.mx.'));
+  });
+
+  it('says when the confirmation could not go out', async () => {
+    const toast = (await import('react-hot-toast')).default;
+    toggle.mockResolvedValue({ data: { ...messages[1], is_handled: true, ack_sent_at: null,
+      confirmation: { sent: false, to: 'beto@x.mx', reason: 'failed' } } } as never);
+    renderWithProviders(<AdminContactInbox />, { route: '/admin/mensajes' });
+    await screen.findByText('Factura de septiembre');
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar atendido el mensaje de Beto Gil' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('no se pudo enviar la confirmación a beto@x.mx')));
+  });
+
+  it('shows «Confirmación enviada el …» on a request that got it', async () => {
+    list.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [
+      { ...messages[1], is_handled: true, ack_sent_at: '2026-09-22T10:00:00Z' },
+    ] } } as never);
+    renderWithProviders(<AdminContactInbox />, { route: '/admin/mensajes?estado=1' });
+    expect(await screen.findByText(/Confirmación enviada el/)).toBeInTheDocument();
+    // A contact message never shows the hint.
+    expect(screen.queryByRole('button', { name: /Marcar atendido/ })).toBeNull();
+  });
+});

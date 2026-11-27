@@ -21,6 +21,8 @@ is marked WA).
 | Consumo diario / resumen semanal | `send_spending_digest` | G (and S if real email) | no | yes | no | WA (digest) | cafeteria@ |
 | Pago fallido / reembolsado | gateway webhook | S + G | yes | yes | yes | no | pagos@ |
 | Ajuste manual de saldo | admin | S + G | yes | yes | no | no | cafeteria@ |
+| Solicitud de facturación (aviso al colegio) | public «Solicitud de facturación» form | every address in Ajustes → «Correos que reciben las solicitudes de factura» (`SiteSettings.billing_emails`: facturas@ and vvega@; empty = `BILLING_EMAIL`), one message; a copy in Mensajes | no | yes | no | no | the family's email |
+| Sus datos de facturación quedaron registrados | Mensajes «Atendido» on a [Facturación] request (single or bulk, 2026-11-26) | F (the «Correo para enviar facturas» address) | no | yes, once per request (`ContactMessage.ack_sent_at`); nothing when the form is sent; reopening and marking again sends nothing | no | no | first billing address |
 | Pre-registro recibido | public form | applicant (confirmation) and A (`ADMISSIONS_EMAIL`) | no | yes | no | no | admisiones@ / applicant |
 | Invitación a inscripción | admin | applicant | no | yes | no | no | admisiones@ |
 | Documento aprobado / rechazado | admin review | applicant | no | yes | no | no | admisiones@ |

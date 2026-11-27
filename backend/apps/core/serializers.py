@@ -52,4 +52,6 @@ class AuditLogSerializer(serializers.ModelSerializer):
 class ContactMessageAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
-        fields = ['id', 'name', 'email', 'subject', 'message', 'is_handled', 'created_at']
+        # ack_sent_at: when a facturación request's family got its confirmation
+        # («Atendido», core.facturacion); null for contact messages.
+        fields = ['id', 'name', 'email', 'subject', 'message', 'is_handled', 'created_at', 'ack_sent_at']

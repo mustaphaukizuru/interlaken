@@ -1,6 +1,8 @@
 """
 Core API views: public contact form, health check + admin audit viewer.
 """
+from contextvars import ContextVar
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
@@ -14,7 +16,7 @@ from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 
 from .audit import record
-from .bulk import AdminBulkView, BulkAction, BulkSkip
+from .bulk import EMAIL_CHUNK, AdminBulkView, BulkAction, BulkSkip, after_commit
 from .exporting import AdminExportMixin
 from .filters import (
     AUDIT_EXPORT_SPEC,
@@ -147,8 +149,14 @@ class PortalBadgesView(APIView):
 class FacturacionRequestView(APIView):
     """POST /api/v1/facturacion/ — CFDI request form (BACKLOG P1-G6).
 
-    Emails BILLING_EMAIL with the fiscal data (Reply-To the requester) and keeps
-    a ContactMessage copy tagged [Facturación] so it shows up in the inbox.
+    Emails every address in Ajustes → «Correos que reciben las solicitudes de
+    factura» (``core.facturacion.recipients``; Reply-To the requester) and keeps
+    a ContactMessage copy tagged [Facturación], with the fields, in Mensajes.
+
+    The family is NOT emailed here any more (owner 2026-11-26): it gets its
+    confirmation when the office marks the request «Atendido»
+    (``core.facturacion.send_confirmation``), so the email means the data was
+    registered for real.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -223,34 +231,14 @@ class FacturacionRequestView(APIView):
             f'Correo para enviar facturas: {d["email"]}',
             f'Teléfono de contacto: {d["phone"]}',
         ])
+        from .facturacion import SUBJECT_PREFIX, recipients
+
         ContactMessage.objects.create(
             name=d['razon_social'][:120], email=d['email'],
-            subject=f'[Facturación] {rfc} · {d["student"]}'[:200], message=body)
-        recipient = getattr(settings, 'BILLING_EMAIL', '') or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
-        send_email(f'[Facturación] Solicitud de factura: {d["razon_social"]}', body, [recipient],
+            subject=f'{SUBJECT_PREFIX} {rfc} · {d["student"]}'[:200], message=body,
+            facturacion={**d, 'rfc': rfc})
+        send_email(f'{SUBJECT_PREFIX} Solicitud de factura: {d["razon_social"]}', body, recipients(),
                    reply_to=d['email'], html=False)
-        from apps.portal.emailing import EmailContent
-
-        ack = EmailContent(
-            category='Facturación', tone='success',
-            title='Recibimos su solicitud de facturación',
-            intro=('Registramos sus datos fiscales. A partir de ahora recibirá sus facturas cada mes, '
-                   '24 horas hábiles después de realizar sus pagos.'),
-            details=[('Alumno', d['student']), ('Razón social', d['razon_social']), ('RFC', rfc),
-                     ('Código postal', d['cp']), ('Régimen fiscal', d['regimen']),
-                     ('Facturas a', d['email'])],
-            note=('Solo se emiten facturas del mes en curso y no es posible cancelar ni cambiar facturas '
-                  'fuera del mes en que se realizó el pago. Si algún dato cambia, responda a este correo.'),
-            reason='Recibe este correo porque envió una solicitud de facturación desde interlaken.edu.mx.',
-        )
-        send_email('Recibimos su solicitud de facturación',
-                   f'Recibimos su solicitud de facturación para {d["razon_social"]} ({rfc}), '
-                   f'alumno {d["student"]}.\n\n'
-                   'A partir de ahora recibirá sus facturas cada mes, 24 horas hábiles después de '
-                   'realizar sus pagos. Solo se emiten facturas del mes en curso y no es posible '
-                   'cancelar ni cambiar facturas fuera del mes en que se realizó el pago.\n\n'
-                   f'Si algún dato cambia, escríbanos a {recipient}.',
-                   [d['email']], reply_to=recipient, content=ack)
         return Response({'detail': 'Solicitud enviada.'}, status=status.HTTP_201_CREATED)
 
 
@@ -279,28 +267,64 @@ class ContactInboxExportView(AdminExportMixin, ContactInboxView):
 
 
 class ContactMessageHandleView(APIView):
-    """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool} (audited)."""
+    """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool} (audited).
+
+    Marking a facturación request «Atendido» sends the family its confirmation
+    (once, ``core.facturacion``); the response carries ``confirmation``
+    ({sent, to, reason}) so the console can say whether it went out.
+    """
     admin_area = 'mensajes'
     permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
         from django.shortcuts import get_object_or_404
 
+        from .facturacion import send_confirmation
+
         m = get_object_or_404(ContactMessage, pk=pk)
         handled = parse_bool_param(request.data.get('is_handled', True))
         if handled is None:
             handled = bool(request.data.get('is_handled'))
+        confirmation = None
         if m.is_handled != handled:
             before = m.is_handled
             m.is_handled = handled
             m.save(update_fields=['is_handled'])
             record('update', m, {'is_handled': [before, handled]}, actor=request.user,
                    context='contact.handled')
-        return Response(ContactMessageAdminSerializer(m).data)
+            if handled:
+                # After the «Atendido» is saved: a mail problem never undoes it.
+                confirmation = send_confirmation(m, actor=request.user)
+        data = ContactMessageAdminSerializer(m).data
+        if confirmation is not None:
+            data['confirmation'] = confirmation
+        return Response(data)
+
+
+# The confirmations a bulk «Marcar atendidos» sent, collected by its after-commit
+# callbacks while the request runs (ContactInboxBulkView.post reads them).
+_BULK_CONFIRMATIONS: ContextVar[list | None] = ContextVar('contact_bulk_confirmations', default=None)
+
+
+def _confirm_after_commit(pk: int, actor) -> None:
+    """Queue the family's facturación confirmation for when the bulk row commits."""
+    def send():
+        from .facturacion import send_confirmation
+
+        message = ContactMessage.objects.filter(pk=pk).first()
+        if message is None:
+            return
+        outcome = send_confirmation(message, actor=actor)
+        sink = _BULK_CONFIRMATIONS.get()
+        if outcome is not None and sink is not None:
+            sink.append(outcome)
+
+    after_commit(send)
 
 
 def _handled_action(name: str, label_es: str, target: bool) -> BulkAction:
-    """``mark_handled`` / ``reopen``: rows already in the target state are *omitidas*."""
+    """``mark_handled`` / ``reopen``: rows already in the target state are *omitidas*.
+    ``mark_handled`` on a facturación request queues the family's confirmation."""
     def check(message, payload):
         if message.is_handled == target:
             raise BulkSkip('ya está atendido' if target else 'ya está pendiente')
@@ -310,13 +334,26 @@ def _handled_action(name: str, label_es: str, target: bool) -> BulkAction:
         before = message.is_handled
         message.is_handled = target
         message.save(update_fields=['is_handled'])
+        if target and message.ack_sent_at is None:
+            from .facturacion import is_request
+
+            if is_request(message):
+                _confirm_after_commit(message.pk, actor)
         return {'is_handled': [before, target]}
 
-    return BulkAction(name=name, label_es=label_es, handler=handler, plan=check, side_effects='none')
+    # «Marcar atendidos» may email a family per row: small chunks, so a commit
+    # never outlives the worker (EMAIL_CHUNK, like the other emailing actions).
+    return BulkAction(name=name, label_es=label_es, handler=handler, plan=check,
+                      side_effects='per_row' if target else 'none',
+                      chunk=EMAIL_CHUNK if target else None)
 
 
 class ContactInboxBulkView(AdminBulkView):
-    """POST /api/v1/core/admin/contact-messages/bulk/ — ``mark_handled`` / ``reopen`` (C5)."""
+    """POST /api/v1/core/admin/contact-messages/bulk/ — ``mark_handled`` / ``reopen`` (C5).
+
+    A committed «Marcar atendidos» also answers ``confirmations``:
+    ``{"sent": n, "failed": n, "no_data": n}`` (facturación requests only).
+    """
     admin_area = 'mensajes'
     entity = 'core.contactmessage'
     list_view_class = ContactInboxView
@@ -327,6 +364,21 @@ class ContactInboxBulkView(AdminBulkView):
             _handled_action('reopen', 'Reabrir', False),
         )
     }
+
+    def post(self, request):
+        sink: list = []
+        token = _BULK_CONFIRMATIONS.set(sink)
+        try:
+            response = super().post(request)
+        finally:
+            _BULK_CONFIRMATIONS.reset(token)
+        if sink and isinstance(getattr(response, 'data', None), dict):
+            response.data['confirmations'] = {
+                'sent': sum(1 for o in sink if o.get('sent')),
+                'failed': sum(1 for o in sink if o.get('reason') == 'failed'),
+                'no_data': sum(1 for o in sink if o.get('reason') == 'no_data'),
+            }
+        return response
 
 
 class AdminAuditExportView(AdminExportMixin, AdminAuditLogView):

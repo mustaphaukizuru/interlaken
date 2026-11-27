@@ -14,6 +14,14 @@ class ContactMessage(models.Model):
     message    = models.TextField('Mensaje')
     is_handled = models.BooleanField('Atendido', default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Facturación requests (owner 2026-11-26): the seven fiscal fields as sent,
+    # so the confirmation the family receives when the office marks the request
+    # «Atendido» can list them; null for contact messages and older requests
+    # (core.facturacion parses those from ``message``).
+    facturacion = models.JSONField('Datos de facturación', null=True, blank=True)
+    # When that confirmation went out. Set only after a successful send, and
+    # never sent twice: reopening and marking «Atendido» again sends nothing.
+    ack_sent_at = models.DateTimeField('Confirmación enviada', null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']

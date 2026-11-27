@@ -37,7 +37,8 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
             'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'chrome', 'sep_incorporations', 'school_year',
             'admissions_public_start', 'admissions_next_from_month', 'pricing_years', 'families_upload_photos',
-            'cafeteria_shows_allergies', 'updated_at',
+            # Admin only (never in SiteSettingsSerializer): internal mailboxes.
+            'cafeteria_shows_allergies', 'billing_emails', 'updated_at',
         ]
         # The price years change only through «Costos y precios» (audited, per group).
         read_only_fields = ['pricing_years', 'updated_at']
@@ -52,6 +53,14 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('Cada registro necesita nivel (Preescolar/Primaria/Secundaria) y texto.')
             out.append({'level': level, 'label': str(label).strip()[:200]})
         return out
+
+    def validate_billing_emails(self, value):
+        from apps.core.facturacion import clean_recipients
+
+        try:
+            return clean_recipients(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from None
 
     def validate_phone_e164(self, value):
         return self._phone(value, 'phone_e164')

@@ -95,7 +95,7 @@ describe('AdminSettings (CMS preview + density)', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number);
     });
-    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^guardar$/i }));
     await waitFor(() => expect(mockedPatch).toHaveBeenCalledTimes(1));
     expect(mockedPatch.mock.calls[0][0]).toMatchObject({
       whatsapp_number: SAMPLE.whatsapp_number,
@@ -119,7 +119,7 @@ describe('AdminSettings (CMS preview + density)', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number);
     });
-    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^guardar$/i }));
 
     expect(
       await screen.findByText('Introduzca una dirección de correo electrónico válida.'),
@@ -144,7 +144,7 @@ describe('AdminSettings (CMS preview + density)', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Correo de contacto')).toHaveValue(SAMPLE.contact_email);
     });
-    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^guardar$/i }));
     expect(
       await screen.findByText('Introduzca una dirección de correo electrónico válida.'),
     ).toBeInTheDocument();
@@ -160,11 +160,11 @@ describe('AdminSettings (CMS preview + density)', () => {
   it('keeps Guardar disabled while loading and after a failed load (never PATCHes blanks)', async () => {
     mockedGet.mockRejectedValueOnce(new Error('boom'));
     renderPage();
-    const save = screen.getByRole('button', { name: /guardar/i });
+    const save = screen.getByRole('button', { name: /^guardar$/i });
     expect(save).toBeDisabled();
     expect(await screen.findByText('No se pudieron cargar los ajustes')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    expect(screen.getByRole('button', { name: /^guardar$/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /^guardar$/i }));
     expect(mockedPatch).not.toHaveBeenCalled();
   });
 
@@ -175,7 +175,7 @@ describe('AdminSettings (CMS preview + density)', () => {
     await waitFor(() => expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number));
     await userEvent.type(screen.getByLabelText('WhatsApp'), '9');
     expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole('button', { name: /guardar/i })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^guardar$/i })[0]);
     await waitFor(() => expect(mockedPatch).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText('Cambios sin guardar')).not.toBeInTheDocument());
   });

@@ -2080,7 +2080,7 @@
         "errPhone": "Escriba el teléfono a 10 dígitos: (00) 0000-0000.",
         "errGeneral": "No se pudo enviar. Intente de nuevo o escriba a {facturas}.",
         "doneTitle": "Solicitud enviada",
-        "doneText": "Le enviamos una confirmación a {correo}. Recibirá sus facturas cada mes desde {facturas}, 24 horas hábiles después de realizar sus pagos."
+        "doneText": "Recibimos sus datos. Le confirmaremos por correo a {correo} cuando queden registrados; desde entonces recibirá sus facturas cada mes desde {facturas}, 24 horas hábiles después de realizar sus pagos."
       }
     },
     "faq": {

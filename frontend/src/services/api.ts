@@ -880,6 +880,11 @@ export interface ContactMessage {
   message: string;
   is_handled: boolean;
   created_at: string;
+  /** Facturación requests: when the family got «Sus datos de facturación quedaron
+   *  registrados» (sent once, on «Atendido»; owner 2026-11-26). */
+  ack_sent_at?: string | null;
+  /** Only in the «Atendido» answer of a facturación request: whether that email went out. */
+  confirmation?: { sent: boolean; to: string; reason: '' | 'already_sent' | 'no_data' | 'failed' };
 }
 
 export const coreApi = {

@@ -22,9 +22,12 @@ def test_facturacion_request_emails_billing_and_stores_inbox_copy(api_client, se
     assert resp.status_code == 201, resp.data
     to_billing = [m for m in mail.outbox if m.to == ['facturas@interlaken.com.mx']][0]
     assert to_billing.reply_to == ['luis@test.mx'] and 'PELU800101AB1' in to_billing.body
-    assert any(m.to == ['luis@test.mx'] for m in mail.outbox)  # confirmation to requester
+    # Owner 2026-11-26: nothing to the family on submit; it hears from the
+    # school when the request is marked «Atendido» (test_facturacion_atendido).
+    assert not any(m.to == ['luis@test.mx'] for m in mail.outbox)
     msg = ContactMessage.objects.get()
     assert msg.subject.startswith('[Facturación]') and msg.is_handled is False
+    assert msg.facturacion['rfc'] == 'PELU800101AB1' and msg.ack_sent_at is None
 
 
 def test_facturacion_validation(api_client, settings):
