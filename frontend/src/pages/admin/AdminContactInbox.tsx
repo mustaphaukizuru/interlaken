@@ -40,6 +40,23 @@ const BULK_ACTIONS: BulkActionDef[] = [
 ];
 
 const isInvoice = (m: ContactMessage) => m.subject.startsWith('[Facturación]');
+/** A facturación request whose family has not been confirmed yet: «Atendido» sends it. */
+const confirmsOnHandle = (m: ContactMessage) => isInvoice(m) && !m.is_handled && !m.ack_sent_at;
+const CONFIRM_HINT = 'Al marcarla como atendida, la familia recibe por correo la confirmación de que sus datos quedaron registrados.';
+
+/** The toast after «Atendido» on a facturación request (owner 2026-11-26). */
+function confirmationToast(c: NonNullable<ContactMessage['confirmation']>) {
+  if (c.sent) toast.success(`Mensaje atendido. Se envió la confirmación a ${c.to}.`);
+  else if (c.reason === 'failed') toast.error(`Quedó atendido, pero no se pudo enviar la confirmación a ${c.to}. Reábralo y márquelo otra vez para reintentar.`);
+  else if (c.reason === 'no_data') toast.error('Quedó atendido. Esta solicitud no tiene un correo legible: confirme a la familia por su cuenta.');
+  else toast.success('Mensaje atendido. La confirmación ya se había enviado antes.');
+}
+
+/** «Confirmación enviada el …» under a facturación request that got it. */
+function ConfirmationNote({ m }: { m: ContactMessage }) {
+  if (!isInvoice(m) || !m.ack_sent_at) return null;
+  return <span className="block text-xs text-green-700">Confirmación enviada el {when(m.ack_sent_at)}</span>;
+}
 const when = (iso: string) => new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
 const replyHref = (m: ContactMessage) => `mailto:${m.email}?subject=${encodeURIComponent(`Re: ${m.subject}`)}`;
 
@@ -66,6 +83,7 @@ const COLUMNS: Column<ContactMessage>[] = [
           <span className="font-semibold text-ink">{m.subject}</span>
           {isInvoice(m) && <Badge variant="info">Factura</Badge>}
         </div>
+        <ConfirmationNote m={m} />
         <p className="line-clamp-1 max-w-[420px] text-xs text-subtle" title={m.message}>{m.message}</p>
       </div>
     ),
@@ -113,7 +131,8 @@ export default function AdminContactInbox() {
       { id: m.id, is_handled: isHandled },
       {
         onSuccess: (res) => {
-          toast.success(isHandled ? 'Mensaje marcado como atendido.' : 'Mensaje reabierto.');
+          if (isHandled && res.data.confirmation) confirmationToast(res.data.confirmation);
+          else toast.success(isHandled ? 'Mensaje marcado como atendido.' : 'Mensaje reabierto.');
           setOpen((cur) => (cur && cur.id === m.id ? res.data : cur));
         },
         onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo actualizar.')),
@@ -161,6 +180,7 @@ export default function AdminContactInbox() {
                 loading={toggle.isPending && toggle.variables?.id === m.id}
                 onClick={() => setHandled(m, !m.is_handled)}
                 aria-label={m.is_handled ? `Reabrir mensaje de ${m.name}` : `Marcar atendido el mensaje de ${m.name}`}
+                title={confirmsOnHandle(m) ? CONFIRM_HINT : undefined}
               >
                 {m.is_handled ? <><Undo2 className="h-4 w-4" aria-hidden="true" /> Reabrir</> : <><Check className="h-4 w-4" aria-hidden="true" /> Atendido</>}
               </Button>
@@ -212,7 +232,16 @@ export default function AdminContactInbox() {
         allMatching={selection.allMatching}
         filters={{ q: filters.q, handled: filters.handled, from: filters.from, to: filters.to }}
         execute={bulk.run}
-        onDone={(r) => { if (r.ok > 0) selection.onClear(); }}
+        onDone={(r) => {
+          if (r.ok > 0) selection.onClear();
+          // Facturación requests among them: their families were just confirmed.
+          const c = (r as typeof r & { confirmations?: { sent: number; failed: number; no_data: number } }).confirmations;
+          if (c && c.sent > 0) toast.success(c.sent === 1 ? 'Se envió 1 confirmación de facturación.' : `Se enviaron ${c.sent} confirmaciones de facturación.`);
+          if (c && c.failed + c.no_data > 0) {
+            const n = c.failed + c.no_data;
+            toast.error(n === 1 ? '1 confirmación de facturación no se pudo enviar: revise esa solicitud.' : `${n} confirmaciones de facturación no se pudieron enviar: revise esas solicitudes.`);
+          }
+        }}
       />
 
       <Modal open={!!open} onClose={() => setOpen(null)} title={open?.subject ?? ''} maxWidth={600}>
@@ -231,6 +260,8 @@ export default function AdminContactInbox() {
               <dd className="text-ink">{when(open.created_at)}</dd>
             </dl>
             <p className="whitespace-pre-line rounded-sm bg-cream-2 p-3 text-ink">{open.message}</p>
+            <ConfirmationNote m={open} />
+            {confirmsOnHandle(open) && <p className="text-xs text-subtle">{CONFIRM_HINT}</p>}
             <div className="flex flex-wrap justify-end gap-2">
               <a href={replyHref(open)} className="btn-outline min-h-[44px] text-sm">
                 <Mail className="h-4 w-4" aria-hidden="true" /> Responder por correo

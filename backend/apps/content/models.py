@@ -96,6 +96,12 @@ class SiteSettings(models.Model):
         help_text=('Encendido: la consola de cafetería muestra las alergias de los alumnos cuya familia '
                    'autorizó los datos de salud (solo las alergias). Encenderlo puede requerir '
                    'actualizar el aviso de privacidad.'))
+    # Who receives the website's «Solicitud de facturación» (owner 2026-11-26:
+    # facturas@ and vvega@). A list of addresses, editable in Ajustes, never
+    # public. Empty = the BILLING_EMAIL setting (core.facturacion.recipients).
+    billing_emails = models.JSONField(
+        'Correos que reciben las solicitudes de factura', default=list, blank=True,
+        help_text='Cada solicitud de facturación del sitio llega a todas estas direcciones.')
 
     # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
     tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')

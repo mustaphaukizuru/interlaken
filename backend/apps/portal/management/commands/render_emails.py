@@ -265,6 +265,19 @@ def _account_samples(child_user, child) -> list[Sample]:
     return out
 
 
+def _billing_samples() -> list[Sample]:
+    """Facturación (owner 2026-11-26): sent when the office marks the request
+    «Atendido» in Mensajes, never when the family submits the form."""
+    from apps.core.facturacion import confirmation_content
+
+    subject, content, _text = confirmation_content({
+        'student': 'Ana Prueba López', 'razon_social': 'María Prueba López', 'rfc': 'PULM800101AB1',
+        'cp': '54000', 'regimen': 'Régimen de sueldos y salarios e ingresos asimilados a salarios',
+        'email': 'mama.prueba@ejemplo.test', 'phone': '5512345678',
+    })
+    return [Sample('facturacion-registrada', 'Facturación', subject, content, 'facturas@interlaken.com.mx')]
+
+
 def build_samples() -> list[Sample]:
     """Every sample, built without sending anything. Raises if a send slipped through."""
     captured: list[tuple[str, EmailContent]] = []
@@ -290,7 +303,8 @@ def build_samples() -> list[Sample]:
         samples = (_notification_samples(parent, child_user, staff)
                    + _admissions_samples(capture)
                    + _visit_samples()
-                   + _account_samples(child_user, child))
+                   + _account_samples(child_user, child)
+                   + _billing_samples())
     if len(getattr(mail, 'outbox', []) or []) != outbox_before:
         raise CommandError('An email reached the outbox: render_emails must never send.')
     return samples

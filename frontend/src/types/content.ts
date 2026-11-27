@@ -32,5 +32,7 @@ export interface SiteSettings {
   families_upload_photos?: boolean;
   /** Ajustes «Alergias en la cafetería» (also public: the texts on who sees allergies follow it). Off by default. */
   cafeteria_shows_allergies?: boolean;
+  /** Ajustes «Solicitudes de factura» (admin only, never public): who receives each request. */
+  billing_emails?: string[];
   updated_at?: string;
 }

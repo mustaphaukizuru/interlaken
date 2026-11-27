@@ -5,6 +5,7 @@ import { AdmissionsPublicStartCard } from '@/components/admin/AdmissionsPublicSt
 import { SchoolCycleCard } from '@/components/admin/SchoolCycleCard';
 import { CredentialPhotosCard } from '@/components/admin/CredentialPhotosCard';
 import { CafeteriaAllergiesCard } from '@/components/admin/CafeteriaAllergiesCard';
+import { BillingEmailsCard } from '@/components/admin/BillingEmailsCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -385,6 +386,8 @@ export default function AdminSettings() {
             <CredentialPhotosCard value={data?.families_upload_photos} loaded={loaded} />
 
             <CafeteriaAllergiesCard value={data?.cafeteria_shows_allergies} loaded={loaded} />
+
+            <BillingEmailsCard value={data?.billing_emails} loaded={loaded} />
 
             <AdmissionTemplatesCard />
 

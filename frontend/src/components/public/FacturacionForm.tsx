@@ -63,7 +63,9 @@ export const FACTURACION_FORM_DEFAULTS = {
   errPhone: 'Escriba el teléfono a 10 dígitos: (00) 0000-0000.',
   errGeneral: 'No se pudo enviar. Intente de nuevo o escriba a {facturas}.',
   doneTitle: 'Solicitud enviada',
-  doneText: 'Le enviamos una confirmación a {correo}. Recibirá sus facturas cada mes desde {facturas}, 24 horas hábiles después de realizar sus pagos.',
+  // Owner 2026-11-26: no email when the form is sent; the confirmation goes
+  // out when the office registers the data (Mensajes «Atendido»).
+  doneText: 'Recibimos sus datos. Le confirmaremos por correo a {correo} cuando queden registrados; desde entonces recibirá sus facturas cada mes desde {facturas}, 24 horas hábiles después de realizar sus pagos.',
 };
 export type FacturacionFormCopy = typeof FACTURACION_FORM_DEFAULTS;
 
