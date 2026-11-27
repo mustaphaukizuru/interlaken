@@ -124,6 +124,21 @@ def _notification_samples(parent, child_user, staff) -> list[Sample]:
             details=[('Alumno', short), ('Recarga', money('500'))],
             highlight=('Saldo actual', money('612.50')),
             intro=f'La recarga de {money("500")} para {first} ya está disponible en la cafetería.')),
+        # «Caja» (owner 2026-11-27): money received at the front desk.
+        Sample('caja-recarga-recibida', 'Notificaciones', 'Recibimos su recarga (recepción)', notification_content(
+            user=parent, notif_type='payment', title='Recibimos su recarga', message='', tone='success',
+            details=[('Folio', 'R-000123'), ('Alumno', short), ('Monto', money('200')),
+                     ('Forma de pago', 'Efectivo'), ('Recibió', 'Personal de recepción'),
+                     ('Fecha', '27/11/2026 08:15'), ('Saldo actual', money('612.50'))],
+            highlight=('Monto', money('200')),
+            intro=f'Recibimos su recarga para la cafetería de {first}. El saldo ya está cargado: ya puede usarlo.')),
+        Sample('caja-recarga-anulada', 'Notificaciones', 'Recarga anulada (recepción)', notification_content(
+            user=parent, notif_type='payment', title='Recarga anulada', message='', tone='warning',
+            details=[('Folio', 'R-000123'), ('Alumno', short), ('Monto', money('200')),
+                     ('Forma de pago', 'Efectivo'), ('Fecha', '27/11/2026 08:15'),
+                     ('Saldo actual', money('412.50'))],
+            highlight=('Monto', money('200')),
+            intro=f'Se anuló una recarga de la cafetería de {first}.')),
         Sample('pago-recibido', 'Notificaciones', 'Pago de recarga recibido', notification_content(
             user=parent, notif_type='payment', title='Pago de recarga recibido', message='', tone='success',
             details=[('Alumno', short), ('El saldo se actualiza', 'lunes 23 de noviembre a las 7:30 a.m.'),

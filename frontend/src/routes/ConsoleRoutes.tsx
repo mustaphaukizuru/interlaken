@@ -43,6 +43,8 @@ const AdminSettings   = lazy(() => import('@/pages/admin/AdminSettings'));
 // Admisiones list, pipeline and Expediente: one entry (see AdmissionsConsole).
 const AdmissionsConsole = lazy(() => import('@/pages/admin/AdmissionsConsole'));
 const AdminCafeteria  = lazy(() => import('@/pages/admin/AdminCafeteria'));
+const AdminCaja = lazy(() => import('@/pages/admin/AdminCaja'));
+const AdminCajaReceipt = lazy(() => import('@/pages/admin/AdminCajaReceipt'));
 const AdminCafeteriaStudent = lazy(() => import('@/pages/admin/AdminCafeteriaStudent'));
 const AdminStudents   = lazy(() => import('@/pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('@/pages/admin/AdminStudentDetail'));
@@ -140,6 +142,9 @@ export function AdminRoutes() {
         <Route path="admisiones/:caseId" element={<AdmissionsConsole page="case" />} />
         <Route path="visitas"     element={<AdminBookings />} />
         <Route path="visitas/semana" element={<AdminVisitsWeek />} />
+        {/* «Caja»: front-desk top-ups (owner 2026-11-27). */}
+        <Route path="caja" element={<AdminCaja />} />
+        <Route path="caja/recibo/:topupId" element={<AdminCajaReceipt />} />
         <Route path="cafeteria"   element={<AdminCafeteria />} />
         <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
         {/* The person's own staff wallet, inside the console (owner, 2026-11-25). */}

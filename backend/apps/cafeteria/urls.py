@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import admin_data, views
+from . import admin_data, caja_views, views
 
 urlpatterns = [
     path('balance/',                     views.MyBalanceView.as_view(),           name='cafeteria-balance'),
@@ -26,6 +26,12 @@ urlpatterns = [
     path('export/',                      views.ParentExportView.as_view(),        name='cafeteria-export'),
     # On-demand Loyverse poll (parents/staff) — does not wait for cron.
     path('refresh/',                     views.RefreshFromLoyverseView.as_view(), name='cafeteria-refresh'),
+    # «Caja»: money taken at the front desk (owner 2026-11-27).
+    path('admin/caja/lookup/',               caja_views.CajaLookupView.as_view(),          name='caja-lookup'),
+    path('admin/caja/topups/',               caja_views.CajaTopUpListCreateView.as_view(), name='caja-topups'),
+    path('admin/caja/topups/<int:pk>/',      caja_views.CajaTopUpDetailView.as_view(),     name='caja-topup'),
+    path('admin/caja/topups/<int:pk>/void/', caja_views.CajaVoidView.as_view(),            name='caja-topup-void'),
+    path('admin/caja/topups/<int:pk>/verify/', caja_views.CajaVerifyView.as_view(),        name='caja-topup-verify'),
     path('admin/balances/',              admin_data.AdminBalancesView.as_view(),       name='admin-balances'),
     path('admin/topup/<int:pk>/apply/',  views.AdminApplyTopUpView.as_view(),     name='admin-apply-topup'),
     path('admin/topup/<int:pk>/pos-loaded/', views.AdminMarkTopUpPosLoadedView.as_view(),

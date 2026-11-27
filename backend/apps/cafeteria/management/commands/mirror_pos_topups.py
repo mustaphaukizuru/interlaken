@@ -31,6 +31,17 @@ class Command(BaseCommand):
                     f'Card top-ups written into Loyverse: {pushed["pushed"]}, waiting '
                     f'{pushed["waiting"]}, failed {pushed["failed"]}, '
                     f'checks resolved {pushed["resolved"]}.')
+        # Front-desk top-ups («Caja») still waiting for Loyverse, same rule.
+        from apps.cafeteria.caja import push_due_desk_topups
+        try:
+            desk = push_due_desk_topups()
+        except Exception as e:  # noqa: BLE001 (the mirror must always run)
+            self.stderr.write(self.style.ERROR(f'Desk top-up pass failed: {e}'))
+        else:
+            if any(desk.values()):
+                self.stdout.write(
+                    f'Desk top-ups written into Loyverse: {desk["pushed"]}, waiting '
+                    f'{desk["waiting"]}, failed {desk["failed"]}.')
         try:
             r = mirror_pos_topups(notify=not options['no_notify'])
         except LoyverseError as e:

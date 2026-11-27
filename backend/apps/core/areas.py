@@ -41,6 +41,9 @@ AREAS: dict[str, tuple[str, str]] = {
                     'Comunicados a familias y calendario escolar.'),
     'cafeteria': ('Cafetería y pagos',
                   'Saldos, depósitos, carga en POS, reconciliación y pagos con tarjeta.'),
+    # Owner 2026-11-27: whoever takes money at the front desk (Veronica).
+    'caja': ('Caja',
+             'Registrar recargas en recepción y ver su corte de caja.'),
 }
 
 # Puestos: ready-made area sets for the staff form ("Personalizado" = any mix).
