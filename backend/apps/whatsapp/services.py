@@ -25,7 +25,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.bookings.models import AvailabilitySlot, Booking
-from apps.bookings.services import SlotUnavailable, create_booking
+from apps.bookings.services import AlreadyBooked, SlotUnavailable, create_booking
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +241,12 @@ def _book_slot(sender, profile_name, slot_id_raw):
             source=Booking.Source.WHATSAPP,
             notify_email=False,
         )
+    except AlreadyBooked as exc:
+        # The website's sentence, told to answer right here; nothing is booked twice.
+        from apps.bookings.services.booking import already_booked_message
+
+        send_text(sender, already_booked_message(exc.existing, whatsapp=True))
+        return 'already-booked'
     except SlotUnavailable as exc:
         send_text(sender, f'{exc} Le muestro otras fechas disponibles.')
         _offer_slots(sender)

@@ -519,12 +519,12 @@ docker compose restart app
 
 ## Backups
 
-Three separate things need backing up, and only one of them is handled for you.
+Three separate things need backing up. The first two are handled for you.
 
 | What | Where it lives | Who backs it up |
 |---|---|---|
 | School data (parents, payments, ledger) | the external database (or `pgdata` here, if you moved it) | `deploy/backup-db.sh` on this box, nightly, plus its **encrypted** off-site copy to a private bucket once `BACKUP_S3_*` is set (below) |
-| Uploaded documents | the `media` Docker volume on this VPS | **nobody, until you set this up** |
+| Uploaded documents | the `media` Docker volume on this VPS | the same nightly `backup-db.sh` run: archived and **encrypted at once** (`media-<date>.tar.gz.gpg`, only ciphertext kept, 30 days), and copied off-site with the dump when `BACKUP_S3_*` or `BACKUP_REMOTE` is set |
 | TLS certificate | the `caddy_data` volume | re-issued automatically if lost |
 
 **The backup that runs from this box.** `backup-db.sh` (installed by the
@@ -666,21 +666,27 @@ Good to know:
   fingerprint in `deploy/backup-encrypt.sh` and `BACKUP_KEY_IDS` in
   `backend/apps/core/backups.py` together; a test fails if they disagree.
 
-**Uploaded documents are the gap.** Admission documents are legally retained,
-and a Docker volume on a single VPS is one failed disk away from gone. Back the
-volume up nightly and copy the archives off the box:
+**Uploaded documents (since 2026-11-28).** Admission documents are legally
+retained, and a Docker volume on a single VPS is one failed disk away from gone.
+The nightly `backup-db.sh` run now also archives the `media` volume (read-only
+mount, `BACKUP_MEDIA_VOLUME`, default `interlaken_media`), encrypts it at once
+to the same key and keeps **only** the ciphertext as
+`/var/backups/interlaken/media-AAAA-MM-DD-HHMM.tar.gz.gpg` (30 days). The
+plaintext archive never outlives the encryption step. The same ciphertext goes
+off-site with the dump (`offsite_backup --kind media`, its own marker
+`backup_media`). `check_backup_fresh` emails the admins at 07:45 when the
+archive failed or is older than a day (silent until the first one reports).
+Nothing to install: it rides the existing 02:30 cron line.
+
+Restore (needs the school's private key, like any off-box copy):
 
 ```bash
-sudo tee /etc/cron.daily/interlaken-media >/dev/null <<'SH'
-#!/bin/sh
-docker run --rm -v interlaken_media:/src:ro -v /var/backups/interlaken:/dst alpine   tar czf /dst/media-$(date +%F).tar.gz -C /src .
-find /var/backups/interlaken -name 'media-*.tar.gz' -mtime +30 -delete
-SH
-sudo chmod +x /etc/cron.daily/interlaken-media
+gpg --import interlaken-backup-PRIVATE-key.asc          # once per machine
+gpg --decrypt media-AAAA-MM-DD-HHMM.tar.gz.gpg > media.tar.gz
+# on the VPS, into the volume (stop the app first if you replace everything):
+docker run --rm -v interlaken_media:/m -v "$PWD":/b postgres:17-alpine   tar -C /m -xzf /b/media.tar.gz
+rm media.tar.gz                                          # plaintext: delete when done
 ```
-
-Copy those archives off the machine as well. A backup that only exists on the
-server it protects is not a backup.
 
 ### Moving documents to object storage later (optional)
 

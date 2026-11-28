@@ -37,10 +37,12 @@ from .serializers import (
     SlotGeneratorSerializer,
 )
 from .services import (
+    AlreadyBooked,
     SlotUnavailable,
     calendar,
     change_booking_status,
     create_booking,
+    existing_payload,
     occupied_seats,
 )
 from .services.staff_alerts import CANCELLED_BY_FAMILY, alert_staff
@@ -216,6 +218,12 @@ class BookingCreateView(APIView):
                 source=Booking.Source.WEB,
                 pre_registration=lead,
             )
+        except AlreadyBooked as exc:
+            # 409: the family already has a visit to come (owner 2026-11-26). The
+            # page shows it with the school's WhatsApp and phone instead of booking twice.
+            return Response({'detail': str(exc), 'code': 'already_booked',
+                             'existing': existing_payload(exc.existing)},
+                            status=status.HTTP_409_CONFLICT)
         except SlotUnavailable as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if lead is not None:

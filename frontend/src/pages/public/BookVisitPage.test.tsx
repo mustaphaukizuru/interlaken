@@ -200,6 +200,30 @@ describe('BookVisitPage', () => {
     expect(await screen.findByText('El número debe tener de 10 a 15 dígitos.')).toBeInTheDocument();
   });
 
+  it('a family that already has a visit sees it with the school WhatsApp and phone, not a red error (owner 2026-11-26)', async () => {
+    const user = userEvent.setup();
+    mockedSettings.mockResolvedValue({ data: { whatsapp_number: '5215553791188', phone_display: '(55) 5379-1188', phone_e164: '+525553791188' } } as never);
+    mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);
+    const detail = 'Ya tiene una visita agendada el jueves 3 de diciembre a las 11:45 (Visita Individual). '
+      + 'Si desea cambiarla, escríbanos por WhatsApp o llame al colegio.';
+    mockedCreate.mockRejectedValue({ response: { status: 409, data: { detail, code: 'already_booked', existing: { date: '2099-12-03', start_time: '11:45' } } } });
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: /15 de junio/i }));
+    await user.click(await screen.findByRole('button', { name: /09:00/i }));
+    await user.type(await screen.findByLabelText(/Nombre completo/i), 'Marta Ejemplo');
+    await user.type(screen.getByLabelText(/Correo electrónico/i), 'marta@ejemplo.test');
+    await user.type(screen.getByLabelText(/Teléfono/i), '5512345678');
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+
+    expect(await screen.findByText(detail)).toBeInTheDocument();
+    const wa = screen.getByRole('link', { name: /Escribir por WhatsApp/ });
+    expect(wa.getAttribute('href')).toContain('5215553791188');
+    expect(screen.getByRole('link', { name: /Llamar \(55\) 5379-1188/ })).toHaveAttribute('href', 'tel:+525553791188');
+    // Not the generic failure, and nothing confirmed.
+    expect(screen.queryByText('No fue posible completar la reserva. Intente de nuevo.')).toBeNull();
+    expect(screen.queryByText('¡Visita confirmada!')).toBeNull();
+  });
+
   it('books without a token when the page has none', async () => {
     const user = userEvent.setup();
     mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);

@@ -36,6 +36,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.core.backups import (
+    MEDIA_MIN_BYTES,
+    MEDIA_NAME_RE,
     NAME_RE,
     BackupConfigError,
     BackupRefused,
@@ -45,6 +47,7 @@ from apps.core.backups import (
     describe_location,
     storage_configured,
 )
+from apps.core.backups import MIN_BYTES as MIN_BYTES_DB
 from apps.core.models import OpsStatus
 
 REMOTE_FAILED = "la copia a BACKUP_REMOTE falló (ver /var/log/interlaken/backup.log)"
@@ -63,6 +66,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--name", default="", help="db-<date>.sql.gz.gpg")
+        parser.add_argument(
+            "--kind",
+            choices=("db", "media"),
+            default="db",
+            help="db: the database dump; media: the uploaded-files archive (own marker).",
+        )
         parser.add_argument(
             "--remote",
             choices=("none", "ok", "failed"),
@@ -84,7 +93,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **o):
         remote = o["remote"]
-        marker = OpsStatus.get("backup") or {}
+        # The uploaded-files archive has its own marker (backup_media), so a
+        # media problem never hides or overwrites the database copy's outcome.
+        self.kind = o["kind"]
+        self.marker_key = "backup_media" if self.kind == "media" else "backup"
+        marker = OpsStatus.get(self.marker_key) or {}
         marker["offsite_remote"] = remote != "none"
 
         if o["failed"].strip():
@@ -95,7 +108,7 @@ class Command(BaseCommand):
             return
 
         if not storage_configured() and remote == "none":
-            OpsStatus.set("backup", marker)
+            OpsStatus.set(self.marker_key, marker)
             self.stdout.write(
                 "offsite backup skipped: sin copia externa (set BACKUP_S3_* in deploy/.env; "
                 "docs/DEPLOY_HOSTINGER_VPS.md, Off-site copy)"
@@ -118,9 +131,10 @@ class Command(BaseCommand):
         self._finish(marker, copied, errors)
 
     def _upload(self, name: str, keep: int) -> str:
-        name = check_name(name)
+        media = self.kind == "media"
+        name = check_name(name, kind=self.kind)
         data = sys.stdin.buffer.read()
-        check_ciphertext(data)
+        check_ciphertext(data, min_bytes=MEDIA_MIN_BYTES if media else MIN_BYTES_DB)
         storage = backup_storage()
 
         key = storage.save(name, ContentFile(data, name=name))
@@ -142,7 +156,8 @@ class Command(BaseCommand):
         """Keep the newest ``keep`` dumps by name (names sort by date). Best effort."""
         try:
             _, files = storage.listdir("")
-            dumps = sorted(f for f in files if NAME_RE.match(f))
+            name_re = MEDIA_NAME_RE if self.kind == "media" else NAME_RE
+            dumps = sorted(f for f in files if name_re.match(f))
             for old in dumps[:-keep] if len(dumps) > keep else []:
                 if old != just_uploaded:
                     storage.delete(old)
@@ -162,7 +177,7 @@ class Command(BaseCommand):
         else:
             marker["offsite_error"] = None
             marker["offsite_error_at"] = None
-        OpsStatus.set("backup", marker)
+        OpsStatus.set(self.marker_key, marker)
         if errors:
             raise CommandError(f"offsite backup FAILED: {marker['offsite_error']}")
         self.stdout.write(f"offsite backup ok: {marker['offsite']}")

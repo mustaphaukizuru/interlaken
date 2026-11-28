@@ -13,6 +13,11 @@ day, none at all, or a failed last attempt emails the admins, once per
 distinct problem and weekly while it lasts (apps.payments.ops_alerts). Without
 one the console keeps saying «sin copia externa» and nobody is emailed daily
 about a decision the school has not made yet.
+
+It also watches the uploaded-files archive the same run makes (``backup_media``,
+owner 2026-11-28): a failed or stale archive emails the admins every morning
+while it lasts. Silent until the first archive reports, so a fresh install or
+the deploy that adds it does not alert on day one.
 """
 
 from django.core.management.base import BaseCommand
@@ -44,6 +49,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **o):
         self._check_restore_drill(o['no_email'])
+        self._check_media(o['max_age_hours'], o['no_email'])
         marker = OpsStatus.get('backup') or {}
         self._check_offsite(marker, o['max_age_hours'], o['no_email'])
         last_ok = parse_datetime(marker.get('at') or '') if marker.get('ok') else None
@@ -82,6 +88,52 @@ class Command(BaseCommand):
             recipients,
         )
         self.stdout.write(f'alert email {"sent" if sent else "NOT sent"} to {len(recipients)} admin(s)')
+
+    def _check_media(self, max_age_hours: int, no_email: bool) -> None:
+        """The uploaded-files archive: failed, stale, or its off-site copy failing."""
+        from .record_backup import MEDIA_KEY
+
+        marker = OpsStatus.get(MEDIA_KEY)
+        if not marker:
+            self.stdout.write('uploaded files: none recorded yet')
+            return
+        at = parse_datetime(marker.get('at') or '')
+        age_h = (timezone.now() - at).total_seconds() / 3600 if at else None
+        problems = []
+        if not marker.get('ok'):
+            problems.append(f"el último respaldo de los archivos subidos falló: "
+                            f"{marker.get('error') or 'sin motivo registrado'}")
+        if age_h is None or age_h > max_age_hours:
+            problems.append('el último respaldo de los archivos subidos tiene '
+                            f"{'una fecha ilegible' if age_h is None else f'{age_h:.0f} horas'}")
+        if offsite_configured() and marker.get('offsite_error'):
+            problems.append(f"la copia externa de los archivos falló: {marker['offsite_error']}")
+        OpsStatus.set('backup_media_check', {
+            'at': timezone.now().isoformat(),
+            'stale': bool(problems),
+            'age_hours': round(age_h, 1) if age_h is not None else None,
+        })
+        if not problems:
+            self.stdout.write(f"uploaded files fresh: {age_h:.1f} h old, {marker.get('files', 0)} files")
+            return
+        detail = '; '.join(problems)
+        self.stdout.write(self.style.ERROR(f'UPLOADED FILES BACKUP: {detail}'))
+        if no_email:
+            return
+        from apps.portal.services import send_email
+
+        recipients = _admin_emails()
+        if not recipients:
+            self.stderr.write('no active admin to email')
+            return
+        sent = send_email(
+            'Interlaken: respaldo de archivos subidos atrasado',
+            f'El respaldo nocturno de los archivos subidos (fotos y documentos) tiene un problema: '
+            f'{detail}.\n\nRevise en el servidor /var/log/interlaken/backup.log. Mientras tanto '
+            'no existe una copia reciente de esos archivos.',
+            recipients,
+        )
+        self.stdout.write(f'media alert email {"sent" if sent else "NOT sent"} to {len(recipients)} admin(s)')
 
     def _check_restore_drill(self, no_email: bool) -> None:
         """Email once when the monthly drill has not reported for MAX_DRILL_AGE_DAYS.

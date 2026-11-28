@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
-from apps.bookings.services import SlotUnavailable, create_booking
+from apps.bookings.services import AlreadyBooked, SlotUnavailable, create_booking, existing_payload
 from apps.core.audit import record
 from apps.core.exceptions import error_body
 from apps.core.listing import AdminListMixin
@@ -771,6 +771,10 @@ class OpenSchoolDaySignUpView(APIView):
                 num_attendees=num,
                 source=Booking.Source.WEB,
             )
+        except AlreadyBooked as exc:
+            return Response({'detail': str(exc), 'code': 'already_booked',
+                             'existing': existing_payload(exc.existing)},
+                            status=status.HTTP_409_CONFLICT)
         except SlotUnavailable as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)

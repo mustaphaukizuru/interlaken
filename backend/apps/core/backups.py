@@ -38,9 +38,14 @@ from django.conf import settings
 
 # backup-db.sh names dumps db-<YYYY-MM-DD>-<HHMM>.sql.gz; the ciphertext adds .gpg.
 NAME_RE = re.compile(r"^db-\d{4}-\d{2}-\d{2}(-\d{4})?\.sql\.gz\.gpg$")
+# The uploaded-files archive of the same run (owner 2026-11-28): media-<date>.tar.gz.gpg.
+MEDIA_NAME_RE = re.compile(r"^media-\d{4}-\d{2}-\d{2}(-\d{4})?\.tar\.gz\.gpg$")
 GZIP_MAGIC = b"\x1f\x8b"
 # A real dump is well over this (backup-db.sh refuses < 10 KB before encrypting).
 MIN_BYTES = 10_000
+# An almost empty media volume archives to a few hundred bytes of ciphertext:
+# still a real, restorable backup, so the floor is only "not an empty file".
+MEDIA_MIN_BYTES = 200
 
 # The encryption subkey of deploy/backup-public-key.asc (primary key
 # AAA0DA4256F7EC7A752477B06574D2D47EC9E0A2). A dump encrypted to any other key
@@ -121,11 +126,11 @@ def pkesk_key_ids(data: bytes) -> list[str] | None:
     return None
 
 
-def check_ciphertext(data: bytes) -> None:
+def check_ciphertext(data: bytes, *, min_bytes: int = MIN_BYTES) -> None:
     """Raise ``BackupRefused`` unless ``data`` is a dump encrypted to the backup key."""
     if data[:2] == GZIP_MAGIC:
         raise BackupRefused("es un volcado gzip SIN cifrar; nunca sale del servidor sin cifrar")
-    if len(data) < MIN_BYTES:
+    if len(data) < min_bytes:
         raise BackupRefused(
             f"el archivo mide {len(data)} bytes: no es un respaldo (¿página de error?)"
         )
@@ -136,8 +141,13 @@ def check_ciphertext(data: bytes) -> None:
         raise BackupRefused(f"está cifrado para otra llave ({', '.join(ids)}), no la del colegio")
 
 
-def check_name(name: str) -> str:
+def check_name(name: str, *, kind: str = "db") -> str:
     name = (name or "").strip()
+    if kind == "media":
+        if not MEDIA_NAME_RE.match(name):
+            raise BackupRefused(
+                f"nombre no válido {name!r}: debe ser media-AAAA-MM-DD-HHMM.tar.gz.gpg")
+        return name
     if not NAME_RE.match(name):
         raise BackupRefused(f"nombre no válido {name!r}: debe ser db-AAAA-MM-DD-HHMM.sql.gz.gpg")
     return name
