@@ -1110,6 +1110,18 @@ class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generic
         # Subquery, not a join: a top-up with two attempts would list twice.
         return Q(pk__in=Payment.objects.filter(pk=int(digits)).values("related_topup_id"))
 
+    def get_serializer(self, *args, **kwargs):
+        # The page's possible POS duplicates in one query (cafeteria.hand_loads),
+        # not one per row. Only the list; the export never shows them.
+        if kwargs.get("many") and args and "context" not in kwargs:
+            from .hand_loads import pos_mirror_map
+
+            rows = list(args[0])
+            context = self.get_serializer_context()
+            context["pos_mirrors"] = pos_mirror_map(rows)
+            return self.get_serializer_class()(rows, *args[1:], context=context, **kwargs)
+        return super().get_serializer(*args, **kwargs)
+
     def get_queryset(self):
         from apps.payments.models import Payment
 
@@ -1147,10 +1159,27 @@ APPLY_PAID_CHUNK = 5
 APPLY_PAID_BUDGET_SECONDS = 20
 
 
+def _bulk_duplicate_skip(topup, amount=None):
+    """A bulk «Aplicar» never decides for a person whether an anonymous POS
+    recarga is this money (cafeteria.hand_loads): that row is skipped."""
+    from .hand_loads import mirrored_duplicate
+
+    dup = mirrored_duplicate(topup, amount=amount)
+    if dup is not None:
+        raise BulkSkip(
+            f"Loyverse ya registró una recarga de ${dup.amount:,.2f} para este alumno; "
+            "revísela desde su fila («Es esta misma» o «Es otra recarga»)"
+        )
+
+
 def _apply_plan(topup, payload):
     if topup.method != TopUpRequest.Method.OFFICE:
         raise BulkSkip("es una recarga en línea (se acredita sola al confirmarse el pago)")
+    if (topup.status == TopUpRequest.Status.COMPLETED
+            and topup.applied_via == TopUpRequest.AppliedVia.POS_SYNC):
+        raise BulkSkip("ya se encontró en Loyverse y se acreditó")
     assert_transition(TOPUP_ENTITY, topup.status, TopUpRequest.Status.COMPLETED)
+    _bulk_duplicate_skip(topup)
     if topup.amount is None or topup.amount <= 0:
         raise ValueError("El monto de la recarga debe ser positivo.")
     if not topup.student.loyverse_id:
@@ -1211,6 +1240,7 @@ def _apply_paid_plan(topup, payload):
         raise BulkSkip("su pago no está aprobado (o fue devuelto)")
     if payment.needs_bank_verification():
         raise BulkSkip("falta verificar la operación en MultiCobros")
+    _bulk_duplicate_skip(topup, amount=payment.amount)
 
 
 def _apply_paid_handler(topup, payload, actor):

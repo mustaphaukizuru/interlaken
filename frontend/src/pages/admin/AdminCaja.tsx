@@ -283,6 +283,7 @@ function Outcome({ done, onNew }: { done: { topup: CajaTopUp; outcome: CajaOutco
   const view = {
     pushed: { Icon: CheckCircle2, tone: 'bg-success-bg text-success', title: `Cargada en Loyverse: ${topup.student.name} ya puede gastar ${amount}.` },
     applied: { Icon: CheckCircle2, tone: 'bg-success-bg text-success', title: `Registrada: ${amount} para ${topup.student.name}.` },
+    found: { Icon: CheckCircle2, tone: 'bg-success-bg text-success', title: `Encontrada en Loyverse: ${amount} para ${topup.student.name} ya estaba cargada. No la cargue otra vez.` },
     waiting: { Icon: Clock, tone: 'bg-warning-bg text-warning', title: 'Pendiente de cargar en Loyverse: la app lo reintenta en unos minutos. No la cargue en el POS.' },
     failed: { Icon: AlertTriangle, tone: 'bg-danger-bg text-danger', title: 'La app no pudo cargarla en Loyverse. El equipo de cafetería recibió un aviso; no la cargue en el POS sin revisar Loyverse.' },
     skipped: { Icon: Clock, tone: 'bg-warning-bg text-warning', title: 'Registrada. La carga automática en Loyverse está apagada: aplíquela en Cafetería → Depósitos.' },
@@ -313,6 +314,7 @@ function Outcome({ done, onNew }: { done: { topup: CajaTopUp; outcome: CajaOutco
 const STATE_BADGE: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'neutral' | 'info' }> = {
   pushed: { label: 'Cargada', variant: 'success' },
   applied: { label: 'Aplicada', variant: 'success' },
+  found: { label: 'Encontrada en Loyverse', variant: 'success' },
   waiting: { label: 'Pendiente', variant: 'warning' },
   failed: { label: 'No se cargó', variant: 'error' },
   skipped: { label: 'Por aplicar', variant: 'warning' },

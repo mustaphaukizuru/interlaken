@@ -48,6 +48,8 @@ urlpatterns = [
     # Paid online top-ups waiting for their POS load (scheduled apply mode).
     path('admin/topup/<int:pk>/apply-paid/', views.AdminApplyPaidTopUpView.as_view(),
          name='admin-topup-apply-paid'),
+    path('admin/topup/<int:pk>/link-pos/', views.AdminLinkTopUpToPosView.as_view(),
+         name='admin-topup-link-pos'),
     path('admin/topup/<int:pk>/refund-paid/', views.AdminRefundPaidTopUpView.as_view(),
          name='admin-topup-refund-paid'),
     path('admin/sync/<int:pk>/',         views.AdminSyncBalanceView.as_view(),    name='admin-sync-balance'),

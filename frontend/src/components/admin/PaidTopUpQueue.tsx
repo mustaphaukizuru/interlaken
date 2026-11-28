@@ -21,6 +21,7 @@ import { MulticobrosUploadButton } from '@/components/admin/MulticobrosUploadBut
 import { FilterBar } from '@/components/admin/FilterBar';
 import { PersonalTag } from '@/components/admin/PersonalTag';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
+import { PosMirrorChoice, mirrorFromError, type PosMirrorAsk } from '@/components/admin/PosMirrorChoice';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { PERSON_STATUS_OPTIONS, PERSON_TIPO_OPTIONS, personStatusParam } from '@/lib/people';
 import { idsParam, type BulkResult, type ExportFormat } from '@/services/dataOps';
@@ -402,6 +403,7 @@ export function ApplyPaidDialog({ row, onClose }: { row: TopUpLogEntry | null; o
 function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void }) {
   const invalidate = useInvalidateMoney();
   const [refusal, setRefusal] = useState<{ message: string; code?: string; points?: string; wallet?: string } | null>(null);
+  const [mirror, setMirror] = useState<PosMirrorAsk | null>(null);
   const [force, setForce] = useState(false);
   const [note, setNote] = useState('');
   const apply = useMutation({
@@ -418,6 +420,12 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
         toast.success('Esta recarga ya estaba aplicada.');
         onClose();
         void invalidate();
+        return;
+      }
+      const found = mirrorFromError(err);
+      if (found) {
+        // The POS mirror may already have counted this load: ask, never guess.
+        setMirror({ topupId: row.id, studentName: row.student_name, amount: row.amount, kind: 'paid', mirror: found });
         return;
       }
       setRefusal({
@@ -437,6 +445,7 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
     if (force && !note.trim()) return;
     apply.mutate();
   };
+  if (mirror) return <PosMirrorChoice ask={mirror} onDone={onClose} onCancel={onClose} />;
   return (
     <form className="space-y-4" onSubmit={submit}>
       <p className="text-sm text-muted">
