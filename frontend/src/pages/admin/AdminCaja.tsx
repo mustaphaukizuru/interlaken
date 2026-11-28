@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { AlertTriangle, Ban, CheckCircle2, Clock, Printer, ScanLine, ShieldCheck } from 'lucide-react';
@@ -12,6 +12,7 @@ import { apiErrorMessage, apiErrorStatus } from '@/lib/apiErrors';
 import { formatMXN } from '@/lib/format';
 import { plural } from '@/lib/plural';
 import { useAuthStore } from '@/store/authStore';
+import { CorteCaja } from '@/components/admin/CorteCaja';
 import {
   cajaApi, newIdempotencyKey,
   type CajaAccount, type CajaOutcome, type CajaTopUp, type DeskMethod,
@@ -42,6 +43,10 @@ function accountLine(a: Pick<CajaAccount, 'tipo' | 'grade' | 'group' | 'puesto_l
 export default function AdminCaja() {
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
+  const meId = useAuthStore((s) => s.user?.id);
+  // «Registrar recarga» or «Corte de caja» (Part 2), kept in the address.
+  const [params, setParams] = useSearchParams();
+  const view = params.get('vista') === 'corte' ? 'corte' : 'registrar';
   const scanRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState('');
   const [matches, setMatches] = useState<CajaAccount[] | null>(null);
@@ -123,6 +128,21 @@ export default function AdminCaja() {
         title="Caja"
         subtitle="Registre aquí el dinero que recibe en recepción. La app lo carga primero en Loyverse y luego en el saldo: no lo cargue también en el POS."
       />
+      <div role="tablist" aria-label="Caja" className="mb-4 inline-flex gap-1 rounded-md bg-cream-2 p-1" data-print="hide">
+        {([['registrar', 'Registrar recarga'], ['corte', 'Corte de caja']] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            onClick={() => setParams(value === 'corte' ? { vista: 'corte' } : {}, { replace: true })}
+            className={`min-h-[44px] rounded-sm px-4 text-sm font-semibold ${view === value ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'corte' ? <CorteCaja isAdmin={isAdmin} meId={meId} /> : (
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card title="Registrar recarga">
           {done ? (
@@ -241,6 +261,7 @@ export default function AdminCaja() {
 
         <TodayList rows={today.data} loading={today.isLoading} isAdmin={isAdmin} />
       </div>
+      )}
 
       <ConfirmDialog
         open={duplicate !== null}

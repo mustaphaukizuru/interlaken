@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import admin_data, caja_views, views
+from . import admin_data, caja_views, corte_views, views
 
 urlpatterns = [
     path('balance/',                     views.MyBalanceView.as_view(),           name='cafeteria-balance'),
@@ -32,6 +32,13 @@ urlpatterns = [
     path('admin/caja/topups/<int:pk>/',      caja_views.CajaTopUpDetailView.as_view(),     name='caja-topup'),
     path('admin/caja/topups/<int:pk>/void/', caja_views.CajaVoidView.as_view(),            name='caja-topup-void'),
     path('admin/caja/topups/<int:pk>/verify/', caja_views.CajaVerifyView.as_view(),        name='caja-topup-verify'),
+    # «Corte de caja» and «Ingresos de cafetería» (Part 2, owner 2026-11-27).
+    path('admin/caja/corte/',                corte_views.CorteView.as_view(),              name='caja-corte'),
+    path('admin/caja/cortes/',               corte_views.CortesView.as_view(),             name='caja-cortes'),
+    path('admin/caja/corte/close/',          corte_views.CorteCloseView.as_view(),         name='caja-corte-close'),
+    path('admin/caja/corte/<int:pk>/reopen/', corte_views.CorteReopenView.as_view(),       name='caja-corte-reopen'),
+    path('admin/ingresos/',                  corte_views.IngresosView.as_view(),           name='cafeteria-ingresos'),
+    path('admin/ingresos/export/',           corte_views.IngresosExportView.as_view(),     name='cafeteria-ingresos-export'),
     path('admin/balances/',              admin_data.AdminBalancesView.as_view(),       name='admin-balances'),
     path('admin/topup/<int:pk>/apply/',  views.AdminApplyTopUpView.as_view(),     name='admin-apply-topup'),
     path('admin/topup/<int:pk>/pos-loaded/', views.AdminMarkTopUpPosLoadedView.as_view(),

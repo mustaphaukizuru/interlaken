@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/caja', () => ({
   cajaApi: { lookup: vi.fn(), today: vi.fn(), create: vi.fn(), void: vi.fn(), verify: vi.fn(), get: vi.fn() },
+  corteApi: { get: vi.fn(), people: vi.fn(), close: vi.fn(), reopen: vi.fn() },
   newIdempotencyKey: () => 'key-1',
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import AdminCaja from './AdminCaja';
-import { cajaApi } from '@/services/caja';
+import { cajaApi, corteApi } from '@/services/caja';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { useAuthStore } from '@/store/authStore';
 
@@ -117,5 +118,21 @@ describe('AdminCaja', () => {
     await scanAna();
     expect(screen.getByRole('alert')).toHaveTextContent('aún no está vinculada a Loyverse');
     expect(screen.getByRole('button', { name: 'Registrar recarga' })).toBeDisabled();
+  });
+});
+
+describe('AdminCaja: corte de caja tab (Part 2)', () => {
+  it('opens the corte from its tab and keeps it in the address', async () => {
+    vi.mocked(corteApi.get).mockResolvedValue({ data: {
+      day: '2026-11-27', user: { id: 3, name: 'Caja Prueba' }, expected: { cash: '0.00', card: '0.00', link: '0.00' },
+      expected_total: '0.00', count: 0, pending_load: { count: 0, amount: '0.00' }, topups: [], voids: [],
+      duplicates: [], close: null, is_today: true,
+    } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminCaja />, { route: '/admin/caja' });
+    await user.click(screen.getByRole('tab', { name: 'Corte de caja' }));
+    expect(await screen.findByText(/No hay recargas registradas ese día/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Credencial o matrícula')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Corte de caja' })).toHaveAttribute('aria-selected', 'true');
   });
 });

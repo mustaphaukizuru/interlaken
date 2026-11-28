@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, CircleDollarSign, FileLock2, FolderCheck, Briefcase, Banknote, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, CircleDollarSign, FileLock2, FolderCheck, Briefcase, Banknote, ChartColumn, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
@@ -82,6 +82,8 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         // «Caja» (owner 2026-11-27): money taken at the front desk, loaded into
         // Loyverse by the app. Its own area, so the desk needs nothing else.
         { icon: Banknote,   label: 'Caja',      to: '/admin/caja' },
+        // «Ingresos» (Caja Part 2): money in by day and channel, for cafetería staff and admins.
+        { icon: ChartColumn, label: 'Ingresos', to: '/admin/ingresos' },
         // «Por verificar»: card top-ups nothing applies until someone checks
         // them in MultiCobros (2026-11-18: two sat in Loyverse all morning).
         // It opens exactly those in Depósitos (owner, 2026-11-25).

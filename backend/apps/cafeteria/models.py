@@ -530,3 +530,60 @@ class LoyverseSyncState(models.Model):
 
     def __str__(self):
         return f'Loyverse sync — última descarga: {self.last_full_fetch_at or "nunca"}'
+
+
+class DeskCashClose(models.Model):
+    """«Corte de caja»: one person's front-desk money for one school day.
+
+    Owner 2026-11-27 (Part 2 of «Caja»): at the end of the day whoever took
+    money at the front desk counts it and closes the day. ``expected_*`` is the
+    snapshot of that person's desk top-ups of the day that still count (not
+    voided) at closing time; ``counted_*`` is what they counted (card and link
+    are optional: the terminal or link report may not be at hand). While a day
+    is closed its top-ups cannot be voided from Caja and no new one is recorded
+    for that person that day; an administrator reopens it with a reason. One
+    row per (person, day): a reopen clears ``closed_at`` and a new close fills
+    it again; every step is in Auditoría.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='desk_cash_closes',
+                             verbose_name='Recibió')
+    day = models.DateField('Día')
+    expected_cash = models.DecimalField('Efectivo esperado', max_digits=10, decimal_places=2,
+                                        default=0)
+    expected_card = models.DecimalField('Tarjeta esperada', max_digits=10, decimal_places=2,
+                                        default=0)
+    expected_link = models.DecimalField('Liga de pago esperada', max_digits=10, decimal_places=2,
+                                        default=0)
+    counted_cash = models.DecimalField('Efectivo contado', max_digits=10, decimal_places=2,
+                                       null=True, blank=True)
+    counted_card = models.DecimalField('Tarjeta según terminal', max_digits=10, decimal_places=2,
+                                       null=True, blank=True)
+    counted_link = models.DecimalField('Ligas según reporte', max_digits=10, decimal_places=2,
+                                       null=True, blank=True)
+    topups_count = models.PositiveIntegerField('Recargas', default=0)
+    note = models.TextField('Nota', blank=True, default='')
+    closed_at = models.DateTimeField('Cerrado el', null=True, blank=True)
+    closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='+', verbose_name='Cerró')
+    reopened_at = models.DateTimeField('Reabierto el', null=True, blank=True)
+    reopened_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='+', verbose_name='Reabrió')
+    reopen_reason = models.CharField('Motivo de la reapertura', max_length=255, blank=True,
+                                     default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Corte de caja'
+        verbose_name_plural = 'Cortes de caja'
+        ordering = ['-day', 'user_id']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'day'], name='caf_desk_close_user_day'),
+        ]
+
+    @property
+    def is_closed(self) -> bool:
+        return self.closed_at is not None
+
+    def __str__(self):
+        return f'Corte {self.day} · {self.user_id}{" (cerrado)" if self.is_closed else ""}'

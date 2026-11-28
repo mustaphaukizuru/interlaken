@@ -189,6 +189,11 @@ def create_desk_topup(
     amount = cents(amount) if amount not in (None, "") else None
     reference = str(reference or "").strip()[:80]
     _validate(student, amount, desk_method, reference)
+    # Part 2: once this person closed today's corte de caja, nothing new is
+    # added to it (an administrator reopens it).
+    from .corte import assert_day_open, today
+
+    assert_day_open(getattr(actor, "pk", None), today())
 
     if not confirm_duplicate:
         earlier = (
@@ -457,6 +462,10 @@ def void_desk_topup(topup_id, *, reason, actor) -> dict:
                 code="already_voided",
                 status=409,
             )
+        # Part 2: a closed corte de caja is final until an administrator reopens it.
+        from .corte import assert_day_open, local_day
+
+        assert_day_open(topup.received_by_id, local_day(topup.created_at))
         now = timezone.now()
         amount = cents(topup.amount)
         if topup.status == TopUpRequest.Status.PENDING:
