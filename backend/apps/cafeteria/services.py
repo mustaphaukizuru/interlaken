@@ -1573,7 +1573,8 @@ def notify_topup_applied(topup, balance) -> int:
         return 0
 
 
-def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
+def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = '',
+                     confirm_pos_duplicate: bool = False):
     """Credit a PAID online top-up once staff have loaded it into the Loyverse POS.
 
     Before crediting, the server checks that Loyverse really holds the money:
@@ -1607,6 +1608,10 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
         topup = (TopUpRequest.objects.select_for_update()
                  .select_related('student__user').get(pk=topup.pk))
         if topup.status == TopUpRequest.Status.COMPLETED:
+            if topup.applied_via == TopUpRequest.AppliedVia.POS_SYNC:
+                from apps.cafeteria.hand_loads import found_message
+
+                raise TopUpApplyError(found_message(), code='already_applied', status=409)
             raise TopUpApplyError('Esta recarga ya está aplicada en el saldo.',
                                   code='already_applied', status=409)
         if topup.method != TopUpRequest.Method.ONLINE or topup.status != TopUpRequest.Status.PAID:
@@ -1624,6 +1629,19 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
         if payment.needs_bank_verification():
             raise TopUpApplyError('Verifique primero la operación en MultiCobros (Banorte).',
                                   code='needs_verification')
+        if not confirm_pos_duplicate:
+            # The POS mirror may already have counted this load as an
+            # anonymous cash recarga (cafeteria.hand_loads): a person decides.
+            from apps.cafeteria.hand_loads import (
+                duplicate_details,
+                duplicate_message,
+                mirrored_duplicate,
+            )
+
+            dup = mirrored_duplicate(topup, amount=payment.amount)
+            if dup is not None:
+                raise TopUpApplyError(duplicate_message(dup), code='pos_already_mirrored',
+                                      status=409, **duplicate_details(dup))
 
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
         amount = Decimal(str(payment.amount))
@@ -2877,6 +2895,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     # be applied are NOT skipped: this pass is what applies them.
     pending_pos = set(pos_queue_reasons(include_paid=False))
     paid_by_student = _paid_topups_by_student()
+    # Office / desk top-ups waiting for someone to type them into the POS
+    # (cafeteria.hand_loads): a gap of exactly one of them IS that top-up, not
+    # an anonymous cash recarga that «Aplicar» would then credit a second time.
+    from apps.cafeteria import hand_loads
+    hand_by_student = hand_loads.candidates_by_student()
 
     students = (StudentProfile.objects.filter(is_active=True)
                 .exclude(loyverse_id='').select_related('user'))
@@ -2889,6 +2912,8 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         student__in=students).only('student_id', 'balance', 'last_synced')}
     credited = skipped_pending = in_sync = below = unseeded = deferred = 0
     applied_paid = held_paid = held_unverified = applied_paid_students = 0
+    found_hand = 0
+    found_hand_total = Decimal('0')
     total = drift_total = applied_paid_total = Decimal('0')
     stamp: list[int] = []
     applied_notices: list = []
@@ -2904,6 +2929,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
             stamp.append(student.id)
             continue
         paid = paid_by_student.get(student.id)
+        hand = hand_by_student.get(student.id)
         seen = wallets.get(student.id)
         if seen is None or seen.last_synced is None:
             unseeded += 1              # sync_balances seeds these from Loyverse
@@ -2929,6 +2955,10 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                                     status=TopUpRequest.Status.PAID)
                             .values_list('pk', flat=True))
                 paid = [(t, p) for t, p in paid if t.pk in still]
+            if hand:
+                # Same lock order: top-up rows first, then the wallet.
+                hand = list(TopUpRequest.objects.select_for_update()
+                            .filter(pk__in=[t.pk for t in hand]).order_by('created_at', 'pk'))
             cb = (CafeteriaBalance.objects.select_for_update()
                   .filter(student=student).first())
             if cb is None or cb.last_synced is None:
@@ -2966,12 +2996,23 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                         if p.needs_bank_verification())
                     continue
                 if applied is None:
+                    found = (hand_loads.match_gap_locked(student, cb, hand, delta, now)
+                             if hand else None)
+                    if found is not None:
+                        found_hand += 1
+                        found_hand_total += delta
+                        continue
                     held_paid += 1
                     continue
                 applied_paid += len(applied)
                 applied_paid_students += 1
                 applied_paid_total += delta
                 applied_notices.extend((topup, cb.balance) for topup in applied)
+                continue
+            if hand and hand_loads.match_gap_locked(student, cb, hand, delta, now) is not None:
+                found_hand += 1
+                found_hand_total += delta
+                stamp.append(student.id)
                 continue
             cb.balance = (cb.balance or Decimal('0')) + delta
             cb.last_synced = now
@@ -3024,7 +3065,8 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
               'skipped_pending': skipped_pending, 'unseeded': unseeded,
               'applied_paid': applied_paid, 'applied_paid_total': applied_paid_total,
               'applied_paid_students': applied_paid_students,
-              'held_paid': held_paid, 'held_unverified': held_unverified}
+              'held_paid': held_paid, 'held_unverified': held_unverified,
+              'found_hand': found_hand, 'found_hand_total': found_hand_total}
     if full_roster:
         result['audit'] = _record_wallet_audit(customers, result, now)
 
@@ -3035,6 +3077,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         f'{applied_paid} paid online top-up(s) applied (${applied_paid_total}), '
         f'{held_paid} held (gap matches no paid top-up), '
         f'{held_unverified} held until verified in MultiCobros, '
+        f'{found_hand} hand-loaded office/desk top-up(s) found (${found_hand_total}), '
         f'{skipped_pending} pending POS load/unload, {unseeded} unseeded.')
     return result
 

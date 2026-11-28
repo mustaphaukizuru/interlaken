@@ -59,6 +59,7 @@ import { GRADES } from '@/lib/grades';
 import { LOW_BALANCE_THRESHOLD_MAX, thresholdProblem } from '@/lib/validators';
 import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, isCardTopUp, movementSign, options } from '@/lib/status/cafeteria';
 import { MovementAmount } from '@/components/admin/MovementAmount';
+import { PosMirrorDialog, type PosMirrorAsk } from '@/components/admin/PosMirrorChoice';
 import { PAYMENT_FAILURE, gatewayLabel } from '@/lib/status/payment';
 import type { CafeteriaBalance, TopUpLogEntry } from '@/types';
 import { plural } from '@/lib/plural';
@@ -689,7 +690,9 @@ const TOPUP_ACTIONS: BulkActionDef[] = [
 ];
 
 const posBadge = (d: TopUpLogEntry) =>
-  d.needs_apply ? <Badge variant={d.apply_overdue ? 'error' : 'warning'}>{d.apply_overdue ? 'Por aplicar (vencida)' : 'Por cargar y aplicar'}</Badge>
+  d.found_in_loyverse ? <Badge variant="success">Encontrada en Loyverse</Badge>
+    : d.pos_mirror ? <Badge variant="warning">¿Ya está en Loyverse?</Badge>
+    : d.needs_apply ? <Badge variant={d.apply_overdue ? 'error' : 'warning'}>{d.apply_overdue ? 'Por aplicar (vencida)' : 'Por cargar y aplicar'}</Badge>
     : d.needs_pos_unload ? <Badge variant="error">Quitar del POS</Badge>
     : d.needs_pos_load ? <Badge variant="warning">Pendiente POS</Badge>
     : d.pos_loaded_at ? <Badge variant="success">En POS</Badge>
@@ -800,6 +803,8 @@ function DepositsTab() {
   const [reconciling, setReconciling] = useState<TopUpLogEntry | null>(null);
   const [applyingPaid, setApplyingPaid] = useState<TopUpLogEntry | null>(null);
   const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
+  // cafeteria.hand_loads: an anonymous POS recarga may already be this money.
+  const [mirrorAsk, setMirrorAsk] = useState<PosMirrorAsk | null>(null);
   const fetchExport = exporter((p) => exportTopups.mutateAsync(p), filters, selection);
   const reviewNote = review ? REVIEW_NOTES[review] : undefined;
 
@@ -854,7 +859,14 @@ function DepositsTab() {
             exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="depositos_cafeteria" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
           />
         )}
-        rowActions={(d) => (d.method === 'office' && d.status === 'pending') ? (
+        rowActions={(d) => d.pos_mirror ? (
+          <Button size="sm" variant="secondary"
+            onClick={() => d.pos_mirror && setMirrorAsk({ topupId: d.id, studentName: d.student_name, amount: d.amount,
+              kind: d.method === 'online' ? 'paid' : 'office', mirror: d.pos_mirror })}
+            aria-label={`Revisar si la recarga de ${d.student_name} ya está en Loyverse`}>
+            <FileSearch className="w-3.5 h-3.5" aria-hidden="true" /> Ya en Loyverse: revisar
+          </Button>
+        ) : (d.method === 'office' && d.status === 'pending') ? (
           <Button size="sm" onClick={() => setPending({ action: TOPUP_ACTIONS[0], ids: [d.id] })} aria-label={`Aplicar depósito de ${d.student_name}`}>
             <Wallet className="w-3.5 h-3.5" aria-hidden="true" /> Aplicar
           </Button>
@@ -890,6 +902,7 @@ function DepositsTab() {
       <ReconcileBanorteDialog row={reconciling} onClose={() => setReconciling(null)} />
       <VerifyBanorteDialog row={verifying} onClose={() => setVerifying(null)} />
       <ApplyPaidDialog row={applyingPaid} onClose={() => setApplyingPaid(null)} />
+      <PosMirrorDialog ask={mirrorAsk} onClose={() => setMirrorAsk(null)} />
     </Card>
   );
 }

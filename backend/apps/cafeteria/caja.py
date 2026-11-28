@@ -260,7 +260,12 @@ def outcome_of(topup) -> dict:
     """The outcome of a desk top-up already recorded (idempotent replies, lists)."""
     S = TopUpRequest.PushState
     if topup.status == TopUpRequest.Status.COMPLETED:
-        state = "pushed" if topup.applied_via == TopUpRequest.AppliedVia.AUTO_POS else "applied"
+        if topup.applied_via == TopUpRequest.AppliedVia.AUTO_POS:
+            state = "pushed"
+        elif topup.applied_via == TopUpRequest.AppliedVia.POS_SYNC:
+            state = "found"     # someone loaded it into the POS (cafeteria.hand_loads)
+        else:
+            state = "applied"
     elif topup.loyverse_push_state == S.WAITING:
         state = "waiting"
     elif topup.loyverse_push_state == S.FAILED:
@@ -490,9 +495,12 @@ def void_desk_topup(topup_id, *, reason, actor) -> dict:
         if topup.status != TopUpRequest.Status.COMPLETED:
             raise CajaError("Esta recarga no se puede anular.", code="not_voidable", status=409)
         if topup.applied_via != TopUpRequest.AppliedVia.AUTO_POS:
+            how = ("se encontró en Loyverse (alguien la cargó a mano en el POS)"
+                   if topup.applied_via == TopUpRequest.AppliedVia.POS_SYNC
+                   else "se aplicó a mano en Depósitos")
             raise CajaError(
-                "Esta recarga se aplicó a mano en Depósitos: corríjala con un ajuste en "
-                "Cafetería y quítela también del POS.",
+                f"Esta recarga {how}: corríjala con un ajuste en Cafetería y quítela "
+                "también del POS.",
                 code="manual",
                 status=409,
             )

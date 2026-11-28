@@ -414,6 +414,10 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     loyverse_code = serializers.SerializerMethodField()
     loyverse_points = serializers.SerializerMethodField()
     wallet_balance = serializers.SerializerMethodField()
+    # cafeteria.hand_loads: «Encontrada en Loyverse», and an anonymous POS
+    # recarga that may be this same money (the console asks before «Aplicar»).
+    found_in_loyverse = serializers.SerializerMethodField()
+    pos_mirror = serializers.SerializerMethodField()
 
     class Meta:
         model = TopUpRequest
@@ -429,8 +433,17 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'applied_by_name', 'needs_apply', 'apply_overdue',
             'loyverse_code', 'loyverse_points', 'wallet_balance', 'payer',
             'loyverse_push_state', 'loyverse_push_state_display', 'loyverse_push_note',
-            'loyverse_push_at', 'loyverse_auto',
+            'loyverse_push_at', 'loyverse_auto', 'found_in_loyverse', 'pos_mirror',
         ]
+
+    def get_found_in_loyverse(self, obj):
+        return (obj.status == TopUpRequest.Status.COMPLETED
+                and obj.applied_via == TopUpRequest.AppliedVia.POS_SYNC)
+
+    def get_pos_mirror(self, obj):
+        """Filled by the list view for the page in one query
+        (``hand_loads.pos_mirror_map``); ``None`` elsewhere."""
+        return (self.context.get('pos_mirrors') or {}).get(obj.pk)
 
     def get_payer(self, obj):
         """The account that paid a card top-up, and when (``None`` for cash)."""

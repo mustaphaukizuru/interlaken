@@ -966,6 +966,16 @@ class AdminApplyTopUpView(APIView):
                 refusal = self._refusal(topup)
                 if refusal:
                     return Response(error_body(refusal), status=400)
+                # An anonymous POS recarga of the same amount may already be
+                # this money (cafeteria.hand_loads): a person decides.
+                from apps.core.flags import truthy
+
+                from .hand_loads import duplicate_details, duplicate_message, mirrored_duplicate
+
+                dup = mirrored_duplicate(topup)
+                if dup is not None and not truthy(request.data.get('confirm_pos_duplicate', False)):
+                    return Response(error_body(duplicate_message(dup), code='pos_already_mirrored',
+                                               **duplicate_details(dup)), status=409)
                 student = topup.student
                 # Pass a stable reference so the credit writes a TOPUP ledger row and
                 # is idempotent (re-applying the same request is a no-op) — without it
@@ -1001,6 +1011,11 @@ class AdminApplyTopUpView(APIView):
         if topup.status == TopUpRequest.Status.PAID:
             return ('Esta recarga en línea está pagada y pendiente de aplicar: se aplica desde '
                     'POS Loyverse → «Por aplicar» después de cargarla en el POS.')
+        if (topup.status == TopUpRequest.Status.COMPLETED
+                and topup.applied_via == TopUpRequest.AppliedVia.POS_SYNC):
+            from .hand_loads import found_message
+
+            return found_message()
         if topup.status != TopUpRequest.Status.PENDING:
             return 'Esta recarga ya fue procesada.'
         # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
@@ -1407,8 +1422,10 @@ class AdminApplyPaidTopUpView(APIView):
         topup = get_object_or_404(TopUpRequest.objects.select_related('student__user'), pk=pk)
         force = truthy(request.data.get('force', False))
         note = str(request.data.get('note', '') or '')
+        confirm = truthy(request.data.get('confirm_pos_duplicate', False))
         try:
-            tx, balance = apply_paid_topup(topup, actor=request.user, force=force, note=note)
+            tx, balance = apply_paid_topup(topup, actor=request.user, force=force, note=note,
+                                           confirm_pos_duplicate=confirm)
         except TopUpApplyError as exc:
             return _apply_error_response(exc)
         except LoyverseError:
@@ -2020,3 +2037,32 @@ class AdminBulkTopUpView(APIView):
                          'remaining': remaining, 'batch_id': batch,
                          'total': str(amount * len(credited)),
                          'notified': notified, 'queued_notifications': queued}, status=201)
+
+
+class AdminLinkTopUpToPosView(APIView):
+    """POST /api/v1/cafeteria/admin/topup/<pk>/link-pos/ ``{transaction}``
+
+    «Es esta misma» (``cafeteria.hand_loads.link_mirrored_topup``): the
+    anonymous POS recarga ``transaction`` IS this office/desk or paid card
+    top-up. The ledger row takes the top-up's reference and the top-up is
+    closed; no money moves.
+    """
+    admin_area = 'cafeteria'
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from .hand_loads import HandLoadError, link_mirrored_topup
+
+        raw = request.data.get('transaction')
+        try:
+            tx_id = int(raw)
+        except (TypeError, ValueError):
+            return Response(error_body('Indique la recarga de Loyverse.', code='transaction'),
+                            status=400)
+        try:
+            topup = link_mirrored_topup(pk, tx_id, actor=request.user)
+        except HandLoadError as exc:
+            return Response(error_body(exc.message, code=exc.code), status=exc.status)
+        return Response({'id': topup.pk, 'status': topup.status,
+                         'applied_via': topup.applied_via,
+                         'detail': 'Listo: la recarga quedó vinculada a la de Loyverse.'})

@@ -228,6 +228,13 @@ export interface CafeteriaTransaction {
   adjustment_amount?: string | null;
 }
 
+/** An anonymous POS recarga of the same student and amount (cafeteria.hand_loads). */
+export interface PosMirror {
+  pos_transaction: number;
+  pos_date: string;
+  pos_amount: string;
+}
+
 export interface TopUpLogEntry {
   id: number;
   student_id: number;
@@ -268,6 +275,10 @@ export interface TopUpLogEntry {
   loyverse_push_at?: string | null;
   /** The app will write this paid top-up into Loyverse itself: do not load it by hand. */
   loyverse_auto?: boolean;
+  /** The money was found in Loyverse (someone loaded it into the POS by hand). */
+  found_in_loyverse?: boolean;
+  /** An anonymous POS recarga that may be this same money: ask before «Aplicar». */
+  pos_mirror?: PosMirror | null;
   /** Paid, waiting to be loaded into the POS and applied. */
   needs_apply?: boolean;
   /** Past the time promised to the family. */

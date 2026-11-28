@@ -63,9 +63,18 @@ const bulk = <R extends BulkResult = BulkResult>(url: string) => (body: BulkRequ
 export const cafeteriaAdminApi = {
   /** Paid card top-up loaded into the POS: credit the wallet once Loyverse shows it
    *  (`force` + `note` skips that check and leaves it in "Cargar en POS"). */
-  applyPaidTopUp: (topupId: number, body: { force?: boolean; note?: string } = {}) =>
+  applyPaidTopUp: (topupId: number, body: { force?: boolean; note?: string; confirm_pos_duplicate?: boolean } = {}) =>
     api.post<{ id: number; status: string; balance: string; detail: string }>(
       `${BASE}/topup/${topupId}/apply-paid/`, body),
+  /** Office / desk top-up loaded by hand: «Aplicar» it. `confirm_pos_duplicate`
+   *  says the anonymous POS recarga the server found is a different one. */
+  applyOfficeTopUp: (topupId: number, body: { confirm_pos_duplicate?: boolean } = {}) =>
+    api.post<{ detail: string }>(`${BASE}/topup/${topupId}/apply/`, body),
+  /** «Es esta misma»: the anonymous POS recarga `transaction` IS this top-up
+   *  (the ledger row is relabelled; no money moves). */
+  linkTopUpToPos: (topupId: number, transaction: number) =>
+    api.post<{ id: number; status: string; detail: string }>(
+      `${BASE}/topup/${topupId}/link-pos/`, { transaction }),
   /** Paid card top-up refunded in MultiCobros before it was applied. */
   refundPaidTopUp: (topupId: number, body: { note: string; bank_refund_confirmed: boolean; pos_not_loaded_confirmed: boolean }) =>
     api.post<{ id: number; status: string; detail: string }>(

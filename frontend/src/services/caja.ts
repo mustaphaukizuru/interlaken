@@ -25,7 +25,7 @@ export interface CajaAccount {
 
 /** `pushed`: in Loyverse and in the wallet; `waiting`: the app retries;
  *  `failed`: the staff were told; `skipped`: the automatic load is off. */
-export type CajaState = 'pushed' | 'applied' | 'waiting' | 'failed' | 'skipped' | 'voided';
+export type CajaState = 'pushed' | 'applied' | 'found' | 'waiting' | 'failed' | 'skipped' | 'voided';
 
 export interface CajaTopUp {
   id: number;
