@@ -512,7 +512,8 @@ class TestBackupScript:
 
     def test_encryption_failure_uploads_nothing(self):
         code = self._code()
-        block = code[code.index("if ! why=$(encrypt_dump") :]
+        # The database dump's block (the uploaded-files archive has its own, test_backup_media).
+        block = code[code.index('if ! why=$(encrypt_dump "$out"') :]
         block = block[: block.index("\nfi\n")]
         assert "--failed" in block and "exit 1" in block
         assert "rclone" not in block and "--name" not in block

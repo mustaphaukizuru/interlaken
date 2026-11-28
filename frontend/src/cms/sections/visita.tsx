@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { AlertTriangle, CalendarDays, Clock, MapPin, CheckCircle, MessageCircle } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CalendarDays, Clock, MapPin, CheckCircle, MessageCircle, Phone } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { bookingsApi } from '@/services/api';
@@ -31,7 +31,7 @@ import { Illustration, wash } from '@/components/ui/Illustration';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { isIllustration, type IllustrationName } from '@/lib/illustrations';
 import { phoneProblem } from '@/lib/validators';
-import { apiFieldErrors } from '@/lib/apiErrors';
+import { apiErrorCode, apiFieldErrors } from '@/lib/apiErrors';
 import type { AvailabilitySlot } from '@/types';
 import { imageSrc, imageSrcSet, useCmsImage, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
@@ -145,7 +145,7 @@ function VisitBookingView(p: BookingProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [confirmed, setConfirmed] = useState<AvailabilitySlot | null>(null);
-  const { whatsapp_number } = useSiteSettings();
+  const { whatsapp_number, phone_display, phone_e164 } = useSiteSettings();
   // `?lead=` is the signed visit link the office sends from the Expediente:
   // the booking attaches itself to that case. It stays in the address (a
   // reload keeps it) and is never shown; a bad or old one is ignored by the API.
@@ -201,12 +201,17 @@ function VisitBookingView(p: BookingProps) {
   // The outcome shows on the page: the confirmation replaces the form, a
   // failure sits above the button (react-hook-form focuses the first invalid field).
   const [bookingError, setBookingError] = useState<string | null>(null);
+  // The family already has a visit still to come (owner 2026-11-26: one family
+  // booked three times). The server names that visit; the page offers the
+  // school's WhatsApp and phone to change it instead of a red error.
+  const [alreadyBooked, setAlreadyBooked] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (confirmed || bookingError) resultRef.current?.focus(); }, [confirmed, bookingError]);
+  useEffect(() => { if (confirmed || bookingError || alreadyBooked) resultRef.current?.focus(); }, [confirmed, bookingError, alreadyBooked]);
 
   const onSubmit = async (values: FormData) => {
     if (!selectedSlot) return;
     setBookingError(null);
+    setAlreadyBooked(null);
     try {
       await bookingsApi.createBooking({
         slot: selectedSlot.id,
@@ -229,6 +234,10 @@ function VisitBookingView(p: BookingProps) {
     } catch (err: unknown) {
       // The server's reason (a full slot, or a field it refused) before the generic message.
       const fields = apiFieldErrors(err);
+      if (apiErrorCode(err) === 'already_booked' && fields.detail) {
+        setAlreadyBooked(fields.detail);
+        return;
+      }
       setBookingError(
         fields.detail ?? fields.parent_phone ?? fields.parent_email ?? fields.parent_name ??
           (c('bookingError') || 'No fue posible completar la reserva. Intente de nuevo.'),
@@ -388,6 +397,35 @@ function VisitBookingView(p: BookingProps) {
                   <Input id="visit-grade" label={c('gradeLabel')} autoComplete="off" className={inputClass} {...register('child_grade')} />
 
                   <PrivacyNote />
+                  {alreadyBooked ? (
+                    <div ref={resultRef} tabIndex={-1} role="alert" className="space-y-3 rounded-sm bg-purple-light px-4 py-3 text-sm text-ink focus:outline-none">
+                      <p className="flex items-start gap-2 font-semibold">
+                        <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-purple" aria-hidden="true" />
+                        <span>{alreadyBooked}</span>
+                      </p>
+                      {/* Stacked and full width: the form column is narrow, and side by
+                          side the phone button ran past the panel (QA 2026-11-28). */}
+                      {(whatsapp_number || phone_e164) && (
+                        <div className="flex flex-col gap-2">
+                          {whatsapp_number && (
+                            <a
+                              href={waHref(whatsapp_number, 'Hola, tengo una visita agendada al Colegio Interlaken y me gustaría cambiarla.')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-secondary min-h-[44px] w-full justify-center text-sm"
+                            >
+                              <MessageCircle className="h-4 w-4" aria-hidden="true" /> Escribir por WhatsApp
+                            </a>
+                          )}
+                          {phone_e164 && (
+                            <a href={`tel:${phone_e164}`} className="btn-outline min-h-[44px] w-full justify-center text-sm">
+                              <Phone className="h-4 w-4" aria-hidden="true" /> Llamar {phone_display}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                   {bookingError ? (
                     <div ref={resultRef} tabIndex={-1} role="alert" className="flex items-start gap-2 rounded-sm bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger focus:outline-none">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

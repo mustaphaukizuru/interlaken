@@ -37,7 +37,13 @@ Apagado mientras `SENTRY_DSN` y `VITE_SENTRY_DSN` estén vacíos en `/opt/interl
   ./restore-db.sh /var/backups/interlaken/db-AAAA-MM-DD-HHMM.sql.gz --into-live
   ```
   Detiene `app`, carga el dump, reinicia y muestra los conteos. Tiempo esperado: menos de 2 minutos con la base actual.
-- Archivos subidos (media: avatares, documentos, biblioteca del CMS) viven en el volumen `media` o en Supabase Storage si está configurado; el dump de Postgres no los incluye. Con Supabase activo el bucket es la copia durable.
+- Archivos subidos (media: avatares, documentos, biblioteca del CMS) viven en el volumen `media`; el dump de Postgres no los incluye. Desde el 28-11-2026 la misma corrida de las 02:30 los empaqueta y **cifra de inmediato** (`media-AAAA-MM-DD-HHMM.tar.gz.gpg` en `/var/backups/interlaken`, 30 días; nunca queda una copia sin cifrar) y los sube fuera del servidor junto con el volcado cuando hay copia externa configurada. Si falla o tiene más de un día, `check_backup_fresh` avisa a los administradores a las 07:45. Restaurar (con la llave privada):
+  ```bash
+  gpg --decrypt media-AAAA-MM-DD-HHMM.tar.gz.gpg > media.tar.gz
+  docker run --rm -v interlaken_media:/m -v "$PWD":/b postgres:17-alpine tar -C /m -xzf /b/media.tar.gz
+  rm media.tar.gz
+  ```
+  Si más adelante se usa Supabase Storage para los archivos, el bucket es la copia durable.
 
 ## 4. Incidentes frecuentes
 
