@@ -30,6 +30,9 @@ const SECTIONS: [prefix: string, areas: AreaKey[]][] = [
   ['/admin/caja', ['caja']],
   ['/admin/cafeteria', ['cafeteria']],
   ['/admin/pagos', ['cafeteria']],
+  // «Ingresos de cafetería» (Caja Part 2): the money report, after Cafetería so
+  // a cashier still lands on Cafetería.
+  ['/admin/ingresos', ['cafeteria']],
   ['/admin/comunicados', ['comunicados']],
   ['/admin/calendario', ['comunicados']],
   ['/admin/mensajes', ['mensajes']],

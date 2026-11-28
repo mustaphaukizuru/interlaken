@@ -73,6 +73,72 @@ export const cajaApi = {
   verify: (id: number) => api.post<{ topup: CajaTopUp }>(`${BASE}/topups/${id}/verify/`, {}),
 };
 
+// ── Corte de caja (Part 2) ────────────────────────────────────────────────
+export type Money3 = Record<DeskMethod, string | null>;
+
+export interface CorteRow {
+  id: number;
+  folio: string;
+  time: string;
+  student: string;
+  amount: string;
+  desk_method: DeskMethod;
+  desk_method_label: string;
+  reference: string;
+  loaded: boolean;
+  voided: boolean;
+  void_reason: string;
+  voided_by: string;
+  needs_verification: boolean;
+}
+
+export interface CorteClose {
+  id: number;
+  closed: boolean;
+  closed_at: string | null;
+  closed_by: string;
+  expected: Money3;
+  counted: Money3;
+  difference: Money3;
+  topups_count: number;
+  note: string;
+  reopened_at: string | null;
+  reopened_by: string;
+  reopen_reason: string;
+}
+
+export interface CorteSummary {
+  day: string;
+  user: { id: number; name: string };
+  expected: Record<DeskMethod, string>;
+  expected_total: string;
+  count: number;
+  pending_load: { count: number; amount: string };
+  topups: CorteRow[];
+  voids: CorteRow[];
+  duplicates: { first: string; second: string; student: string; amount: string }[];
+  close: CorteClose | null;
+  is_today: boolean;
+}
+
+export interface CortePerson { user: { id: number; name: string }; expected_total: string; count: number; closed: boolean }
+
+export interface CorteCloseBody {
+  day: string;
+  user?: number;
+  counted_cash: string;
+  counted_card?: string;
+  counted_link?: string;
+  note?: string;
+}
+
+export const corteApi = {
+  get: (params: { day?: string; user?: number } = {}) => api.get<CorteSummary>(`${BASE}/corte/`, { params }),
+  people: (day: string) => api.get<{ day: string; people: CortePerson[] }>(`${BASE}/cortes/`, { params: { day } }),
+  close: (body: CorteCloseBody) => api.post<CorteSummary>(`${BASE}/corte/close/`, body),
+  reopen: (id: number, reason: string) => api.post<CorteSummary>(`${BASE}/corte/${id}/reopen/`, { reason }),
+};
+
 /** A key per form submission: a double click never records two top-ups. */
 export function newIdempotencyKey(): string {
   try {

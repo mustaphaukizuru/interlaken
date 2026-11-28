@@ -13,6 +13,10 @@ describe('console areas', () => {
     expect(canOpen(admin, '/admin/usuarios')).toBe(true);
     expect(canOpen(cafeteria, '/admin/cafeteria/12')).toBe(true);
     expect(canOpen(cafeteria, '/admin/pagos')).toBe(true);
+    // «Ingresos de cafetería» (Caja Part 2): cafetería staff, not the desk-only «Caja».
+    expect(canOpen(cafeteria, '/admin/ingresos')).toBe(true);
+    expect(canOpen({ role: 'staff', staff_areas: ['caja'] }, '/admin/ingresos')).toBe(false);
+    expect(canOpen({ role: 'staff', staff_areas: ['caja'] }, '/admin/caja')).toBe(true);
     expect(canOpen(cafeteria, '/admin/alumnos')).toBe(false);
     expect(canOpen(secretaria, '/admin/admisiones/pipeline')).toBe(true);
     expect(canOpen(secretaria, '/admin/calendario')).toBe(true);
